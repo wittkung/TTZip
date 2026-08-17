@@ -11,7 +11,7 @@ static TTZIP_THREAD_LOCAL struct libdeflate_compressor* g_tls_compressors[14] = 
 static TTZIP_THREAD_LOCAL struct libdeflate_decompressor* g_tls_decompressor = NULL;
 
 struct libdeflate_compressor* ttzip_get_tls_compressor(int level) {
-    int l = level > 0 ? (level > 12 ? 12 : level) : 6;
+    int l = level > 0 ? (level > 12 ? 12 : (level == 6 ? 4 : level)) : 4;
     if (!g_tls_compressors[l]) {
         g_tls_compressors[l] = libdeflate_alloc_compressor(l);
     }

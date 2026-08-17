@@ -175,6 +175,18 @@ public enum POSIXCLIArgumentParser {
                         options.language = v
                         if inlineValue == nil { i += 1 }
                     }
+                case "standard":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
+                        options.standardFormat = v
+                        if inlineValue == nil { i += 1 }
+                    }
+                case "differential", "oracle":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
+                        options.differentialOracle = v
+                        if inlineValue == nil { i += 1 }
+                    }
+                case "fuzz", "mutation-fuzz":
+                    options.fuzz = true
                 case "tier":
                     if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
                         options.tier = v

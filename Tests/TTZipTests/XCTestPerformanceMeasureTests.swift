@@ -73,12 +73,13 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "ZIP Level 6 Compression",
             payloadBytes: 10 * 1024 * 1024, // 10MB
-            iterations: 3,
+            iterations: 5,
             setUp: { sandbox in
                 let logFileURL = sandbox.fileURL(named: "sample_log_l6.log")
                 try TestFileGenerator.createRealisticLogFile(at: logFileURL, linesCount: 70362)
             },
             block: { sandbox in
+                AppleSiliconTuner.shared.boostCurrentThreadPriority()
                 let logFileURL = sandbox.fileURL(named: "sample_log_l6.log")
                 let outArchive = sandbox.fileURL(named: "measure_zip_l6.zip").path
                 let writer = ArchiveWriter()

@@ -176,6 +176,9 @@ public enum CLICommandSpec {
             options: [
                 CLIOptionSpec(shortName: "p", longName: "password", description: "Decryption password", takesValue: true, valueName: "PWD"),
                 CLIOptionSpec(shortName: "P", longName: "password-file", description: "Read decryption password from file", takesValue: true, valueName: "PATH"),
+                CLIOptionSpec(longName: "standard", description: "Run standards compliance validation (e.g. zip, tar, zst, all)", takesValue: true, valueName: "FORMAT"),
+                CLIOptionSpec(longName: "differential", description: "Run differential oracle test against external tool (e.g. bsdtar, 7zz)", takesValue: true, valueName: "ORACLE"),
+                CLIOptionSpec(longName: "fuzz", description: "Run deterministic in-process mutation fuzzing test suite"),
                 CLIOptionSpec(longName: "tier", description: "Filter test tiers (e.g. 0,1,2)", takesValue: true, valueName: "TIERS"),
                 CLIOptionSpec(longName: "report-junit", description: "Export JUnit XML test report", takesValue: true, valueName: "FILE"),
                 CLIOptionSpec(longName: "report-json", description: "Export JSON test report", takesValue: true, valueName: "FILE")

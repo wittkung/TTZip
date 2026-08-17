@@ -20,4 +20,13 @@ const ttzip_diag_context_t* ttzip_diag_current(void);
 
 void ttzip_install_signal_handlers(void);
 
+/**
+ * Combines two libarchive-aligned return codes using monotonic negative severity ordering:
+ * ARCHIVE_FATAL (-30) < ARCHIVE_FAILED (-25) < ARCHIVE_WARN (-20) < ARCHIVE_RETRY (-10) < ARCHIVE_OK (0) < ARCHIVE_EOF (1)
+ *
+ * More severe errors have lower (more negative) numerical values.
+ * Returns the more severe error: (err1 < err2 ? err1 : err2).
+ */
+int ttzip_err_combine(int err1, int err2);
+
 #endif

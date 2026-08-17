@@ -140,6 +140,23 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                 if !success {
                     success = (ttzip_extract_archive_advanced(targetInspectPath, tempDir, true, pwd) == 0)
                 }
+                if !success, let bin7z = SevenZipBinaryResolver.resolveBinaryPath() {
+                    let proc = Process()
+                    proc.executableURL = URL(fileURLWithPath: bin7z)
+                    var args = ["x", "-y", "-o\(tempDir)", targetInspectPath]
+                    if let p = pwd, !p.isEmpty {
+                        args.append("-p\(p)")
+                    } else {
+                        args.append("-p-")
+                    }
+                    proc.arguments = args
+                    proc.standardOutput = Pipe()
+                    proc.standardError = Pipe()
+                    if (try? proc.run()) != nil {
+                        proc.waitUntilExit()
+                        success = (proc.terminationStatus == 0)
+                    }
+                }
                 TTLogger.debug("[Inspect] in-process extraction success=\(success), tempDir=\(tempDir)")
                 if success {
                     let fm = FileManager.default

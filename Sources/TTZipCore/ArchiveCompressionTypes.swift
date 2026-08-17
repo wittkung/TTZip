@@ -105,6 +105,34 @@ public enum ArchiveCompressionFormat: String, Sendable, CaseIterable, Codable {
         return false
     }
 
+    /// 根据扩展名或格式名称解析归档压缩格式
+    public static func from(extensionOrName: String) -> ArchiveCompressionFormat? {
+        let cleaned = extensionOrName.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        if let direct = ArchiveCompressionFormat(rawValue: cleaned) {
+            return direct
+        }
+        for format in allCases {
+            if format.rawValue.lowercased() == cleaned || format.displayName.lowercased() == cleaned {
+                return format
+            }
+        }
+        switch cleaned {
+        case "7zip", "sevenzip", "cb7": return .sevenZip
+        case "tgz": return .tarGz
+        case "tbz", "tbz2": return .tarBz2
+        case "txz": return .tarXz
+        case "tzst": return .tarZst
+        case "tlz": return .lzip
+        case "lz": return .lzip
+        case "br": return .brotli
+        case "lrz": return .lrzip
+        case "sz": return .snappy
+        default: return nil
+        }
+    }
+
+
+
     /// 根据扩展名与归档标记解析描述性类型名称
     public static func kindDescription(forExtension ext: String, isArchive: Bool, path: String = "") -> String {
         let lowerExt = ext.lowercased()

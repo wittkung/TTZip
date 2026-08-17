@@ -37,12 +37,14 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
     }
 
     size_t alloc_cap = (size_t)(total_payload_bytes + list.count * 128 + 4096);
-    uint8_t* out_mem = (alloc_cap <= 16 * 1024 * 1024) ? (uint8_t*)malloc(alloc_cap) : NULL;
+    uint8_t stack_out_mem[131072];
+    uint8_t* out_mem = (alloc_cap <= sizeof(stack_out_mem)) ? stack_out_mem : ((alloc_cap <= 16 * 1024 * 1024) ? (uint8_t*)malloc(alloc_cap) : NULL);
 
     if (out_mem) {
-        uint64_t* offsets = (uint64_t*)malloc(list.count * sizeof(uint64_t));
+        uint64_t stack_offsets[64];
+        uint64_t* offsets = (list.count <= 64) ? stack_offsets : (uint64_t*)malloc(list.count * sizeof(uint64_t));
         if (!offsets) {
-            free(out_mem);
+            if (out_mem != stack_out_mem) free(out_mem);
             close(out_fd);
             return TTZIP_ERR_OUT_OF_MEMORY;
         }
@@ -195,8 +197,8 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
 
         pwrite_all(out_fd, out_mem, (size_t)current_offset, 0);
 
-        free(out_mem);
-        free(offsets);
+        if (out_mem != stack_out_mem) free(out_mem);
+        if (offsets != stack_offsets) free(offsets);
         close(out_fd);
         return TTZIP_OK;
     }

@@ -138,3 +138,7 @@ void ttzip_install_signal_handlers(void) {
     sigaction(SIGBUS, &sa, NULL);
     sigaction(SIGSEGV, &sa, NULL);
 }
+
+int ttzip_err_combine(int err1, int err2) {
+    return (err1 < err2) ? err1 : err2;
+}

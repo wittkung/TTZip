@@ -10,7 +10,7 @@ public enum FastHexDiffEngine: Sendable {
     ///   - expected: 期望缓冲区切片
     ///   - actual: 实际缓冲区切片
     ///   - maxWindow: 差分展示最大字节数（默认 256 字节，防止刷屏）
-    ///   - useAnsi: 是否启用 ANSI 终端高亮颜色
+    ///   - useAnsi: 是否启用 ANSI 终端高亮颜色 (默认 true)
     /// - Returns: 若完全一致返回 nil；若分歧返回格式化的差分文本
     public static func generateDiff(
         expected: UnsafeRawBufferPointer,
@@ -18,101 +18,171 @@ public enum FastHexDiffEngine: Sendable {
         maxWindow: Int = 256,
         useAnsi: Bool = true
     ) -> String? {
+        // 快速处理零长度特例
+        if expected.count == 0 && actual.count == 0 {
+            return nil
+        }
+        
         let minLen = min(expected.count, actual.count)
-        guard let pExp = expected.baseAddress, let pAct = actual.baseAddress else {
-            if expected.count == actual.count { return nil }
-            return "Buffer null pointer comparison failure (expected: \(expected.count)B, actual: \(actual.count)B)"
-        }
-        
-        // 1. 快速 64 字节块跳跃寻找首个分歧点
         var mismatchOffset = minLen
-        var offset = 0
-        while offset + 64 <= minLen {
-            if memcmp(pExp.advanced(by: offset), pAct.advanced(by: offset), 64) != 0 {
-                break
+        
+        if minLen > 0, let pExp = expected.baseAddress, let pAct = actual.baseAddress {
+            var offset = 0
+            
+            // 1. 64 字节 SIMD 块跳跃寻找首个分歧块 (利用 libc/NEON 高度优化的 memcmp)
+            while offset + 64 <= minLen {
+                if memcmp(pExp.advanced(by: offset), pAct.advanced(by: offset), 64) != 0 {
+                    // 在发生分歧的 64 字节块内，先以 8 字节 (64-bit 字) 快速收敛，再精确到单字节
+                    var inner = offset
+                    let innerEnd = offset + 64
+                    while inner + 8 <= innerEnd {
+                        if pExp.loadUnaligned(fromByteOffset: inner, as: UInt64.self) != pAct.loadUnaligned(fromByteOffset: inner, as: UInt64.self) {
+                            break
+                        }
+                        inner += 8
+                    }
+                    while inner < innerEnd {
+                        if pExp.load(fromByteOffset: inner, as: UInt8.self) != pAct.load(fromByteOffset: inner, as: UInt8.self) {
+                            mismatchOffset = inner
+                            break
+                        }
+                        inner += 1
+                    }
+                    break
+                }
+                offset += 64
             }
-            offset += 64
-        }
-        while offset < minLen {
-            if pExp.load(fromByteOffset: offset, as: UInt8.self) != pAct.load(fromByteOffset: offset, as: UInt8.self) {
-                mismatchOffset = offset
-                break
+            
+            // 若 64 字节块内未发生分歧，检查尾部剩余字节
+            if mismatchOffset == minLen {
+                while offset + 8 <= minLen {
+                    if pExp.loadUnaligned(fromByteOffset: offset, as: UInt64.self) != pAct.loadUnaligned(fromByteOffset: offset, as: UInt64.self) {
+                        break
+                    }
+                    offset += 8
+                }
+                while offset < minLen {
+                    if pExp.load(fromByteOffset: offset, as: UInt8.self) != pAct.load(fromByteOffset: offset, as: UInt8.self) {
+                        mismatchOffset = offset
+                        break
+                    }
+                    offset += 1
+                }
             }
-            offset += 1
+        } else if expected.count == 0 || actual.count == 0 {
+            mismatchOffset = 0
         }
         
-        // 若全部公共前缀一致且长度相同，则无分歧
+        // 2. 若全部公共前缀一致且长度相同，则完全匹配，零堆分配立即返回 nil
         if mismatchOffset == minLen && expected.count == actual.count {
             return nil
         }
         
-        // 2. 计算 16 字节对齐的滑动展示窗口
+        // 3. 计算 16 字节对齐的滑动展示窗口 (保留前置 64 字节上下文)
         let start = max(0, (mismatchOffset - 64) & ~0x0F)
         let totalMaxLen = max(expected.count, actual.count)
         let end = min(totalMaxLen, start + maxWindow)
         
-        // 3. 查表法单次缓冲组装
+        // 4. 预分配字符串缓冲组装格式化差分视图
         var result = ""
         result.reserveCapacity(4096)
         
-        let diffIndicator = useAnsi ? "\u{001B}[1;31m" : "_"
-        let resetIndicator = useAnsi ? "\u{001B}[0m" : "_"
-        
         result.append(String(format: "⚠️ [Binary Mismatch] First difference at offset 0x%08X (%d bytes):\n", mismatchOffset, mismatchOffset))
         result.append("  Expected length: \(expected.count) bytes | Actual length: \(actual.count) bytes\n\n")
-        result.append("  Offset    Expected (Hex)                    Actual (Hex)                      ASCII (Exp|Act)\n")
-        result.append("  ---------------------------------------------------------------------------------------------\n")
+        result.append("  Offset    Expected (Hex)                                    Actual (Hex)                                      | Expected (ASCII) | Actual (ASCII)  |\n")
+        result.append("  ---------------------------------------------------------------------------------------------------------------------------------------------\n")
         
         for lineStart in stride(from: start, to: end, by: 16) {
-            let lineEnd = min(lineStart + 16, end)
             result.append(String(format: "  %08X  ", lineStart))
             
-            // Expected Hex 列 (16 字节)
+            // Expected Hex 列 (16 字节，每字节固定 3 字符对齐)
             for i in lineStart..<lineStart + 16 {
                 if i < expected.count {
                     let b = expected[i]
                     let isDiff = (i >= actual.count || b != actual[i])
-                    if isDiff { result.append(diffIndicator) } else { result.append(" ") }
-                    result.append(Character(UnicodeScalar(hexDigits[Int(b >> 4)])))
-                    result.append(Character(UnicodeScalar(hexDigits[Int(b & 0x0F)])))
-                    if isDiff { result.append(resetIndicator) }
+                    if isDiff {
+                        if useAnsi {
+                            result.append(" \u{001B}[1;31m")
+                            result.append(Character(UnicodeScalar(hexDigits[Int(b >> 4)])))
+                            result.append(Character(UnicodeScalar(hexDigits[Int(b & 0x0F)])))
+                            result.append("\u{001B}[0m")
+                        } else {
+                            result.append("_")
+                            result.append(Character(UnicodeScalar(hexDigits[Int(b >> 4)])))
+                            result.append(Character(UnicodeScalar(hexDigits[Int(b & 0x0F)])))
+                            result.append("_")
+                        }
+                    } else {
+                        result.append(" ")
+                        result.append(Character(UnicodeScalar(hexDigits[Int(b >> 4)])))
+                        result.append(Character(UnicodeScalar(hexDigits[Int(b & 0x0F)])))
+                    }
                 } else {
                     result.append("   ")
                 }
             }
             result.append("  ")
             
-            // Actual Hex 列 (16 字节)
+            // Actual Hex 列 (16 字节，每字节固定 3 字符对齐)
             for i in lineStart..<lineStart + 16 {
                 if i < actual.count {
                     let b = actual[i]
                     let isDiff = (i >= expected.count || b != expected[i])
-                    if isDiff { result.append(diffIndicator) } else { result.append(" ") }
-                    result.append(Character(UnicodeScalar(hexDigits[Int(b >> 4)])))
-                    result.append(Character(UnicodeScalar(hexDigits[Int(b & 0x0F)])))
-                    if isDiff { result.append(resetIndicator) }
+                    if isDiff {
+                        if useAnsi {
+                            result.append(" \u{001B}[1;31m")
+                            result.append(Character(UnicodeScalar(hexDigits[Int(b >> 4)])))
+                            result.append(Character(UnicodeScalar(hexDigits[Int(b & 0x0F)])))
+                            result.append("\u{001B}[0m")
+                        } else {
+                            result.append("_")
+                            result.append(Character(UnicodeScalar(hexDigits[Int(b >> 4)])))
+                            result.append(Character(UnicodeScalar(hexDigits[Int(b & 0x0F)])))
+                            result.append("_")
+                        }
+                    } else {
+                        result.append(" ")
+                        result.append(Character(UnicodeScalar(hexDigits[Int(b >> 4)])))
+                        result.append(Character(UnicodeScalar(hexDigits[Int(b & 0x0F)])))
+                    }
                 } else {
                     result.append("   ")
                 }
             }
-            result.append("  |")
+            result.append("  | ")
             
             // ASCII Preview (Expected)
-            for i in lineStart..<lineEnd {
+            for i in lineStart..<lineStart + 16 {
                 if i < expected.count {
                     let b = expected[i]
-                    result.append((b >= 32 && b <= 126) ? Character(UnicodeScalar(b)) : ".")
+                    let isDiff = (i >= actual.count || b != actual[i])
+                    let char = (b >= 32 && b <= 126) ? Character(UnicodeScalar(b)) : "."
+                    if isDiff && useAnsi {
+                        result.append("\u{001B}[1;31m")
+                        result.append(char)
+                        result.append("\u{001B}[0m")
+                    } else {
+                        result.append(char)
+                    }
                 } else {
                     result.append(" ")
                 }
             }
-            result.append("|")
+            result.append(" | ")
             
             // ASCII Preview (Actual)
-            for i in lineStart..<lineEnd {
+            for i in lineStart..<lineStart + 16 {
                 if i < actual.count {
                     let b = actual[i]
-                    result.append((b >= 32 && b <= 126) ? Character(UnicodeScalar(b)) : ".")
+                    let isDiff = (i >= expected.count || b != expected[i])
+                    let char = (b >= 32 && b <= 126) ? Character(UnicodeScalar(b)) : "."
+                    if isDiff && useAnsi {
+                        result.append("\u{001B}[1;31m")
+                        result.append(char)
+                        result.append("\u{001B}[0m")
+                    } else {
+                        result.append(char)
+                    }
                 } else {
                     result.append(" ")
                 }
@@ -124,7 +194,12 @@ public enum FastHexDiffEngine: Sendable {
     }
     
     /// Data 便捷重载
-    public static func generateDiff(expected: Data, actual: Data, maxWindow: Int = 256, useAnsi: Bool = true) -> String? {
+    public static func generateDiff(
+        expected: Data,
+        actual: Data,
+        maxWindow: Int = 256,
+        useAnsi: Bool = true
+    ) -> String? {
         expected.withUnsafeBytes { pExp in
             actual.withUnsafeBytes { pAct in
                 generateDiff(expected: pExp, actual: pAct, maxWindow: maxWindow, useAnsi: useAnsi)

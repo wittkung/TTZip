@@ -203,6 +203,9 @@ int ttzip_create_zip_parallel_c(
             }
         } else if (item_unc_size >= 64 * 1024) {
             src_buf = mmap(NULL, item_unc_size, PROT_READ, MAP_SHARED, fd, 0);
+            if (src_buf != MAP_FAILED) {
+                madvise(src_buf, item_unc_size, MADV_WILLNEED | MADV_SEQUENTIAL);
+            }
         }
 
         if (!src_buf || src_buf == MAP_FAILED) {
@@ -220,7 +223,16 @@ int ttzip_create_zip_parallel_c(
             return;
         }
 
-        item->crc32 = ttzip_compute_buffer_crc32_neon(0, src_buf, item_unc_size);
+        __block uint32_t computed_crc = 0;
+        dispatch_group_t crc_group = NULL;
+        if (item_unc_size >= 1024 * 1024 && list.count <= 4) {
+            crc_group = dispatch_group_create();
+            dispatch_group_async(crc_group, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
+                computed_crc = ttzip_compute_buffer_crc32_neon(0, src_buf, item_unc_size);
+            });
+        } else {
+            computed_crc = ttzip_compute_buffer_crc32_neon(0, src_buf, item_unc_size);
+        }
 
         uint8_t* arena_slot = (payload_arena && item->arena_cap >= item_unc_size) ? (payload_arena + item->arena_offset) : NULL;
 
@@ -353,6 +365,12 @@ int ttzip_create_zip_parallel_c(
                 }
             }
         }
+
+        if (crc_group) {
+            dispatch_group_wait(crc_group, DISPATCH_TIME_FOREVER);
+            dispatch_release(crc_group);
+        }
+        item->crc32 = computed_crc;
 
         if (item->compressed_payload != src_buf && src_buf != stack_in_buf) {
             if (heap_src) {

@@ -145,6 +145,15 @@ public struct CLIOptions: Sendable {
     /// Markdown 报告输出路径 (--markdown-report <path>)
     public var markdownReportPath: String? = nil
     
+    /// 标准格式测试 (--standard <format>)
+    public var standardFormat: String? = nil
+    
+    /// 差分预言机测试 (--differential <oracle>)
+    public var differentialOracle: String? = nil
+    
+    /// 是否执行确定性变异模糊测试 (--fuzz)
+    public var fuzz: Bool = false
+    
     /// 是否针对 Silesia 211MB 真实语料库进行基准测试 (--silesia)
     public var silesia: Bool = false
     

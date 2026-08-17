@@ -8,6 +8,10 @@ final class TestReportGeneratorTests: XCTestCase {
         let sample = "TTZip High Performance Core".data(using: .utf8)!
         let diff = FastHexDiffEngine.generateDiff(expected: sample, actual: sample)
         XCTAssertNil(diff, "Exact match should produce no diff")
+        
+        let empty = Data()
+        let emptyDiff = FastHexDiffEngine.generateDiff(expected: empty, actual: empty)
+        XCTAssertNil(emptyDiff, "Empty match should produce no diff")
     }
     
     func testFastHexDiffEngineMismatch() {
@@ -20,6 +24,48 @@ final class TestReportGeneratorTests: XCTestCase {
         XCTAssertNotNil(diff, "Mismatch should produce diff output")
         XCTAssertTrue(diff!.contains("0x0000002A"), "Diff should pinpoint offset 0x2A (42)")
         XCTAssertTrue(diff!.contains("_BB_") || diff!.contains("BB"), "Diff should show mismatched byte")
+    }
+    
+    func testFastHexDiffEngineSimdChunkHoppingLargeBuffer() {
+        // Test 64-byte SIMD chunk hopping beyond 256 bytes
+        let dataA = Data(repeating: 0x11, count: 1024)
+        var dataB = Data(repeating: 0x11, count: 1024)
+        
+        // Inject difference at offset 350 (which is inside the 5th 64-byte chunk: 320..<384)
+        dataB[350] = 0x99
+        
+        let diff = FastHexDiffEngine.generateDiff(expected: dataA, actual: dataB, maxWindow: 256, useAnsi: true)
+        XCTAssertNotNil(diff)
+        XCTAssertTrue(diff!.contains("0x0000015E"), "Offset 350 in hex is 0x0000015E")
+        XCTAssertTrue(diff!.contains("\u{001B}[1;31m"), "Should contain ANSI bold red color code")
+    }
+    
+    func testFastHexDiffEngineLengthMismatchAndEmpty() {
+        let dataA = Data([0x01, 0x02, 0x03, 0x04])
+        let dataB = Data([0x01, 0x02])
+        
+        let diffShort = FastHexDiffEngine.generateDiff(expected: dataA, actual: dataB, useAnsi: false)
+        XCTAssertNotNil(diffShort)
+        XCTAssertTrue(diffShort!.contains("Expected length: 4 bytes | Actual length: 2 bytes"))
+        XCTAssertTrue(diffShort!.contains("0x00000002"))
+        
+        let empty = Data()
+        let diffEmpty = FastHexDiffEngine.generateDiff(expected: empty, actual: dataA, useAnsi: false)
+        XCTAssertNotNil(diffEmpty)
+        XCTAssertTrue(diffEmpty!.contains("Expected length: 0 bytes | Actual length: 4 bytes"))
+    }
+    
+    func testFastHexDiffEngineRawBufferPointer() {
+        let bytesA: [UInt8] = [0x50, 0x4B, 0x03, 0x04, 0x14, 0x00]
+        let bytesB: [UInt8] = [0x50, 0x4B, 0x03, 0x04, 0x20, 0x00]
+        
+        bytesA.withUnsafeBytes { pExp in
+            bytesB.withUnsafeBytes { pAct in
+                let diff = FastHexDiffEngine.generateDiff(expected: pExp, actual: pAct, useAnsi: true)
+                XCTAssertNotNil(diff)
+                XCTAssertTrue(diff!.contains("0x00000004"), "Mismatch at offset 4")
+            }
+        }
     }
     
     func testUnicodeDiagnosticFormatterScalars() {
