@@ -231,7 +231,8 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "ZIP Store Direct I/O",
             payloadBytes: 50 * 1024 * 1024, // 50MB
-            iterations: 3,
+            iterations: 4,
+            warmupIterations: 2,
             setUp: { sandbox in
                 let hugeFileURL = sandbox.fileURL(named: "huge_50m.bin")
                 try TestFileGenerator.createHugeFile(at: hugeFileURL, sizeInMB: 50)

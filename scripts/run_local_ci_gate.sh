@@ -86,7 +86,7 @@ declare -a STAGE_KEYS=(
 )
 
 declare -a STAGE_COMMANDS=(
-    "swift test --filter PipeStreamingTests,ShellCompletionTests,ManPageGenerationTests,ArchiveFormatStandardTests,CLIPackagingTests,ArchiveInspectorViewTests"
+    "swift test --filter PipeStreamingTests,ShellCompletionTests,ManPageGenerationTests,ArchiveFormatStandardTests,CLIPackagingTests,ArchiveInspectorViewTests,InteractiveTUITests,MediaPreviewAuditTests"
     "swift test --filter ArchiveStandardsComplianceTests"
     "swift test --filter DifferentialOracleTests"
     "swift test --filter ArchiveMutationFuzzTests"

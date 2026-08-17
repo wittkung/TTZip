@@ -138,6 +138,26 @@ public enum CLICommandRouter {
             }
             return await handleTreeArchive(path: path, options: options)
             
+        case .explore:
+            guard let path = options.positionals.first else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: explore command requires an archive path.")
+                TerminalRenderEngine.shared.logError("Try 'ttzip-cli explore <archive>' for more information.")
+                return .usage
+            }
+            let pwd = SecureCredentialResolver.resolvePassword(
+                explicitPassword: options.password,
+                passwordFile: options.passwordFile,
+                archiveName: path
+            )
+            let explorer = InteractiveTUIExplorer(archivePath: path, password: pwd)
+            do {
+                let code = try await explorer.run()
+                return code == 0 ? .ok : .software
+            } catch {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: \(error.localizedDescription)")
+                return .software
+            }
+            
         case .list, .inspect:
             guard let path = options.positionals.first else {
                 TerminalRenderEngine.shared.logError("ttzip-cli: error: missing archive path.")

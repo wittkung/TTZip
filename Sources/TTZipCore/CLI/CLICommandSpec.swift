@@ -207,6 +207,16 @@ public enum CLICommandSpec {
             ]
         ),
         CLICommandMetadata(
+            name: "explore",
+            aliases: ["tui", "browse"],
+            summary: "Launch interactive terminal TUI explorer for archive inspection and selective extraction",
+            usage: "ttzip-cli explore <archive> [options]",
+            options: [
+                CLIOptionSpec(shortName: "p", longName: "password", description: "Decryption password for encrypted archive", takesValue: true, valueName: "PWD"),
+                CLIOptionSpec(shortName: "P", longName: "password-file", description: "Read decryption password from file", takesValue: true, valueName: "PATH")
+            ]
+        ),
+        CLICommandMetadata(
             name: "completion",
             aliases: [],
             summary: "Generate shell auto-completion scripts (zsh, bash, fish, nushell)",

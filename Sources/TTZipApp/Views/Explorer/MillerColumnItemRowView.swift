@@ -93,22 +93,11 @@ public struct MillerColumnItemRowView: View {
             onSelectItem(item, columnIndex, isCommand, isShift, dirURL)
         }
         .onDrag {
-            let targets = multiSelectedPaths.contains(item.path) && multiSelectedPaths.count > 1 ? Array(multiSelectedPaths) : [item.path]
-            let providers = targets.map { NSItemProvider(object: URL(fileURLWithPath: $0) as NSURL) }
-            return providers.first ?? NSItemProvider(object: URL(fileURLWithPath: item.path) as NSURL)
+            let providers = buildDragProviders()
+            return providers.first ?? Self.makeDragItemProvider(for: item)
         }
         .onDrop(of: [.fileURL, .text], isTargeted: nil) { providers in
-            let targetDir = item.isDirectory ? URL(fileURLWithPath: item.path) : dirURL
-            for provider in providers {
-                _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                    if let srcURL = url, srcURL.isFileURL {
-                        DispatchQueue.main.async {
-                            FileDragDropHelper.performMove(sources: [srcURL], to: targetDir)
-                        }
-                    }
-                }
-            }
-            return true
+            handleDrop(providers: providers)
         }
         .contextMenu {
             MillerColumnItemContextMenu(
@@ -122,6 +111,79 @@ public struct MillerColumnItemRowView: View {
                 onTriggerNewFolder: onTriggerNewFolder,
                 onTriggerNewFile: onTriggerNewFile
             )
+        }
+    }
+    
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        let targetDir = item.isDirectory ? URL(fileURLWithPath: item.path) : dirURL
+        for provider in providers {
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                if let srcURL = url, srcURL.isFileURL {
+                    DispatchQueue.main.async {
+                        FileDragDropHelper.performMove(sources: [srcURL], to: targetDir)
+                    }
+                }
+            }
+        }
+        return true
+    }
+    
+    private func buildDragProviders() -> [NSItemProvider] {
+        let isMulti = multiSelectedPaths.contains(item.path) && multiSelectedPaths.count > 1
+        let targets: [String] = isMulti ? Array(multiSelectedPaths) : [item.path]
+        return targets.map { (path: String) -> NSItemProvider in
+            if path == item.path {
+                return Self.makeDragItemProvider(for: item)
+            }
+            let dummyItem = DiskItemInfo(
+                virtualName: (path as NSString).lastPathComponent,
+                virtualURL: URL(string: path) ?? URL(fileURLWithPath: path),
+                isDirectory: false,
+                isArchive: false,
+                sizeText: "",
+                rawSizeBytes: 0,
+                kindText: ""
+            )
+            return Self.makeDragItemProvider(for: dummyItem)
+        }
+    }
+    
+    public static func parseVirtualURL(_ path: String) -> (archivePath: String, subpath: String) {
+        if let u = URL(string: path),
+           let comp = URLComponents(url: u, resolvingAgainstBaseURL: false),
+           let sub = comp.queryItems?.first(where: { $0.name == "subpath" })?.value {
+            var arch = u.path
+            if arch.isEmpty { arch = path }
+            return (arch, sub)
+        }
+        return (path, "")
+    }
+    
+    public static func makeDragItemProvider(for item: DiskItemInfo) -> NSItemProvider {
+        let (archivePath, subpath) = parseVirtualURL(item.path)
+        if !subpath.isEmpty {
+            let filename = (subpath as NSString).lastPathComponent
+            let hash = abs(archivePath.hashValue).description + "_" + abs(filename.hashValue).description
+            if let cached = PreviewLRUCacheManager.shared.cachedURL(forKey: hash),
+               FileManager.default.fileExists(atPath: cached.path) {
+                let provider = NSItemProvider(object: cached as NSURL)
+                provider.suggestedName = filename
+                return provider
+            } else {
+                let provider = NSItemProvider()
+                provider.suggestedName = filename
+                if let u = URL(string: item.path), u.scheme != nil {
+                    provider.registerObject(u as NSURL, visibility: .all)
+                } else {
+                    provider.registerObject(URL(fileURLWithPath: item.path) as NSURL, visibility: .all)
+                }
+                return provider
+            }
+        } else {
+            let fileURL = URL(fileURLWithPath: item.path)
+            let provider = NSItemProvider(object: fileURL as NSURL)
+            provider.suggestedName = item.name
+            return provider
         }
     }
 }
@@ -182,7 +244,7 @@ public struct MillerColumnItemContextMenu: View {
         } else if item.path.contains("?subpath=") {
             Button {
                 onSelectItem(item, columnIndex, false, false, dirURL)
-                let (archivePath, subpath) = parseVirtualURL(item.path)
+                let (archivePath, subpath) = MillerColumnItemRowView.parseVirtualURL(item.path)
                 let destDir = (archivePath as NSString).deletingLastPathComponent
                 Task {
                     let pwd = ArchivePasswordStore.shared.getPassword(for: archivePath)
@@ -199,7 +261,7 @@ public struct MillerColumnItemContextMenu: View {
                 panel.canChooseDirectories = true
                 panel.canChooseFiles = false
                 if panel.runModal() == .OK, let destURL = panel.url {
-                    let (archivePath, subpath) = parseVirtualURL(item.path)
+                    let (archivePath, subpath) = MillerColumnItemRowView.parseVirtualURL(item.path)
                     Task {
                         let pwd = ArchivePasswordStore.shared.getPassword(for: archivePath)
                         try? await TTZipEngineFacade.shared.extractSingleEntry(archivePath: archivePath, entryPath: subpath, destinationDir: destURL.path, password: pwd)
@@ -213,7 +275,7 @@ public struct MillerColumnItemContextMenu: View {
             Divider()
             
             Button {
-                let (_, subpath) = parseVirtualURL(item.path)
+                let (_, subpath) = MillerColumnItemRowView.parseVirtualURL(item.path)
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(subpath, forType: .string)
             } label: {
@@ -354,16 +416,5 @@ public struct MillerColumnItemContextMenu: View {
                 Label("移到废纸篓", systemImage: "trash")
             }
         }
-    }
-    
-    private func parseVirtualURL(_ path: String) -> (archivePath: String, subpath: String) {
-        if let u = URL(string: path),
-           let comp = URLComponents(url: u, resolvingAgainstBaseURL: false),
-           let sub = comp.queryItems?.first(where: { $0.name == "subpath" })?.value {
-            var arch = u.path
-            if arch.isEmpty { arch = path }
-            return (arch, sub)
-        }
-        return (path, "")
     }
 }

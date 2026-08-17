@@ -268,6 +268,9 @@ public struct UnifiedAudioPlayerView: View {
         .onAppear {
             setupPlayer()
         }
+        .onChange(of: url) { _, _ in
+            setupPlayer()
+        }
         .onDisappear {
             cleanUpPlayer()
         }
@@ -291,6 +294,7 @@ public struct UnifiedAudioPlayerView: View {
     }
     
     private func setupPlayer() {
+        cleanUpPlayer()
         let newPlayer = AVPlayer(url: url)
         self.player = newPlayer
         
@@ -363,6 +367,8 @@ public struct UnifiedAudioPlayerView: View {
             timeObserverToken = nil
         }
         player?.pause()
+        player?.rate = 0
+        player?.replaceCurrentItem(with: nil)
         player = nil
         isPlaying = false
     }

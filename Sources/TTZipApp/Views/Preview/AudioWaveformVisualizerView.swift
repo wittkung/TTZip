@@ -47,7 +47,9 @@ public struct AudioWaveformVisualizerView: View {
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
         )
         .onAppear {
-            startTimer()
+            if isPlaying {
+                startTimer()
+            }
         }
         .onDisappear {
             stopTimer()
@@ -55,6 +57,8 @@ public struct AudioWaveformVisualizerView: View {
         .onChange(of: isPlaying) { _, newValue in
             if newValue {
                 startTimer()
+            } else {
+                stopTimer()
             }
         }
     }

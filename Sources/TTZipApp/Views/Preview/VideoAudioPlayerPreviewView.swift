@@ -72,8 +72,11 @@ public final class SharedVideoPlayerStore: ObservableObject {
             timeObserverToken = nil
         }
         player?.pause()
+        player?.rate = 0
+        player?.replaceCurrentItem(with: nil)
         player = nil
         currentURL = nil
+        isPlaying = false
         currentTime = 0
         duration = 0
     }
@@ -187,6 +190,11 @@ public struct UnifiedVideoPlayerView: View {
         }
         .onChange(of: url) { _, newURL in
             store.setup(url: newURL)
+        }
+        .onDisappear {
+            hideTimer?.invalidate()
+            hideTimer = nil
+            store.cleanUp()
         }
     }
     

@@ -219,6 +219,7 @@ public enum CLICommand: String, Sendable {
     case hash
     case delete
     case update
+    case explore
     case version = "--version"
     case shortVersion = "-v"
     case help = "--help"
@@ -238,6 +239,8 @@ public enum CLICommand: String, Sendable {
             self = .list
         case "test", "t", "verify":
             self = .test
+        case "explore", "tui", "browse":
+            self = .explore
         case "bench", "b", "benchmark":
             self = .bench
         case "bench_pk", "benchpk", "pk":

@@ -23,6 +23,8 @@ public struct InteractiveZoomImageView: View {
                         Color.clear
                         
                         Image(nsImage: image)
+                            .interpolation(.high)
+                            .antialiased(true)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .scaleEffect(scale)
