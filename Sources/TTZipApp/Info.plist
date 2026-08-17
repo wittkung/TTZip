@@ -30,6 +30,8 @@
 	<string>public.app-category.utilities</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 TTZip Inc. All rights reserved.</string>
+	<key>SUFeedURL</key>
+	<string>https://ttzip.metastudyline.com/appcast.xml</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSHighResolutionCapable</key>
