@@ -8,12 +8,12 @@
 import Foundation
 import TTZipCore
 
-/// Standalone test harness command dispatcher (aligned with libarchive test_main.c)
+/// 模块化测试调度引擎 (支持 Tier 0-5 分层过滤、JUnit XML、JSON、Markdown)
 public enum TestCommand {
     
-    /// Main entry point for executing CLI tests
+    /// 执行 CLI 驱动的自动化测试
     public static func run(options: CLIOptions) async {
-        // Backward compatibility: If positional argument is an existing archive file, verify integrity
+        // 兼容旧行为：若位置参数为既有归档文件，则执行完整性校验
         if let firstArg = options.positionals.first, FileManager.default.fileExists(atPath: firstArg) {
             await runFileIntegrity(path: firstArg)
             return
@@ -26,150 +26,188 @@ public enum TestCommand {
         if verbosity >= 0 {
             print("\n==========================================================================================")
             print("   🧪 \u{001B}[1;36m[TTZip Native Test Harness]\u{001B}[0m Running Test Driver (Session: \(sessionID))")
+            if let tier = options.tier {
+                print("   🏷️ Tier Filter: \"\(tier)\"")
+            }
             if let filter = options.filterPattern {
                 print("   🔍 Filter: \"\(filter)\" | Verbosity: \(verbosity) | KeepTemp: \(options.keepTempFiles)")
             }
             print("==========================================================================================\n")
         }
         
-        var totalPassed = 0
-        var totalFailed = 0
-        let totalSkipped = 0
-        var totalAssertions = 0
-
+        var testCaseRecords: [TestCaseRecord] = []
         var suiteResults: [[String: Any]] = []
         
-        // 1. Run in-process fast diagnostic matrix across 16 formats
-        let nativeStartTime = Date()
-        var nativePassed = 0
-        var nativeFailed = 0
-        var nativeCases: [[String: Any]] = []
-        
-        let selectedFormats = CLIArgumentParser.parseFormats(options.format) ?? ArchiveCompressionFormat.allCases.filter {
-            $0 != .snappy
+        // 解析选定的测试分层 (默认为 Tier 0 + Tier 1)
+        let activeTiers: Set<Int>
+        if let tierStr = options.tier {
+            let parsed = tierStr.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: CharacterSet.whitespaces)) }
+            activeTiers = Set(parsed.isEmpty ? [0, 1] : parsed)
+        } else {
+            activeTiers = [0, 1]
         }
         
-        for format in selectedFormats {
-            if let filter = options.filterPattern, !format.rawValue.localizedCaseInsensitiveContains(filter) && !filter.localizedCaseInsensitiveContains("format") {
-                continue
+        // MARK: - 1. Tier 0: 纯内存微单元测试 (SIMD / 本地化 / POSIX 命令行规范)
+        if activeTiers.contains(0) {
+            let t0Start = Date()
+            var t0Passed = 0
+            var t0Failed = 0
+            var t0Cases: [[String: Any]] = []
+            
+            // 1.1 本地化完备性测试
+            let l10nStart = Date()
+            var l10nSuccess = true
+            let allKeys = L10n.allRawKeys
+            for lang in AppLanguage.allCases {
+                for key in allKeys {
+                    let val = TTZipLocalizationManager.shared.string(for: RawKeyWrapper(key), language: lang)
+                    if val == key || val.isEmpty { l10nSuccess = false }
+                }
             }
+            let l10nDur = Date().timeIntervalSince(l10nStart)
+            t0Passed += (l10nSuccess ? 1 : 0)
+            t0Failed += (l10nSuccess ? 0 : 1)
+            let rec1 = TestCaseRecord(name: "testLocalizationIntegrity", className: "Tier0_LocalizationTests", tier: 0, durationSeconds: l10nDur, passed: l10nSuccess)
+            testCaseRecords.append(rec1)
+            t0Cases.append(["caseName": rec1.name, "status": l10nSuccess ? "passed" : "failed", "durationMs": l10nDur * 1000.0])
             
-            let caseStartTime = Date()
-            let config = FormatDiagnosticConfig(
-                format: format,
-                levelsToTest: [.store, .level1],
-                testPasswordEncryption: false,
-                sampleFileCount: 20,
-                lineRepeatCount: 500
-            )
+            // 1.2 POSIX 参数解析规范测试
+            let posixStart = Date()
+            let parseRes = POSIXCLIArgumentParser.parse(args: ["archive", "out.tar.zst", "src/", "--format=tar.zst", "--level=3", "--dry-run"])
+            let posixSuccess = (parseRes.command == .archive && parseRes.options.format == "tar.zst" && parseRes.options.dryRun)
+            let posixDur = Date().timeIntervalSince(posixStart)
+            t0Passed += (posixSuccess ? 1 : 0)
+            t0Failed += (posixSuccess ? 0 : 1)
+            let rec2 = TestCaseRecord(name: "testPOSIXCLIArgumentParser", className: "Tier0_CLIPOSIXTests", tier: 0, durationSeconds: posixDur, passed: posixSuccess)
+            testCaseRecords.append(rec2)
+            t0Cases.append(["caseName": rec2.name, "status": posixSuccess ? "passed" : "failed", "durationMs": posixDur * 1000.0])
             
-            let isSuccess = (try? FormatDiagnosticSuiteRunner.shared.runDiagnosticSuite(config: config)) ?? false
-            let caseDuration = Date().timeIntervalSince(caseStartTime) * 1000.0
+            let t0TotalDur = Date().timeIntervalSince(t0Start) * 1000.0
+            suiteResults.append([
+                "suiteName": "Tier0_MicroUnitSuite",
+                "passedCount": t0Passed,
+                "failedCount": t0Failed,
+                "skippedCount": 0,
+                "durationMs": t0TotalDur,
+                "cases": t0Cases
+            ])
             
-            if isSuccess {
-                nativePassed += 1
-                totalAssertions += 5
-                nativeCases.append([
-                    "caseName": "diagnostic_\(format.rawValue)",
-                    "status": "passed",
-                    "durationMs": caseDuration,
-                    "assertionCount": 5
-                ])
-                if verbosity >= 1 {
-                    print("  \u{001B}[32m✓\u{001B}[0m [NativeDiagnostic] \(format.rawValue.uppercased()) roundtrip pass (\(String(format: "%.1f", caseDuration))ms)")
-                } else if verbosity == 0 {
-                    print(".", terminator: "")
-                    fflush(stdout)
-                }
-            } else {
-                nativeFailed += 1
-                totalAssertions += 5
-                let failureInfo: [String: Any] = [
-                    "file": "Sources/TTZipCore/Benchmark/FormatDiagnosticSuiteRunner.swift",
-                    "line": 50,
-                    "expression": "runDiagnosticSuite == true",
-                    "deferredMessage": "Diagnostic roundtrip failed for format: \(format.rawValue)"
-                ]
-                nativeCases.append([
-                    "caseName": "diagnostic_\(format.rawValue)",
-                    "status": "failed",
-                    "durationMs": caseDuration,
-                    "assertionCount": 5,
-                    "failure": failureInfo
-                ])
-                if verbosity >= -1 {
-                    print("\n  \u{001B}[31m✗\u{001B}[0m [NativeDiagnostic] \(format.rawValue.uppercased()) failed roundtrip validation")
-                }
+            if verbosity >= 1 {
+                print("  \u{001B}[32m✓\u{001B}[0m [Tier 0] Micro/Unit suites passed (\(String(format: "%.1f", t0TotalDur))ms)")
             }
         }
         
-        if verbosity == 0 {
-            print("")
+        // MARK: - 2. Tier 1: 16 种格式往返与诊断测试
+        if activeTiers.contains(1) {
+            let nativeStartTime = Date()
+            var nativePassed = 0
+            var nativeFailed = 0
+            var nativeCases: [[String: Any]] = []
+            
+            let selectedFormats = CLIArgumentParser.parseFormats(options.format) ?? ArchiveCompressionFormat.allCases.filter {
+                $0 != .snappy
+            }
+            
+            for format in selectedFormats {
+                if let filter = options.filterPattern, !format.rawValue.localizedCaseInsensitiveContains(filter) && !filter.localizedCaseInsensitiveContains("format") {
+                    continue
+                }
+                
+                let caseStartTime = Date()
+                let config = FormatDiagnosticConfig(
+                    format: format,
+                    levelsToTest: [.store, .level1],
+                    testPasswordEncryption: false,
+                    sampleFileCount: 20,
+                    lineRepeatCount: 500
+                )
+                
+                let isSuccess = (try? FormatDiagnosticSuiteRunner.shared.runDiagnosticSuite(config: config)) ?? false
+                let caseDurationSec = Date().timeIntervalSince(caseStartTime)
+                let caseDurationMs = caseDurationSec * 1000.0
+                
+                let rec = TestCaseRecord(
+                    name: "testDiagnostic_\(format.rawValue)",
+                    className: "Tier1_FormatRoundtripTests",
+                    tier: 1,
+                    durationSeconds: caseDurationSec,
+                    passed: isSuccess,
+                    failureMessage: isSuccess ? nil : "Diagnostic roundtrip failed for format: \(format.rawValue)"
+                )
+                testCaseRecords.append(rec)
+                
+                if isSuccess {
+                    nativePassed += 1
+                    nativeCases.append([
+                        "caseName": rec.name,
+                        "status": "passed",
+                        "durationMs": caseDurationMs,
+                        "assertionCount": 5
+                    ])
+                    if verbosity >= 1 {
+                        print("  \u{001B}[32m✓\u{001B}[0m [Tier 1] \(format.rawValue.uppercased()) roundtrip pass (\(String(format: "%.1f", caseDurationMs))ms)")
+                    } else if verbosity == 0 {
+                        print(".", terminator: "")
+                        fflush(stdout)
+                    }
+                } else {
+                    nativeFailed += 1
+                    nativeCases.append([
+                        "caseName": rec.name,
+                        "status": "failed",
+                        "durationMs": caseDurationMs,
+                        "assertionCount": 5
+                    ])
+                    if verbosity >= -1 {
+                        print("\n  \u{001B}[31m✗\u{001B}[0m [Tier 1] \(format.rawValue.uppercased()) failed roundtrip validation")
+                    }
+                }
+            }
+            
+            if verbosity == 0 {
+                print("")
+            }
+            
+            let nativeDuration = Date().timeIntervalSince(nativeStartTime) * 1000.0
+            suiteResults.append([
+                "suiteName": "Tier1_FormatRoundtripSuite",
+                "passedCount": nativePassed,
+                "failedCount": nativeFailed,
+                "skippedCount": 0,
+                "durationMs": nativeDuration,
+                "cases": nativeCases
+            ])
         }
-        
-        let nativeDuration = Date().timeIntervalSince(nativeStartTime) * 1000.0
-        totalPassed += nativePassed
-        totalFailed += nativeFailed
-        
-        suiteResults.append([
-            "suiteName": "NativeFormatDiagnosticSuite",
-            "passedCount": nativePassed,
-            "failedCount": nativeFailed,
-            "skippedCount": 0,
-            "totalAssertions": (nativePassed + nativeFailed) * 5,
-            "durationMs": nativeDuration,
-            "cases": nativeCases
-        ])
         
         let totalDuration = Date().timeIntervalSince(startTimestamp) * 1000.0
-        let totalCases = totalPassed + totalFailed + totalSkipped
+        let totalPassed = testCaseRecords.filter(\.passed).count
+        let totalFailed = testCaseRecords.filter { !$0.passed }.count
+        let totalCases = testCaseRecords.count
         let passRate = totalCases > 0 ? (Double(totalPassed) / Double(totalCases)) * 100.0 : 100.0
         
-        let osVer = ProcessInfo.processInfo.operatingSystemVersionString
-        #if arch(arm64)
-        let cpuArch = "arm64 (Apple Silicon)"
-        #else
-        let cpuArch = "x86_64 (Intel)"
-        #endif
-        let cores = ProcessInfo.processInfo.activeProcessorCount
+        let sessionReport = TestSessionReport(
+            timestamp: startTimestamp.timeIntervalSince1970,
+            testCases: testCaseRecords
+        )
         
-        // 2. Assemble structured test report dictionary
-        let reportData: [String: Any] = [
-            "sessionId": sessionID,
-            "startTime": ISO8601DateFormatter().string(from: startTimestamp),
-            "endTime": ISO8601DateFormatter().string(from: Date()),
-            "durationMs": totalDuration,
-            "environment": [
-                "osVersion": osVer,
-                "cpuArchitecture": cpuArch,
-                "logicalCores": cores,
-                "swiftVersion": "6.0"
-            ],
-            "options": [
-                "filterPattern": options.filterPattern ?? "",
-                "verbosity": options.verbosity,
-                "keepTempFiles": options.keepTempFiles,
-                "dumpOnFailure": options.dumpOnFailure,
-                "jsonReportPath": options.jsonReportPath ?? "",
-                "markdownReportPath": options.markdownReportPath ?? ""
-            ],
-            "summary": [
-                "totalSuites": suiteResults.count,
-                "totalCases": totalCases,
-                "passedCases": totalPassed,
-                "failedCases": totalFailed,
-                "skippedCases": totalSkipped,
-                "totalAssertions": totalAssertions,
-                "passRate": passRate
-            ],
-            "suites": suiteResults
-        ]
-        
-        // 3. Persist test reports if requested
+        // 3. 持久化各种格式的测试报告
         if let jsonPath = options.jsonReportPath {
-            TestReportGenerator.generateJSON(report: reportData, outputPath: jsonPath)
+            let jsonString = sessionReport.toJSON()
+            let url = URL(fileURLWithPath: jsonPath)
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? jsonString.write(to: url, atomically: true, encoding: .utf8)
             if verbosity >= 0 {
                 print("  📄 JSON Report saved to: \(jsonPath)")
+            }
+        }
+        
+        if let junitPath = options.junitReportPath {
+            let xmlString = JUnitReportBuilder.buildXML(from: sessionReport)
+            let url = URL(fileURLWithPath: junitPath)
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? xmlString.write(to: url, atomically: true, encoding: .utf8)
+            if verbosity >= 0 {
+                print("  📑 JUnit XML Report saved to: \(junitPath)")
             }
         }
         
@@ -178,13 +216,13 @@ public enum TestCommand {
                 sessionID: sessionID,
                 startTime: ISO8601DateFormatter().string(from: startTimestamp),
                 durationMs: totalDuration,
-                osVersion: osVer,
-                arch: cpuArch,
+                osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+                arch: "arm64",
                 totalSuites: suiteResults.count,
                 totalCases: totalCases,
                 passedCases: totalPassed,
                 failedCases: totalFailed,
-                skippedCases: totalSkipped,
+                skippedCases: 0,
                 passRate: passRate,
                 suites: suiteResults,
                 outputPath: mdPath
@@ -194,7 +232,7 @@ public enum TestCommand {
             }
         }
         
-        // 4. Output summary dashboard
+        // 4. 控制台汇总看板
         if verbosity >= 0 {
             print("\n==========================================================================================")
             if totalFailed == 0 {
@@ -221,4 +259,9 @@ public enum TestCommand {
             exit(1)
         }
     }
+}
+
+private struct RawKeyWrapper: LocaleKeyProtocol {
+    let rawKey: String
+    init(_ key: String) { self.rawKey = key }
 }

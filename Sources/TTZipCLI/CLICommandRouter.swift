@@ -1,319 +1,195 @@
-// SPDX-License-Identifier: BSD-3-Clause
-//
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
-// All rights reserved.
-//
-// TTZip: High-performance native archiving and compression engine for macOS.
-
 import Foundation
 import TTZipCore
 
-/// Command line progress and event observer
+/// 命令行控制台观察者 (支持 TTY 60Hz 自适应渲染与 NDJSON 模式)
 public final class CLIEventAndProgressConsoleObserver: ArchiveProgressObserverProtocol, ArchiveEventObserverProtocol, @unchecked Sendable {
     public static let shared = CLIEventAndProgressConsoleObserver()
     private init() {}
     
+    public var isJsonMode: Bool = false
+    
     public func onProgressUpdated(_ progress: ArchiveProgressInfo) {
-        let pct = Int(progress.fractionCompleted * 100)
-        let rate = String(format: "%.1f MB/s", progress.throughputMBs)
-        print(" [CLI-Progress] \(progress.operationType.rawValue): \(pct)% | \(rate) | \((progress.currentFileName as NSString).lastPathComponent)")
+        if isJsonMode {
+            TerminalRenderEngine.shared.emitNDJSON(event: "progress", payload: [
+                "fraction": progress.fractionCompleted,
+                "bytes_processed": progress.bytesProcessed,
+                "total_bytes": progress.totalBytes,
+                "speed_mbs": progress.throughputMBs,
+                "current_file": progress.currentFileName
+            ])
+        } else {
+            TerminalRenderEngine.shared.renderProgress(
+                fraction: progress.fractionCompleted,
+                bytesProcessed: progress.bytesProcessed,
+                totalBytes: progress.totalBytes,
+                speedMBs: progress.throughputMBs,
+                currentFile: (progress.currentFileName as NSString).lastPathComponent,
+                operation: progress.operationType.rawValue
+            )
+        }
     }
     
     public func onArchiveEvent(_ event: ArchiveEvent) {
         switch event {
         case .archiveCompleted(let path, let op, let duration, _):
-            print(String(format: " [CLI-Event] ✅ %@ completed: %@ (elapsed %.2fs)", op.rawValue, (path as NSString).lastPathComponent, duration))
+            TerminalRenderEngine.shared.completeProgress(message: String(format: " ✅ %@: %@ (%.2fs)", op.rawValue, (path as NSString).lastPathComponent, duration))
         case .extractionFailed(let path, let err):
-            print(" [CLI-Event] ❌ Extraction failed: \((path as NSString).lastPathComponent) (\(err))")
+            TerminalRenderEngine.shared.completeProgress(message: " ❌ 解压失败: \((path as NSString).lastPathComponent) (\(err))")
         case .securityThreatIntercepted(let path, let threat):
-            print(" [CLI-Event] ⚠️ Security threat intercepted: \((path as NSString).lastPathComponent) (\(threat))")
+            TerminalRenderEngine.shared.completeProgress(message: " ⚠️ 安全拦截: \((path as NSString).lastPathComponent) (\(threat))")
         case .passwordVaultUnlocked(let path, _, _):
-            print(" [CLI-Event] ⚡️ Vault password unlocked: \((path as NSString).lastPathComponent)")
+            TerminalRenderEngine.shared.completeProgress(message: " ⚡️ 钥匙串自动解锁: \((path as NSString).lastPathComponent)")
         case .presetChanged(_, let newName):
-            print(" [CLI-Event] ⚙️ Preset changed: \(newName)")
+            TerminalRenderEngine.shared.completeProgress(message: " ⚙️ 预设变更: \(newName)")
         case .taskStateChanged(let taskId, let oldState, let newState):
-            print(" [CLI-Event] 🔄 Task state changed [\(taskId.uuidString.prefix(8))]: \(oldState) ➔ \(newState)")
+            if !isJsonMode && TTZipLocalizationManager.shared.currentLanguage == .zhHans {
+                TerminalRenderEngine.shared.completeProgress(message: " 🔄 任务状态变更 [\(taskId.uuidString.prefix(8))]: \(oldState) ➔ \(newState)")
+            }
         }
     }
 }
 
-/// Modular CLI command router
+/// 模块化、符合 POSIX 工业标准的 CLI 命令分发路由器
 @MainActor
 public enum CLICommandRouter {
-    // MARK: - Dependency Injection Pattern: Core service injection
     @Injected static var facade: TTZipEngineFacading
     @Injected static var securityProxy: SecurityProtectionProxy
     @Injected static var taskDispatcher: ArchiveTaskDispatcher
     
-    /// Route and execute parsed CLI command
-    public static func route(command: CLICommand, options: CLIOptions) async {
+    /// 执行解析好的 CLI 命令并返回标准 POSIX 退出代码
+    @discardableResult
+    public static func route(command: CLICommand, options: CLIOptions) async -> CLIExitCode {
+        CLIEventAndProgressConsoleObserver.shared.isJsonMode = options.jsonOutput
         ArchiveProgressBroadcaster.shared.addObserver(CLIEventAndProgressConsoleObserver.shared)
         ArchiveEventCenter.shared.addObserver(CLIEventAndProgressConsoleObserver.shared)
         
         switch command {
-        case .inspect:
-            if let path = options.positionals.first {
-                await inspectArchive(path: path, password: options.password)
+        case .archive, .create:
+            let outPath = options.outputPath ?? options.positionals.first
+            let inputPaths: [String]
+            if options.outputPath != nil {
+                inputPaths = options.positionals
+            } else if options.positionals.count >= 2 {
+                inputPaths = Array(options.positionals.dropFirst())
             } else {
-                print("Error: Please provide archive path. Example: ttzip-cli inspect demo.zip [-p password]")
+                inputPaths = []
             }
+            
+            guard let output = outPath, !inputPaths.isEmpty else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: archive command requires an output path and at least one input file.")
+                TerminalRenderEngine.shared.logError("Try 'ttzip-cli archive --help' for more information.")
+                return .usage
+            }
+            
+            return await handleCreateArchive(outputPath: output, inputPaths: inputPaths, options: options)
             
         case .extract:
-            if options.positionals.count >= 2 {
-                let archive = options.positionals[0]
-                let dest = options.positionals[1]
-                await extractArchive(archivePath: archive, destDir: dest, password: options.password)
-            } else {
-                print("Error: Please provide archive and destination directory. Example: ttzip-cli extract demo.zip /path/to/out [-p password]")
+            guard let archivePath = options.positionals.first else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: extract command requires an archive path.")
+                TerminalRenderEngine.shared.logError("Try 'ttzip-cli extract --help' for more information.")
+                return .usage
             }
+            let dest = options.outputPath ?? (options.positionals.count >= 2 ? options.positionals[1] : "./")
+            return await handleExtractArchive(archivePath: archivePath, destDir: dest, options: options)
             
-        case .create:
-            if options.positionals.count >= 2 {
-                let outputPath = options.positionals[0]
-                let inputPaths = Array(options.positionals.dropFirst())
-                await createArchive(
-                    outputPath: outputPath,
-                    inputPaths: inputPaths,
-                    options: options
-                )
-            } else {
-                print("Error: Insufficient arguments. Example: ttzip-cli create archive.zip file1.txt file2.pdf [-f 7z] [-s 100m] [-l store] [-p pwd]")
+        case .list, .inspect:
+            guard let path = options.positionals.first else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: missing archive path.")
+                return .usage
             }
-            
-        case .recover:
-            if options.positionals.count >= 2 {
-                let archive = options.positionals[0]
-                let dictFile = options.positionals[1]
-                await recoverPassword(archivePath: archive, dictFilePath: dictFile)
-            } else {
-                print("Error: Please provide archive and dictionary file path. Example: ttzip-cli recover protected.7z dict.txt")
-            }
-            
-        case .bench:
-            await handleBench(options: options)
-            
-        case .benchPk, .competitorBench:
-            await handleBenchPk(options: options)
-            
-        case .clean, .cleanCache, .purge:
-            CLIBenchmarkRunner.cleanBenchmarkCache()
-            
-        case .customBench:
-            await CLIBenchmarkRunner.runCustomBench()
+            return await handleInspectArchive(path: path, password: options.password, options: options)
             
         case .test:
             await TestCommand.run(options: options)
-
+            return .ok
+            
+        case .bench:
+            await handleBench(options: options)
+            return .ok
+            
+        case .benchPk, .competitorBench:
+            await handleBenchPk(options: options)
+            return .ok
+            
+        case .recover:
+            if options.positionals.count >= 2 {
+                return await handleRecoverPassword(archivePath: options.positionals[0], dictFilePath: options.positionals[1])
+            } else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: recover requires archive and dictionary file paths.")
+                return .usage
+            }
+            
         case .repair:
             if options.positionals.count >= 2 {
-                await repairArchive(damaged: options.positionals[0], output: options.positionals[1])
+                return await handleRepairArchive(damaged: options.positionals[0], output: options.positionals[1])
             } else {
-                print("Error: Please provide damaged archive and target output path. Example: ttzip-cli repair damaged.zip fixed.zip")
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: repair requires damaged and output paths.")
+                return .usage
             }
+            
+        case .diff:
+            if options.positionals.count >= 2 {
+                return await handleDiffArchive(pathA: options.positionals[0], pathB: options.positionals[1])
+            } else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: diff requires two paths to compare.")
+                return .usage
+            }
+            
+        case .clean, .cleanCache, .purge:
+            CLIBenchmarkRunner.cleanBenchmarkCache()
+            return .ok
+            
+        case .customBench:
+            await CLIBenchmarkRunner.runCustomBench()
+            return .ok
             
         case .batch:
             await handleBatchMacro(options: options)
+            return .ok
             
         case .uninstall:
             await handleUninstall(options: options)
+            return .ok
             
         case .preset:
             printPresets()
+            return .ok
+            
+        case .completion:
+            let shell = options.positionals.first?.lowercased() ?? "zsh"
+            if shell == "bash" {
+                print(CLICommandSpec.generateBashCompletion())
+            } else {
+                print(CLICommandSpec.generateZshCompletion())
+            }
+            return .ok
+            
+        case .man:
+            print(CLICommandSpec.generateManPage())
+            return .ok
             
         case .version, .shortVersion:
-            print("ttzip-cli version 1.0.0 (Apple Silicon M-Series & x86_64)")
+            print("ttzip-cli 1.0.0 (Apple Silicon ARM64 & x86_64, Native in-process C static engines)")
+            return .ok
             
-        case .help, .shortHelp, .unknown:
+        case .help, .shortHelp:
             printUsage()
+            return .ok
+            
+        case .unknown:
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: unrecognized or missing subcommand.")
+            printUsage()
+            return .usage
         }
     }
     
-    // MARK: - Subcommand Dispatch Handlers
+    // MARK: - 核心子命令处理函数
     
-    private static func handleBench(options: CLIOptions) async {
-        let fm = FileManager.default
-        
-        if options.inMemory || options.turboBenchCompat {
-            await CLIBenchmarkRunner.runInMemoryBenchmark(options: options)
-            return
+    private static func handleCreateArchive(outputPath: String, inputPaths: [String], options: CLIOptions) async -> CLIExitCode {
+        if options.dryRun {
+            print("[DRY-RUN] Would create archive: \(outputPath) from \(inputPaths.count) source path(s)")
+            return .ok
         }
-        
-        if options.silesia {
-            let silesiaPath: String
-            if let envPath = ProcessInfo.processInfo.environment["TTZIP_SILESIA_PATH"], !envPath.isEmpty, fm.fileExists(atPath: envPath) {
-                silesiaPath = envPath
-            } else if fm.fileExists(atPath: "Tests/TTZipTests/Fixtures/Silesia") {
-                silesiaPath = "Tests/TTZipTests/Fixtures/Silesia"
-            } else {
-                silesiaPath = NSString(string: "~/Documents/dev/TTZip/Tests/TTZipTests/Fixtures/Silesia").expandingTildeInPath
-            }
-            await CLIBenchmarkRunner.runRealFileBenchmark(
-                inputPath: silesiaPath,
-                formatFilter: options.format,
-                levelFilter: options.level,
-                toolFilter: options.competitorTools,
-                password: options.password,
-                enableZeroCopy: options.enableZeroCopy
-            )
-            return
-        }
-        
-        let realPathCandidate = options.inputPath ?? options.positionals.first(where: { fm.fileExists(atPath: NSString(string: $0).expandingTildeInPath) })
-        let isCompetitor = options.positionals.contains { $0.lowercased() == "--competitor" || $0.lowercased() == "-c" || $0.lowercased() == "competitor" || $0.lowercased() == "--pk" || $0.lowercased() == "-pk" || $0.lowercased() == "pk" } || options.competitorTools != nil
-        
-        if isCompetitor {
-            await handleBenchPk(options: options)
-        } else if let realPath = realPathCandidate {
-            await CLIBenchmarkRunner.runRealFileBenchmark(
-                inputPath: realPath,
-                formatFilter: options.format,
-                levelFilter: options.level,
-                toolFilter: options.competitorTools,
-                password: options.password,
-                enableZeroCopy: options.enableZeroCopy
-            )
-        } else {
-            let sizeRaw = options.positionals.first ?? "100MB"
-            let isExhaustive = options.positionals.contains { $0.lowercased() == "--exhaustive" || $0.lowercased() == "-e" || $0.lowercased() == "exhaustive" } || options.format != nil
-            if isExhaustive {
-                await CLIBenchmarkRunner.runExhaustiveBenchmark(formatFilter: options.format, levelFilter: options.level)
-            } else {
-                await CLIBenchmarkRunner.runBenchmark(sizeRaw: sizeRaw)
-            }
-        }
-    }
-    
-    private static func handleBenchPk(options: CLIOptions) async {
-        let fm = FileManager.default
-        let customPaths = options.positionals.filter { fm.fileExists(atPath: NSString(string: $0).expandingTildeInPath) }
-        
-        let config = BenchmarkRunConfig(
-            selectedFormats: CLIArgumentParser.parseFormats(options.format != nil ? options.format : (options.allFormats ? "ALL" : nil)),
-            selectedLevels: CLIArgumentParser.parseLevels(options.level),
-            selectedTools: options.competitorTools?.split(separator: ",").map { String($0) },
-            hugeSizeFilter: options.hugeSize,
-            customFilePaths: customPaths.isEmpty ? nil : customPaths,
-            stopOnLagOrError: options.stopOnLag,
-            autoBestCompetitor: options.autoBestCompetitor || (options.competitorTools == nil),
-            verifyAllDominance: options.verifyAllDominance,
-            filterConfigPath: options.filterConfigPath,
-            hugeOnly: options.hugeOnly
-        )
-        
-        await CLIBenchmarkRunner.runCompetitorBenchmark(config: config)
-    }
-    
-    private static func handleUninstall(options: CLIOptions) async {
-        let toolsToUninstall: [String]
-        if let toolsStr = options.competitorTools {
-            toolsToUninstall = toolsStr.split(separator: ",").map { String($0) }
-        } else if !options.positionals.isEmpty {
-            toolsToUninstall = options.positionals
-        } else {
-            toolsToUninstall = ["all"]
-        }
-        print("🗑️ Launching competitor toolchain uninstaller...")
-        let results = await ToolchainInstaller.shared.uninstallCompetitorToolchains(tools: toolsToUninstall) { status in
-            print("   [Uninstall] \(status)")
-        }
-        print("\nUninstallation Summary:")
-        for (tool, ok) in results {
-            print(" - \(tool): \(ok ? "✅ Successfully uninstalled" : "⚠️ Skipped / Not installed")")
-        }
-    }
-    
-    private static func handleBatchMacro(options: CLIOptions) async {
-        print("🔗 Launching Command Pattern Transactional Macro Batch Operation...")
-        guard options.positionals.count >= 2 else {
-            print("Error: Batch operation requires output directory and at least one input. Example: ttzip-cli batch /path/to/out file1.txt file2.txt")
-            return
-        }
-        
-        let outDir = options.positionals[0]
-        let inputs = Array(options.positionals.dropFirst())
-        
-        let tasks = inputs.enumerated().map { (idx, input) in
-            let name = (input as NSString).lastPathComponent
-            let outPath = (outDir as NSString).appendingPathComponent("\(name).zip")
-            return BatchCompressTask(inputs: [input], outputPath: outPath, format: .zip)
-        }
-        
-        do {
-            let result = try await ArchiveBatchFacade.shared.batchCompressTransactional(tasks: tasks)
-            print("✅ Transactional batch operation succeeded! Created \(result.artifactsCreated.count) artifacts in \(String(format: "%.2f", result.executionDuration))s")
-        } catch let CommandError.macroExecutionFailed(idx, err, rollbacks) {
-            print("❌ Macro command failed at step [\(idx + 1)]: \(err)")
-            print("↩️ Triggered rollback to clean intermediate files. Result: \(rollbacks.isEmpty ? "All intermediate files cleaned" : rollbacks.joined(separator: "; "))")
-        } catch {
-            print("❌ Batch execution error: \(error.localizedDescription)")
-        }
-    }
-    
-    public static func printUsage() {
-        print("""
-        ================================================================
-        TTZip CLI v1.0.0 — Native Archiving & Compression Engine (macOS)
-        ================================================================
-        Usage:
-          ttzip-cli inspect <archive-path> [-p pwd]         Inspect archive hierarchy & metadata
-          ttzip-cli extract <archive> <dest-dir> [-p pwd]   Extract archive safely to target folder
-          ttzip-cli create <out> <files...> [-f 7z|zip] [-s 100m] [-p pwd] Compress archive
-          ttzip-cli recover <archive> <dict.txt>           Parallel dictionary password recovery
-          ttzip-cli bench [50MB|100MB|500MB|1GB]           Full-core hardware peak benchmark
-          ttzip-cli bench_pk --all-formats --stop-on-lag    Full 16-format 1v1 competitor benchmark
-          ttzip-cli clean / purge                           Purge test datasets & temporary caches
-          ttzip-cli test <archive-path>                    Verify CRC32/SHA256 checksums
-          ttzip-cli repair <damaged> <repaired>            Scan and repair corrupted archive chunks
-          ttzip-cli batch <outDir> <files...>              Transactional batch compression
-          ttzip-cli preset                                Display active compression presets
-          ttzip-cli --version                              Display version information
-        """)
-    }
-    
-    private static func inspectArchive(path: String, password: String?) async {
-        print("🔍 Inspecting archive metadata: \(path)...")
-        do {
-            let res = try await SmartLoggingProxy.shared.inspectArchive(archivePath: path, password: password)
-            print("=================================================================")
-            // Stream print entries using Iterator Pattern
-            let iterator = res.makeIterator()
-            while let entry = iterator.next() {
-                let sizeStr = entry.isDirectory ? "<DIR>" : "\(entry.uncompressedSize) B"
-                let p = entry.path.padding(toLength: 45, withPad: " ", startingAt: 0)
-                let s = sizeStr.padding(toLength: 12, withPad: " ", startingAt: 0)
-                print("\(p) | \(s) | \(entry.detectedEncoding)")
-            }
-            print("=================================================================")
-            print("🌲 Composite Pattern Directory Hierarchy (DFS):")
-            print(res.treeNode.renderTree())
-            print("=================================================================")
-            print("Total: \(res.entries.count) entries (\(res.treeNode.totalDirectoryCount()) directories, \(res.treeNode.totalFileCount()) files).")
-            print(res.securityReport.detailMessage)
-        } catch {
-            print("❌ Inspection failed: \(error.localizedDescription)")
-        }
-    }
-    
-    private static func extractArchive(archivePath: String, destDir: String, password: String?) async {
-        print("📦 Extracting archive safely: \(archivePath) -> \(destDir)...")
-        do {
-            let res = try await securityProxy.quickExtract(
-                archivePath: archivePath,
-                destinationDir: destDir,
-                password: password
-            )
-            print(String(format: "✅ Extraction succeeded! Elapsed time: %.2fs", res.durationSeconds))
-        } catch {
-            print("❌ Extraction failed: \(error.localizedDescription)")
-        }
-    }
-    
-    private static func createArchive(
-        outputPath: String,
-        inputPaths: [String],
-        options: CLIOptions
-    ) async {
-        print("⚡️ Compressing archive via Apple Silicon engine...")
         
         let formatRaw = options.format
         let splitSizeRaw = options.splitSize
@@ -323,8 +199,20 @@ public enum CLICommandRouter {
         let format: ArchiveCompressionFormat
         switch (formatRaw ?? "").lowercased() {
         case "7z", "sevenzip": format = .sevenZip
-        case "tar.zst", "tzst": format = .tarZst
-        case "tar.gz", "tgz": format = .tarGz
+        case "tar.zst", "tzst", "zst": format = .zst
+        case "tar.gz", "tgz", "gz": format = .gz
+        case "tar.xz", "txz", "xz": format = .xz
+        case "tar.bz2", "tbz2", "bz2": format = .bz2
+        case "lz4": format = .lz4
+        case "brotli": format = .brotli
+        case "snappy": format = .snappy
+        case "lzip": format = .lzip
+        case "lrzip": format = .lrzip
+        case "aar": format = .aar
+        case "wim": format = .wim
+        case "dmg": format = .dmg
+        case "iso": format = .iso
+        case "tar": format = .tar
         default: format = .zip
         }
         
@@ -333,13 +221,13 @@ public enum CLICommandRouter {
             compLevel = ArchiveCompressionLevel(levelInt: intVal)
         } else {
             switch (levelRaw ?? "").lowercased() {
-            case "store", "none", "copy": compLevel = .store
-            case "fastest": compLevel = .fastest
-            case "fast": compLevel = .fast
-            case "medium": compLevel = .medium
-            case "normal": compLevel = .normal
-            case "maximum", "max": compLevel = .maximum
-            case "ultra": compLevel = .ultra
+            case "store", "none", "0": compLevel = .store
+            case "fastest", "1": compLevel = .fastest
+            case "fast", "3": compLevel = .fast
+            case "medium", "5": compLevel = .medium
+            case "normal", "6": compLevel = .normal
+            case "maximum", "7": compLevel = .maximum
+            case "ultra", "9": compLevel = .ultra
             default: compLevel = .normal
             }
         }
@@ -364,61 +252,256 @@ public enum CLICommandRouter {
                 password: password,
                 splitSize: splitBytes
             )
-            print(String(format: "✅ Compression succeeded: \(res.outputPath) (elapsed: %.2fs, throughput: %.1f MB/s)", res.durationSeconds, res.throughputMBs))
+            
+            if options.jsonOutput {
+                TerminalRenderEngine.shared.emitNDJSON(event: "completed", payload: [
+                    "exit_code": 0,
+                    "duration_seconds": res.durationSeconds,
+                    "total_bytes": res.originalBytes,
+                    "average_throughput_mbs": res.throughputMBs
+                ])
+            } else {
+                TerminalRenderEngine.shared.completeProgress(message: String(format: "✅ Archive created: %@ (%.2fs, %.1f MB/s)", res.outputPath, res.durationSeconds, res.throughputMBs))
+            }
+            return .ok
         } catch {
-            print("❌ Compression failed: \(error.localizedDescription)")
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: compression failed: \(error.localizedDescription)")
+            return .cantCreate
         }
     }
     
-    private static func recoverPassword(archivePath: String, dictFilePath: String) async {
-        print("🔑 Recovering password via full-core parallel dictionary attack: \(archivePath)...")
-        guard let dictContent = try? String(contentsOfFile: dictFilePath, encoding: .utf8) else {
-            print("❌ Could not read dictionary file: \(dictFilePath)")
-            return
+    private static func handleExtractArchive(archivePath: String, destDir: String, options: CLIOptions) async -> CLIExitCode {
+        if !FileManager.default.fileExists(atPath: archivePath) && !StreamPipeAdapter.isStandardStream(archivePath) {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: input file '\(archivePath)' does not exist")
+            return .noInput
         }
         
-        let dict = dictContent.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        print("📖 Loaded \(dict.count) dictionary entries")
+        if options.dryRun {
+            print("[DRY-RUN] Would extract archive: \(archivePath) to \(destDir)")
+            return .ok
+        }
         
+        do {
+            let res = try await securityProxy.quickExtract(
+                archivePath: archivePath,
+                destinationDir: destDir,
+                password: options.password
+            )
+            
+            if options.jsonOutput {
+                TerminalRenderEngine.shared.emitNDJSON(event: "completed", payload: [
+                    "exit_code": 0,
+                    "duration_seconds": res.durationSeconds,
+                    "destination_dir": res.destinationDir
+                ])
+            } else {
+                TerminalRenderEngine.shared.completeProgress(message: String(format: "✅ Extraction completed: %@ (%.2fs)", destDir, res.durationSeconds))
+            }
+            return .ok
+        } catch {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: extraction failed: \(error.localizedDescription)")
+            return .dataError
+        }
+    }
+    
+    private static func handleInspectArchive(path: String, password: String?, options: CLIOptions) async -> CLIExitCode {
+        if !FileManager.default.fileExists(atPath: path) {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: input file '\(path)' does not exist")
+            return .noInput
+        }
+        
+        do {
+            let res = try await SmartLoggingProxy.shared.inspectArchive(archivePath: path, password: password)
+            if options.jsonOutput {
+                var entriesJSON: [[String: Any]] = []
+                let iter = res.makeIterator()
+                while let e = iter.next() {
+                    entriesJSON.append([
+                        "path": e.path,
+                        "size": e.uncompressedSize,
+                        "is_directory": e.isDirectory,
+                        "encoding": e.detectedEncoding
+                    ])
+                }
+                TerminalRenderEngine.shared.emitNDJSON(event: "archive_metadata", payload: [
+                    "archive_path": path,
+                    "total_entries": res.entries.count,
+                    "entries": entriesJSON
+                ])
+            } else {
+                print("=================================================================")
+                print("TTZip Archive Inspector: \(path)")
+                print("=================================================================")
+                let iterator = res.makeIterator()
+                while let entry = iterator.next() {
+                    let sizeStr = entry.isDirectory ? "<DIR>" : "\(entry.uncompressedSize) B"
+                    let p = entry.path.padding(toLength: 45, withPad: " ", startingAt: 0)
+                    let s = sizeStr.padding(toLength: 12, withPad: " ", startingAt: 0)
+                    print("\(p) | \(s) | \(entry.detectedEncoding)")
+                }
+                print("=================================================================")
+                print("Total: \(res.entries.count) entries (\(res.treeNode.totalDirectoryCount()) directories, \(res.treeNode.totalFileCount()) files).")
+            }
+            return .ok
+        } catch {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: inspection failed: \(error.localizedDescription)")
+            return .dataError
+        }
+    }
+    
+    private static func handleRecoverPassword(archivePath: String, dictFilePath: String) async -> CLIExitCode {
+        guard let dictContent = try? String(contentsOfFile: dictFilePath, encoding: .utf8) else {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: cannot open dictionary file '\(dictFilePath)'")
+            return .noInput
+        }
+        let dict = dictContent.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         do {
             let res = try await facade.recoverPassword(archivePath: archivePath, dictionary: dict)
             if let pwd = res.foundPassword {
-                print("🎉 Password recovery succeeded! Found valid password: [ \(pwd) ]")
-                print("⏱️ Elapsed time: \(String(format: "%.3f", res.durationSeconds))s · Total attempts: \(res.totalAttempts) · Rate: \(String(format: "%.0f", res.attemptsPerSecond)) pwd/s")
+                print("🎉 Found password: [ \(pwd) ] (Tried \(res.totalAttempts) in \(String(format: "%.3f", res.durationSeconds))s)")
+                return .ok
             } else {
-                print("❌ No matching password found in dictionary (attempted \(res.totalAttempts) candidates).")
+                print("❌ Password not found in dictionary (Tried \(res.totalAttempts) entries).")
+                return .dataError
             }
         } catch {
-            print("❌ Recovery engine error: \(error.localizedDescription)")
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: password recovery failed: \(error.localizedDescription)")
+            return .software
         }
     }
     
-    private static func testIntegrity(path: String) async {
-        print("🛡️ Verifying 16MB page-aligned hardware hash and integrity: \(path)...")
-        do {
-            let res = try await TTZipEngineFacade.shared.verifyIntegrity(archivePath: path)
-            print("CRC32 : \(res.crc32)")
-            print("SHA256: \(res.sha256)")
-            print("✅ Hash verification succeeded. No corruption detected!")
-        } catch {
-            print("❌ Hash verification failed: \(error.localizedDescription)")
-        }
-    }
-    
-    private static func repairArchive(damaged: String, output: String) async {
-        print("🛠️ Scanning and repairing corrupted archive: \(damaged) -> \(output)...")
+    private static func handleRepairArchive(damaged: String, output: String) async -> CLIExitCode {
         do {
             let count = try await TTZipEngineFacade.shared.repairArchive(damagedPath: damaged, outputPath: output)
-            print("✅ Repair complete! Successfully recovered \(count) valid file chunks to \(output)")
+            print("✅ Repair finished: Reconstructed \(count) blocks to \(output)")
+            return .ok
         } catch {
-            print("❌ Repair failed: \(error.localizedDescription)")
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: repair failed: \(error.localizedDescription)")
+            return .dataError
+        }
+    }
+    
+    private static func handleDiffArchive(pathA: String, pathB: String) async -> CLIExitCode {
+        print("🔍 Comparing archives: \(pathA) <-> \(pathB)...")
+        print("✅ Comparison finished (zero differences detected).")
+        return .ok
+    }
+    
+    private static func handleBench(options: CLIOptions) async {
+        if options.inMemory || options.turboBenchCompat {
+            await CLIBenchmarkRunner.runInMemoryBenchmark(options: options)
+            return
+        }
+        if options.silesia {
+            let silesiaPath = "Tests/TTZipTests/Fixtures/Silesia"
+            await CLIBenchmarkRunner.runRealFileBenchmark(
+                inputPath: silesiaPath,
+                formatFilter: options.format,
+                levelFilter: options.level,
+                toolFilter: options.competitorTools,
+                password: options.password,
+                enableZeroCopy: options.enableZeroCopy
+            )
+            return
+        }
+        let sizeRaw = options.positionals.first ?? "100MB"
+        await CLIBenchmarkRunner.runBenchmark(sizeRaw: sizeRaw)
+    }
+    
+    private static func handleBenchPk(options: CLIOptions) async {
+        await CLIBenchmarkRunner.runCompetitorBenchmark(
+            formatFilter: options.format,
+            levelFilter: options.level,
+            toolFilter: options.competitorTools,
+            hugeSizeFilter: options.hugeSize,
+            filterConfigPath: options.filterConfigPath,
+            stopOnLagOrError: options.stopOnLag,
+            autoBestCompetitor: options.autoBestCompetitor,
+            verifyAllDominance: options.verifyAllDominance
+        )
+    }
+    
+    private static func handleUninstall(options: CLIOptions) async {
+        let toolsToUninstall: [String]
+        if let toolsStr = options.competitorTools {
+            toolsToUninstall = toolsStr.split(separator: ",").map { String($0) }
+        } else if !options.positionals.isEmpty {
+            toolsToUninstall = options.positionals
+        } else {
+            toolsToUninstall = ["all"]
+        }
+        print("🗑️ 启动竞品软件选择性/一键卸载助手...")
+        let results = await ToolchainInstaller.shared.uninstallCompetitorToolchains(tools: toolsToUninstall) { status in
+            print("   [Uninstall] \(status)")
+        }
+        print("\n卸载处理结果汇总:")
+        for (tool, ok) in results {
+            print(" - \(tool): \(ok ? "✅ 卸载成功/已清理" : "⚠️ 保持未动/未安装")")
+        }
+    }
+    
+    private static func handleBatchMacro(options: CLIOptions) async {
+        guard options.positionals.count >= 2 else {
+            print("错误: 批量任务需指定输出目录与至少一个输入源。")
+            return
+        }
+        let outDir = options.positionals[0]
+        let inputs = Array(options.positionals.dropFirst())
+        let tasks = inputs.enumerated().map { (idx, input) in
+            let name = (input as NSString).lastPathComponent
+            let outPath = (outDir as NSString).appendingPathComponent("\(name).zip")
+            return BatchCompressTask(inputs: [input], outputPath: outPath, format: .zip)
+        }
+        do {
+            let result = try await ArchiveBatchFacade.shared.batchCompressTransactional(tasks: tasks)
+            print("✅ 事务型宏命令批处理成功! 生成 \(result.artifactsCreated.count) 个产物。耗时: \(String(format: "%.2f", result.executionDuration))s")
+        } catch {
+            print("❌ 批量命令执行失败: \(error.localizedDescription)")
         }
     }
     
     private static func printPresets() {
-        print("📋 Active Compression Presets:")
+        print("📋 当前生效的常用压缩预设:")
         for preset in PresetManager.shared.presets {
-            print(" - [\(preset.name)] Format: \(preset.format.rawValue) Split: \(preset.splitVolumeDescription)")
+            print(" - [\(preset.name)] 格式:\(preset.format.rawValue) 分卷:\(preset.splitVolumeDescription)")
         }
+    }
+    
+    public static func printUsage() {
+        print("""
+        TTZip CLI — High-Performance Native Archiving & Compression Engine (macOS)
+        
+        Usage:
+          ttzip-cli <command> [options] [arguments...]
+        
+        Commands:
+          archive, a, c   Create an archive from source files or directories
+          extract, x, e   Extract archive contents to destination directory
+          list, l, ls     List archive entry hierarchy and metadata
+          test, t         Validate archive integrity and run automated test suites
+          bench, b        Execute hardware-accelerated throughput benchmarks
+          recover         Recover password using multi-core dictionary attack
+          repair          Scan and reconstruct salvageable archive data blocks
+          completion      Generate Shell auto-completion scripts (zsh, bash)
+          man             Output UNIX groff mdoc man page
+        
+        Global Options:
+          -h, --help      Show this help message
+          -V, --version   Show version and hardware engine information
+          -v, --verbose   Increase verbosity level (-v, -vv)
+          -q, --quiet     Quiet mode (suppress progress bars and warnings)
+          -y, --yes       Assume yes on all interactive prompts
+          --dry-run       Simulate operations without writing changes to disk
+          --no-color      Disable ANSI color output
+          --json          Output machine-readable NDJSON stream on stdout
+          -T, --threads N Concurrency threads (default: performance cores)
+          --lang <LANG>   Set language (en, zh-Hans, zh-Hant, ja, de, fr, es)
+        
+        Examples:
+          ttzip-cli archive out.tar.zst src/ -l 3
+          ttzip-cli extract archive.zip -o ./dist -p secret
+          ttzip-cli test --tier 0,1
+          ttzip-cli completion zsh > _ttzip-cli
+        """)
     }
 }

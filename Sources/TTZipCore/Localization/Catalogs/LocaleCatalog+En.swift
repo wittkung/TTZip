@@ -1,0 +1,73 @@
+import Foundation
+
+public enum LocaleCatalogEn {
+    public static let strings: [String: String] = [
+        "common.cancel": "Cancel",
+        "common.ok": "OK",
+        "common.done": "Done",
+        "common.save": "Save",
+        "common.close": "Close",
+        "common.retry": "Retry",
+        "common.success": "Success",
+        "common.failed": "Failed",
+        "common.loading": "Loading...",
+        "common.warning": "Warning",
+        "common.error": "Error",
+        "common.processing": "Processing...",
+        
+        "archive.compress": "Compress",
+        "archive.extract": "Extract",
+        "archive.compressing": "Compressing...",
+        "archive.extracting": "Extracting...",
+        "archive.compress_success": "Archive created successfully",
+        "archive.extract_success": "Archive extracted successfully",
+        "archive.compress_failed": "Compression failed",
+        "archive.extract_failed": "Extraction failed",
+        "archive.password_required": "Password required",
+        "archive.incorrect_password": "Incorrect password",
+        "archive.corrupt_data": "Archive data is corrupt",
+        "archive.unsupported_format": "Unsupported archive format",
+        "archive.format": "Format",
+        "archive.compression_level": "Compression Level",
+        "archive.split_volume": "Split Volume",
+        "archive.encryption": "Encryption",
+        
+        "cli.usage_header": "TTZip CLI — High-performance native archiving engine",
+        "cli.subcommands": "Commands",
+        "cli.global_options": "Global Options",
+        "cli.error_missing_arg": "Missing required argument: %@",
+        "cli.error_file_not_found": "File not found: %@",
+        "cli.error_invalid_format": "Invalid archive format: %@",
+        "cli.dry_run_prefix": "[DRY-RUN] Would execute: %@",
+        "cli.bench_running": "Running benchmark for format %@ (Pass %d/%d)...",
+        "cli.test_summary": "Test Summary: %d passed, %d failed in %.2fs",
+        
+        "benchmark.throughput": "Throughput",
+        "benchmark.compression_ratio": "Ratio",
+        "benchmark.duration": "Duration",
+        "benchmark.memory_usage": "Memory",
+        "benchmark.peak_throughput": "Peak Throughput",
+        "benchmark.speedup": "Speedup",
+        
+        "error.file_not_found": "The specified file or directory does not exist.",
+        "error.permission_denied": "Permission denied accessing path.",
+        "error.disk_full": "Destination disk is full.",
+        "error.zip_slip_detected": "Zip Slip directory traversal vulnerability detected and blocked.",
+        "error.corrupted_header": "Archive header magic check failed or corrupted.",
+        "error.crc_mismatch": "CRC32 checksum mismatch in extracted payload.",
+        "error.out_of_memory": "Out of memory allocating buffer.",
+        "error.operation_cancelled": "Operation cancelled by user.",
+        
+        "settings.title": "Preferences",
+        "settings.general": "General",
+        "settings.language": "Language",
+        "settings.byte_units": "Byte Units",
+        "settings.license_status": "License Status",
+        "settings.hardware_topology": "Hardware Topology",
+        
+        "vault.title": "Password Vault",
+        "vault.unlock_prompt": "Enter password to unlock vault",
+        "vault.add_password": "Add Password",
+        "vault.empty_vault": "Vault is empty"
+    ]
+}

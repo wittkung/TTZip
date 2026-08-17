@@ -1,0 +1,73 @@
+import Foundation
+
+public enum LocaleCatalogEs {
+    public static let strings: [String: String] = [
+        "common.cancel": "Cancelar",
+        "common.ok": "Aceptar",
+        "common.done": "Hecho",
+        "common.save": "Guardar",
+        "common.close": "Cerrar",
+        "common.retry": "Reintentar",
+        "common.success": "Éxito",
+        "common.failed": "Error",
+        "common.loading": "Cargando...",
+        "common.warning": "Advertencia",
+        "common.error": "Error",
+        "common.processing": "Procesando...",
+        
+        "archive.compress": "Comprimir",
+        "archive.extract": "Extraer",
+        "archive.compressing": "Comprimiendo...",
+        "archive.extracting": "Extrayendo...",
+        "archive.compress_success": "Archivo creado con éxito",
+        "archive.extract_success": "Archivo extraído con éxito",
+        "archive.compress_failed": "Error al comprimir",
+        "archive.extract_failed": "Error al extraer",
+        "archive.password_required": "Se requiere contraseña",
+        "archive.incorrect_password": "Contraseña incorrecta",
+        "archive.corrupt_data": "Datos del archivo corruptos",
+        "archive.unsupported_format": "Formato no compatible",
+        "archive.format": "Formato",
+        "archive.compression_level": "Nivel de compresión",
+        "archive.split_volume": "Volumen dividido",
+        "archive.encryption": "Cifrado",
+        
+        "cli.usage_header": "TTZip CLI — Motor nativo de compresión de alto rendimiento",
+        "cli.subcommands": "Comandos",
+        "cli.global_options": "Opciones globales",
+        "cli.error_missing_arg": "Falta el argumento requerido: %@",
+        "cli.error_file_not_found": "Archivo no encontrado: %@",
+        "cli.error_invalid_format": "Formato no válido: %@",
+        "cli.dry_run_prefix": "[SIMULACIÓN] Ejecutaría: %@",
+        "cli.bench_running": "Ejecutando benchmark para formato %@ (Paso %d/%d)...",
+        "cli.test_summary": "Resumen de pruebas: %d aprobadas, %d fallidas en %.2fs",
+        
+        "benchmark.throughput": "Rendimiento",
+        "benchmark.compression_ratio": "Tasa de compresión",
+        "benchmark.duration": "Duración",
+        "benchmark.memory_usage": "Memoria",
+        "benchmark.peak_throughput": "Rendimiento máximo",
+        "benchmark.speedup": "Aceleración",
+        
+        "error.file_not_found": "El archivo o directorio especificado no existe.",
+        "error.permission_denied": "Permiso denegado.",
+        "error.disk_full": "Disco lleno.",
+        "error.zip_slip_detected": "Ataque de salto de directorio Zip Slip detectado y bloqueado.",
+        "error.corrupted_header": "Verificación Magic de encabezado fallida o corrupta.",
+        "error.crc_mismatch": "Discrepancia en la suma de verificación CRC32.",
+        "error.out_of_memory": "Memoria insuficiente.",
+        "error.operation_cancelled": "Operación cancelada por el usuario.",
+        
+        "settings.title": "Preferencias",
+        "settings.general": "General",
+        "settings.language": "Idioma",
+        "settings.byte_units": "Unidades de bytes",
+        "settings.license_status": "Estado de la licencia",
+        "settings.hardware_topology": "Topología de hardware",
+        
+        "vault.title": "Bóveda de contraseñas",
+        "vault.unlock_prompt": "Introduzca la contraseña para desbloquear",
+        "vault.add_password": "Añadir contraseña",
+        "vault.empty_vault": "Bóveda vacía"
+    ]
+}
