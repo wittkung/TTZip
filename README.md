@@ -189,10 +189,14 @@ TTZip is built with deep gratitude for foundational open-source compression engi
 - [7-Zip / LZMA SDK](https://www.7-zip.org) (Igor Pavlov)
 - [Keka](https://github.com/aonez/Keka) (aone) & [The Unarchiver](https://theunarchiver.com) (Dag Ågren)
 
-### 🌟 Upstream Contribution Commitments
-We actively contribute generic hardware acceleration breakthroughs back to upstream projects:
-- **ARM64 / Apple Silicon SIMD Vectorization**: Sharing 4-way unrolled Galois Field polynomial multiplication (`vmull_p64`) patches and SWAR pattern matchers with foundational libraries.
-- **Reproducible Test Harnesses**: Publishing zero-dependency standalone C verification suites to assist upstream maintainers in verifying ARM64 performance.
+### 🌟 Upstream Contributions & Community Stewardship
+We actively contribute verified hardware acceleration and architectural cleanups back to foundational upstream projects:
+
+- **[`libarchive/libarchive`](https://github.com/libarchive/libarchive)** (Official Operating System Core Foundation):
+  - ✅ **ARMv8 ACLE Hardware-Accelerated CRC32 & Architectural Unification** ([PR #3391](https://github.com/libarchive/libarchive/pull/3391) — **Merged into `master`**, Commit [`8e439b92`](https://github.com/libarchive/libarchive/commit/8e439b92787c8104e22c5958caf0a7ef9532567f)): Unified the library's internal CRC32 API across all format readers (7z, GZIP, RAR, ZIP) with single-cycle ARMv8 hardware acceleration, strict C99 aliasing safety, GNU Autotools / CMake dual-build support, and three-tier graceful fallback.
+  - 🔄 **7-Zip AES-256-CBC Stream Decryption Pipeline** ([PR #3388](https://github.com/libarchive/libarchive/pull/3388)): Atomic-commit cryptographic pipeline integration with volatile memory clearing (`memset_s` semantics) and clean streaming error propagation.
+  - 💡 **POSIX `F_PREALLOCATE` & `fallocate` Heuristics** ([Issue #3392](https://github.com/libarchive/libarchive/issues/3392) / [PR #3393](https://github.com/libarchive/libarchive/pull/3393)): High-resolution monotonic benchmark measurements (+39% ~ +70% throughput) and transparent zero-configuration default extraction heuristics.
+- **Reproducible Test Harnesses**: Publishing zero-dependency standalone C verification suites to assist upstream maintainers in verifying Apple Silicon and ARM64 vector throughput.
 
 Detailed licensing attributions are documented in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
 
