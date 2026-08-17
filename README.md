@@ -153,20 +153,23 @@ Detailed licensing and copyright attributions are maintained in [ACKNOWLEDGEMENT
 
 ---
 
+---
+
 ## 📄 License & Community Model
 
-TTZip is proud to support the global developer community while **strictly prohibiting any third-party commercial exploitation, white-label wrapping, or unauthorized resale**.
+TTZip is proud to support the global developer community while **strictly prohibiting any third-party white-label copycats, malicious traffic diversion, or app store piracy (regardless of whether free or paid)**.
 
-### 🌟 Source-Available & Open Collaboration (`TTZip Non-Commercial License`)
+### 🌟 Source-Available & Open Collaboration (`TTZip Anti-Copycat License`)
 - **100% Transparent**: All source code (`ttzip-cli`, `TTZipCore`, `CTTZipBridge`, `TTZipApp`) is open for reading, learning, security auditing, and community contributions.
 - **Free for Personal Use**: You are free to run `ttzip-cli` and `TTZipApp` on your personal machines for personal, non-commercial daily tasks.
-- **🔴 Strict Commercial Ban (严禁商业套壳与倒卖)**:
-  1. **No Commercial Wrapping**: You may NOT embed, wrap, or bundle `ttzip-cli` or `TTZipCore` into any paid commercial software, SaaS service, or proprietary product.
-  2. **No App Store Resale**: You may NOT publish TTZip (or renamed forks) to the **Apple Mac App Store**, Steam, Setapp, or any commercial marketplace.
-  3. **Official Commercial Monopoly**: Official Mac App Store distribution and commercial monetization are reserved exclusively for the author.
+- **🔴 Strict Public Distribution & Copycat Ban (无论免费或收费，一律严禁套壳上架)**:
+  1. **No App Store Publishing (Free or Paid)**: You may **NOT** publish TTZip (or renamed forks) to the **Apple Mac App Store**, Steam, Setapp, or any marketplace — **even as a free app**. Official Mac App Store distribution is exclusive to the author.
+  2. **No Free Copycats or Traffic Siphoning**: You may NOT repackage TTZip to siphon traffic, promote advertisements, or bundle with third-party software.
+  3. **No Commercial Resale or Cloud Wrapping**: You may NOT embed TTZip into paid commercial products or SaaS services without a commercial license.
   4. **Enterprise Licensing**: Commercial companies wishing to integrate TTZip into proprietary commercial pipelines must purchase a **Commercial License**.
 
 Third-party component licenses and acknowledgements are documented in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
+
 
 
 
