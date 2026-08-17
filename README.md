@@ -75,7 +75,11 @@ Measured under physical monotonic hardware timers (`mach_absolute_time()`) on Ap
 Install `ttzip-cli` along with UNIX manual pages (`man ttzip-cli`) and shell auto-completions (`zsh`, `bash`, `fish`, `nushell`) with a single command:
 
 ```bash
-brew tap wittkung/tap
+# Direct single-line installation
+brew install wittkung/ttzip/ttzip-cli
+
+# Or add tap first
+brew tap wittkung/ttzip
 brew install ttzip-cli
 ```
 
@@ -94,21 +98,39 @@ The compiled standalone binary will be available at `.build/release/ttzip-cli`.
 
 ## 💻 CLI Command Reference & Stream Pipelines
 
-`ttzip-cli` provides 9 dedicated subcommands with full UNIX pipe streaming support:
+`ttzip-cli` provides 10 dedicated subcommands with full UNIX pipe streaming and interactive TUI support:
 
 ### Subcommands Overview
 
 | Command | Aliases | Description | Key Options |
 | :--- | :--- | :--- | :--- |
+| `explore` | `tui`, `browse` | Launch interactive terminal TUI archive explorer | `↑`/`↓`/`j`/`k` navigate, `Enter`/`l` drill down, `Space` select, `e` extract, `p` peek |
 | `archive` / `create` | `a`, `c` | Create and compress archives | `-f <format>`, `-l <level>`, `-p <password>`, `--split`, `--exclude` |
 | `extract` | `x`, `e` | Extract archive contents | `-o <dir>`, `--strip-components`, `--overwrite`, `-p <password>` |
 | `list` | `l`, `ls` | List archive contents & metadata | `--json`, `-v`, `--filter <glob>` |
-| `test` | `t`, `verify` | Verify archive integrity | `--standard`, `--differential`, `--fuzz`, `--report-json` |
+| `test` | `t`, `verify` | Verify archive integrity & standards | `--standard`, `--differential`, `--fuzz`, `--report-json` |
 | `bench` | `b`, `pk` | Run physical monotonic benchmarks | `-f <format>`, `--iterations`, `--json` |
-| `inspect` | `i`, `info` | Inspect format headers & magic | `--raw`, `--encoding`, `--hash` |
-| `health` | - | Standards compliance & vulnerability check | `--strict`, `--check-zip-slip` |
+| `inspect` | `i`, `info` | Inspect format headers & magic signatures | `--raw`, `--encoding`, `--hash` |
+| `tree` | - | Display archive visual tree hierarchy | `-d <depth>`, `--exclude <glob>` |
 | `man` | - | Output UNIX groff mdoc manual page | `--output <file>` |
 | `completion` | - | Generate shell auto-completion script | `zsh`, `bash`, `fish`, `nushell` |
+
+### Interactive Terminal TUI Mode (`explore`)
+
+```bash
+# Launch zero-dependency ANSI/VT100 interactive explorer
+ttzip-cli explore release_bundle.tar.zst
+
+# Keybindings inside TUI:
+#  ↑ / k       Move cursor up
+#  ↓ / j       Move cursor down
+#  Enter / l   Drill down / expand directory
+#  Backspace/h Collapse directory / back to parent
+#  Space       Toggle entry selection checkbox
+#  e           Extract selected entries to current directory
+#  p           Popup peek modal (syntax preview / hex dump)
+#  q / Esc     Exit cleanly and restore terminal screen
+```
 
 ### UNIX Stream Pipelines (1-Liners)
 
