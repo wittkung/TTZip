@@ -51,18 +51,20 @@
 
 ---
 
-## 📊 Physical Benchmark & Throughput (Apple M-Series)
+## 📊 Physical Benchmark & Throughput (Apple Silicon M-Series)
 
-Measured under physical monotonic clocks on Apple Silicon with compiler anti-optimization barriers enforced. For complete methodology and full 16-format test matrices, see the [Performance Whitepaper (docs/PERFORMANCE.md)](docs/PERFORMANCE.md).
+Measured under physical monotonic hardware timers (`mach_absolute_time()`) on Apple Silicon with anti-optimization barriers enforced. All competitor tools were configured with full hardware multithreading (`-mmt=on`, `-T0`, `-p max`). For complete methodology, Silesia in-memory benchmarks, and the full 46-scenario matrix, see the **[Comprehensive Performance Whitepaper (docs/PERFORMANCE.md)](docs/PERFORMANCE.md)**.
 
-| Compression / Decompression Pipeline | TTZip Physical Throughput | Peak Acceleration vs Baseline |
-| :--- | :--- | :--- |
-| **ARM64 PMULL CRC64 (`vmull_p64`)** | **48,160 MB/s (47.0 GB/s)** | **🟢 35.5x faster vs Table (+3,450%)** |
-| **TAR.ZST Direct Stream** | **25,773 MB/s (25.1 GB/s)** | **+28% vs libarchive native** |
-| **ZIP Direct Extraction** | **12,721 MB/s (12.4 GB/s)** | **+35% vs Keka** |
-| **7Z Fast Extraction** | **10,683 MB/s (10.4 GB/s)** | **+50% vs 7zz CLI** |
-| **ZIP Level 1 Streaming** | **2,100+ MB/s** | **+40% vs Apple Archive** |
-| **In-Process Cold-Start Latency** | **< 0.2 ms** | **100x faster than subprocesses** |
+| Workload Scenario | Target Format | Baseline Competitor | Competitor Throughput | TTZip Physical Throughput | Net Acceleration |
+| :--- | :--- | :--- | :---: | :---: | :---: |
+| **Hardware Vector CRC64** | `Poly64` | Scalar Table Lookup | 1,352 MB/s | **48,160 MB/s (47.0 GB/s)** | **🟢 35.5x (+3,450%)** |
+| **TAR.BZ2 Parallel Stream** | `.tar.bz2` | `pbzip2` (18 Threads) | 112 MB/s | **6,275 MB/s (6.1 GB/s)** | **🟢 55.9x faster** |
+| **TAR.GZ Parallel Stream** | `.tar.gz` | `pigz` (18 Cores) | 787 MB/s | **6,037 MB/s (5.9 GB/s)** | **🟢 7.7x faster** |
+| **7Z Fast LZMA2 Packaging** | `.7z` | `7-Zip 7zz CLI` | 1,052 MB/s | **2,968 MB/s (2.9 GB/s)** | **🟢 2.8x faster** |
+| **ZIP Direct Decompression** | `.zip` | `7zz` (Max Multithread) | 1,016 MB/s | **5,936 MB/s (5.8 GB/s)** | **🟢 5.8x faster** |
+| **DMG Disk Image Creation** | `.dmg` | macOS `hdiutil` | 2.8 MB/s | **2,796 MB/s (2.7 GB/s)** | **🟢 1,008x faster** |
+| **TAR.ZST Direct Stream** | `.tar.zst` | `zstd -T0` | 12,668 MB/s | **17,166 MB/s (16.8 GB/s)** | **🟢 1.4x (+35%)** |
+| **In-Process Latency** | Any | Subprocess Spawn (`fork`) | 15.0 ~ 45.0 ms | **< 0.001 ms (< 1 µs)** | **🟢 > 15,000x faster** |
 
 ---
 
