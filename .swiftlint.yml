@@ -1,0 +1,44 @@
+included:
+  - Sources
+
+excluded:
+  - .build
+  - build
+  - .build_custom
+  - .build_tmp
+  - Vendor
+  - TTZip.xcodeproj
+  - specs
+
+disabled_rules:
+  - trailing_whitespace
+  - todo
+  - identifier_name
+  - function_body_length
+  - type_body_length
+  - file_length
+  - line_length
+  - force_unwrapping
+  - function_parameter_count
+  - implicit_optional_initialization
+  - control_statement
+  - vertical_whitespace
+  - force_cast
+  - trailing_semicolon
+  - empty_count
+  - cyclomatic_complexity
+  - inclusive_language
+  - type_name
+  - trailing_newline
+  - non_optional_string_data_conversion
+  - optional_data_string_conversion
+  - unused_closure_parameter
+  - for_where
+  - redundant_discardable_let
+  - large_tuple
+  - multiple_closures_with_trailing_closure
+  - statement_position
+  - legacy_hashing
+  - shorthand_operator
+  - unused_setter_value
+  - unused_optional_binding

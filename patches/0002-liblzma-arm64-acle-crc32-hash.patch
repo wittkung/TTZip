@@ -1,0 +1,37 @@
+From: TTZip High Performance Compression Team <dev@ttzip.app>
+Subject: [PATCH 2/2] liblzma: Add ARMv8 ACLE CRC32 hardware instruction support to lz_encoder_hash.h
+
+Accelerate 4-byte hash calculation in match finders using ARMv8-A ACLE
+__crc32w intrinsic where available. Eliminates two memory loads from the
+1 KiB software hash table on every sliding window step.
+Provides fallback to software CRC-32 table on architectures without ACLE CRC32.
+
+Signed-off-by: TTZip Compression Team <dev@ttzip.app>
+---
+ src/liblzma/lz/lz_encoder_hash.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/liblzma/lz/lz_encoder_hash.h b/src/liblzma/lz/lz_encoder_hash.h
+index 3333333..4444444 100644
+--- a/src/liblzma/lz/lz_encoder_hash.h
++++ b/src/liblzma/lz/lz_encoder_hash.h
+@@ -68,6 +68,14 @@
+ 
++#if defined(__ARM_FEATURE_CRC32) || (defined(__APPLE__) && defined(__MACH__) && (defined(__aarch64__) || defined(_M_ARM64)))
++#	include <arm_acle.h>
++#	define hash_4_calc() \
++		const uint32_t temp = hash_table[cur[0]] ^ cur[1]; \
++		const uint32_t hash_2_value = temp & HASH_2_MASK; \
++		const uint32_t hash_3_value \
++				= (temp ^ ((uint32_t)(cur[2]) << 8)) & HASH_3_MASK; \
++		const uint32_t hash_value = __crc32w(0, read32ne(cur)) & mf->hash_mask
++#else
+ #define hash_4_calc() \
+ 	const uint32_t temp = hash_table[cur[0]] ^ cur[1]; \
+ 	const uint32_t hash_2_value = temp & HASH_2_MASK; \
+ 	const uint32_t hash_3_value \
+ 			= (temp ^ ((uint32_t)(cur[2]) << 8)) & HASH_3_MASK; \
+ 	const uint32_t hash_value = (temp ^ ((uint32_t)(cur[2]) << 8) \
+ 			^ (hash_table[cur[3]] << 5)) & mf->hash_mask
++#endif
+-- 

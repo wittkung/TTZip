@@ -1,0 +1,28 @@
+<svg id="main-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full drop-shadow-2xl">
+              <!-- Definitions for Filters -->
+              <defs>
+                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#000000" flood-opacity="0.12"/>
+                  <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.06"/>
+                </filter>
+              </defs>
+
+              <!-- App Icon Squircle Background -->
+              <rect id="svg-bg" width="512" height="512" rx="115" fill="#F5F4F0"/>
+
+              <!-- Icon Symbol Group with Shadow -->
+              <g id="svg-symbol-group" filter="url(#shadow)">
+                <!-- Kintsugi Gold Z Diagonal Line -->
+                <line id="svg-line-z" x1="376" y1="136" x2="136" y2="376" stroke="#D4AF37" stroke-width="46" stroke-linecap="round"/>
+
+                <!-- Top-Left T: Top Horizontal Bar -->
+                <line id="svg-tl-bar" x1="91" y1="136" x2="326" stroke="#479E6B" stroke-width="46" stroke-linecap="round" y2="136"/>
+                <!-- Top-Left T: Left Vertical Wall -->
+                <line id="svg-tl-wall" x1="136" y1="136" x2="136" y2="326" stroke="#479E6B" stroke-width="46" stroke-linecap="round"/>
+
+                <!-- Bottom-Right T: Bottom Horizontal Bar -->
+                <line id="svg-br-bar" x1="186" y1="376" x2="421" stroke="#479E6B" stroke-width="46" stroke-linecap="round" y2="376"/>
+                <!-- Bottom-Right T: Right Vertical Wall -->
+                <line id="svg-br-wall" x1="376" y1="186" x2="376" y2="376" stroke="#479E6B" stroke-width="46" stroke-linecap="round"/>
+              </g>
+            </svg>

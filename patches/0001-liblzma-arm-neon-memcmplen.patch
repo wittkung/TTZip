@@ -1,0 +1,70 @@
+From: TTZip High Performance Compression Team <dev@ttzip.app>
+Subject: [PATCH 1/2] liblzma: Add ARM NEON 128-bit vectorization to lzma_memcmplen
+
+Incorporate 128-bit ARM NEON vector comparison (vld1q_u8 + veorq_u8 +
+vgetq_lane_u64 + __builtin_ctzll) into lzma_memcmplen for aarch64.
+Sets LZMA_MEMCMPLEN_EXTRA to 16 on ARM NEON platforms.
+Ensures zero out-of-bounds reads and transparent fallback on non-ARM
+architectures.
+
+Signed-off-by: TTZip Compression Team <dev@ttzip.app>
+---
+ src/liblzma/common/memcmplen.h | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+
+diff --git a/src/liblzma/common/memcmplen.h b/src/liblzma/common/memcmplen.h
+index 1111111..2222222 100644
+--- a/src/liblzma/common/memcmplen.h
++++ b/src/liblzma/common/memcmplen.h
+@@ -18,6 +18,12 @@
+ #	include <immintrin.h>
+ #endif
+ 
++#if defined(TUKLIB_FAST_UNALIGNED_ACCESS) \
++		&& (defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(__aarch64__) || defined(_M_ARM64)) \
++		&& !defined(_MSC_VER)
++#	include <arm_neon.h>
++#endif
++
+ // Only include <intrin.h> if it is needed. The header is only needed
+ // on Windows when using an MSVC compatible compiler. The Intel compiler
+ // can use the intrinsics without the header file.
+@@ -58,6 +64,34 @@ lzma_memcmplen(const uint8_t *buf1, const uint8_t *buf2,
+ 	assert(limit <= UINT32_MAX / 2);
+ 
++#if defined(TUKLIB_FAST_UNALIGNED_ACCESS) \
++		&& (defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(__aarch64__) || defined(_M_ARM64)) \
++		&& (defined(__GNUC__) || defined(__clang__) || defined(_MSC_VER))
++#	define LZMA_MEMCMPLEN_EXTRA 16
++	while (len < limit) {
++		uint8x16_t q1 = vld1q_u8(buf1 + len);
++		uint8x16_t q2 = vld1q_u8(buf2 + len);
++		uint8x16_t qdiff = veorq_u8(q1, q2);
++
++		uint64_t d0 = vgetq_lane_u64(vreinterpretq_u64_u8(qdiff), 0);
++		if (d0 != 0) {
++#		if defined(WORDS_BIGENDIAN)
++			len += (uint32_t)__builtin_clzll(d0) >> 3;
++#		else
++			len += (uint32_t)__builtin_ctzll(d0) >> 3;
++#		endif
++			return my_min(len, limit);
++		}
++
++		uint64_t d1 = vgetq_lane_u64(vreinterpretq_u64_u8(qdiff), 1);
++		if (d1 != 0) {
++#		if defined(WORDS_BIGENDIAN)
++			len += 8 + ((uint32_t)__builtin_clzll(d1) >> 3);
++#		else
++			len += 8 + ((uint32_t)__builtin_ctzll(d1) >> 3);
++#		endif
++			return my_min(len, limit);
++		}
++
++		len += 16;
++	}
++
++	return limit;
++
+ #if defined(TUKLIB_FAST_UNALIGNED_ACCESS) \
+-- 

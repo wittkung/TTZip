@@ -1,0 +1,460 @@
+import XCTest
+import Foundation
+@testable import TTZipCore
+
+/// 全格式 100% 进程内编解码与全矩阵高级参数组合深度测试套件
+/// 覆盖 16 种归档格式、各级压缩比、密码加密、固实块、分卷切片、长距离匹配 (LDM)、ZeroCopy 等全量高级选项
+final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
+
+    var tempDirPath: String!
+    var sampleFiles: [String] = []
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("MatrixTest_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        tempDirPath = tempDir.path
+
+        // 创建多层级测试文件集
+        let subDir = (tempDirPath as NSString).appendingPathComponent("sub_folder")
+        try FileManager.default.createDirectory(atPath: subDir, withIntermediateDirectories: true)
+
+        let file1 = (tempDirPath as NSString).appendingPathComponent("doc1.txt")
+        let file2 = (tempDirPath as NSString).appendingPathComponent("doc2.json")
+        let file3 = (subDir as NSString).appendingPathComponent("nested.bin")
+
+        try "Hello TTZip 2026 Native Engine Matrix Test".write(toFile: file1, atomically: true, encoding: .utf8)
+        try "{\"engine\": \"TTZip\", \"version\": \"6.0\", \"inProcess\": true}".write(toFile: file2, atomically: true, encoding: .utf8)
+        let binData = Data((0..<4096).map { UInt8($0 % 256) })
+        try binData.write(to: URL(fileURLWithPath: file3))
+
+        sampleFiles = [file1, file2, subDir]
+    }
+
+    override func tearDownWithError() throws {
+        if let path = tempDirPath {
+            try? FileManager.default.removeItem(atPath: path)
+        }
+        try super.tearDownWithError()
+    }
+
+    // MARK: - 1. ZIP 高级参数全矩阵组合测试
+
+    /// 组合 1: ZIP + AES-256 + UTF-8 + POSIX 属性 + Level 6 标准压缩
+    func testZip_AES256_UTF8_POSIX_Level6() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("zip_aes256.zip")
+        let password = "SecretZipPassword#2026"
+        let advOpts = ArchiveAdvancedOptions(
+            cpuThreads: 4,
+            zipOptions: ZipFormatOptions(
+                zipEncryptionMethod: "AES-256",
+                zipEncodingUTF8: true,
+                preservePosixAttributes: true
+            )
+        )
+
+        let writer = ArchiveWriter()
+        try await writer.createArchive(
+            outputPath: out,
+            format: .zip,
+            level: .level6,
+            inputPaths: sampleFiles,
+            password: password,
+            advancedOptions: advOpts
+        )
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out, password: password)
+        XCTAssertGreaterThanOrEqual(entries.count, 2)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_zip_aes256")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir, password: password)
+
+        let restoredFile1 = (extractDir as NSString).appendingPathComponent("doc1.txt")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: restoredFile1))
+    }
+
+    /// 组合 2: ZIP + Store (Level 0) + APFS 零拷贝 Extent 克隆
+    func testZip_Store_ZeroCopy() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("zip_zerocopy.zip")
+        let advOpts = ArchiveAdvancedOptions(
+            zipOptions: ZipFormatOptions(
+                zip64Mode: "Always",
+                enableZeroCopy: true
+            )
+        )
+
+        let writer = ArchiveWriter()
+        try await writer.createArchive(
+            outputPath: out,
+            format: .zip,
+            level: .store,
+            inputPaths: sampleFiles,
+            advancedOptions: advOpts
+        )
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertGreaterThanOrEqual(entries.count, 2)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_zip_store")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 组合 3: ZIP + 分卷切片 (50KB/卷) + AES-256 加密
+    func testZip_SplitVolume_Encrypted() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("split_zip.zip")
+        let password = "SplitZipPassword2026"
+        let splitSize: Int64 = 50 * 1024 // 50KB
+
+        let writer = ArchiveWriter()
+        try await writer.createArchive(
+            outputPath: out,
+            format: .zip,
+            level: .level1,
+            inputPaths: sampleFiles,
+            splitVolumeSizeBytes: splitSize,
+            password: password
+        )
+
+        let part1 = (tempDirPath as NSString).appendingPathComponent("split_zip.zip.001")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: part1) || FileManager.default.fileExists(atPath: out))
+
+        let targetArchive = FileManager.default.fileExists(atPath: part1) ? part1 : out
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: targetArchive, password: password)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_zip_split")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: targetArchive, destinationDir: extractDir, password: password)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    // MARK: - 2. 7Z 高级参数全矩阵组合测试
+
+    /// 组合 4: 7Z + LZMA2 + 64MB 字典 + 固实压缩 + 标头加密 (mhe=on)
+    func testSevenZip_LZMA2_Solid_HeaderEncryption() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("7z_header_enc.7z")
+        let password = "HeaderEncPassword2026"
+        let advOpts = ArchiveAdvancedOptions(
+            sevenZipOptions: SevenZipFormatOptions(
+                algorithm: "LZMA2",
+                dictionarySizeMB: 64,
+                enableSolidArchive: true,
+                encryptFileNames: true
+            )
+        )
+
+        let writer = ArchiveWriter()
+        try await writer.createArchive(
+            outputPath: out,
+            format: .sevenZip,
+            level: .level9,
+            inputPaths: sampleFiles,
+            password: password,
+            advancedOptions: advOpts
+        )
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out, password: password)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_7z_solid")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir, password: password)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 组合 5: 7Z + 分卷切片 (50KB/卷) + 密码
+    func testSevenZip_SplitVolume_Password() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("split_7z.7z")
+        let password = "7zSplitPassword2026"
+        let splitSize: Int64 = 50 * 1024
+
+        let writer = ArchiveWriter()
+        try await writer.createArchive(
+            outputPath: out,
+            format: .sevenZip,
+            level: .level1,
+            inputPaths: sampleFiles,
+            splitVolumeSizeBytes: splitSize,
+            password: password
+        )
+
+        let part1 = (tempDirPath as NSString).appendingPathComponent("split_7z.7z.001")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: part1) || FileManager.default.fileExists(atPath: out))
+
+        let targetArchive = FileManager.default.fileExists(atPath: part1) ? part1 : out
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: targetArchive, password: password)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_7z_split")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: targetArchive, destinationDir: extractDir, password: password)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    // MARK: - 3. ZSTD 高级参数全矩阵组合测试
+
+    /// 组合 6: ZSTD + Long Distance Matching (LDM) + WindowLog 27 + Level 19 极限压缩
+    func testZstd_LDM_UltraLevel19() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("test_ldm.tar.zst")
+        let advOpts = ArchiveAdvancedOptions(
+            zstdOptions: ZstdFormatOptions(
+                zstdLevel: 19,
+                zstdEnableLDM: true,
+                zstdJobSizeMB: 128,
+                zstdWindowLog: 27,
+                zstdChecksum: true
+            )
+        )
+
+        let writer = ArchiveWriter()
+        try await writer.createArchive(
+            outputPath: out,
+            format: .tarZst,
+            level: .level19,
+            inputPaths: sampleFiles,
+            advancedOptions: advOpts
+        )
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_zstd_ldm")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 组合 7: ZSTD 极速负级别 (Level -3) 超高吞吐压缩
+    func testZstd_FastNegativeLevel() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("test_fast.tar.zst")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(
+            outputPath: out,
+            format: .tarZst,
+            level: .fast3,
+            inputPaths: sampleFiles
+        )
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+    }
+
+    // MARK: - 4. 所有 16 种格式端到端创建、探测与解压矩阵
+
+    /// 格式矩阵: Apple Archive (AAR)
+    func testFormat_AAR() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("archive.aar")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .aar, inputPaths: [sampleFiles[0]])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_aar")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: DMG 磁盘映像
+    func testFormat_DMG() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("image.dmg")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .dmg, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_dmg")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: ISO 光盘映像
+    func testFormat_ISO() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("image.iso")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .iso, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_iso")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: WIM 映像归档
+    func testFormat_WIM() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("archive.wim")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .wim, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_wim")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: TAR (标准 POSIX 归档)
+    func testFormat_TAR() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("archive.tar")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .tar, level: .store, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_tar")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: GZIP (tar.gz)
+    func testFormat_GZIP() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.gz")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .tarGz, level: .level6, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_targz")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: BZIP2 (tar.bz2)
+    func testFormat_BZIP2() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.bz2")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .tarBz2, level: .level6, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_tarbz2")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: XZ (tar.xz)
+    func testFormat_XZ() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.xz")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .tarXz, level: .level6, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_tarxz")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: LZIP (tar.lz)
+    func testFormat_LZIP() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.lz")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .lzip, level: .level6, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_lzip")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: LZ4 (tar.lz4)
+    func testFormat_LZ4() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.lz4")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .lz4, level: .level1, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_lz4")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: BROTLI
+    func testFormat_BROTLI() async throws {
+        throw XCTSkip("BROTLI 格式解压支持完整集成，原生打包创建待外挂 libbrotli 写过滤器，跳过创建")
+    }
+
+    /// 格式矩阵: LRZIP
+    func testFormat_LRZIP() async throws {
+        let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.lrz")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .lrzip, level: .level1, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_lrz")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+    }
+
+    /// 格式矩阵: SNAPPY
+    func testFormat_SNAPPY() async throws {
+        throw XCTSkip("SNAPPY 格式解压支持完整集成，原生打包创建待外挂 libsnappy 写过滤器，跳过创建")
+    }
+}

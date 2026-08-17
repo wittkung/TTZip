@@ -1,0 +1,85 @@
+import Foundation
+import TTZipCore
+
+/// 测试报告生成与持久化引擎 (支持 Console ANSI、Markdown 与 JSON Schema 强类型输出)
+public enum TestReportGenerator {
+    
+    /// 生成 JSON 字符串并可持久化至目标路径
+    @discardableResult
+    public static func generateJSON(
+        report: [String: Any],
+        outputPath: String? = nil
+    ) -> String {
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]),
+              let jsonString = String(data: jsonData, encoding: .utf8) else {
+            return "{}"
+        }
+        
+        if let path = outputPath {
+            let url = URL(fileURLWithPath: path)
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? jsonString.write(to: url, atomically: true, encoding: .utf8)
+        }
+        
+        return jsonString
+    }
+    
+    /// 生成格式化的 Markdown 报告并可持久化至目标路径
+    @discardableResult
+    public static func generateMarkdown(
+        sessionID: String,
+        startTime: String,
+        durationMs: Double,
+        osVersion: String,
+        arch: String,
+        totalSuites: Int,
+        totalCases: Int,
+        passedCases: Int,
+        failedCases: Int,
+        skippedCases: Int,
+        passRate: Double,
+        suites: [[String: Any]],
+        outputPath: String? = nil
+    ) -> String {
+        var md = ""
+        md += "# 🧪 TTZip Test Execution & Diagnostic Report\n\n"
+        md += "> **Generated**: \(startTime) | **Duration**: \(String(format: "%.2f", durationMs)) ms | **Session**: `\(sessionID)`\n\n"
+        md += "---\n\n"
+        
+        // 1. KPI 概览看板
+        md += "## 1. Executive Summary\n\n"
+        md += "| Metric | Value | Status |\n"
+        md += "| :--- | :--- | :--- |\n"
+        md += "| **Total Test Suites** | \(totalSuites) | 📦 |\n"
+        md += "| **Total Test Cases** | \(totalCases) | 🧪 |\n"
+        md += "| **Passed Cases** | \(passedCases) | \u{001B}[0m🟢 |\n"
+        md += "| **Failed Cases** | \(failedCases) | \(failedCases == 0 ? "🟢 0" : "🔴 \(failedCases)") |\n"
+        md += "| **Skipped Cases** | \(skippedCases) | ⚪ \(skippedCases) |\n"
+        md += "| **Pass Rate** | \(String(format: "%.1f", passRate))% | \(passRate >= 100.0 ? "🏆 100%" : "⚠️") |\n"
+        md += "| **Environment** | \(osVersion) (\(arch)) | 💻 |\n\n"
+        
+        // 2. 套件明细列表
+        md += "## 2. Test Suite Breakdown\n\n"
+        md += "| Suite Name | Passed | Failed | Skipped | Duration (ms) |\n"
+        md += "| :--- | :--- | :--- | :--- | :--- |\n"
+        
+        for suite in suites {
+            let name = suite["suiteName"] as? String ?? "Unknown"
+            let p = suite["passedCount"] as? Int ?? 0
+            let f = suite["failedCount"] as? Int ?? 0
+            let s = suite["skippedCount"] as? Int ?? 0
+            let d = suite["durationMs"] as? Double ?? 0.0
+            let statusIcon = f == 0 ? "🟢" : "🔴"
+            md += "| \(statusIcon) **\(name)** | \(p) | \(f) | \(s) | \(String(format: "%.2f", d)) |\n"
+        }
+        md += "\n"
+        
+        if let path = outputPath {
+            let url = URL(fileURLWithPath: path)
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? md.write(to: url, atomically: true, encoding: .utf8)
+        }
+        
+        return md
+    }
+}

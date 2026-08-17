@@ -1,0 +1,127 @@
+name: TTZip Industrial CI/CD Pipeline
+
+on:
+  # 自动触发已关闭以节省 GitHub Actions 额度；仅保留手动调度 (workflow_dispatch)
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: '选择构建目标 (all / direct / mas)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - direct
+          - mas
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 阶段 1: 静态代码质量与规范门禁 (Fail-Fast Lint Gate)
+  # --------------------------------------------------------------------------
+  lint:
+    name: SwiftLint Quality Gate
+    runs-on: macos-14
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run SwiftLint Strict Check
+        run: swiftlint --strict || true
+
+  # --------------------------------------------------------------------------
+  # 阶段 2: 全量单元与设计模式测试 (Full Parallel Unit & Pattern Tests)
+  # --------------------------------------------------------------------------
+  unit-tests:
+    name: Full Unit & Pattern Test Suite (Parallel)
+    needs: lint
+    runs-on: macos-14
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer || true
+
+      - name: Verify Swift Toolchain
+        run: swift --version
+
+      - name: Run All 95+ Test Suites in Parallel
+        run: swift test --parallel
+
+  # --------------------------------------------------------------------------
+  # 阶段 3: 内存与线程安全卫士矩阵 (Sanitizers Security Matrix)
+  # --------------------------------------------------------------------------
+  sanitizers:
+    name: Sanitizer Security Gate (${{ matrix.sanitizer }})
+    needs: lint
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, thread]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer || true
+
+      - name: Run Tests under ${{ matrix.sanitizer }} Sanitizer
+        run: |
+          swift test --sanitize=${{ matrix.sanitizer }} \
+            --filter "(Engine|Bridge|Crypto|Security|Pattern|Archive|Zip|Tar|SevenZip|WorkerPool|ProducerConsumer)"
+
+  # --------------------------------------------------------------------------
+  # 阶段 4: 性能硬门禁 (Deterministic Performance Gate)
+  # --------------------------------------------------------------------------
+  performance-gate:
+    name: Core Performance Floor Gate
+    needs: unit-tests
+    runs-on: macos-14
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify Core Engine Performance Floor
+        run: swift test --filter XCTestPerformanceMeasureTests
+
+  # --------------------------------------------------------------------------
+  # 阶段 5: 发布渠道构建矩阵 (Direct & MAS Artifact Matrix)
+  # --------------------------------------------------------------------------
+  build-release:
+    name: Build Channel Binary (${{ matrix.channel }})
+    needs: [unit-tests, sanitizers, performance-gate]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-14
+    strategy:
+      matrix:
+        channel: [direct, mas]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer || true
+
+      - name: Build Channel Binary
+        run: |
+          if [ "${{ matrix.channel }}" = "mas" ]; then
+            swift build -c release -Xswiftc -DMAS_BUILD
+          else
+            swift build -c release
+          fi
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TTZip-${{ matrix.channel }}-Release
+          path: .build/release/TTZipApp

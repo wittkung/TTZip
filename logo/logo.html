@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TTZip 图标设计与生成器 (macOS 26 Spec)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bamboo: '#789262',
+            bambooDark: '#8FA876',
+            kintsugiLight: '#D4AF37',
+            kintsugiDark: '#E6C35C',
+            appbg: '#F5F4F0',
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden selection:bg-emerald-500 selection:text-white">
+
+  <!-- Header (Fixed Top Bar) -->
+  <header class="shrink-0 border-b border-slate-800 bg-slate-950/90 backdrop-blur px-6 py-3 flex items-center justify-between z-50">
+    <div class="flex items-center space-x-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[#789262] to-[#5b7249] flex items-center justify-center font-bold text-white shadow-lg shadow-emerald-950/50">
+        TT
+      </div>
+      <div>
+        <h1 class="text-base font-bold text-white tracking-wide flex items-center gap-2">
+          TTZip App Icon Designer
+          <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">macOS 专属设计</span>
+        </h1>
+        <p class="text-xs text-slate-400">基于双 T 互锁与 Z 轴拉链交织几何学（融合金缮金）</p>
+      </div>
+    </div>
+
+    <!-- Export Quick Actions -->
+    <div class="flex items-center space-x-3">
+      <button onclick="exportSVG()" class="px-4 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors border border-slate-700 flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        导出矢量 SVG
+      </button>
+      <button onclick="exportPNG(1024)" class="px-4 py-2 text-xs font-semibold bg-[#789262] hover:bg-[#657d51] text-white rounded-lg transition-all shadow-md shadow-emerald-950 flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        导出高清 1024px PNG
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Viewport Layout (Split Fixed Left & Independent Scroll Right) -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden min-h-0">
+
+    <!-- Left Column: Fixed Preview & Canvas Area (7 Cols) -->
+    <div class="lg:col-span-6 xl:col-span-7 flex flex-col space-y-4 h-full overflow-y-auto pr-1">
+
+      <!-- Main Canvas Container -->
+      <div class="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-6 md:p-8 flex flex-col items-center justify-center relative overflow-hidden group shrink-0">
+        <!-- Grid Background Effect -->
+        <div class="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+
+        <!-- Quick Theme Switcher Pill -->
+        <div class="absolute top-4 right-4 z-20 flex items-center space-x-1 bg-slate-950/90 border border-slate-800 backdrop-blur rounded-lg p-1 text-xs">
+          <button id="quick-light-btn" onclick="setThemeMode('light')" class="px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer flex items-center gap-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            ☀️ 浅色
+          </button>
+          <button id="quick-dark-black-btn" onclick="setThemeMode('dark-black')" class="px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer flex items-center gap-1 text-slate-400 hover:text-white">
+            🌙 深色黑底
+          </button>
+        </div>
+
+        <div class="relative z-10 flex flex-col items-center">
+          <!-- Main Interactive SVG Icon -->
+          <div id="icon-wrapper" class="w-64 h-64 md:w-80 md:h-80 transition-transform duration-300 transform group-hover:scale-[1.02]">
+            <svg id="main-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full drop-shadow-2xl">
+              <!-- Definitions for Filters & Liquid Glass Gradients -->
+              <defs>
+                <!-- Standard Vector Drop Shadow -->
+                <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#000000" flood-opacity="0.14" />
+                  <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.08" />
+                </filter>
+
+                <!-- macOS 26 3D Layered Parallax Drop Shadow -->
+                <filter id="shadow-3d" x="-30%" y="-30%" width="160%" height="160%">
+                  <feDropShadow dx="0" dy="24" stdDeviation="20" flood-color="#000000" flood-opacity="0.28" />
+                  <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.16" />
+                  <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.10" />
+                </filter>
+
+                <!-- Liquid Glass Background Overlay Gradient (Light Mode) -->
+                <linearGradient id="glass-grad-light" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.65" />
+                  <stop offset="35%" stop-color="#F5F4F0" stop-opacity="0.20" />
+                  <stop offset="100%" stop-color="#E5E4DE" stop-opacity="0.55" />
+                </linearGradient>
+
+                <!-- Liquid Glass Background Overlay Gradient (Dark Mode) -->
+                <linearGradient id="glass-grad-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.18" />
+                  <stop offset="40%" stop-color="#18181B" stop-opacity="0.05" />
+                  <stop offset="100%" stop-color="#000000" stop-opacity="0.45" />
+                </linearGradient>
+
+                <!-- Liquid Glass Specular Bevel Border Gradient (Light) -->
+                <linearGradient id="glass-border-light" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95" />
+                  <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.15" />
+                  <stop offset="100%" stop-color="#000000" stop-opacity="0.12" />
+                </linearGradient>
+
+                <!-- Liquid Glass Specular Bevel Border Gradient (Dark) -->
+                <linearGradient id="glass-border-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.50" />
+                  <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.08" />
+                  <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.30" />
+                </linearGradient>
+
+                <!-- Top-Left Radial Specular Light Reflection -->
+                <radialGradient id="glass-specular-light" cx="20%" cy="15%" r="65%">
+                  <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.55" />
+                  <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.10" />
+                  <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.00" />
+                </radialGradient>
+              </defs>
+
+              <!-- App Icon Squircle Background -->
+              <rect id="svg-bg" width="512" height="512" rx="115" fill="#F5F4F0" />
+
+              <!-- macOS 26 Liquid Glass Specular Overlay Layer -->
+              <g id="glass-overlay">
+                <rect width="512" height="512" rx="115" fill="url(#glass-specular-light)" />
+                <rect id="glass-shading-rect" width="512" height="512" rx="115" fill="url(#glass-grad-light)" />
+                <rect id="glass-bevel-rect" x="1.5" y="1.5" width="509" height="509" rx="113.5" fill="none" stroke="url(#glass-border-light)" stroke-width="3" />
+              </g>
+
+              <!-- Icon Symbol Group with Shadow -->
+              <g id="svg-symbol-group" filter="url(#shadow-3d)">
+                <!-- Kintsugi Gold Z Diagonal Line -->
+                <line id="svg-line-z" x1="376" y1="136" x2="136" y2="376" stroke="#D4AF37" stroke-width="32" stroke-linecap="round" />
+
+                <!-- Top-Left T: Top Horizontal Bar -->
+                <line id="svg-tl-bar" x1="106" y1="136" x2="336" stroke="#789262" stroke-width="32" stroke-linecap="round" />
+                <!-- Top-Left T: Left Vertical Wall -->
+                <line id="svg-tl-wall" x1="136" y1="136" x2="136" y2="336" stroke="#789262" stroke-width="32" stroke-linecap="round" />
+
+                <!-- Bottom-Right T: Bottom Horizontal Bar -->
+                <line id="svg-br-bar" x1="176" y1="376" x2="406" stroke="#789262" stroke-width="32" stroke-linecap="round" />
+                <!-- Bottom-Right T: Right Vertical Wall -->
+                <line id="svg-br-wall" x1="376" y1="176" x2="376" y2="376" stroke="#789262" stroke-width="32" stroke-linecap="round" />
+              </g>
+            </svg>
+          </div>
+
+          <p class="text-xs text-slate-400 mt-4 tracking-wider uppercase font-semibold">主画布 (512 × 512 矢量视图)</p>
+        </div>
+      </div>
+
+      <!-- macOS Dock Preview Area -->
+      <div class="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 flex flex-col space-y-3 shrink-0">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+          <span class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            macOS Dock 实际效果模拟 (与系列产品对比)
+          </span>
+          <span class="text-[11px] text-slate-500">自动适配 macOS 悬浮视效</span>
+        </div>
+
+        <!-- Simulated Dock Bar -->
+        <div class="bg-slate-950/80 backdrop-blur-xl border border-white/10 rounded-2xl p-2.5 flex items-center justify-center space-x-3 md:space-x-4 max-w-md mx-auto shadow-2xl">
+          <!-- Finder Mock -->
+          <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-tr from-blue-500 to-cyan-300 flex items-center justify-center text-white text-xs font-bold shadow-md">
+            Finder
+          </div>
+          <!-- Safari Mock -->
+          <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center text-white text-xs font-bold shadow-md">
+            Safari
+          </div>
+
+          <!-- Sister Product Mock -->
+          <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-[#F5F4F0] p-1.5 shadow-md flex items-center justify-center relative group" title="Ittime (专注软件)">
+            <svg viewBox="0 0 100 100" class="w-full h-full">
+              <circle cx="50" cy="20" r="10" fill="#D4AF37" />
+              <path d="M20 35 H80 V48 H56 V85 H44 V48 H20 Z" fill="#C04848" />
+            </svg>
+            <div class="absolute -top-7 text-[10px] bg-slate-800 text-slate-300 font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Ittime</div>
+          </div>
+
+          <!-- TTZip Target Icon (Dynamic Live Preview) -->
+          <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl p-0.5 shadow-xl flex items-center justify-center relative group cursor-pointer transition-transform hover:scale-110" id="dock-icon-wrapper" style="background-color: #F5F4F0;">
+            <svg id="dock-mini-svg" viewBox="0 0 512 512" class="w-full h-full">
+              <!-- Dynamically mirrored content -->
+            </svg>
+            <div class="absolute -top-7 text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">TTZip (当前)</div>
+          </div>
+
+          <!-- Terminal Mock -->
+          <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-800 flex items-center justify-center text-emerald-400 text-xs font-mono font-bold shadow-md border border-slate-700">
+            &gt;_
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Independent Scrollable Control Panel (5 Cols) -->
+    <div class="lg:col-span-6 xl:col-span-5 h-full overflow-y-auto pr-2 custom-scrollbar space-y-5 bg-slate-900/90 border border-slate-800/90 rounded-2xl p-5 md:p-6">
+
+      <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+        <h2 class="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-2">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+          几何参数微调面板
+        </h2>
+        <button onclick="resetDefaults()" class="text-xs text-slate-400 hover:text-emerald-400 underline transition-colors cursor-pointer">恢复默认预设</button>
+      </div>
+
+      <!-- Presets & Custom Presets -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-medium text-slate-400">快捷预设与自定义方案</label>
+          <button onclick="saveCurrentPreset()" class="text-xs font-medium text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-md transition-all cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            保存当前为预设
+          </button>
+        </div>
+
+        <!-- Built-in System Presets Grid -->
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="applyPreset('standard')" class="px-3 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-lg text-xs text-left text-slate-200 transition-all cursor-pointer">
+            <span class="font-bold block text-emerald-400">标准黄金比例</span>
+            <span class="text-[10px] text-slate-400">圆角端点 + 平衡留空</span>
+          </button>
+          <button onclick="applyPreset('macos26-glass')" class="px-3 py-2 bg-slate-950 hover:bg-slate-800 border border-cyan-500/40 hover:border-cyan-400 rounded-lg text-xs text-left text-slate-200 transition-all cursor-pointer">
+            <span class="font-bold block text-cyan-400">macOS 26 玻璃分层</span>
+            <span class="text-[10px] text-cyan-300/70">液态通透 + 3D 浮雕景深</span>
+          </button>
+          <button onclick="applyPreset('sharp')" class="px-3 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-lg text-xs text-left text-slate-200 transition-all cursor-pointer">
+            <span class="font-bold block text-amber-400">极客方角切边</span>
+            <span class="text-[10px] text-slate-400">直角端点 + 紧凑结构</span>
+          </button>
+          <button onclick="applyPreset('bold')" class="px-3 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-lg text-xs text-left text-slate-200 transition-all cursor-pointer">
+            <span class="font-bold block text-emerald-400">厚重实体块</span>
+            <span class="text-[10px] text-slate-400">超粗线条 + 大伸展</span>
+          </button>
+        </div>
+
+        <!-- User Saved Custom Presets Container -->
+        <div id="custom-presets-container" class="space-y-1.5 pt-1 hidden">
+          <span class="text-[10px] text-slate-400 block font-medium">我的自定义预设</span>
+          <div id="custom-presets-list" class="grid grid-cols-2 gap-2">
+            <!-- Dynamically populated custom presets -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Line Thickness, Independent Caps & Slash Length -->
+      <div class="space-y-3 pt-2 border-t border-slate-800/80">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-medium text-slate-300">双 T 线条粗细 (T Stroke Width): <span id="val-stroke-t" class="text-emerald-400 font-bold">32px</span></label>
+        </div>
+        <input type="range" id="param-stroke-t" min="12" max="64" value="32" class="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer">
+
+        <div class="flex items-center justify-between pt-1">
+          <label class="text-xs font-medium text-slate-300">金缮斜线粗细 (Slash Stroke Width): <span id="val-stroke-slash" class="text-amber-400 font-bold">32px</span></label>
+        </div>
+        <input type="range" id="param-stroke-slash" min="12" max="64" value="32" class="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer">
+
+        <div class="flex items-center justify-between pt-1">
+          <label class="text-xs font-medium text-slate-300">双 T 线条端点 (T Line Cap)</label>
+          <div class="flex items-center space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+            <button id="cap-t-round" onclick="setLineCapT('round')" class="px-2 py-0.5 rounded bg-[#789262] text-white font-medium cursor-pointer">圆角 (Round)</button>
+            <button id="cap-t-square" onclick="setLineCapT('square')" class="px-2 py-0.5 rounded text-slate-400 hover:text-white cursor-pointer">平角 (Square)</button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <label class="text-xs font-medium text-slate-300">金缮斜线端点 (Slash Line Cap)</label>
+          <div class="flex items-center space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+            <button id="cap-slash-round" onclick="setLineCapSlash('round')" class="px-2 py-0.5 rounded bg-amber-500/80 text-white font-medium cursor-pointer">圆角 (Round)</button>
+            <button id="cap-slash-square" onclick="setLineCapSlash('square')" class="px-2 py-0.5 rounded text-slate-400 hover:text-white cursor-pointer">平角 (Square)</button>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center pt-2 border-t border-slate-800/60">
+          <label class="text-xs font-medium text-slate-300">金缮斜线延伸长度 (Slash Length): <span id="val-slash-len" class="text-amber-400 font-bold">100%</span></label>
+        </div>
+        <input type="range" id="param-slash-len" min="30" max="160" value="100" class="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer">
+      </div>
+
+      <!-- Layer Order Control -->
+      <div class="space-y-3 pt-2 border-t border-slate-800/80">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-medium text-slate-300">图层遮挡顺序 (Layer Order)</label>
+          <div class="flex items-center space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+            <button id="layer-t-top" onclick="setLayerOrder('t-on-top')" class="px-2 py-0.5 rounded bg-[#789262] text-white font-medium cursor-pointer">绿色 T 在上</button>
+            <button id="layer-slash-top" onclick="setLayerOrder('slash-on-top')" class="px-2 py-0.5 rounded text-slate-400 hover:text-white cursor-pointer">金色斜杠在上</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- macOS 26 Liquid Glass & 3D Layered Depth -->
+      <div class="space-y-3 pt-2 border-t border-slate-800/80">
+        <div class="flex justify-between items-center">
+          <label class="text-xs font-bold text-slate-200 uppercase tracking-wide flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L5.6 15.13a2 2 0 00-1.168.143L3 16l3 3 2.16-1.08a6 6 0 013.86-.517l.318-.158a6 6 0 003.86-.517l2.387.477a2 2 0 001.022-.547l.821-.821z"/></svg>
+            macOS 26 液态玻璃与 3D 分层
+          </label>
+          <span id="glass-status-tag" class="text-[11px] text-cyan-400 font-mono">Liquid Glass 开启</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button id="toggle-glass-btn" onclick="toggleLiquidGlass()" class="px-3 py-2 bg-slate-950 border border-cyan-500/50 text-cyan-300 rounded-lg text-xs text-left transition-all cursor-pointer flex items-center justify-between">
+            <div>
+              <span class="font-bold block">✨ 液态玻璃光泽</span>
+              <span class="text-[10px] text-slate-400">通透倒角反光与折射</span>
+            </div>
+            <span id="glass-badge" class="w-2 h-2 rounded-full bg-cyan-400 shadow-sm shadow-cyan-500"></span>
+          </button>
+
+          <button id="toggle-depth-btn" onclick="toggle3DDepth()" class="px-3 py-2 bg-slate-950 border border-amber-500/50 text-amber-300 rounded-lg text-xs text-left transition-all cursor-pointer flex items-center justify-between">
+            <div>
+              <span class="font-bold block">🏔️ 3D 分层浮雕景深</span>
+              <span class="text-[10px] text-slate-400">多阶悬浮阴影离体感</span>
+            </div>
+            <span id="depth-badge" class="w-2 h-2 rounded-full bg-amber-400 shadow-sm shadow-amber-500"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Overhang Settings -->
+      <div class="space-y-3 pt-2 border-t border-slate-800/80">
+        <div class="flex justify-between items-center">
+          <label class="text-xs font-medium text-slate-300">左上 T (横线向左微伸) : <span id="val-overhang-l" class="text-emerald-400 font-bold">30px</span></label>
+        </div>
+        <input type="range" id="param-overhang-l" min="0" max="70" value="30" class="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer">
+
+        <div class="flex justify-between items-center pt-1">
+          <label class="text-xs font-medium text-slate-300">右下 T (横线向右微伸) : <span id="val-overhang-r" class="text-emerald-400 font-bold">30px</span></label>
+        </div>
+        <input type="range" id="param-overhang-r" min="0" max="70" value="30" class="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer">
+      </div>
+
+      <!-- 4-Axis Corner Gap Settings -->
+      <div class="space-y-3 pt-2 border-t border-slate-800/80">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-bold text-slate-200 block uppercase tracking-wide">4 轴独立断口留空微调</span>
+        </div>
+
+        <!-- Top-Left T Gaps -->
+        <div class="space-y-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+          <span class="text-[10px] font-bold text-emerald-400 block">左上 T 断口留缝</span>
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center">
+              <label class="text-[11px] text-slate-300">横线右端留空 (Top Bar Right Gap) : <span id="val-gap-tl-bar" class="text-emerald-400 font-bold">40px</span></label>
+            </div>
+            <input type="range" id="param-gap-tl-bar" min="10" max="90" value="40" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer">
+
+            <div class="flex justify-between items-center pt-1">
+              <label class="text-[11px] text-slate-300">竖线下端留空 (Left Wall Bottom Gap) : <span id="val-gap-tl-wall" class="text-emerald-400 font-bold">40px</span></label>
+            </div>
+            <input type="range" id="param-gap-tl-wall" min="10" max="90" value="40" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer">
+          </div>
+        </div>
+
+        <!-- Bottom-Right T Gaps -->
+        <div class="space-y-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+          <span class="text-[10px] font-bold text-amber-400 block">右下 T 断口留缝</span>
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center">
+              <label class="text-[11px] text-slate-300">竖线上端留空 (Right Wall Top Gap) : <span id="val-gap-br-wall" class="text-amber-400 font-bold">40px</span></label>
+            </div>
+            <input type="range" id="param-gap-br-wall" min="10" max="90" value="40" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer">
+
+            <div class="flex justify-between items-center pt-1">
+              <label class="text-[11px] text-slate-300">横线左端留空 (Bottom Bar Left Gap) : <span id="val-gap-br-bar" class="text-amber-400 font-bold">40px</span></label>
+            </div>
+            <input type="range" id="param-gap-br-bar" min="10" max="90" value="40" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer">
+          </div>
+        </div>
+      </div>
+
+      <!-- Color Adjustments & Theme Modes -->
+      <div class="space-y-3 pt-2 border-t border-slate-800/80">
+        <div class="flex justify-between items-center">
+          <label class="text-xs font-bold text-slate-200 uppercase tracking-wide flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+            图标模式与配色方案
+          </label>
+          <span id="current-theme-tag" class="text-[11px] text-emerald-400 font-mono font-medium">浅色模式 (#F5F4F0)</span>
+        </div>
+
+        <!-- Quick Icon Background Theme Buttons -->
+        <div>
+          <span class="text-[10px] text-slate-400 block mb-1.5">快捷模式切换</span>
+          <div class="grid grid-cols-3 gap-2">
+            <button id="theme-btn-light" onclick="setThemeMode('light')" class="px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-slate-950 border-emerald-500/50 text-emerald-400">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#F5F4F0] border border-slate-400 shadow-sm"></span>
+              浅色经典
+            </button>
+            <button id="theme-btn-dark-black" onclick="setThemeMode('dark-black')" class="px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-slate-950 border-slate-800 text-slate-400 hover:text-white">
+              <span class="w-2.5 h-2.5 rounded-full bg-black border border-slate-600 shadow-sm"></span>
+              深色纯黑
+            </button>
+            <button id="theme-btn-dark-slate" onclick="setThemeMode('dark-slate')" class="px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-slate-950 border-slate-800 text-slate-400 hover:text-white">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#18181B] border border-slate-600 shadow-sm"></span>
+              暗夜石墨
+            </button>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center pt-2 border-t border-slate-800/60">
+          <label class="text-[11px] font-medium text-slate-400 block">竹青色预设 (Color.bambooGreen)</label>
+          <div class="flex items-center space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+            <button id="bamboo-mode-light" onclick="setBambooMode('light')" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium cursor-pointer">浅色 #789262</button>
+            <button id="bamboo-mode-dark" onclick="setBambooMode('dark')" class="px-2 py-0.5 rounded text-slate-400 hover:text-white cursor-pointer">深色 #8FA876</button>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center pt-2 border-t border-slate-800/60">
+          <label class="text-[11px] font-medium text-slate-400 block">金缮金预设 (Color.kintsugiGold)</label>
+          <div class="flex items-center space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+            <button id="mode-light" onclick="setKintsugiMode('light')" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium cursor-pointer">浅色 #D4AF37</button>
+            <button id="mode-dark" onclick="setKintsugiMode('dark')" class="px-2 py-0.5 rounded text-slate-400 hover:text-white cursor-pointer">深色 #E6C35C</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 pt-1">
+          <div>
+            <span class="text-[10px] text-slate-400 block mb-1">主色：竹青色</span>
+            <div class="flex items-center space-x-2">
+              <input type="color" id="color-bamboo" value="#789262" class="w-8 h-8 rounded border-0 bg-transparent cursor-pointer">
+              <span id="text-bamboo" class="text-[11px] font-mono text-slate-300">#789262</span>
+            </div>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 block mb-1">金缮金 (当前)</span>
+            <div class="flex items-center space-x-2">
+              <input type="color" id="color-mustard" value="#D4AF37" class="w-8 h-8 rounded border-0 bg-transparent cursor-pointer">
+              <span id="text-mustard" class="text-[11px] font-mono text-slate-300">#D4AF37</span>
+            </div>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 block mb-1">背景底色</span>
+            <div class="flex items-center space-x-2">
+              <input type="color" id="color-bg" value="#F5F4F0" class="w-8 h-8 rounded border-0 bg-transparent cursor-pointer">
+              <span id="text-bg" class="text-[11px] font-mono text-slate-300">#F5F4F0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Modular Scripts -->
+  <script src="js/state.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

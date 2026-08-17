@@ -1,0 +1,385 @@
+#include "include/CTTZipBridge_ZipWrite.h"
+#include "include/CTTZipBridge.h"
+#include "include/CTTZipCommon.h"
+#include "include/CTTZipCoreArchitecture.h"
+#include "include/CTTZipBridge_Crypto.h"
+#include "include/CTTZipBridge_Archive.h"
+#include "include/CTTZipZipWriteInternal.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <libgen.h>
+#include <dirent.h>
+#include <libdeflate.h>
+#include <dispatch/dispatch.h>
+#include <errno.h>
+
+#define write_all ttzip_io_write_all
+
+static bool is_mac_junk_path_zip(const char* path) {
+    if (!path) return false;
+    if (strstr(path, "/.DS_Store") || strstr(path, "/__MACOSX/")) return true;
+    const char *base = strrchr(path, '/');
+    base = base ? base + 1 : path;
+    return (strcmp(base, ".DS_Store") == 0 || strncmp(base, "._", 2) == 0);
+}
+
+
+static void collect_c_items_recursive(const char* src_path, const char* rel_path, bool skip_mac_junk, ttzip_c_item_list_t* list) {
+    if (!src_path || !rel_path) return;
+    if (skip_mac_junk && is_mac_junk_path_zip(src_path)) return;
+    
+    struct stat st;
+    if (lstat(src_path, &st) != 0) return;
+    
+    if (list->count >= list->capacity) {
+        size_t new_cap = (list->capacity == 0) ? 512 : list->capacity * 2;
+        ttzip_c_item_t* new_items = (ttzip_c_item_t*)realloc(list->items, new_cap * sizeof(ttzip_c_item_t));
+        if (!new_items) return;
+        memset(new_items + list->capacity, 0, (new_cap - list->capacity) * sizeof(ttzip_c_item_t));
+        list->items = new_items;
+        list->capacity = new_cap;
+    }
+    
+    ttzip_c_item_t* item = &list->items[list->count++];
+    memset(item, 0, sizeof(ttzip_c_item_t));
+    strncpy(item->src_path, src_path, sizeof(item->src_path) - 1);
+    strncpy(item->rel_path, rel_path, sizeof(item->rel_path) - 1);
+    item->is_directory = S_ISDIR(st.st_mode);
+    if (item->is_directory) {
+        size_t rlen = strlen(item->rel_path);
+        if (rlen > 0 && item->rel_path[rlen - 1] != '/' && rlen + 1 < sizeof(item->rel_path)) {
+            item->rel_path[rlen] = '/';
+            item->rel_path[rlen + 1] = '\0';
+        }
+        item->uncompressed_size = 0;
+        item->compressed_size = 0;
+        item->crc32 = 0;
+        item->compression_method = 0;
+        item->actual_method = 0;
+        item->compressed_payload = NULL;
+        item->is_mmapped = false;
+
+        DIR *dir = opendir(src_path);
+        if (dir) {
+            int dfd = dirfd(dir);
+            struct dirent *de;
+            while ((de = readdir(dir)) != NULL) {
+                if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
+                if (skip_mac_junk && (strcmp(de->d_name, ".DS_Store") == 0 || strncmp(de->d_name, "._", 2) == 0)) continue;
+                char child_src[4096];
+                char child_rel[4096];
+                snprintf(child_src, sizeof(child_src), "%s/%s", src_path, de->d_name);
+                snprintf(child_rel, sizeof(child_rel), "%s/%s", rel_path, de->d_name);
+
+                if (de->d_type == DT_REG) {
+                    struct stat cst;
+                    if (fstatat(dfd, de->d_name, &cst, AT_SYMLINK_NOFOLLOW) == 0) {
+                        if (list->count >= list->capacity) {
+                            size_t new_cap = list->capacity * 2;
+                            ttzip_c_item_t* new_items = (ttzip_c_item_t*)realloc(list->items, new_cap * sizeof(ttzip_c_item_t));
+                            if (new_items) {
+                                memset(new_items + list->capacity, 0, (new_cap - list->capacity) * sizeof(ttzip_c_item_t));
+                                list->items = new_items;
+                                list->capacity = new_cap;
+                            }
+                        }
+                        if (list->count < list->capacity) {
+                            ttzip_c_item_t* citem = &list->items[list->count++];
+                            memset(citem, 0, sizeof(ttzip_c_item_t));
+                            strncpy(citem->src_path, child_src, sizeof(citem->src_path) - 1);
+                            strncpy(citem->rel_path, child_rel, sizeof(citem->rel_path) - 1);
+                            citem->is_directory = false;
+                            citem->uncompressed_size = (int64_t)cst.st_size;
+                            citem->compressed_size = 0;
+                            citem->crc32 = 0;
+                            citem->compression_method = 8;
+                            citem->actual_method = 8;
+                            citem->compressed_payload = NULL;
+                            citem->is_mmapped = false;
+                            continue;
+                        }
+                    }
+                }
+                collect_c_items_recursive(child_src, child_rel, skip_mac_junk, list);
+            }
+            closedir(dir);
+        }
+    } else {
+        item->uncompressed_size = (int64_t)st.st_size;
+        item->compressed_size = 0;
+        item->crc32 = 0;
+        item->compression_method = 8; // Deflate
+        item->actual_method = 8;
+        item->compressed_payload = NULL;
+        item->is_mmapped = false;
+    }
+}
+
+int ttzip_create_zip_parallel_c(
+    const char* output_zip_path,
+    const char* const* input_paths,
+    size_t input_count,
+    int level,
+    bool skip_mac_junk,
+    const char* password
+) {
+    if (!output_zip_path || !input_paths || input_count == 0) return TTZIP_ERR_INVALID_PARAM;
+    
+    ttzip_c_item_list_t list = { NULL, 0, 0 };
+    for (size_t i = 0; i < input_count; i++) {
+        const char* src_path = input_paths[i];
+        if (!src_path || strlen(src_path) == 0) continue;
+        const char* last_slash = strrchr(src_path, '/');
+        const char* base_name = last_slash ? (last_slash + 1) : src_path;
+        collect_c_items_recursive(src_path, base_name, skip_mac_junk, &list);
+    }
+    
+    if (list.count == 0) {
+        if (list.items) free(list.items);
+        return TTZIP_ERR_INVALID_PARAM;
+    }
+
+    bool has_password = (password && strlen(password) > 0);
+
+    // 1. 计算总未压缩字节并构建输出 Arena 内存池（消除海量小文件的 per-file malloc/free 锁争用）
+    uint64_t total_uncompressed_bytes = 0;
+    size_t active_files_count = 0;
+    for (size_t i = 0; i < list.count; i++) {
+        if (!list.items[i].is_directory && list.items[i].uncompressed_size > 0) {
+            total_uncompressed_bytes += (uint64_t)list.items[i].uncompressed_size;
+            active_files_count++;
+        }
+    }
+
+    uint8_t* payload_arena = NULL;
+    if (total_uncompressed_bytes > 0 && total_uncompressed_bytes <= 128 * 1024 * 1024) {
+        size_t arena_cap = (size_t)total_uncompressed_bytes + active_files_count * 512 + 64 * 1024;
+        payload_arena = (uint8_t*)malloc(arena_cap);
+        if (payload_arena) {
+            size_t curr_off = 0;
+            for (size_t i = 0; i < list.count; i++) {
+                if (!list.items[i].is_directory && list.items[i].uncompressed_size > 0) {
+                    size_t bound = (size_t)list.items[i].uncompressed_size + 512;
+                    list.items[i].arena_offset = curr_off;
+                    list.items[i].arena_cap = bound;
+                    curr_off += bound;
+                }
+            }
+        }
+    }
+
+    // 2. 全核并发零锁快速读取与压缩
+    dispatch_apply(list.count, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t idx) {
+        ttzip_c_item_t* item = &list.items[idx];
+        if (item->is_directory || item->uncompressed_size == 0) {
+            item->actual_method = 0;
+            item->compressed_size = 0;
+            item->crc32 = 0;
+            return;
+        }
+
+        size_t item_unc_size = ttzip_clamp_size((uint64_t)item->uncompressed_size);
+
+        int fd = open(item->src_path, O_RDONLY);
+        if (fd < 0) {
+            return;
+        }
+
+        uint8_t stack_in_buf[65536];
+        uint8_t stack_out_buf[65536 + 512];
+        void* src_buf = NULL;
+        uint8_t* heap_src = NULL;
+
+        if (item_unc_size <= sizeof(stack_in_buf)) {
+            ssize_t read_bytes = pread(fd, stack_in_buf, item_unc_size, 0);
+            if (read_bytes == (ssize_t)item_unc_size) {
+                src_buf = stack_in_buf;
+            }
+        } else if (item_unc_size >= 64 * 1024) {
+            src_buf = mmap(NULL, item_unc_size, PROT_READ, MAP_SHARED, fd, 0);
+        }
+
+        if (!src_buf || src_buf == MAP_FAILED) {
+            heap_src = (uint8_t*)malloc(item_unc_size);
+            if (heap_src) {
+                ssize_t read_bytes = pread(fd, heap_src, item_unc_size, 0);
+                if (read_bytes == (ssize_t)item_unc_size) {
+                    src_buf = heap_src;
+                }
+            }
+        }
+
+        if (!src_buf) {
+            close(fd);
+            return;
+        }
+
+        item->crc32 = ttzip_compute_buffer_crc32_neon(0, src_buf, item_unc_size);
+
+        uint8_t* arena_slot = (payload_arena && item->arena_cap >= item_unc_size) ? (payload_arena + item->arena_offset) : NULL;
+
+        if (level == 0) {
+            item->actual_method = 0;
+            if (has_password) {
+                size_t enc_size = item_unc_size + 18 + 10;
+                uint8_t* enc_buf = arena_slot ? arena_slot : (uint8_t*)malloc(enc_size);
+                if (enc_buf) {
+                    arc4random_buf(enc_buf, 16);
+                    uint8_t derived_keys[66];
+                    size_t pass_len = strlen(password);
+                    if (ttzip_pbkdf2_sha1_fast(password, pass_len, enc_buf, 16, 1000, derived_keys, 66) == 0) {
+                        enc_buf[16] = derived_keys[64];
+                        enc_buf[17] = derived_keys[65];
+                        uint8_t* cipher_dst = enc_buf + 18;
+                        ttzip_aes256_encrypt_and_hmac_fused(derived_keys, (const uint8_t*)src_buf, item_unc_size, cipher_dst, enc_buf + 18 + item_unc_size);
+                        item->compressed_payload = enc_buf;
+                        item->compressed_size = (int64_t)enc_size;
+                    } else if (!arena_slot) {
+                        free(enc_buf);
+                    }
+                    ttzip_secure_zero(derived_keys, sizeof(derived_keys));
+                }
+            } else {
+                if (arena_slot) {
+                    memcpy(arena_slot, src_buf, item_unc_size);
+                    item->compressed_payload = arena_slot;
+                } else if (src_buf == stack_in_buf) {
+                    uint8_t* store_buf = (uint8_t*)malloc(item_unc_size);
+                    if (store_buf) {
+                        memcpy(store_buf, stack_in_buf, item_unc_size);
+                        item->compressed_payload = store_buf;
+                    }
+                } else {
+                    item->compressed_payload = src_buf;
+                    item->is_mmapped = (heap_src == NULL);
+                }
+                item->compressed_size = item->uncompressed_size;
+            }
+        } else {
+            struct libdeflate_compressor* compressor = ttzip_get_tls_compressor(level > 0 ? level : 6);
+            if (compressor) {
+                size_t max_comp_bound = libdeflate_deflate_compress_bound(compressor, item_unc_size);
+                uint8_t* comp_buf = arena_slot ? arena_slot : ((max_comp_bound <= sizeof(stack_out_buf)) ? stack_out_buf : (uint8_t*)malloc(max_comp_bound));
+
+                if (comp_buf) {
+                    size_t actual_comp_size = libdeflate_deflate_compress(compressor, src_buf, item_unc_size, comp_buf, max_comp_bound);
+                    if (actual_comp_size > 0 && (int64_t)actual_comp_size < item->uncompressed_size) {
+                        item->actual_method = 8;
+                        if (has_password) {
+                            size_t enc_size = actual_comp_size + 18 + 10;
+                            uint8_t* enc_buf = arena_slot ? arena_slot : (uint8_t*)malloc(enc_size);
+                            if (enc_buf) {
+                                uint8_t tmp_comp[65536];
+                                uint8_t* safe_comp_src = comp_buf;
+                                if (comp_buf == arena_slot && actual_comp_size <= sizeof(tmp_comp)) {
+                                    memcpy(tmp_comp, comp_buf, actual_comp_size);
+                                    safe_comp_src = tmp_comp;
+                                }
+                                arc4random_buf(enc_buf, 16);
+                                uint8_t derived_keys[66];
+                                size_t pass_len = strlen(password);
+                                if (ttzip_pbkdf2_sha1_fast(password, pass_len, enc_buf, 16, 1000, derived_keys, 66) == 0) {
+                                    enc_buf[16] = derived_keys[64];
+                                    enc_buf[17] = derived_keys[65];
+                                    uint8_t* cipher_dst = enc_buf + 18;
+                                    ttzip_aes256_encrypt_and_hmac_fused(derived_keys, safe_comp_src, actual_comp_size, cipher_dst, enc_buf + 18 + actual_comp_size);
+                                    item->compressed_payload = enc_buf;
+                                    item->compressed_size = (int64_t)enc_size;
+                                } else if (!arena_slot) {
+                                    free(enc_buf);
+                                }
+                                ttzip_secure_zero(derived_keys, sizeof(derived_keys));
+                            }
+                        } else {
+                            if (arena_slot) {
+                                item->compressed_payload = arena_slot;
+                                item->compressed_size = (int64_t)actual_comp_size;
+                            } else {
+                                uint8_t* final_comp = (uint8_t*)malloc(actual_comp_size);
+                                if (final_comp) {
+                                    memcpy(final_comp, comp_buf, actual_comp_size);
+                                    item->compressed_payload = final_comp;
+                                    item->compressed_size = (int64_t)actual_comp_size;
+                                }
+                            }
+                        }
+                    } else {
+                        item->actual_method = 0;
+                        if (has_password) {
+                            size_t enc_size = item_unc_size + 18 + 10;
+                            uint8_t* enc_buf = arena_slot ? arena_slot : (uint8_t*)malloc(enc_size);
+                            if (enc_buf) {
+                                arc4random_buf(enc_buf, 16);
+                                uint8_t derived_keys[66];
+                                size_t pass_len = strlen(password);
+                                if (ttzip_pbkdf2_sha1_fast(password, pass_len, enc_buf, 16, 1000, derived_keys, 66) == 0) {
+                                    enc_buf[16] = derived_keys[64];
+                                    enc_buf[17] = derived_keys[65];
+                                    uint8_t* cipher_dst = enc_buf + 18;
+                                    ttzip_aes256_encrypt_and_hmac_fused(derived_keys, (const uint8_t*)src_buf, item_unc_size, cipher_dst, enc_buf + 18 + item_unc_size);
+                                    item->compressed_payload = enc_buf;
+                                    item->compressed_size = (int64_t)enc_size;
+                                } else if (!arena_slot) {
+                                    free(enc_buf);
+                                }
+                                ttzip_secure_zero(derived_keys, sizeof(derived_keys));
+                            }
+                        } else {
+                            if (arena_slot) {
+                                memcpy(arena_slot, src_buf, item_unc_size);
+                                item->compressed_payload = arena_slot;
+                            } else if (src_buf == stack_in_buf) {
+                                uint8_t* store_buf = (uint8_t*)malloc(item_unc_size);
+                                if (store_buf) {
+                                    memcpy(store_buf, stack_in_buf, item_unc_size);
+                                    item->compressed_payload = store_buf;
+                                }
+                            } else {
+                                item->compressed_payload = src_buf;
+                                item->is_mmapped = (heap_src == NULL);
+                            }
+                            item->compressed_size = item->uncompressed_size;
+                        }
+                    }
+                    if (!arena_slot && comp_buf != stack_out_buf) {
+                        free(comp_buf);
+                    }
+                }
+            }
+        }
+
+        if (item->compressed_payload != src_buf && src_buf != stack_in_buf) {
+            if (heap_src) {
+                free(heap_src);
+            } else if (src_buf && src_buf != MAP_FAILED) {
+                munmap(src_buf, (size_t)item->uncompressed_size);
+            }
+        }
+        close(fd);
+    });
+
+    int res = ttzip_write_zip_archive_disk(output_zip_path, &list, has_password);
+
+    if (payload_arena) {
+        free(payload_arena);
+    } else {
+        for (size_t i = 0; i < list.count; i++) {
+            if (list.items[i].compressed_payload) {
+                if (list.items[i].is_mmapped) {
+                    munmap(list.items[i].compressed_payload, (size_t)list.items[i].uncompressed_size);
+                } else {
+                    free(list.items[i].compressed_payload);
+                }
+            }
+        }
+    }
+    free(list.items);
+    return res;
+}
+

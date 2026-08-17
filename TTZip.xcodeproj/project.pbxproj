@@ -1,0 +1,456 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		8A1000102C10000000000001 /* TTZipApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000022C10000000000001 /* TTZipApp.swift */; };
+		8A1000112C10000000000001 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000032C10000000000001 /* MainView.swift */; };
+		8A1000122C10000000000001 /* ArchiveExplorerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000042C10000000000001 /* ArchiveExplorerView.swift */; };
+		8A1000132C10000000000001 /* CompressModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000052C10000000000001 /* CompressModalView.swift */; };
+		8A1000142C10000000000001 /* ExtractModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000062C10000000000001 /* ExtractModalView.swift */; };
+		8A1000152C10000000000001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000072C10000000000001 /* SettingsView.swift */; };
+		8A1000252C10000000000001 /* AppViewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000262C10000000000001 /* AppViewState.swift */; };
+		8A1000312C10000000000001 /* MediaPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000302C10000000000001 /* MediaPreviewView.swift */; };
+		8A1000332C10000000000001 /* PasswordVaultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000322C10000000000001 /* PasswordVaultView.swift */; };
+		8A1000352C10000000000001 /* PresetWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000342C10000000000001 /* PresetWorkspaceView.swift */; };
+		8A1000372C10000000000001 /* CompressionProgressModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000362C10000000000001 /* CompressionProgressModalView.swift */; };
+		8A1000392C10000000000001 /* PasswordPromptSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000382C10000000000001 /* PasswordPromptSheetView.swift */; };
+		8A1000412C10000000000001 /* NativeArchiveOutlineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000402C10000000000001 /* NativeArchiveOutlineView.swift */; };
+		8A1000502C10000000000001 /* 7zz in Resources */ = {isa = PBXBuildFile; fileRef = 8A1000512C10000000000001 /* 7zz */; };
+		8A1000612C10000000000001 /* TTZipTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000602C10000000000001 /* TTZipTheme.swift */; };
+		8A1000632C10000000000001 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000622C10000000000001 /* VisualEffectView.swift */; };
+		8A1000652C10000000000001 /* TTZipFluidBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000642C10000000000001 /* TTZipFluidBackgroundView.swift */; };
+		8A1000692C10000000000001 /* BenchmarkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1000682C10000000000001 /* BenchmarkView.swift */; };
+		8A1000202C10000000000001 /* TTZipCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8A10001B2C10000000000001 /* TTZipCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		8A1000012C10000000000001 /* TTZip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TTZip.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8A1000022C10000000000001 /* TTZipApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/TTZipApp.swift; sourceTree = SOURCE_ROOT; };
+		8A1000032C10000000000001 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/MainView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000042C10000000000001 /* ArchiveExplorerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/ArchiveExplorerView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000052C10000000000001 /* CompressModalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/CompressModalView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000062C10000000000001 /* ExtractModalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/ExtractModalView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000072C10000000000001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/SettingsView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000302C10000000000001 /* MediaPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/MediaPreviewView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000322C10000000000001 /* PasswordVaultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/PasswordVaultView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000342C10000000000001 /* PresetWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/PresetWorkspaceView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000362C10000000000001 /* CompressionProgressModalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/CompressionProgressModalView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000382C10000000000001 /* PasswordPromptSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/PasswordPromptSheetView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000402C10000000000001 /* NativeArchiveOutlineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/Explorer/NativeArchiveOutlineView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000602C10000000000001 /* TTZipTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Theme/TTZipTheme.swift; sourceTree = SOURCE_ROOT; };
+		8A1000622C10000000000001 /* VisualEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/VisualEffectView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000642C10000000000001 /* TTZipFluidBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/TTZipFluidBackgroundView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000682C10000000000001 /* BenchmarkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/Views/BenchmarkView.swift; sourceTree = SOURCE_ROOT; };
+		8A1000512C10000000000001 /* 7zz */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = Sources/TTZipApp/Resources/7zz; sourceTree = SOURCE_ROOT; };
+		8A1000262C10000000000001 /* AppViewState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TTZipApp/ViewModels/AppViewState.swift; sourceTree = SOURCE_ROOT; };
+		8A1000082C10000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Sources/TTZipApp/Info.plist; sourceTree = SOURCE_ROOT; };
+		8A1000092C10000000000001 /* TTZip.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Sources/TTZipApp/TTZip.entitlements; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8A10000A2C10000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A1000202C10000000000001 /* TTZipCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		8A10000B2C10000000000001 = {
+			isa = PBXGroup;
+			children = (
+				8A10000D2C10000000000001 /* Sources */,
+				8A10000C2C10000000000001 /* Products */,
+				8A10001A2C10000000000001 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		8A10000C2C10000000000001 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8A1000012C10000000000001 /* TTZip.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8A10000D2C10000000000001 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				8A1000022C10000000000001 /* TTZipApp.swift */,
+				8A1000262C10000000000001 /* AppViewState.swift */,
+				8A1000032C10000000000001 /* MainView.swift */,
+				8A1000042C10000000000001 /* ArchiveExplorerView.swift */,
+				8A1000052C10000000000001 /* CompressModalView.swift */,
+				8A1000062C10000000000001 /* ExtractModalView.swift */,
+				8A1000072C10000000000001 /* SettingsView.swift */,
+				8A1000302C10000000000001 /* MediaPreviewView.swift */,
+				8A1000322C10000000000001 /* PasswordVaultView.swift */,
+				8A1000342C10000000000001 /* PresetWorkspaceView.swift */,
+				8A1000362C10000000000001 /* CompressionProgressModalView.swift */,
+				8A1000382C10000000000001 /* PasswordPromptSheetView.swift */,
+				8A1000402C10000000000001 /* NativeArchiveOutlineView.swift */,
+				8A1000602C10000000000001 /* TTZipTheme.swift */,
+				8A1000622C10000000000001 /* VisualEffectView.swift */,
+				8A1000642C10000000000001 /* TTZipFluidBackgroundView.swift */,
+				8A1000682C10000000000001 /* BenchmarkView.swift */,
+				8A1000082C10000000000001 /* Info.plist */,
+				8A1000092C10000000000001 /* TTZip.entitlements */,
+			);
+			name = Sources;
+			sourceTree = "<group>";
+		};
+		8A10001A2C10000000000001 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8A1000162C10000000000001 /* TTZip */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A1000172C10000000000001 /* Build configuration list for PBXNativeTarget "TTZip" */;
+			buildPhases = (
+				8A10000E2C10000000000001 /* Sources */,
+				8A10000A2C10000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TTZip;
+			packageProductDependencies = (
+				8A10001B2C10000000000001 /* TTZipCore */,
+			);
+			productName = TTZip;
+			productReference = 8A1000012C10000000000001 /* TTZip.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		8A1000192C10000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					8A1000162C10000000000001 = {
+						CreatedOnToolsVersion = 15.4;
+					};
+				};
+			};
+			buildConfigurationList = 8A1000182C10000000000001 /* Build configuration list for PBXProject "TTZip" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 8A10000B2C10000000000001;
+			packageReferences = (
+				8A10001E2C10000000000001 /* XCLocalSwiftPackageReference . */,
+			);
+			productRefGroup = 8A10000C2C10000000000001 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8A1000162C10000000000001 /* TTZip */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		8A10000E2C10000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A1000102C10000000000001 /* TTZipApp.swift in Sources */,
+				8A1000252C10000000000001 /* AppViewState.swift in Sources */,
+				8A1000112C10000000000001 /* MainView.swift in Sources */,
+				8A1000122C10000000000001 /* ArchiveExplorerView.swift in Sources */,
+				8A1000132C10000000000001 /* CompressModalView.swift in Sources */,
+				8A1000142C10000000000001 /* ExtractModalView.swift in Sources */,
+				8A1000152C10000000000001 /* SettingsView.swift in Sources */,
+				8A1000312C10000000000001 /* MediaPreviewView.swift in Sources */,
+				8A1000332C10000000000001 /* PasswordVaultView.swift in Sources */,
+				8A1000352C10000000000001 /* PresetWorkspaceView.swift in Sources */,
+				8A1000372C10000000000001 /* CompressionProgressModalView.swift in Sources */,
+				8A1000392C10000000000001 /* PasswordPromptSheetView.swift in Sources */,
+				8A1000412C10000000000001 /* NativeArchiveOutlineView.swift in Sources */,
+				8A1000612C10000000000001 /* TTZipTheme.swift in Sources */,
+				8A1000632C10000000000001 /* VisualEffectView.swift in Sources */,
+				8A1000652C10000000000001 /* TTZipFluidBackgroundView.swift in Sources */,
+				8A1000692C10000000000001 /* BenchmarkView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		8A10001C2C10000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = Sources/TTZipApp/TTZip.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_PROTOTYPES = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor/include",
+					"$(SRCROOT)/Vendor/include/uchardet",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor/lib",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor/lib/libarchive.a",
+					"$(SRCROOT)/Vendor/lib/libuchardet.a",
+					"$(SRCROOT)/Vendor/lib/liblzma.a",
+					"$(SRCROOT)/Vendor/lib/libzstd.a",
+					"$(SRCROOT)/Vendor/lib/liblz4.a",
+					"$(SRCROOT)/Vendor/lib/libb2.a",
+					"-lc++",
+					"-lz",
+					"-lbz2",
+					"-lxml2",
+					"-lexpat",
+					"-liconv",
+					"-Xlinker",
+					"-w",
+				);
+				INFOPLIST_FILE = Sources/TTZipApp/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ttzip.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				RECOMMENDED_MACOSX_DEPLOYMENT_TARGET = 14.0;
+				WARNING_CFLAGS = (
+					"$(inherited)",
+					"-Wno-everything",
+				);
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		8A10001D2C10000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = Sources/TTZipApp/TTZip.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_PROTOTYPES = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor/include",
+					"$(SRCROOT)/Vendor/include/uchardet",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor/lib",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor/lib/libarchive.a",
+					"$(SRCROOT)/Vendor/lib/libuchardet.a",
+					"$(SRCROOT)/Vendor/lib/liblzma.a",
+					"$(SRCROOT)/Vendor/lib/libzstd.a",
+					"$(SRCROOT)/Vendor/lib/liblz4.a",
+					"$(SRCROOT)/Vendor/lib/libb2.a",
+					"-lc++",
+					"-lz",
+					"-lbz2",
+					"-lxml2",
+					"-lexpat",
+					"-liconv",
+					"-Xlinker",
+					"-w",
+				);
+				INFOPLIST_FILE = Sources/TTZipApp/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ttzip.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				RECOMMENDED_MACOSX_DEPLOYMENT_TARGET = 14.0;
+				WARNING_CFLAGS = (
+					"$(inherited)",
+					"-Wno-everything",
+				);
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		8A1000212C10000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_PROTOTYPES = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-Xlinker",
+					"-w",
+				);
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+
+			};
+			name = Debug;
+		};
+		8A1000222C10000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_PROTOTYPES = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_FAST_MATH = YES;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-Xlinker",
+					"-w",
+				);
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		8A1000172C10000000000001 /* Build configuration list for PBXNativeTarget "TTZip" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A10001C2C10000000000001 /* Debug */,
+				8A10001D2C10000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8A1000182C10000000000001 /* Build configuration list for PBXProject "TTZip" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A1000212C10000000000001 /* Debug */,
+				8A1000222C10000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8A10001B2C10000000000001 /* TTZipCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TTZipCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		8A10001E2C10000000000001 /* XCLocalSwiftPackageReference . */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+	};
+	rootObject = 8A1000192C10000000000001 /* Project object */;
+}
