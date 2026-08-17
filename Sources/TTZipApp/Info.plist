@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>zh_CN</string>
+	<string>en</string>
 	<key>CFBundleExecutable</key>
 	<string>TTZip</string>
 	<key>CFBundleIconFile</key>
@@ -15,6 +15,8 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
+	<string>TTZip</string>
+	<key>CFBundleDisplayName</key>
 	<string>TTZip</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
@@ -28,55 +30,77 @@
 	<string>public.app-category.utilities</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 TTZip Inc. All rights reserved.</string>
-	<key>SUFeedURL</key>
-	<string>https://ttzip.app/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>w3t/8bK1w4A2sJ9xR0yQ7zP5uM4vN3bL2k1j0h9g8f7e=</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
 	
+	<!-- 16-Format Document Types Binding -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>All Compressed Archives</string>
+			<string>All Supported Compressed Archives</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
-			<string>Owner</string>
+			<string>Default</string>
 			<key>CFBundleTypeExtensions</key>
 			<array>
-				<string>7z</string>
 				<string>zip</string>
-				<string>zst</string>
-				<string>gz</string>
+				<string>zipx</string>
+				<string>cbz</string>
+				<string>7z</string>
+				<string>cb7</string>
 				<string>tar</string>
+				<string>gz</string>
+				<string>tgz</string>
 				<string>bz2</string>
+				<string>tbz2</string>
+				<string>tbz</string>
 				<string>xz</string>
-				<string>001</string>
-				<string>002</string>
-				<string>rar</string>
+				<string>txz</string>
+				<string>zst</string>
+				<string>tzst</string>
+				<string>lz4</string>
+				<string>br</string>
+				<string>lz</string>
+				<string>lzip</string>
+				<string>lrz</string>
+				<string>lrzip</string>
+				<string>aar</string>
+				<string>sz</string>
+				<string>snappy</string>
+				<string>wim</string>
+				<string>dmg</string>
 				<string>iso</string>
+				<string>rar</string>
+				<string>cbr</string>
 				<string>cab</string>
-				<string>cpio</string>
-				<string>ar</string>
+				<string>001</string>
 			</array>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>public.archive</string>
-				<string>public.data</string>
-				<string>public.item</string>
-				<string>org.7-zip.7-zip-archive</string>
+				<string>public.zip-archive</string>
 				<string>com.pkware.zip-archive</string>
+				<string>org.7-zip.7-zip-archive</string>
 				<string>public.tar-archive</string>
 				<string>org.gnu.gnu-zip-archive</string>
 				<string>public.bzip2-archive</string>
 				<string>public.xz-archive</string>
-				<string>com.rarlab.rar-archive</string>
-				<string>org.7-zip.7-zip-split-archive</string>
 				<string>org.facebook.zstd-archive</string>
+				<string>org.lz4.lz4-archive</string>
+				<string>com.rarlab.rar-archive</string>
+				<string>com.apple.disk-image-udif</string>
+				<string>public.iso-image</string>
+				<string>org.7-zip.7-zip-split-archive</string>
+				<string>public.archive</string>
+				<string>public.data</string>
 			</array>
 		</dict>
 	</array>
 
+	<!-- Imported UTIs for Formats Not Standard in macOS -->
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>
@@ -134,6 +158,25 @@
 				<array>
 					<string>zst</string>
 					<string>zstd</string>
+					<string>tzst</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.lz4.lz4-archive</string>
+			<key>UTTypeDescription</key>
+			<string>LZ4 Compressed Archive</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.archive</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>lz4</string>
 				</array>
 			</dict>
 		</dict>
