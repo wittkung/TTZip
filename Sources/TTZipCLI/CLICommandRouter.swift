@@ -115,7 +115,7 @@ public enum CLICommandRouter {
             printPresets()
             
         case .version, .shortVersion:
-            print("TTZip Enterprise Commercial CLI v1.5.0 (Apple Silicon Native)")
+            print("ttzip-cli version 1.0.0 (Apple Silicon M-Series & x86_64)")
             
         case .help, .shortHelp, .unknown:
             printUsage()
@@ -246,7 +246,7 @@ public enum CLICommandRouter {
     public static func printUsage() {
         print("""
         ================================================================
-        TTZip Enterprise CLI 工具集 v1.5.0 (Apple Silicon M-Series Engine)
+        TTZip CLI v1.0.0 — Native Archiving & Compression Engine (macOS)
         ================================================================
         用法:
           ttzip-cli inspect <archive-path> [-p pwd]         查看归档目录树与元数据

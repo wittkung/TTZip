@@ -33,6 +33,7 @@ keka_zip.zip
 payload/
 scratch_bench/
 build_app/
+build_dist/
 build/
 *.bin
 test*.7z
