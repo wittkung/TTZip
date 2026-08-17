@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 1. LZ4 极速微秒级引擎（游戏资源、内存镜像与极速吞吐）
+/// LZ4 microsecond in-memory codec engine for game assets, memory dumps, and real-time buffers.
 public final class LZ4LzoEngine: @unchecked Sendable {
     public init() {}
     
@@ -98,7 +105,7 @@ public final class LZ4LzoEngine: @unchecked Sendable {
     }
 }
 
-/// 2. ZStandard 高吞吐均衡算法引擎 (Meta Zstd Native Direct Binding)
+/// Zstandard high-throughput in-process direct binding engine.
 public final class ZstdDictionaryEngine: @unchecked Sendable {
     private var compressionLevel: Int32
     
@@ -150,11 +157,11 @@ public final class ZstdDictionaryEngine: @unchecked Sendable {
     }
 }
 
-/// 3. Delta / RLE 时序与数值数组预滤器
+/// First-order delta / RLE numerical pre-filter for entropy minimization.
 public final class DeltaRLEFilter: @unchecked Sendable {
     public init() {}
     
-    /// 将数值数组转换为一阶微元增量 Delta 序列，极大改善压缩机 LZ 熵权
+    /// Converts numeric byte sequence into first-order differential delta stream.
     public func applyDeltaFilter(data: Data) -> Data {
         guard !data.isEmpty else { return data }
         let count = data.count
@@ -170,7 +177,7 @@ public final class DeltaRLEFilter: @unchecked Sendable {
         return Data(bytesNoCopy: dstPtr, count: count, deallocator: .custom { ptr, _ in ptr.deallocate() })
     }
     
-    /// 一阶微元增量 Delta 逆变换
+    /// Reverses first-order differential delta stream back into original bytes.
     public func removeDeltaFilter(data: Data) -> Data {
         guard !data.isEmpty else { return data }
         let count = data.count
