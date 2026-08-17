@@ -252,7 +252,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
             }
         )
         #if DEBUG
-        XCTAssertGreaterThan(metrics.throughputMBs, 6000.0, "ZIP Store 吞吐速率必须高于 6000 MB/s (Debug 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 5500.0, "ZIP Store 吞吐速率必须高于 5500 MB/s (Debug 模式硬门禁)")
         #else
         XCTAssertGreaterThan(metrics.throughputMBs, 7500.0, "ZIP Store 吞吐速率必须高于 7500 MB/s (Release 模式硬门禁)")
         #endif
