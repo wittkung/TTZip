@@ -1,38 +1,43 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 import CTTZipBridge
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
-/// 流水线执行拓扑模式
+/// Stream pipeline execution topology mode.
 public enum StreamExecutionMode: String, Sendable, Equatable, CaseIterable {
-    /// 读写物理磁盘文件
+    /// Reading and writing physical files on disk.
     case directFile = "directFile"
-    /// 从 stdin 读取归档数据，解压至目标目录
+    /// Reading archive data from stdin, extracting to destination directory.
     case standardInputPipe = "standardInputPipe"
-    /// 从磁盘读取输入，流式写入 stdout 归档
+    /// Reading input from disk, streaming archive payload to stdout.
     case standardOutputPipe = "standardOutputPipe"
-    /// 从 stdin 读取并向 stdout 发射
+    /// Reading from stdin and streaming output to stdout.
     case duplexPipe = "duplexPipe"
-    /// 归档内单条目瞬时提取至 stdout（无磁盘中间文件）
+    /// Extracting a single entry from an archive directly to stdout (zero disk staging).
     case singleEntryStdout = "singleEntryStdout"
 }
 
-/// 进度与日志输出路由策略
+/// Progress and telemetry event routing policy.
 public enum StreamProgressRouting: String, Sendable, Equatable, CaseIterable {
-    /// 完全静默进度
+    /// Completely suppress progress bars and interactive logs.
     case suppressed = "suppressed"
-    /// 路由至 stderr（保证 stdout 纯净二进制流）
+    /// Route progress updates to standard error (preserving pure binary output on stdout).
     case standardError = "standardError"
-    /// 直接输出至 stdout（仅限 stdout 为交互式 TTY 且非二进制流）
+    /// Output inline on standard output (allowed only when stdout is a TTY and not a binary pipe).
     case inlineTty = "inlineTty"
 }
 
-/// 目标 Shell 补全方言
+/// Target shell for auto-completion generation.
 public enum ShellTarget: String, Sendable, Equatable, CaseIterable {
     case zsh = "zsh"
     case bash = "bash"
@@ -40,7 +45,7 @@ public enum ShellTarget: String, Sendable, Equatable, CaseIterable {
     case nushell = "nushell"
 }
 
-/// 流水线强类型配置模型
+/// Strongly-typed pipeline streaming configuration.
 public struct StreamPipelineConfig: Sendable, Equatable {
     public let mode: StreamExecutionMode
     public let inputPath: String?
@@ -69,35 +74,55 @@ public struct StreamPipelineConfig: Sendable, Equatable {
     }
 }
 
-/// 标准输入/输出管道流式适配器 (Stream Pipe Adapter)
+/// Standard I/O stream pipe adapter.
+///
+/// Manages TTY detection, pipe buffer sizing, stdin spooling, and clean error propagation.
 public enum StreamPipeAdapter {
     
-    /// 检查路径是否代表标准流管道 ("-")
+    /// Checks whether a given path string represents standard I/O (`"-"`).
     @inline(__always)
     public static func isStandardStream(_ path: String?) -> Bool {
         guard let p = path?.trimmingCharacters(in: .whitespaces) else { return false }
         return p == "-"
     }
     
-    /// 检查 stdout 是否连接至交互式终端 TTY
+    /// Checks whether stdout is connected to an interactive terminal TTY.
     @inline(__always)
     public static func isStdoutTTY() -> Bool {
+        #if canImport(Darwin)
         return Darwin.isatty(STDOUT_FILENO) != 0
+        #elseif canImport(Glibc)
+        return Glibc.isatty(STDOUT_FILENO) != 0
+        #else
+        return false
+        #endif
     }
     
-    /// 检查 stderr 是否连接至交互式终端 TTY
+    /// Checks whether stderr is connected to an interactive terminal TTY.
     @inline(__always)
     public static func isStderrTTY() -> Bool {
+        #if canImport(Darwin)
         return Darwin.isatty(STDERR_FILENO) != 0
+        #elseif canImport(Glibc)
+        return Glibc.isatty(STDERR_FILENO) != 0
+        #else
+        return false
+        #endif
     }
     
-    /// 检查 stdin 是否连接至交互式终端 TTY
+    /// Checks whether stdin is connected to an interactive terminal TTY.
     @inline(__always)
     public static func isStdinTTY() -> Bool {
+        #if canImport(Darwin)
         return Darwin.isatty(STDIN_FILENO) != 0
+        #elseif canImport(Glibc)
+        return Glibc.isatty(STDIN_FILENO) != 0
+        #else
+        return false
+        #endif
     }
     
-    /// 确定当前执行的流式模式
+    /// Determines the execution stream topology mode based on input and output parameters.
     public static func determineMode(
         inputPath: String?,
         outputPath: String?,
@@ -121,7 +146,7 @@ public enum StreamPipeAdapter {
         }
     }
     
-    /// 确定进度输出路由策略
+    /// Computes the appropriate progress output routing policy.
     public static func determineProgressRouting(
         mode: StreamExecutionMode,
         isQuiet: Bool = false
@@ -137,7 +162,7 @@ public enum StreamPipeAdapter {
         }
     }
     
-    /// 从标准输入流读取数据，自适应选择内存缓存或临时匿名文件
+    /// Reads standard input into an anonymous temporary spool file for random-access archives.
     public static func readStdinToTemporaryFileIfNeeded(suffix: String = ".tmp") throws -> (path: String, isTemporary: Bool) {
         let chunkSize = 64 * 1024 // 64 KB
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: chunkSize)
@@ -159,7 +184,13 @@ public enum StreamPipeAdapter {
         
         var totalRead: Int64 = 0
         while true {
+            #if canImport(Darwin)
             let bytesRead = Darwin.read(STDIN_FILENO, buffer, chunkSize)
+            #elseif canImport(Glibc)
+            let bytesRead = Glibc.read(STDIN_FILENO, buffer, chunkSize)
+            #else
+            let bytesRead = 0
+            #endif
             if bytesRead <= 0 { break }
             
             let data = Data(bytesNoCopy: buffer, count: bytesRead, deallocator: .none)
@@ -170,7 +201,7 @@ public enum StreamPipeAdapter {
         return (tempFile.path, true)
     }
     
-    /// 清理临时流式缓存文件
+    /// Removes temporary stream cache file.
     public static func cleanupTemporaryFile(_ path: String) {
         try? FileManager.default.removeItem(atPath: path)
     }

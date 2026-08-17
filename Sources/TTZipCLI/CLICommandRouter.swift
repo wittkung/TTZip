@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
@@ -14,7 +14,10 @@ import Darwin
 import Glibc
 #endif
 
-/// 命令行控制台观察者 (支持 TTY 60Hz 自适应渲染与 NDJSON 模式)
+/// Console observer for archive events and real-time progress updates.
+///
+/// Implements `ArchiveProgressObserverProtocol` and `ArchiveEventObserverProtocol` to provide
+/// 60Hz rate-limited ANSI terminal rendering and machine-readable NDJSON telemetry streams.
 public final class CLIEventAndProgressConsoleObserver: ArchiveProgressObserverProtocol, ArchiveEventObserverProtocol, @unchecked Sendable {
     public static let shared = CLIEventAndProgressConsoleObserver()
     private init() {}
@@ -22,6 +25,8 @@ public final class CLIEventAndProgressConsoleObserver: ArchiveProgressObserverPr
     public var isJsonMode: Bool = false
     public var isSilenced: Bool = false
     
+    /// Handles continuous progress updates from active compression/extraction pipelines.
+    /// - Parameter progress: Structured snapshot containing throughput, bytes, and completed fraction.
     public func onProgressUpdated(_ progress: ArchiveProgressInfo) {
         guard !isSilenced else { return }
         if isJsonMode {
@@ -44,35 +49,44 @@ public final class CLIEventAndProgressConsoleObserver: ArchiveProgressObserverPr
         }
     }
     
+    /// Handles discrete lifecycle events emitted by the core engine.
+    /// - Parameter event: Typed lifecycle event payload.
     public func onArchiveEvent(_ event: ArchiveEvent) {
         guard !isSilenced else { return }
         switch event {
         case .archiveCompleted(let path, let op, let duration, _):
             TerminalRenderEngine.shared.completeProgress(message: String(format: " ✅ %@: %@ (%.2fs)", op.rawValue, (path as NSString).lastPathComponent, duration))
         case .extractionFailed(let path, let err):
-            TerminalRenderEngine.shared.completeProgress(message: " ❌ 解压失败: \((path as NSString).lastPathComponent) (\(err))")
+            TerminalRenderEngine.shared.completeProgress(message: " ❌ Extraction failed: \((path as NSString).lastPathComponent) (\(err))")
         case .securityThreatIntercepted(let path, let threat):
-            TerminalRenderEngine.shared.completeProgress(message: " ⚠️ 安全拦截: \((path as NSString).lastPathComponent) (\(threat))")
+            TerminalRenderEngine.shared.completeProgress(message: " ⚠️ Security threat intercepted: \((path as NSString).lastPathComponent) (\(threat))")
         case .passwordVaultUnlocked(let path, _, _):
-            TerminalRenderEngine.shared.completeProgress(message: " ⚡️ 钥匙串自动解锁: \((path as NSString).lastPathComponent)")
+            TerminalRenderEngine.shared.completeProgress(message: " ⚡️ Password vault unlocked: \((path as NSString).lastPathComponent)")
         case .presetChanged(_, let newName):
-            TerminalRenderEngine.shared.completeProgress(message: " ⚙️ 预设变更: \(newName)")
+            TerminalRenderEngine.shared.completeProgress(message: " ⚙️ Preset changed: \(newName)")
         case .taskStateChanged(let taskId, let oldState, let newState):
-            if !isJsonMode && TTZipLocalizationManager.shared.currentLanguage == .zhHans {
-                TerminalRenderEngine.shared.completeProgress(message: " 🔄 任务状态变更 [\(taskId.uuidString.prefix(8))]: \(oldState) ➔ \(newState)")
+            if !isJsonMode {
+                TerminalRenderEngine.shared.completeProgress(message: " 🔄 Task state changed [\(taskId.uuidString.prefix(8))]: \(oldState) ➔ \(newState)")
             }
         }
     }
 }
 
-/// 模块化、符合 POSIX 工业标准的 CLI 命令分发路由器
+/// Modular, POSIX-compliant command-line router and dispatcher.
+///
+/// Implements standard UNIX CLI conventions, input/output validation, stream piping,
+/// interactive explorer invocation, and returns POSIX standard exit status codes.
 @MainActor
 public enum CLICommandRouter {
     @Injected static var facade: TTZipEngineFacading
     @Injected static var securityProxy: SecurityProtectionProxy
     @Injected static var taskDispatcher: ArchiveTaskDispatcher
     
-    /// 执行解析好的 CLI 命令并返回标准 POSIX 退出代码
+    /// Routes and executes a parsed CLI command with the specified options.
+    /// - Parameters:
+    ///   - command: Parsed subcommand enum identifier.
+    ///   - options: Strongly-typed option configuration.
+    /// - Returns: POSIX compliant exit code (`EX_OK`, `EX_USAGE`, `EX_DATAERR`, `EX_NOINPUT`, etc.).
     @discardableResult
     public static func route(command: CLICommand, options: CLIOptions) async -> CLIExitCode {
         CLIEventAndProgressConsoleObserver.shared.isJsonMode = options.jsonOutput
@@ -766,19 +780,19 @@ public enum CLICommandRouter {
         } else {
             toolsToUninstall = ["all"]
         }
-        print("🗑️ 启动竞品软件选择性/一键卸载助手...")
+        print("🗑️ Starting competitor toolchain uninstaller...")
         let results = await ToolchainInstaller.shared.uninstallCompetitorToolchains(tools: toolsToUninstall) { status in
             print("   [Uninstall] \(status)")
         }
-        print("\n卸载处理结果汇总:")
+        print("\nUninstallation Summary:")
         for (tool, ok) in results {
-            print(" - \(tool): \(ok ? "✅ 卸载成功/已清理" : "⚠️ 保持未动/未安装")")
+            print(" - \(tool): \(ok ? "✅ Successfully uninstalled / removed" : "⚠️ Skipped / Not installed")")
         }
     }
     
     private static func handleBatchMacro(options: CLIOptions) async {
         guard options.positionals.count >= 2 else {
-            print("错误: 批量任务需指定输出目录与至少一个输入源。")
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: batch macro requires an output directory and at least one input file.")
             return
         }
         let outDir = options.positionals[0]
@@ -790,16 +804,16 @@ public enum CLICommandRouter {
         }
         do {
             let result = try await ArchiveBatchFacade.shared.batchCompressTransactional(tasks: tasks)
-            print("✅ 事务型宏命令批处理成功! 生成 \(result.artifactsCreated.count) 个产物。耗时: \(String(format: "%.2f", result.executionDuration))s")
+            print("✅ Transactional batch macro completed: Created \(result.artifactsCreated.count) archives in \(String(format: "%.2f", result.executionDuration))s")
         } catch {
-            print("❌ 批量命令执行失败: \(error.localizedDescription)")
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: batch command failed: \(error.localizedDescription)")
         }
     }
     
     private static func printPresets() {
-        print("📋 当前生效的常用压缩预设:")
+        print("📋 Active Archiving and Compression Presets:")
         for preset in PresetManager.shared.presets {
-            print(" - [\(preset.name)] 格式:\(preset.format.rawValue) 分卷:\(preset.splitVolumeDescription)")
+            print(" - [\(preset.name)] Format: \(preset.format.rawValue) Split: \(preset.splitVolumeDescription)")
         }
     }
     

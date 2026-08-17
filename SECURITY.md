@@ -16,7 +16,7 @@ We actively maintain and provide security updates for the following versions of 
 The TTZip team takes security and privacy seriously. If you discover a potential security vulnerability in TTZip, please report it responsibly:
 
 1. **Do NOT open a public GitHub issue.**
-2. Please send an email directly to the maintainer: **`kevintungs@163.com`** with the subject `[SECURITY] TTZip Vulnerability Report`.
+2. Please send an email directly to the maintainer: **`witt.w.kung@gmail.com`** with the subject `[SECURITY] TTZip Vulnerability Report`.
 3. Include detailed steps to reproduce the issue, proof-of-concept code (if applicable), and affected platforms/versions.
 
 ### Response Timeline

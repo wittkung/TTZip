@@ -1,20 +1,24 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 
-/// 异步分块文件过滤清单加载器 (Asynchronous File Filter Manifest Loader)
+/// Asynchronous chunked file filter list and manifest loader.
+///
+/// Reads newline or NUL-delimited file path lists from disk files or standard input (`-`),
+/// automatically filtering comment lines starting with `#` and empty strings.
 public enum FileFilterListLoader: Sendable {
     
-    /// 从文件路径或标准输入加载过滤路径清单
+    /// Loads an array of filesystem paths from a manifest file or standard input.
     /// - Parameters:
-    ///   - filePath: 文件路径（支持 "-" 代表标准输入）
-    ///   - nullDelimiter: 是否采用 \0 空字符分隔（--null / -0）
-    /// - Returns: 解析后的非空路径字符串数组
+    ///   - filePath: Path to file on disk, or `"-"` for standard input.
+    ///   - nullDelimiter: Whether paths are separated by NUL byte (`\0`) instead of newline (`\n`).
+    /// - Returns: Array of trimmed, non-empty path strings.
+    /// - Throws: `NSError` if the file cannot be opened or read.
     public static func loadPaths(from filePath: String, nullDelimiter: Bool = false) async throws -> [String] {
         let trimmedPath = filePath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPath.isEmpty else { return [] }
@@ -54,7 +58,7 @@ public enum FileFilterListLoader: Sendable {
         results.reserveCapacity(512)
         
         if nullDelimiter {
-            // NUL-delimited 分隔读取
+            // NUL-delimited chunk parsing
             let data = handle.readDataToEndOfFile()
             let paths = data.split(separator: 0).compactMap { chunk -> String? in
                 guard !chunk.isEmpty else { return nil }
@@ -62,10 +66,10 @@ public enum FileFilterListLoader: Sendable {
             }.filter { !$0.isEmpty }
             return paths
         } else {
-            // 行流式读取 (支持 AsyncLineSequence)
+            // Streaming line-by-line parsing
             for try await line in handle.bytes.lines {
                 let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                // 忽略空行与以 # 开头的注释行
+                // Ignore empty lines and comment lines prefixed with '#'
                 if trimmed.isEmpty || trimmed.hasPrefix("#") {
                     continue
                 }

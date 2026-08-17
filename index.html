@@ -3,35 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TTZip — 面向 macOS 的原生高性能归档与压缩解压工具</title>
-    <meta name="description" content="TTZip 是一款专为 Apple Silicon 原生打造的高性能归档与解压工具。100% 进程内 C 引擎，支持 16 种格式全覆盖，空格键 QuickLook 极速预览，零数据收集。">
+    <title>TTZip — 极致性能，纯粹原生。专为 macOS 打造的次世代归档与压缩引擎</title>
+    <meta name="description" content="TTZip 是专为 Apple Silicon (M系列) 原生打造的高性能归档与解压工具。融合禅意极简美学、金缮金线排版与 100% 进程内 C 引擎，ARM64 PMULL CRC 48GB/s，16 种格式全覆盖，0ms QuickLook 穿透预览。">
     <link rel="icon" type="image/png" href="assets/AppIcon.png">
     <style>
         :root {
-            --bg: #FFFFFF;
-            --surface: rgba(245, 245, 247, 0.65);
-            --surface-elevated: rgba(255, 255, 255, 0.85);
-            --border: rgba(229, 229, 234, 0.6);
-            --text-primary: #1D1D1F;
-            --text-secondary: #6E6E73;
+            --bg: #FBFBFD;
+            --surface: rgba(255, 255, 255, 0.72);
+            --surface-elevated: rgba(255, 255, 255, 0.92);
+            --border: rgba(0, 0, 0, 0.07);
+            --border-subtle: rgba(0, 0, 0, 0.035);
+            --text-primary: #1C1C1E;
+            --text-secondary: #58585D;
             --text-tertiary: #86868B;
-            --accent-green: #2D7D46;
-            --accent-green-light: rgba(45, 125, 70, 0.12);
-            --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", sans-serif;
+            --accent-green: #2E8B57;
+            --accent-green-hover: #236B43;
+            --accent-green-light: rgba(46, 139, 87, 0.12);
+            --accent-green-border: rgba(46, 139, 87, 0.28);
+            --kintsugi-gold: #D4AF37;
+            --kintsugi-gold-hover: #C29F2D;
+            --kintsugi-gold-light: rgba(212, 175, 55, 0.14);
+            --kintsugi-gold-border: rgba(212, 175, 55, 0.35);
+            --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", sans-serif;
+            --font-serif: "New York", "Songti SC", "SimSun", Georgia, serif;
             --font-mono: "SF Mono", Monaco, Menlo, Consolas, monospace;
+            --shadow-sm: 0 2px 10px rgba(0,0,0,0.03);
+            --shadow-md: 0 10px 30px rgba(0,0,0,0.05);
+            --shadow-lg: 0 20px 50px rgba(0,0,0,0.08);
+            --shadow-gold: 0 4px 20px rgba(212, 175, 55, 0.25);
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
         }
 
         @media (prefers-color-scheme: dark) {
             :root {
-                --bg: #000000;
-                --surface: rgba(28, 28, 30, 0.65);
-                --surface-elevated: rgba(44, 44, 46, 0.85);
-                --border: rgba(56, 56, 58, 0.6);
+                --bg: #0B0B0D;
+                --surface: rgba(22, 22, 28, 0.68);
+                --surface-elevated: rgba(30, 30, 38, 0.88);
+                --border: rgba(255, 255, 255, 0.08);
+                --border-subtle: rgba(255, 255, 255, 0.04);
                 --text-primary: #F5F5F7;
                 --text-secondary: #A1A1A6;
                 --text-tertiary: #6E6E73;
                 --accent-green: #34C759;
-                --accent-green-light: rgba(52, 199, 89, 0.18);
+                --accent-green-hover: #30B750;
+                --accent-green-light: rgba(52, 199, 89, 0.16);
+                --accent-green-border: rgba(52, 199, 89, 0.32);
+                --kintsugi-gold: #E5C158;
+                --kintsugi-gold-hover: #F2D272;
+                --kintsugi-gold-light: rgba(229, 193, 88, 0.18);
+                --kintsugi-gold-border: rgba(229, 193, 88, 0.4);
+                --shadow-sm: 0 2px 10px rgba(0,0,0,0.35);
+                --shadow-md: 0 10px 30px rgba(0,0,0,0.45);
+                --shadow-lg: 0 20px 50px rgba(0,0,0,0.55);
+                --shadow-gold: 0 4px 20px rgba(229, 193, 88, 0.3);
             }
         }
 
@@ -51,7 +77,7 @@
             position: relative;
         }
 
-        /* 100% TTZip App 同款流体背景容器 */
+        /* 100% TTZip App 原生同款单色竹青流体动态画布 */
         .fluid-canvas-container {
             position: fixed;
             top: 0;
@@ -66,35 +92,36 @@
         }
         @media (prefers-color-scheme: dark) {
             .fluid-canvas-container {
-                opacity: 0.38;
+                opacity: 0.34;
             }
         }
         #fluidCanvas {
             width: 100%;
             height: 100%;
-            filter: blur(80px);
-            -webkit-filter: blur(80px);
-            transform: scale(1.3);
+            filter: blur(85px);
+            -webkit-filter: blur(85px);
+            transform: scale(1.35);
             transform-origin: center;
         }
 
-        /* 前景内容层 */
         .content-wrapper {
             position: relative;
             z-index: 1;
         }
 
-        /* 完全透明顶部栏 (Transparent Top Nav) */
+        /* 顶部导航栏 (完全透明顶部栏 Transparent Sticky Nav) */
         nav {
             position: sticky;
             top: 0;
             z-index: 100;
             background-color: transparent;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
             border-bottom: none;
-            padding: 16px 32px;
+            padding: 18px 32px;
         }
         .nav-container {
-            max-width: 1080px;
+            max-width: 1160px;
             margin: 0 auto;
             display: flex;
             align-items: center;
@@ -103,198 +130,552 @@
         .brand {
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-weight: 600;
-            font-size: 17px;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 18px;
             text-decoration: none;
             color: var(--text-primary);
             letter-spacing: -0.02em;
         }
         .brand img {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.12);
+        }
+        .brand-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            background-color: var(--kintsugi-gold-light);
+            color: var(--kintsugi-gold);
+            border: 1px solid var(--kintsugi-gold-border);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-family: var(--font-mono);
         }
         .nav-links {
             display: flex;
             gap: 24px;
             align-items: center;
             font-size: 14px;
+            font-weight: 500;
         }
         .nav-links a {
             color: var(--text-secondary);
             text-decoration: none;
-            transition: color 0.2s;
+            transition: color 0.2s ease;
         }
         .nav-links a:hover {
             color: var(--text-primary);
         }
-        .btn-mas {
+        .nav-cta {
             background-color: var(--text-primary);
             color: var(--bg) !important;
             padding: 7px 18px;
             border-radius: 20px;
-            font-weight: 500;
+            font-weight: 600;
+            font-size: 13px;
             transition: opacity 0.2s, transform 0.2s;
+            box-shadow: var(--shadow-sm);
         }
-        .btn-mas:hover {
-            opacity: 0.85;
+        .nav-cta:hover {
+            opacity: 0.88;
             transform: scale(1.02);
         }
 
-        /* Hero */
+        /* WSJ 金缮金线微装饰 (Kintsugi Golden Rule Line) */
+        .golden-rule {
+            width: 100%;
+            height: 1.5px;
+            background: linear-gradient(90deg, transparent 0%, var(--kintsugi-gold) 50%, transparent 100%);
+            margin: 32px 0;
+            opacity: 0.85;
+        }
+        .golden-tag {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--kintsugi-gold);
+            font-family: var(--font-mono);
+            display: inline-block;
+            margin-bottom: 8px;
+        }
+
+        /* Hero 头部区域 */
         .hero {
-            max-width: 960px;
-            margin: 70px auto 60px;
+            max-width: 1000px;
+            margin: 48px auto 40px;
             text-align: center;
             padding: 0 24px;
         }
-        .hero-badge {
+        .hero-badge-pill {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            background-color: var(--accent-green-light);
-            color: var(--accent-green);
+            gap: 8px;
+            background-color: var(--surface);
+            color: var(--kintsugi-gold);
             font-size: 12px;
             font-weight: 600;
-            padding: 5px 14px;
+            padding: 6px 16px;
             border-radius: 100px;
             margin-bottom: 24px;
-            border: 1px solid rgba(45, 125, 70, 0.2);
-            backdrop-filter: blur(10px);
+            border: 1px solid var(--kintsugi-gold-border);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-sm);
+        }
+        .hero-badge-pill span.dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background-color: var(--kintsugi-gold);
+            display: inline-block;
         }
         .hero h1 {
-            font-size: 54px;
-            font-weight: 700;
-            letter-spacing: -0.03em;
-            line-height: 1.15;
+            font-size: 58px;
+            font-weight: 800;
+            letter-spacing: -0.035em;
+            line-height: 1.12;
             margin-bottom: 22px;
         }
-        .hero p {
+        .hero h1 span.gold-highlight {
+            color: var(--kintsugi-gold);
+            position: relative;
+            display: inline-block;
+        }
+        .hero p.lead {
             font-size: 20px;
             color: var(--text-secondary);
-            max-width: 700px;
-            margin: 0 auto 38px;
-            line-height: 1.55;
+            max-width: 780px;
+            margin: 0 auto 36px;
+            line-height: 1.6;
+            font-weight: 400;
         }
+
+        /* 行动召唤按钮组 (CTA Buttons) */
         .hero-actions {
             display: flex;
             justify-content: center;
-            gap: 16px;
+            gap: 14px;
             flex-wrap: wrap;
-            margin-bottom: 40px;
+            margin-bottom: 34px;
         }
         .btn-primary {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            background: linear-gradient(180deg, var(--accent-green) 0%, #236337 100%);
-            color: #FFFFFF;
+            gap: 9px;
+            background: linear-gradient(180deg, var(--accent-green) 0%, var(--accent-green-hover) 100%);
+            color: #FFFFFF !important;
             padding: 13px 26px;
-            border-radius: 14px;
+            border-radius: var(--radius-md);
             font-size: 15px;
             font-weight: 600;
             text-decoration: none;
-            box-shadow: 0 4px 16px rgba(45, 125, 70, 0.35);
+            box-shadow: 0 4px 18px rgba(46, 139, 87, 0.35);
             transition: transform 0.15s, box-shadow 0.15s;
         }
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(45, 125, 70, 0.45);
+            box-shadow: 0 6px 24px rgba(46, 139, 87, 0.45);
         }
         .btn-secondary {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 9px;
             background-color: var(--surface);
             backdrop-filter: blur(16px);
-            color: var(--text-primary);
+            -webkit-backdrop-filter: blur(16px);
+            color: var(--text-primary) !important;
             padding: 13px 24px;
-            border-radius: 14px;
+            border-radius: var(--radius-md);
             font-size: 15px;
             font-weight: 600;
             text-decoration: none;
             border: 1px solid var(--border);
-            transition: transform 0.15s, background-color 0.15s;
+            transition: transform 0.15s, background-color 0.15s, border-color 0.15s;
+            box-shadow: var(--shadow-sm);
         }
         .btn-secondary:hover {
             transform: translateY(-1px);
             background-color: var(--surface-elevated);
+            border-color: var(--kintsugi-gold-border);
         }
 
-        /* CLI Box */
+        /* CLI 快捷安装代码框 (Homebrew One-Liner Box) */
         .cli-box {
             background-color: var(--surface);
-            backdrop-filter: blur(16px);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            max-width: 540px;
+            border-radius: var(--radius-md);
+            max-width: 580px;
             margin: 0 auto;
-            padding: 12px 18px;
+            padding: 11px 18px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             font-family: var(--font-mono);
             font-size: 13px;
             color: var(--text-secondary);
-            box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+            box-shadow: var(--shadow-sm);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .cli-box:hover {
+            border-color: var(--kintsugi-gold-border);
+            box-shadow: var(--shadow-gold);
         }
         .cli-code {
             color: var(--accent-green);
             user-select: all;
-            font-weight: 500;
+            font-weight: 600;
+        }
+        .copy-btn {
+            background: var(--surface-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: var(--font-sans);
+            font-weight: 600;
+            transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+        }
+        .copy-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--kintsugi-gold);
         }
 
-        /* Features */
+        /* 通用 Section 样式 */
         .section {
-            max-width: 1080px;
-            margin: 100px auto;
+            max-width: 1160px;
+            margin: 85px auto;
             padding: 0 24px;
         }
         .section-header {
             text-align: center;
-            margin-bottom: 50px;
+            margin-bottom: 44px;
         }
         .section-header h2 {
-            font-size: 36px;
-            font-weight: 700;
-            letter-spacing: -0.02em;
+            font-size: 38px;
+            font-weight: 800;
+            letter-spacing: -0.025em;
             margin-bottom: 12px;
         }
         .section-header p {
             color: var(--text-secondary);
             font-size: 17px;
+            max-width: 700px;
+            margin: 0 auto;
         }
+
+        /* 🖥 交互式 macOS 3 栏米勒列窗口模拟器 (Interactive Desktop Showcase) */
+        .mac-window {
+            background-color: var(--surface-elevated);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            margin: 20px auto 40px;
+        }
+        .mac-titlebar {
+            height: 44px;
+            background: rgba(0, 0, 0, 0.02);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            justify-content: space-between;
+        }
+        .mac-traffic-lights {
+            display: flex;
+            gap: 7px;
+        }
+        .mac-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .dot-close { background-color: #FF5F56; }
+        .dot-min { background-color: #FFBD2E; }
+        .dot-zoom { background-color: #27C93F; }
+        .mac-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-family: var(--font-sans);
+        }
+        .mac-app-body {
+            display: grid;
+            grid-template-columns: 210px 1fr 280px;
+            min-height: 420px;
+            border-top: 1.5px solid var(--kintsugi-gold); /* 严格对齐 Y=90pt Kintsugi Gold Line 哲学 */
+        }
+        @media (max-width: 960px) {
+            .mac-app-body { grid-template-columns: 1fr; }
+            .mac-sidebar, .mac-inspector { display: none; }
+        }
+        .mac-sidebar {
+            background: rgba(0, 0, 0, 0.015);
+            border-right: 1px solid var(--border);
+            padding: 16px 12px;
+        }
+        .sidebar-section-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-tertiary);
+            padding: 6px 10px;
+            font-family: var(--font-mono);
+        }
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .sidebar-item.active, .sidebar-item:hover {
+            background-color: var(--kintsugi-gold-light);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        .mac-miller-columns {
+            padding: 16px;
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+        }
+        .file-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-bottom: 4px;
+            transition: background-color 0.15s;
+        }
+        .file-row:hover, .file-row.active {
+            background-color: var(--accent-green-light);
+        }
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .file-size {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+        .mac-inspector {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.01);
+        }
+        .inspector-preview-box {
+            width: 100%;
+            height: 120px;
+            border-radius: 10px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            text-align: center;
+            padding: 12px;
+        }
+        .inspector-meta-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .inspector-meta-label { color: var(--text-tertiary); }
+        .inspector-meta-val { font-weight: 600; font-family: var(--font-mono); color: var(--text-primary); }
+
+        /* 性能竞技场 (The Performance Arena) */
+        .perf-container {
+            background-color: var(--surface);
+            backdrop-filter: blur(24px) saturate(160%);
+            -webkit-backdrop-filter: blur(24px) saturate(160%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 34px;
+            box-shadow: var(--shadow-md);
+        }
+        .perf-tabs {
+            display: flex;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+            margin-bottom: 26px;
+            overflow-x: auto;
+        }
+        .perf-tab-btn {
+            background: none;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+            white-space: nowrap;
+        }
+        .perf-tab-btn.active {
+            background-color: var(--kintsugi-gold-light);
+            color: var(--kintsugi-gold);
+            border: 1px solid var(--kintsugi-gold-border);
+        }
+        .perf-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+        .perf-stat-card {
+            background-color: var(--surface-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 22px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        .perf-stat-card .label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+            font-family: var(--font-mono);
+        }
+        .perf-stat-card .val {
+            font-size: 30px;
+            font-weight: 800;
+            font-family: var(--font-mono);
+            color: var(--accent-green);
+            margin-bottom: 4px;
+        }
+        .perf-stat-card .baseline {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .perf-stat-card .badge-boost {
+            display: inline-block;
+            margin-top: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--kintsugi-gold);
+            background-color: var(--kintsugi-gold-light);
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+
+        /* 完整基准对照表 */
+        .bench-table-wrapper {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        .bench-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .bench-table th, .bench-table td {
+            padding: 15px 18px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .bench-table th {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-tertiary);
+            background-color: rgba(0, 0, 0, 0.02);
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+        .bench-table tr:hover td {
+            background-color: rgba(0, 0, 0, 0.015);
+        }
+        .speed-highlight {
+            color: var(--accent-green);
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+        .perf-footer-note {
+            margin-top: 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--text-tertiary);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .perf-footer-note a {
+            color: var(--kintsugi-gold);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* 功能矩阵卡片 (Features Grid) */
         .grid-3 {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 22px;
         }
         .card {
             background-color: var(--surface);
             backdrop-filter: blur(20px) saturate(150%);
             -webkit-backdrop-filter: blur(20px) saturate(150%);
             border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 30px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.02);
-            transition: transform 0.25s, box-shadow 0.25s;
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
         }
         .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--kintsugi-gold-border);
             background-color: var(--surface-elevated);
         }
-        .card-icon {
-            font-size: 30px;
-            margin-bottom: 16px;
+        .card-icon-wrapper {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background-color: var(--kintsugi-gold-light);
+            border: 1px solid var(--kintsugi-gold-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-bottom: 18px;
         }
         .card h3 {
             font-size: 19px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            letter-spacing: -0.01em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -0.015em;
         }
         .card p {
             font-size: 14px;
@@ -302,54 +683,172 @@
             line-height: 1.65;
         }
 
-        /* Benchmarks Table */
-        .bench-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 24px;
-            background-color: var(--surface);
-            backdrop-filter: blur(20px);
-            border-radius: 18px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            font-size: 14px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.03);
+        /* 16-Format 全矩阵探索卡 (Format Explorer) */
+        .format-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
         }
-        .bench-table th, .bench-table td {
-            padding: 16px 22px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-        }
-        .bench-table th {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-tertiary);
-            background-color: rgba(0, 0, 0, 0.02);
-        }
-        .bench-table tr:last-child td {
-            border-bottom: none;
-        }
-        .speed-highlight {
-            color: var(--accent-green);
-            font-weight: 600;
+        .format-tag {
             font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 9px;
+            border-radius: 6px;
+            background-color: var(--surface-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        .format-tag.featured {
+            border-color: var(--accent-green-border);
+            color: var(--accent-green);
         }
 
-        /* Footer */
+        /* 终端模拟器 (Terminal Showcase) */
+        .terminal-window {
+            background-color: #121216;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            font-family: var(--font-mono);
+        }
+        .terminal-header {
+            background-color: #1A1A20;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .terminal-dots {
+            display: flex;
+            gap: 7px;
+        }
+        .terminal-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+        }
+        .dot-red { background-color: #FF5F56; }
+        .dot-yellow { background-color: #FFBD2E; }
+        .dot-green { background-color: #27C93F; }
+        .terminal-title {
+            color: #8E8E93;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .terminal-body {
+            padding: 24px;
+            color: #D1D1D6;
+            font-size: 13px;
+            line-height: 1.7;
+            overflow-x: auto;
+        }
+        .terminal-line {
+            margin-bottom: 12px;
+        }
+        .t-prompt { color: #34C759; font-weight: 700; margin-right: 8px; }
+        .t-cmd { color: #FFFFFF; font-weight: 600; }
+        .t-comment { color: #6E6E73; }
+        .t-output { color: #A1A1A6; }
+        .t-highlight { color: #E5C158; }
+
+        /* 开源回馈与致谢 (Upstream Contributions) */
+        .upstream-box {
+            background: linear-gradient(135deg, var(--surface) 0%, var(--surface-elevated) 100%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 36px;
+            box-shadow: var(--shadow-md);
+        }
+        .upstream-list {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+        }
+        .upstream-item {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 18px 20px;
+        }
+        .upstream-item h4 {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+        }
+        .upstream-item p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* 授权与合规模块 (License & Commercial Model) */
+        .license-card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 28px;
+        }
+        @media (max-width: 768px) {
+            .license-card { grid-template-columns: 1fr; }
+        }
+        .license-col h3 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .license-col ul {
+            list-style: none;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+        .license-col ul li {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+        .license-col ul li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: var(--kintsugi-gold);
+            font-weight: bold;
+        }
+        .license-col.prohibit ul li::before {
+            color: #FF453A;
+        }
+
+        /* 页脚 (完全透明底部 Transparent Footer) */
         footer {
-            border-top: 1px solid var(--border);
-            padding: 40px 24px 60px;
+            border-top: none;
+            padding: 50px 24px 70px;
             margin-top: 100px;
             text-align: center;
             color: var(--text-tertiary);
             font-size: 13px;
+            background-color: transparent;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
         }
         .footer-links {
             display: flex;
             justify-content: center;
-            gap: 24px;
-            margin-bottom: 16px;
+            gap: 26px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
         }
         .footer-links a {
             color: var(--text-secondary);
@@ -359,10 +858,16 @@
         .footer-links a:hover {
             color: var(--text-primary);
         }
+        .copyright {
+            margin-top: 12px;
+            font-size: 12px;
+        }
 
         @media (max-width: 768px) {
             .hero h1 { font-size: 38px; }
-            .hero p { font-size: 17px; }
+            .hero p.lead { font-size: 17px; }
+            .nav-links { display: none; }
+            .section-header h2 { font-size: 28px; }
         }
     </style>
 </head>
@@ -373,159 +878,645 @@
         <canvas id="fluidCanvas" width="480" height="320"></canvas>
     </div>
 
-    <!-- Main Content -->
+    <!-- 前景内容层 -->
     <div class="content-wrapper">
 
-        <!-- Navigation (Fully Transparent) -->
+        <!-- 顶部导航栏 (完全透明顶部栏 Transparent Sticky Nav) -->
         <nav>
             <div class="nav-container">
                 <a href="#" class="brand">
                     <img src="assets/AppIcon.png" alt="TTZip Icon">
                     <span>TTZip</span>
+                    <span class="brand-badge">Zen × M-Series</span>
                 </a>
                 <div class="nav-links">
-                    <a href="#features">功能特性</a>
-                    <a href="#benchmarks">实测性能</a>
+                    <a href="#desktop">桌面体验</a>
+                    <a href="performance.html">实测性能</a>
+                    <a href="cli.html">CLI & TUI</a>
+                    <a href="formats.html">16 种格式</a>
+                    <a href="#upstream">开源反哺</a>
+                    <a href="#license">授权协议</a>
                     <a href="privacy.html">隐私政策</a>
                     <a href="https://github.com/wittkung/TTZip" target="_blank" rel="noopener">GitHub</a>
-                    <a href="#download" class="btn-mas">Mac App Store</a>
+                    <a href="https://apps.apple.com/app/id6742512345" class="nav-cta">Mac App Store</a>
                 </div>
             </div>
         </nav>
 
-        <!-- Hero Section -->
+        <!-- Hero 头部区域 -->
         <section class="hero">
-            <div class="hero-badge">⚡️ 面向 macOS 14+ Sonoma / 15+ Sequoia 原生架构</div>
-            <h1>极致性能，优雅极简。<br>Apple Silicon 原生归档引擎。</h1>
-            <p>100% 进程内纯 C 引擎驱动，零 Subprocess 进程调用开销。完整支持 16 大归档格式、空格键 QuickLook 穿透预览与 PBKDF2 密码保险箱。</p>
+            <div class="hero-badge-pill">
+                <span class="dot"></span>
+                <span>Zen (禅) 极简美学 × Apple Silicon 硬件加速</span>
+            </div>
+            <h1>极致性能，优雅极简。<br><span class="gold-highlight">Apple Silicon 原生归档引擎。</span></h1>
+            <p class="lead">100% 进程内纯 C 静态绑定与 ARM64 PMULL 硬件向量驱动。融合 WSJ 编辑级典雅排版与金缮金线玻璃质感，完整支持 16 大格式、0ms QuickLook 穿透预览与 PBKDF2 硬件密码保险箱。</p>
             
             <div class="hero-actions" id="download">
                 <a href="https://apps.apple.com/app/id6742512345" class="btn-primary">
                     <span> 在 Mac App Store 获取 (¥29 买断)</span>
                 </a>
                 <a href="https://github.com/wittkung/TTZip/releases" class="btn-secondary">
-                    <span>独立分发版下载</span>
+                    <span>独立分发版下载 (Direct Release)</span>
+                </a>
+                <a href="https://github.com/wittkung/TTZip" target="_blank" rel="noopener" class="btn-secondary">
+                    <span>GitHub 源码仓库</span>
                 </a>
             </div>
 
             <div class="cli-box">
                 <span>Homebrew 一键安装 CLI：</span>
-                <span class="cli-code">brew install wittkung/ttzip/ttzip-cli</span>
+                <span class="cli-code" id="brewCmd">brew install wittkung/ttzip/ttzip-cli</span>
+                <button class="copy-btn" onclick="copyBrewCmd()">拷贝命令</button>
             </div>
         </section>
 
-        <!-- Features Section -->
+        <!-- 🖥 交互式 3 栏米勒列原生窗口展示 (Interactive Desktop App Showcase) -->
+        <section class="section" id="desktop" style="margin-top: 20px;">
+            <div class="section-header">
+                <span class="golden-tag">Zen × WSJ Editorial Layout</span>
+                <h2>原生 macOS 三栏米勒列桌面体验</h2>
+                <p>点击包内文件，实时在网页上体验 In-Archive QuickLook 0ms 穿透预览与 Pro 检查器。</p>
+            </div>
+
+            <div class="mac-window">
+                <div class="mac-titlebar">
+                    <div class="mac-traffic-lights">
+                        <div class="mac-dot dot-close"></div>
+                        <div class="mac-dot dot-min"></div>
+                        <div class="mac-dot dot-zoom"></div>
+                    </div>
+                    <div class="mac-title">TTZip — Release_v2.5.tar.zst (480.5 MB)</div>
+                    <div style="font-size: 11px; color: var(--kintsugi-gold); font-weight: 700; font-family: var(--font-mono);">⚡️ 16MB mmap ACTIVE</div>
+                </div>
+                <div class="mac-app-body">
+                    <!-- 左侧边栏 -->
+                    <div class="mac-sidebar">
+                        <div class="sidebar-section-title">快捷位置</div>
+                        <div class="sidebar-item active">📦 当前归档</div>
+                        <div class="sidebar-item">🔑 密码保险箱 v4</div>
+                        <div class="sidebar-item">🔍 归档格式体检</div>
+                        <div class="sidebar-item">📊 物理性能压测</div>
+                        <div class="sidebar-section-title" style="margin-top: 16px;">最近解压</div>
+                        <div class="sidebar-item">📂 Silesia_Corpus/</div>
+                        <div class="sidebar-item">📂 Xcode_SDK.zip</div>
+                    </div>
+
+                    <!-- 中央米勒列文件列表 -->
+                    <div class="mac-miller-columns">
+                        <div class="file-row active" onclick="selectDemoFile('cargo', this)">
+                            <div class="file-info">
+                                <span>📄</span>
+                                <span style="font-weight: 600;">Cargo.toml</span>
+                            </div>
+                            <span class="file-size">1.2 KB</span>
+                        </div>
+                        <div class="file-row" onclick="selectDemoFile('video', this)">
+                            <div class="file-info">
+                                <span>🎬</span>
+                                <span>Demo_Trailer_4K.mov</span>
+                            </div>
+                            <span class="file-size">128.4 MB</span>
+                        </div>
+                        <div class="file-row" onclick="selectDemoFile('code', this)">
+                            <div class="file-info">
+                                <span>⚡️</span>
+                                <span>ttzip_crc64_pmull.c</span>
+                            </div>
+                            <span class="file-size">14.8 KB</span>
+                        </div>
+                        <div class="file-row" onclick="selectDemoFile('gbk', this)">
+                            <div class="file-info">
+                                <span>🌐</span>
+                                <span>说明文档_GBK乱码自动修复.txt</span>
+                            </div>
+                            <span class="file-size">4.5 KB</span>
+                        </div>
+                        <div class="file-row" onclick="selectDemoFile('vault', this)">
+                            <div class="file-info">
+                                <span>🔒</span>
+                                <span>enterprise_secret.enc</span>
+                            </div>
+                            <span class="file-size">64.0 KB</span>
+                        </div>
+                    </div>
+
+                    <!-- 右侧 Pro Inspector 检查器面板 -->
+                    <div class="mac-inspector">
+                        <div class="inspector-preview-box" id="inspectorBox">
+                            <span style="font-size: 28px; margin-bottom: 6px;">📄</span>
+                            <strong style="font-size: 13px;">Cargo.toml</strong>
+                            <span style="font-size: 11px; color: var(--accent-green); margin-top: 4px;">✅ 0ms QuickLook 就绪 (空格键查看)</span>
+                        </div>
+
+                        <div class="inspector-meta-row">
+                            <span class="inspector-meta-label">归档算法</span>
+                            <span class="inspector-meta-val" id="metaAlgo">Zstandard (RFC 8878)</span>
+                        </div>
+                        <div class="inspector-meta-row">
+                            <span class="inspector-meta-label">压缩比率</span>
+                            <span class="inspector-meta-val" id="metaRatio">28.4% (3.5x 压缩)</span>
+                        </div>
+                        <div class="inspector-meta-row">
+                            <span class="inspector-meta-label">CRC 校验码</span>
+                            <span class="inspector-meta-val" id="metaCrc">0x8E439B92 (PMULL)</span>
+                        </div>
+                        <div class="inspector-meta-row">
+                            <span class="inspector-meta-label">编码格式</span>
+                            <span class="inspector-meta-val" id="metaEncoding">UTF-8 Clean</span>
+                        </div>
+                        <div class="inspector-meta-row">
+                            <span class="inspector-meta-label">加密状态</span>
+                            <span class="inspector-meta-val" id="metaCrypto">None (Plaintext)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 1: 性能竞技场 (The Performance Arena) -->
+        <section class="section" id="performance">
+            <div class="section-header">
+                <span class="golden-tag">Ground-Truth Physical Benchmarks</span>
+                <h2>物理实测性能竞技场</h2>
+                <p>基于 Apple Silicon 18 核物理单调时钟（mach_absolute_time）实测，竞品工具全开极限多线程并发。</p>
+            </div>
+
+            <div class="perf-container">
+                <div class="perf-tabs">
+                    <button class="perf-tab-btn active" onclick="switchPerfTab('highlights')">🔥 核心突破</button>
+                    <button class="perf-tab-btn" onclick="switchPerfTab('small-files')">📂 海量小文件 (100 Files)</button>
+                    <button class="perf-tab-btn" onclick="switchPerfTab('log-text')">📝 日志文本 (10MB)</button>
+                    <button class="perf-tab-btn" onclick="switchPerfTab('stream-500m')">⚡️ 500MB 大流传输</button>
+                </div>
+
+                <!-- 性能统计卡片网格 -->
+                <div class="perf-grid" id="perfGrid">
+                    <div class="perf-stat-card">
+                        <div class="label">ARM64 PMULL CRC64</div>
+                        <div class="val">48,160 MB/s</div>
+                        <div class="baseline">47.0 GB/s 向量吞吐</div>
+                        <span class="badge-boost">🟢 35.5x 提速 (+3,450%) vs 标量查表</span>
+                    </div>
+                    <div class="perf-stat-card">
+                        <div class="label">TAR.BZ2 多核流式打包</div>
+                        <div class="val">6,275 MB/s</div>
+                        <div class="baseline">基准 pbzip2: 112 MB/s</div>
+                        <span class="badge-boost">🟢 55.9x 提速 vs pbzip2 (18 Cores)</span>
+                    </div>
+                    <div class="perf-stat-card">
+                        <div class="label">TAR.GZ NEON SIMD</div>
+                        <div class="val">6,037 MB/s</div>
+                        <div class="baseline">基准 pigz: 787 MB/s</div>
+                        <span class="badge-boost">🟢 7.7x 提速 vs pigz 全核并行</span>
+                    </div>
+                    <div class="perf-stat-card">
+                        <div class="label">ZIP 进程内直接解压</div>
+                        <div class="val">5,936 MB/s</div>
+                        <div class="baseline">基准 7zz: 1,016 MB/s</div>
+                        <span class="badge-boost">🟢 5.8x 提速 vs 7-Zip 多线程</span>
+                    </div>
+                </div>
+
+                <!-- 对照表格 -->
+                <div class="bench-table-wrapper">
+                    <table class="bench-table">
+                        <thead>
+                            <tr>
+                                <th>测试场景与格式</th>
+                                <th>竞品基准工具</th>
+                                <th>竞品吞吐速率</th>
+                                <th>TTZip 物理吞吐</th>
+                                <th>净加速倍数</th>
+                                <th>底层加速机制</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>ARM64 PMULL CRC64</strong></td>
+                                <td>Scalar Table-Lookup</td>
+                                <td>1,352.0 MB/s</td>
+                                <td class="speed-highlight">48,160.0 MB/s</td>
+                                <td class="speed-highlight">35.5x</td>
+                                <td>ARMv8 vmull_p64 四路向量展开流水线</td>
+                            </tr>
+                            <tr>
+                                <td><strong>TAR.BZ2 (日志文本)</strong></td>
+                                <td>pbzip2 (18 线程)</td>
+                                <td>112.3 MB/s</td>
+                                <td class="speed-highlight">6,274.6 MB/s</td>
+                                <td class="speed-highlight">55.9x</td>
+                                <td>分块多核无锁环形管道 + 内存页复用</td>
+                            </tr>
+                            <tr>
+                                <td><strong>DMG 磁盘映像打包</strong></td>
+                                <td>macOS hdiutil</td>
+                                <td>2.8 MB/s</td>
+                                <td class="speed-highlight">2,795.9 MB/s</td>
+                                <td class="speed-highlight">1,008.7x</td>
+                                <td>进程内 UDIF 结构直接封装，免系统级挂载</td>
+                            </tr>
+                            <tr>
+                                <td><strong>TAR.GZ (日志文本)</strong></td>
+                                <td>Parallel pigz (全核)</td>
+                                <td>787.2 MB/s</td>
+                                <td class="speed-highlight">6,036.9 MB/s</td>
+                                <td class="speed-highlight">7.7x</td>
+                                <td>libdeflate ARM NEON 硬件向量匹配</td>
+                            </tr>
+                            <tr>
+                                <td><strong>7Z Fast LZMA2 打包</strong></td>
+                                <td>7-Zip 7zz CLI</td>
+                                <td>1,051.5 MB/s</td>
+                                <td class="speed-highlight">2,967.6 MB/s</td>
+                                <td class="speed-highlight">2.8x</td>
+                                <td>SWAR GPR Fast-Fail + NEON 128位向量展开</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ZIP 极速解压</strong></td>
+                                <td>7zz (Max Multithread)</td>
+                                <td>1,015.6 MB/s</td>
+                                <td class="speed-highlight">5,936.4 MB/s</td>
+                                <td class="speed-highlight">5.8x</td>
+                                <td>C 并行字节流直解 + APFS 16KB 页对齐写盘</td>
+                            </tr>
+                            <tr>
+                                <td><strong>TAR.ZST Direct Stream</strong></td>
+                                <td>zstd (-T0)</td>
+                                <td>12,667.9 MB/s</td>
+                                <td class="speed-highlight">17,165.8 MB/s</td>
+                                <td class="speed-highlight">1.4x</td>
+                                <td>16MB mmap 零拷贝直通 + 进程内 C 静态绑定</td>
+                            </tr>
+                            <tr>
+                                <td><strong>冷启动与首字节延迟</strong></td>
+                                <td>子进程创建 (fork/spawn)</td>
+                                <td>15.0 ~ 45.0 ms</td>
+                                <td class="speed-highlight">&lt; 0.001 ms (&lt; 1 µs)</td>
+                                <td class="speed-highlight">&gt; 15,000x</td>
+                                <td>100% 静态编译链接，零动态进程开销</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="perf-footer-note">
+                    <span>* 测试设备：Apple Silicon (18 核 [P:6 / E:12]) | 48GB 统一内存 | macOS 14+ | Clang -O3 -flto</span>
+                    <a href="performance.html">阅读完整《性能白皮书与 46 场景对照全表》➔</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: 终端与 CLI / TUI 模式 (Terminal Showcase) -->
+        <section class="section" id="cli">
+            <div class="section-header">
+                <span class="golden-tag">CLI 10-Command Suite & Interactive TUI</span>
+                <h2>终端开发者原生利器</h2>
+                <p>9 大原子子命令 + 交互式 ANSI/VT100 终端 TUI 浏览器，支持标准 UNIX 管道无盘流式处理。</p>
+            </div>
+
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <div class="terminal-dots">
+                        <div class="terminal-dot dot-red"></div>
+                        <div class="terminal-dot dot-yellow"></div>
+                        <div class="terminal-dot dot-green"></div>
+                    </div>
+                    <div class="terminal-title">ttzip-cli — zsh — 80x24</div>
+                    <div style="width: 40px;"></div>
+                </div>
+                <div class="terminal-body">
+                    <div class="terminal-line">
+                        <span class="t-comment"># 1. 启动零依赖 ANSI 交互式终端归档浏览器 (TUI 模式)</span><br>
+                        <span class="t-prompt">❯</span><span class="t-cmd">ttzip-cli explore release_bundle.tar.zst</span><br>
+                        <span class="t-output">┌─ TTZip Interactive Explorer (2,450 entries, 480.5 MB) ──────────────────────────┐</span><br>
+                        <span class="t-output">│  [x] <span class="t-highlight">📁 src/</span>                                       2.4 MB  2026-08-18 01:20 │</span><br>
+                        <span class="t-output">│  [ ] 📄 Cargo.toml                                 1.2 KB  2026-08-18 01:18 │</span><br>
+                        <span class="t-output">│  [ ] 📄 README.md                                  8.4 KB  2026-08-18 01:19 │</span><br>
+                        <span class="t-output">└────────────────────────────────────────────────────────────────────────────────┘</span><br>
+                        <span class="t-comment">快捷键: [↑/↓/j/k] 移动光标  [Enter/l] 展开目录  [Space] 多选  [e] 快速解压  [p] 语法速览  [q] 退出</span>
+                    </div>
+                    <div class="terminal-line" style="margin-top: 18px;">
+                        <span class="t-comment"># 2. 从 curl 直接无中间盘流式解压 (Zero-Disk Staging Pipeline)</span><br>
+                        <span class="t-prompt">❯</span><span class="t-cmd">curl -fsSL https://example.com/huge_dataset.tar.zst | ttzip-cli extract - -o ./data/</span><br>
+                        <span class="t-output">[✓] 流式解压完成: 5,420 个文件 | 解压吞吐: 10,058.3 MB/s | 耗时: 0.24s</span>
+                    </div>
+                    <div class="terminal-line" style="margin-top: 18px;">
+                        <span class="t-comment"># 3. 查看归档层级 Unicode 树状拓扑</span><br>
+                        <span class="t-prompt">❯</span><span class="t-cmd">ttzip-cli tree archive.zip --depth 2</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: 桌面原生特性 (Desktop Native Features) -->
         <section class="section" id="features">
             <div class="section-header">
-                <h2>为速度与原生体验而生</h2>
-                <p>融合极简设计美学与 Apple Silicon 硬件加速的专业归档工具</p>
+                <span class="golden-tag">Native macOS Desktop Experience</span>
+                <h2>专为 macOS 设计的原生桌面体验</h2>
+                <p>将禅意极简美学、SwiftUI/AppKit 深度融合与系统级底层安全结合。</p>
             </div>
 
             <div class="grid-3">
                 <div class="card">
-                    <div class="card-icon">⚡️</div>
-                    <h3>16 种格式全覆盖</h3>
-                    <p>完整支持 ZIP、7Z、TAR、ZSTD、GZIP、BZIP2、XZ、LZIP、LZ4、BROTLI、LRZIP、AAR、SNAPPY、WIM、DMG、ISO，支持 RAR/ZipX/分卷解压与穿透浏览。</p>
+                    <div class="card-icon-wrapper">👁️</div>
+                    <h3>0ms QuickLook 穿透预览</h3>
+                    <p>在 Finder 或应用中轻按空格键，无需解压即可极速穿透查看包内代码、Markdown、4K 视频、无损音频与高清图集，毫秒级响应。</p>
                 </div>
 
                 <div class="card">
-                    <div class="card-icon">👁️</div>
-                    <h3>空格键 QuickLook 穿透预览</h3>
-                    <p>在 Finder 中轻按空格键，无需完整解压即可极速查看包内目录树、代码、高清图片与文档，毫秒级响应。</p>
+                    <div class="card-icon-wrapper">🌐</div>
+                    <h3>uchardet 编码自动修复</h3>
+                    <p>集成通用字符集探测引擎，智能识别并修复 GBK、CP936、Shift-JIS、EUC-KR 等非 UTF-8 编码，彻底消除 Windows 归档乱码。</p>
                 </div>
 
                 <div class="card">
-                    <div class="card-icon">🚀</div>
-                    <h3>Apple Silicon SIMD 加速</h3>
-                    <p>针对 M 系列芯片深度调优，集成 ARM NEON 向量指令集与硬件 PMULL CRC 加速，7Z 与 TAR.ZST 吞吐突破 18,000+ MB/s。</p>
+                    <div class="card-icon-wrapper">🛡️</div>
+                    <h3>密码保险箱 v4 & 纵深防御</h3>
+                    <p>600,000 轮 OWASP 强化 PBKDF2-SHA256 密钥派生与硬件 AES-256-GCM，密码敏感内存使用 volatile 指针强制物理擦除，抵御死存储消除。</p>
                 </div>
 
                 <div class="card">
-                    <div class="card-icon">🛡️</div>
-                    <h3>100% 本地隐私安全</h3>
-                    <p>零网络请求、零用户追踪、零数据上传。所有数据处理完全封闭在本地 App Sandbox 强制沙盒中。</p>
+                    <div class="card-icon-wrapper">🔍</div>
+                    <h3>Archive Inspector 格式体检</h3>
+                    <p>提供可视化魔数探测与合规性诊断面板，主动拦截 Zip-Slip 路径穿越、符号链接 TOCTOU 劫持与非规范 Zip64 溢出缺陷。</p>
                 </div>
 
                 <div class="card">
-                    <div class="card-icon">🔑</div>
-                    <h3>PBKDF2 密码保险箱 v4</h3>
-                    <p>内置 600,000 轮 OWASP 强化 PBKDF2 密钥派生与 AES-256 硬件加密，密码内存释放使用 volatile 指针强制物理擦除。</p>
+                    <div class="card-icon-wrapper">🚀</div>
+                    <h3>100% 进程内 C 静态绑定</h3>
+                    <p>完全消除传统归档工具频繁 fork/posix_spawn 外部 CLI 子进程的上下文切换损耗与管道拷贝开销，函数级调用延迟 &lt; 1 µs。</p>
                 </div>
 
                 <div class="card">
-                    <div class="card-icon">🎯</div>
-                    <h3>智能高熵存储直通</h3>
-                    <p>基于实时 Shannon 字节熵评估（>7.90），自动识别已压缩/加密数据并直通 Store 旁路，避免无谓计算，提速高达 20x~35x。</p>
+                    <div class="card-icon-wrapper">🔒</div>
+                    <h3>100% 本地强制沙盒隐私</h3>
+                    <p>零网络请求、零用户追踪、零数据外发。严格遵循 Apple App Sandbox 强制沙盒安全标准，保护敏感工程资产。</p>
                 </div>
             </div>
         </section>
 
-        <!-- Benchmarks Section -->
-        <section class="section" id="benchmarks">
+        <!-- Section 4: 16 种格式全矩阵 (16-Format Matrix) -->
+        <section class="section" id="formats">
             <div class="section-header">
-                <h2>物理实测性能门禁</h2>
-                <p>基于 Apple M-Series 硬件实测物理吞吐（单调时钟单线程/多核向量加速）</p>
+                <span class="golden-tag">Format Ecosystem</span>
+                <h2>16 种主流归档格式全支持</h2>
+                <p>从现代高压缩比算法到历史传统专有格式，一网打尽。</p>
             </div>
 
-            <table class="bench-table">
-                <thead>
-                    <tr>
-                        <th>归档格式与算法</th>
-                        <th>压缩吞吐 (Throughput)</th>
-                        <th>解压吞吐 (Throughput)</th>
-                        <th>硬件加速特性</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>TAR.ZST (Direct)</strong></td>
-                        <td class="speed-highlight">18,064.9 MB/s</td>
-                        <td class="speed-highlight">10,058.3 MB/s</td>
-                        <td>Direct I/O + 64KB 对齐页面</td>
-                    </tr>
-                    <tr>
-                        <td><strong>ZIP (pkzip)</strong></td>
-                        <td class="speed-highlight">6,201.0 MB/s</td>
-                        <td class="speed-highlight">9,752.5 MB/s</td>
-                        <td>libdeflate SIMD + C 并行解压</td>
-                    </tr>
-                    <tr>
-                        <td><strong>7Z (Fast LZMA2)</strong></td>
-                        <td class="speed-highlight">3,852.5 MB/s</td>
-                        <td class="speed-highlight">8,411.3 MB/s</td>
-                        <td>SWAR + NEON 128-bit 向量展开</td>
-                    </tr>
-                    <tr>
-                        <td><strong>LZ4 (Streaming)</strong></td>
-                        <td class="speed-highlight">8,790.6 MB/s</td>
-                        <td class="speed-highlight">4,108.1 MB/s</td>
-                        <td>极速流式微缓冲管道</td>
-                    </tr>
-                    <tr>
-                        <td><strong>TAR.XZ (Multi-threaded)</strong></td>
-                        <td class="speed-highlight">2,154.9 MB/s</td>
-                        <td class="speed-highlight">4,764.7 MB/s</td>
-                        <td>多核流式打包</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="grid-3">
+                <div class="card">
+                    <h3>现代高速流式格式</h3>
+                    <p>针对闪存 I/O 与多核并发优化的现代高效容器：</p>
+                    <div class="format-tags-container">
+                        <span class="format-tag featured">.tar.zst (Zstandard)</span>
+                        <span class="format-tag featured">.lz4 (LZ4 Frame)</span>
+                        <span class="format-tag featured">.aar (Apple Archive)</span>
+                        <span class="format-tag">.snappy</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>工业标准与高压缩比格式</h3>
+                    <p>全平台通用标准与极致压缩比算法支持：</p>
+                    <div class="format-tags-container">
+                        <span class="format-tag featured">.zip (PKWARE Zip64)</span>
+                        <span class="format-tag featured">.7z (LZMA2 / AES)</span>
+                        <span class="format-tag featured">.tar.gz (GZIP NEON)</span>
+                        <span class="format-tag">.tar.bz2</span>
+                        <span class="format-tag">.tar.xz</span>
+                        <span class="format-tag">.lzip</span>
+                        <span class="format-tag">.lrzip</span>
+                        <span class="format-tag">.brotli</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>系统镜像与专有穿透解压</h3>
+                    <p>系统级光盘镜像、磁盘映像与只读穿透浏览：</p>
+                    <div class="format-tags-container">
+                        <span class="format-tag featured">.dmg (Apple UDIF)</span>
+                        <span class="format-tag featured">.iso (ISO 9660)</span>
+                        <span class="format-tag">.wim (Windows WIM)</span>
+                        <span class="format-tag">.rar / .cbr (解压/浏览)</span>
+                        <span class="format-tag">.zipx (解压)</span>
+                        <span class="format-tag">.cab (解压)</span>
+                        <span class="format-tag">分卷 .001 / .7z.001</span>
+                    </div>
+                </div>
+            </div>
         </section>
 
-        <!-- Footer -->
+        <!-- Section 5: 开源回馈与上游致敬 (Upstream Stewardship) -->
+        <section class="section" id="upstream">
+            <div class="section-header">
+                <span class="golden-tag">Open Source Stewardship & Giving Back</span>
+                <h2>开源生态回馈与贡献</h2>
+                <p>TTZip 站在巨人的肩膀上成长，我们积极将 Apple Silicon 硬件加速成果回馈至全球开源基础库。</p>
+            </div>
+
+            <div class="upstream-box">
+                <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 8px;">向 <a href="https://github.com/libarchive/libarchive" target="_blank" style="color: var(--kintsugi-gold); text-decoration: none;">libarchive/libarchive</a> 官方上游贡献的生产级成果：</h3>
+                <p style="color: var(--text-secondary); font-size: 14px;">作为全球主流操作系统（macOS/BSD/Linux）的归档核心基石，TTZip 团队已向 libarchive 官方提交多项架构级重构与硬件指令集优化补丁：</p>
+
+                <ul class="upstream-list">
+                    <li class="upstream-item">
+                        <h4>✅ ARMv8 ACLE 硬件加速 CRC32 (<a href="https://github.com/libarchive/libarchive/pull/3391" target="_blank" style="color: var(--kintsugi-gold);">PR #3391</a> — 已合入 Master)</h4>
+                        <p>统一全库 CRC32 API 架构，引入 ARMv8 单周期硬件指令加速，支持 GNU Autotools 与 CMake 双构建系统及三层自愈降级。</p>
+                    </li>
+                    <li class="upstream-item">
+                        <h4>🔄 7-Zip AES-256-CBC 流式解密流水线 (<a href="https://github.com/libarchive/libarchive/pull/3388" target="_blank" style="color: var(--kintsugi-gold);">PR #3388</a>)</h4>
+                        <p>原子 Commit 序列整合加密解压管道，引入 volatile 指针密码安全擦除与严格流式错误回溯。</p>
+                    </li>
+                    <li class="upstream-item">
+                        <h4>💡 POSIX 磁盘空间预分配启发式 (<a href="https://github.com/libarchive/libarchive/pull/3393" target="_blank" style="color: var(--kintsugi-gold);">PR #3393</a>)</h4>
+                        <p>实测 +39% ~ +70% 吞吐提升，基于 F_PREALLOCATE 与 posix_fallocate 实现零配置透明加速。</p>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Section 6: 授权协议与商业模式 (License & Commercial Terms) -->
+        <section class="section" id="license">
+            <div class="section-header">
+                <span class="golden-tag">License & Legal Clarity</span>
+                <h2>授权协议与合规保障</h2>
+                <p>采用清晰、严谨的 Source-Available 源码可用与防套壳公共许可协议 (TTZip-SAL-1.0)。</p>
+            </div>
+
+            <div class="license-card">
+                <div class="license-col">
+                    <h3>🟢 免费开放许可范围 (100% Free)</h3>
+                    <ul>
+                        <li><strong>100% 源码透明</strong>：全部源代码开放供阅读、学习、安全审计与社区 PR 贡献。</li>
+                        <li><strong>个人与本地自由使用</strong>：个人日常任务、CLI 流水线开发、学习研究完全免费。</li>
+                        <li><strong>开源回馈自动豁免</strong>：向 libarchive、XZ Utils、zstd 等上游贡献的通用加速例程遵循上游宽松开源许可。</li>
+                    </ul>
+                </div>
+
+                <div class="license-col prohibit">
+                    <h3>🔴 严格禁止行为 (严禁第三方套壳上架)</h3>
+                    <ul>
+                        <li><strong>严禁任何应用商店上架 (无论免费或收费)</strong>：第三方严禁将 TTZip 或改名衍生版本打包上传至 Mac App Store、Microsoft Store、Steam、Setapp 等分发市场。</li>
+                        <li><strong>严禁套壳引流与捆绑分发</strong>：严禁将本软件用于流量截流、广告捆绑或白标贴牌。</li>
+                        <li><strong>商业企业集成授权</strong>：商业公司将 TTZip 嵌入专有收费产品或企业自动化流水线，需购买专属企业商业授权。</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- 页脚 (完全透明底部 Transparent Footer) -->
         <footer>
             <div class="footer-links">
+                <a href="index.html">官网首页</a>
+                <a href="performance.html">实测性能白皮书</a>
+                <a href="cli.html">CLI & TUI 手册</a>
+                <a href="formats.html">16 种格式生态</a>
                 <a href="privacy.html">隐私政策</a>
                 <a href="terms.html">服务条款 (EULA)</a>
                 <a href="https://github.com/wittkung/TTZip" target="_blank" rel="noopener">GitHub 仓库</a>
-                <a href="https://github.com/wittkung/TTZip/issues" target="_blank" rel="noopener">问题反馈</a>
+                <a href="https://github.com/wittkung/TTZip/issues" target="_blank" rel="noopener">Issue 反馈</a>
+                <a href="mailto:witt.w.kung@gmail.com">企业授权咨询</a>
             </div>
-            <p>© 2026 TTZip Inc. 保留所有权利。专为 macOS 原生设计。</p>
+            <p>TTZip — 禅意极简美学 × Apple Silicon 原生架构。</p>
+            <p class="copyright">© 2026 Witt Kung. All rights reserved. 专为 macOS 原生设计。</p>
         </footer>
 
     </div>
 
-    <!-- 100% 严格对齐 TTZipFluidBackgroundView.swift 的单色竹青谐波流体方程 -->
+    <!-- 100% 严格对齐 TTZipFluidBackgroundView.swift 的单色竹青谐波流体方程与交互脚本 -->
     <script>
+        // 1. 桌面演示交互
+        const demoFiles = {
+            'cargo': {
+                icon: '📄',
+                name: 'Cargo.toml',
+                status: '✅ 0ms QuickLook 就绪 (空格键查看)',
+                algo: 'Zstandard (RFC 8878)',
+                ratio: '28.4% (3.5x 压缩)',
+                crc: '0x8E439B92 (PMULL)',
+                encoding: 'UTF-8 Clean',
+                crypto: 'None (Plaintext)'
+            },
+            'video': {
+                icon: '🎬',
+                name: 'Demo_Trailer_4K.mov',
+                status: '✅ 4K 流式穿透直播 (免解压)',
+                algo: 'Direct Store (mmap 零拷贝)',
+                ratio: '100.0% (高熵视频直通)',
+                crc: '0x3F14A9B1 (PMULL)',
+                encoding: 'Binary Stream',
+                crypto: 'None (Direct I/O)'
+            },
+            'code': {
+                icon: '⚡️',
+                name: 'ttzip_crc64_pmull.c',
+                status: '✅ 语法高亮预览就绪',
+                algo: 'LZMA2 (Fast Dictionary)',
+                ratio: '18.2% (5.5x 压缩)',
+                crc: '0x7C92D3E1 (ARMv8)',
+                encoding: 'UTF-8 Clean',
+                crypto: 'None (Source Code)'
+            },
+            'gbk': {
+                icon: '🌐',
+                name: '说明文档_GBK乱码自动修复.txt',
+                status: '✅ uchardet 自动转码修复',
+                algo: 'DEFLATE (libdeflate)',
+                ratio: '34.5% (2.9x 压缩)',
+                crc: '0x99A1C4F2 (NEON)',
+                encoding: 'GBK -> UTF-8 自动映射',
+                crypto: 'None (Text)'
+            },
+            'vault': {
+                icon: '🔒',
+                name: 'enterprise_secret.enc',
+                status: '🔒 需输入主密钥解锁',
+                algo: 'AES-256-GCM + PBKDF2',
+                ratio: '100.0% (加密高熵直通)',
+                crc: '0x5D22E881 (Volatile)',
+                encoding: 'Encrypted Payload',
+                crypto: 'AES-256-GCM (600k OWASP)'
+            }
+        };
+
+        function selectDemoFile(key, rowElem) {
+            document.querySelectorAll('.file-row').forEach(r => r.classList.remove('active'));
+            if (rowElem) rowElem.classList.add('active');
+
+            const item = demoFiles[key] || demoFiles['cargo'];
+            document.getElementById('inspectorBox').innerHTML = `
+                <span style="font-size: 28px; margin-bottom: 6px;">${item.icon}</span>
+                <strong style="font-size: 13px;">${item.name}</strong>
+                <span style="font-size: 11px; color: var(--accent-green); margin-top: 4px;">${item.status}</span>
+            `;
+            document.getElementById('metaAlgo').innerText = item.algo;
+            document.getElementById('metaRatio').innerText = item.ratio;
+            document.getElementById('metaCrc').innerText = item.crc;
+            document.getElementById('metaEncoding').innerText = item.encoding;
+            document.getElementById('metaCrypto').innerText = item.crypto;
+        }
+
+        // 2. 复制 Homebrew 命令
+        function copyBrewCmd() {
+            const cmd = document.getElementById('brewCmd').innerText;
+            navigator.clipboard.writeText(cmd).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.innerText;
+                btn.innerText = '已复制!';
+                btn.style.color = 'var(--accent-green)';
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.color = '';
+                }, 2000);
+            });
+        }
+
+        // 3. 性能 Tab 切换数据
+        const perfData = {
+            'highlights': [
+                { label: 'ARM64 PMULL CRC64', val: '48,160 MB/s', baseline: '47.0 GB/s 向量吞吐', boost: '🟢 35.5x 提速 (+3,450%) vs 标量查表' },
+                { label: 'TAR.BZ2 多核流式打包', val: '6,275 MB/s', baseline: '基准 pbzip2: 112 MB/s', boost: '🟢 55.9x 提速 vs pbzip2 (18 Cores)' },
+                { label: 'TAR.GZ NEON SIMD', val: '6,037 MB/s', baseline: '基准 pigz: 787 MB/s', boost: '🟢 7.7x 提速 vs pigz 全核并行' },
+                { label: 'ZIP 进程内直接解压', val: '5,936 MB/s', baseline: '基准 7zz: 1,016 MB/s', boost: '🟢 5.8x 提速 vs 7-Zip 多线程' }
+            ],
+            'small-files': [
+                { label: 'ZIP 批量解压 (100 Files)', val: '1,882.7 MB/s', baseline: '基准 7zz: 208.8 MB/s', boost: '🟢 9.0x 提速 vs 7-Zip AES 解压' },
+                { label: 'TAR.BZ2 小文件打包', val: '1,116.5 MB/s', baseline: '基准 pbzip2: 81.0 MB/s', boost: '🟢 13.8x 提速 vs pbzip2' },
+                { label: 'TAR.GZ 小文件打包', val: '1,105.2 MB/s', baseline: '基准 pigz: 261.2 MB/s', boost: '🟢 4.2x 提速 vs pigz' },
+                { label: 'DMG 快速打包', val: '796.1 MB/s', baseline: '基准 hdiutil: 2.9 MB/s', boost: '🟢 271.1x 提速 vs hdiutil' }
+            ],
+            'log-text': [
+                { label: 'ZIP Level 6 文本压缩', val: '1,277.4 MB/s', baseline: '基准 7zz: 79.0 MB/s', boost: '🟢 16.2x 提速 vs 7zz' },
+                { label: 'TAR.BZ2 文本打包', val: '6,274.6 MB/s', baseline: '基准 pbzip2: 112.3 MB/s', boost: '🟢 55.9x 提速 vs pbzip2' },
+                { label: 'TAR.ZST 文本打包', val: '8,969.1 MB/s', baseline: '基准 zstd: 1,536.5 MB/s', boost: '🟢 5.8x 提速 vs zstd' },
+                { label: 'WIM 结构化文本打包', val: '5,320.3 MB/s', baseline: '基准 7zz: 292.3 MB/s', boost: '🟢 18.2x 提速 vs 7zz' }
+            ],
+            'stream-500m': [
+                { label: 'TAR.ZST 500MB 流压缩', val: '20,761.5 MB/s', baseline: '基准 zstd: 9,180.1 MB/s', boost: '🟢 2.3x 提速 vs zstd -T0' },
+                { label: 'TAR.GZ 500MB 流压缩', val: '15,213.3 MB/s', baseline: '基准 pigz: 2,160.7 MB/s', boost: '🟢 7.0x 提速 vs pigz' },
+                { label: 'ZIP Level 6 500MB 压缩', val: '1,250.8 MB/s', baseline: '基准 7zz: 96.0 MB/s', boost: '🟢 13.0x 提速 vs 7zz' },
+                { label: 'DMG 500MB 制作', val: '3,413.7 MB/s', baseline: '基准 hdiutil: 99.2 MB/s', boost: '🟢 34.4x 提速 vs hdiutil' }
+            ]
+        };
+
+        function switchPerfTab(tabKey) {
+            document.querySelectorAll('.perf-tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            const container = document.getElementById('perfGrid');
+            const items = perfData[tabKey] || perfData['highlights'];
+            container.innerHTML = items.map(item => `
+                <div class="perf-stat-card">
+                    <div class="label">${item.label}</div>
+                    <div class="val">${item.val}</div>
+                    <div class="baseline">${item.baseline}</div>
+                    <span class="badge-boost">${item.boost}</span>
+                </div>
+            `).join('');
+        }
+
+        // 4. 单色竹青动态流体背景渲染引擎
         (function() {
             const canvas = document.getElementById('fluidCanvas');
             if (!canvas) return;
@@ -563,7 +1554,7 @@
                     const radius = Math.min(w, h) * 0.6;
 
                     // TTZipTheme.bambooGreen 单一色调
-                    const baseColor = isDark ? "#34C759" : "#2D7D46";
+                    const baseColor = isDark ? "#34C759" : "#2E8B57";
 
                     // Orb 1: 100% 不透明度
                     ctx.globalAlpha = 1.0;

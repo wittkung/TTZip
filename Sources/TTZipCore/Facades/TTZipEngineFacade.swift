@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 归档解压高级产物抽象，向外观使用者提供清晰且精炼的处理结果
+/// High-level result payload for archive extraction operations.
 public struct ExtractResult: Sendable, Equatable {
     public let archivePath: String
     public let destinationDir: String
@@ -24,7 +31,7 @@ public struct ExtractResult: Sendable, Equatable {
     }
 }
 
-/// 归档检测与探索高级产物，整合目录条目、组合树、安全审计与哈希指纹
+/// High-level result payload for archive inspection and structural analysis.
 public struct ArchiveInspectionResult: Sendable {
     public let archivePath: String
     public let entries: [ArchiveEntry]
@@ -47,7 +54,7 @@ public struct ArchiveInspectionResult: Sendable {
     }
 }
 
-/// 哈希完整性校验高级产物
+/// Cryptographic hash verification result payload.
 public struct HashVerificationResult: Sendable, Equatable {
     public let filePath: String
     public let crc32: String
@@ -60,7 +67,7 @@ public struct HashVerificationResult: Sendable, Equatable {
     }
 }
 
-/// 主归档统一外观接口协议
+/// Unified high-level engine facade protocol.
 public protocol TTZipEngineFacading: Sendable {
     func quickCompress(
         inputs: [String],

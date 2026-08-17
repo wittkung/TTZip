@@ -1,13 +1,13 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 
-/// 归档标准检查与属性检视展示状态
+/// State representation for archive inspection and standards compliance auditing.
 public struct ArchiveInspectorState: Sendable, Equatable {
     public let filePath: String
     public let fileName: String

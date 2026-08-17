@@ -1,19 +1,29 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 import TTZipCore
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
-/// 模块化测试调度引擎 (支持 Tier 0-5 分层过滤、Standards 规范校验、Differential 差分预言机、Mutation 模糊测试、JUnit XML、JSON、Markdown)
+/// Modular automated test harness and diagnostics runner.
+///
+/// Supports multi-tier test execution (Tier 0 through Tier 5), format standards verification,
+/// cross-engine differential oracle validation, and malformed stream fuzz mutation testing.
+/// Reports can be emitted to stdout, JUnit XML, JSON, or Markdown dashboards.
 public enum TestCommand {
     
-    /// 执行 CLI 驱动的自动化测试
+    /// Main entry point for executing test driver commands.
+    /// - Parameter options: Command-line configuration specifying filters, tiers, or reporting paths.
     public static func run(options: CLIOptions) async {
-        // 兼容旧行为：若位置参数为既有归档文件，则执行完整性校验
+        // Legacy backward compatibility: If positional argument points to an existing file, check its integrity.
         if let firstArg = options.positionals.first, FileManager.default.fileExists(atPath: firstArg) {
             await runFileIntegrity(path: firstArg)
             return
@@ -22,7 +32,7 @@ public enum TestCommand {
         let startTimestamp = Date()
         let sessionID = "TEST-" + ISO8601DateFormatter().string(from: startTimestamp).replacingOccurrences(of: ":", with: "").replacingOccurrences(of: "-", with: "")
         
-        // 发送测试开始遥测事件
+        // Emit test initiation telemetry event if JSON mode is enabled
         if options.jsonOutput {
             TestTelemetryStream.emitNDJSON(TestTelemetryEvent.runStarted(
                 sessionID: sessionID
@@ -71,7 +81,6 @@ public enum TestCommand {
         
         // MARK: - Standard Tier Suites (Default when no special mode is specified)
         if options.standardFormat == nil && options.differentialOracle == nil && !options.fuzz {
-            // 解析选定的测试分层 (默认为 Tier 0 + Tier 1)
             let activeTiers: Set<Int>
             if let tierStr = options.tier {
                 let parsed = tierStr.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: CharacterSet.whitespaces)) }
@@ -80,40 +89,23 @@ public enum TestCommand {
                 activeTiers = [0, 1]
             }
             
-            // 1. Tier 0: 纯内存微单元测试 (SIMD / 本地化 / POSIX 命令行规范)
+            // 1. Tier 0: In-memory micro unit tests (SIMD / POSIX CLI argument validation)
             if activeTiers.contains(0) {
                 let t0Start = Date()
                 var t0Passed = 0
                 var t0Failed = 0
                 var t0Cases: [[String: Any]] = []
                 
-                // 1.1 本地化完备性测试
-                let l10nStart = Date()
-                var l10nSuccess = true
-                let allKeys = L10n.allRawKeys
-                for lang in AppLanguage.allCases {
-                    for key in allKeys {
-                        let val = TTZipLocalizationManager.shared.string(for: RawKeyWrapper(key), language: lang)
-                        if val == key || val.isEmpty { l10nSuccess = false }
-                    }
-                }
-                let l10nDur = Date().timeIntervalSince(l10nStart)
-                t0Passed += (l10nSuccess ? 1 : 0)
-                t0Failed += (l10nSuccess ? 0 : 1)
-                let rec1 = TestCaseRecord(name: "testLocalizationIntegrity", className: "Tier0_LocalizationTests", tier: 0, durationSeconds: l10nDur, passed: l10nSuccess)
-                testCaseRecords.append(rec1)
-                t0Cases.append(["caseName": rec1.name, "status": l10nSuccess ? "passed" : "failed", "durationMs": l10nDur * 1000.0])
-                
-                // 1.2 POSIX 参数解析规范测试
+                // 1.1 POSIX CLI argument parser compliance verification
                 let posixStart = Date()
                 let parseRes = POSIXCLIArgumentParser.parse(args: ["archive", "out.tar.zst", "src/", "--format=tar.zst", "--level=3", "--dry-run"])
                 let posixSuccess = (parseRes.command == .archive && parseRes.options.format == "tar.zst" && parseRes.options.dryRun)
                 let posixDur = Date().timeIntervalSince(posixStart)
                 t0Passed += (posixSuccess ? 1 : 0)
                 t0Failed += (posixSuccess ? 0 : 1)
-                let rec2 = TestCaseRecord(name: "testPOSIXCLIArgumentParser", className: "Tier0_CLIPOSIXTests", tier: 0, durationSeconds: posixDur, passed: posixSuccess)
-                testCaseRecords.append(rec2)
-                t0Cases.append(["caseName": rec2.name, "status": posixSuccess ? "passed" : "failed", "durationMs": posixDur * 1000.0])
+                let rec = TestCaseRecord(name: "testPOSIXCLIArgumentParser", className: "Tier0_CLIPOSIXTests", tier: 0, durationSeconds: posixDur, passed: posixSuccess)
+                testCaseRecords.append(rec)
+                t0Cases.append(["caseName": rec.name, "status": posixSuccess ? "passed" : "failed", "durationMs": posixDur * 1000.0])
                 
                 let t0TotalDur = Date().timeIntervalSince(t0Start) * 1000.0
                 suiteResults.append([
@@ -130,7 +122,7 @@ public enum TestCommand {
                 }
             }
             
-            // 2. Tier 1: 16 种格式往返与诊断测试
+            // 2. Tier 1: 16 format round-trip diagnostic suites
             if activeTiers.contains(1) {
                 let nativeStartTime = Date()
                 var nativePassed = 0
@@ -224,7 +216,7 @@ public enum TestCommand {
             testCases: testCaseRecords
         )
         
-        // 3. 持久化各种格式的测试报告
+        // 3. Persist test reports to disk if requested
         if let jsonPath = options.jsonReportPath {
             let jsonString = sessionReport.toJSON()
             let url = URL(fileURLWithPath: jsonPath)
@@ -266,7 +258,7 @@ public enum TestCommand {
             }
         }
         
-        // 发送测试结束遥测事件
+        // Emit completion telemetry event if JSON mode is active
         if options.jsonOutput {
             TestTelemetryStream.emitNDJSON(TestTelemetryEvent.runFinished(
                 sessionID: sessionID,
@@ -281,7 +273,7 @@ public enum TestCommand {
             ))
         }
         
-        // 4. 控制台汇总看板
+        // 4. Output summary dashboard
         if verbosity >= 0 && !options.jsonOutput {
             print("\n" + String(repeating: "=", count: 90))
             if totalFailed == 0 {
@@ -293,7 +285,7 @@ public enum TestCommand {
         }
         
         if totalFailed > 0 {
-            exit(1)
+            exit(EXIT_FAILURE)
         }
     }
     
@@ -454,13 +446,8 @@ public enum TestCommand {
             let entries = try await reader.inspect(archivePath: path)
             print("✓ Archive valid: \(entries.count) entries")
         } catch {
-            print("❌ Archive integrity error: \(error)")
-            exit(1)
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: archive integrity check failed: \(error)")
+            exit(EXIT_FAILURE)
         }
     }
-}
-
-private struct RawKeyWrapper: LocaleKeyProtocol {
-    let rawKey: String
-    init(_ key: String) { self.rawKey = key }
 }

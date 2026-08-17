@@ -27,6 +27,8 @@ TTZip Pro is an enterprise-grade, high-performance macOS archive management soft
 │ Layer 0: Pristine Upstream & Vendor Static Libraries            │
 │   - Vendor/libarchive-upstream/ (Pristine git worktree / master)│
 │   - Vendor/lib/*.a & Vendor/include/ (liblzma, libzstd, libb2)  │
+│   - Upstream Contributions: ARMv8 CRC32 (PR #3391 Merged),      │
+│     7z AES-256 (PR #3388), Disk Preallocation (PR #3393)        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

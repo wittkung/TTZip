@@ -1,15 +1,30 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 符合 POSIX / GNU 规范的工业级 CLI 命令行解析器 (POSIX CLI Argument Parser)
+/// Production-grade POSIX / GNU compliant command-line argument parser.
+///
+/// Implements standard UNIX option conventions:
+/// - Short flags (`-v`, `-x`, `-f`) and combined short flag clusters (`-vyf`).
+/// - Short options taking values (`-p123456`, `-p 123456`).
+/// - Long options with equals or space separation (`--format=tar.zst`, `--format tar.zst`).
+/// - Standard end-of-options delimiter (`--`).
 public enum POSIXCLIArgumentParser {
     
-    /// 解析结果包含子命令与强类型选项
+    /// Parse result containing detected command and typed options.
     public struct ParseResult: Sendable {
         public let command: CLICommand
         public let options: CLIOptions
     }
     
-    /// 解析原生命令行参数数组
+    /// Parses an array of raw command-line string arguments.
+    /// - Parameter args: Command-line arguments without the executable path.
+    /// - Returns: `ParseResult` with resolved command and options.
     public static func parse(args: [String]) -> ParseResult {
         var options = CLIOptions()
         var positionals: [String] = []

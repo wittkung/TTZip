@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
@@ -12,46 +12,62 @@ import Darwin
 import Glibc
 #endif
 
-/// 终端智能自动分页引擎 (Terminal Auto-Pager Engine)
+/// Intelligent terminal automatic pager dispatcher.
+///
+/// Automatically inspects terminal viewport dimensions (`TIOCGWINSZ`), line counts,
+/// and delegates large outputs to `$PAGER` (or `less -RFX`) while providing transparent
+/// fallback to stdout on non-TTY environments.
 public enum TerminalPagerEngine: Sendable {
     
-    /// 获取终端窗口可视行数
+    /// Obtains the number of visible rows in the current terminal window.
     public static func getTerminalRows() -> Int {
         var ws = winsize()
+        #if canImport(Darwin)
         if ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_row > 0 {
             return Int(ws.ws_row)
         }
+        #elseif canImport(Glibc)
+        if ioctl(STDOUT_FILENO, UInt(TIOCGWINSZ), &ws) == 0 && ws.ws_row > 0 {
+            return Int(ws.ws_row)
+        }
+        #endif
         if let linesStr = ProcessInfo.processInfo.environment["LINES"], let lines = Int(linesStr), lines > 0 {
             return lines
         }
-        return 24 // 标准终端兜底默认高度
+        return 24 // Standard fallback terminal height
     }
     
-    /// 将文本内容自适应输出至终端或分页器
+    /// Displays text adaptively to stdout or an external pager.
     /// - Parameters:
-    ///   - text: 待输出的内容文本
-    ///   - noPager: 是否强制禁用分页器 (--no-pager)
+    ///   - text: Multi-line string content to render.
+    ///   - noPager: Whether to bypass the pager (`--no-pager`).
     public static func display(text: String, noPager: Bool = false) {
-        let isTTY = isatty(STDOUT_FILENO) != 0
+        #if canImport(Darwin)
+        let isTTY = Darwin.isatty(STDOUT_FILENO) != 0
+        #elseif canImport(Glibc)
+        let isTTY = Glibc.isatty(STDOUT_FILENO) != 0
+        #else
+        let isTTY = false
+        #endif
         let termType = ProcessInfo.processInfo.environment["TERM"] ?? ""
         
-        // 1. 若非 TTY 环境、TERM 为 dumb 或用户显式禁用分页，直接输出
+        // 1. If not a TTY, TERM is dumb, or user explicitly requested no pager, print directly
         if !isTTY || noPager || termType == "dumb" {
             print(text)
             return
         }
         
-        // 2. 计算文本总行数
+        // 2. Count total lines of text
         let lineCount = text.split(separator: "\n", omittingEmptySubsequences: false).count
         let terminalRows = getTerminalRows()
         
-        // 3. 行数未超出一屏时，直接 print 避免屏幕闪烁
+        // 3. If line count fits within a single screen, print directly without spawning pager
         if lineCount < terminalRows {
             print(text)
             return
         }
         
-        // 4. 行数超限，调度外部分页器
+        // 4. Dispatch to external pager
         let pagerCmd = ProcessInfo.processInfo.environment["TTZIP_PAGER"] ??
                        ProcessInfo.processInfo.environment["PAGER"] ??
                        "less -RFX"
@@ -69,7 +85,6 @@ public enum TerminalPagerEngine: Sendable {
         let args = Array(parts.dropFirst())
         let process = Process()
         
-        // 查找执行文件路径
         if execName.starts(with: "/") {
             process.executableURL = URL(fileURLWithPath: execName)
         } else {
@@ -85,7 +100,7 @@ public enum TerminalPagerEngine: Sendable {
         process.standardOutput = FileHandle.standardOutput
         process.standardError = FileHandle.standardError
         
-        // 屏蔽 SIGPIPE，防止分页器提前退出导致主进程崩溃
+        // Mask SIGPIPE to prevent crashing if the pager exits early
         #if canImport(Darwin)
         signal(SIGPIPE, SIG_IGN)
         #endif
@@ -98,7 +113,7 @@ public enum TerminalPagerEngine: Sendable {
             try? inputPipe.fileHandleForWriting.close()
             process.waitUntilExit()
         } catch {
-            // 分页器唤起失败时安全回退至标准输出
+            // Graceful fallback to stdout if spawning fails
             print(text)
         }
     }

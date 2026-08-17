@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLI & TUI 终端开发套件 — TTZip (10 大子命令与流式管道)</title>
+    <meta name="description" content="TTZip CLI (ttzip-cli) 官方参考手册：包含 10 大原子子命令、ANSI/VT100 终端交互式 TUI 浏览器、UNIX 无盘流式管道与 Homebrew 自动化配置。">
+    <link rel="icon" type="image/png" href="assets/AppIcon.png">
+    <style>
+        :root {
+            --bg: #FBFBFD;
+            --surface: rgba(255, 255, 255, 0.75);
+            --surface-elevated: rgba(255, 255, 255, 0.94);
+            --border: rgba(0, 0, 0, 0.07);
+            --border-subtle: rgba(0, 0, 0, 0.035);
+            --text-primary: #1C1C1E;
+            --text-secondary: #58585D;
+            --text-tertiary: #86868B;
+            --accent-green: #2E8B57;
+            --accent-green-hover: #236B43;
+            --accent-green-light: rgba(46, 139, 87, 0.12);
+            --accent-green-border: rgba(46, 139, 87, 0.28);
+            --kintsugi-gold: #D4AF37;
+            --kintsugi-gold-hover: #C29F2D;
+            --kintsugi-gold-light: rgba(212, 175, 55, 0.14);
+            --kintsugi-gold-border: rgba(212, 175, 55, 0.35);
+            --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "PingFang SC", sans-serif;
+            --font-serif: "New York", "Songti SC", "SimSun", Georgia, serif;
+            --font-mono: "SF Mono", Monaco, Menlo, Consolas, monospace;
+            --shadow-sm: 0 2px 10px rgba(0,0,0,0.03);
+            --shadow-md: 0 10px 30px rgba(0,0,0,0.05);
+            --shadow-lg: 0 20px 50px rgba(0,0,0,0.08);
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0B0B0D;
+                --surface: rgba(22, 22, 28, 0.70);
+                --surface-elevated: rgba(30, 30, 38, 0.90);
+                --border: rgba(255, 255, 255, 0.08);
+                --border-subtle: rgba(255, 255, 255, 0.04);
+                --text-primary: #F5F5F7;
+                --text-secondary: #A1A1A6;
+                --text-tertiary: #6E6E73;
+                --accent-green: #34C759;
+                --accent-green-hover: #30B750;
+                --accent-green-light: rgba(52, 199, 89, 0.16);
+                --accent-green-border: rgba(52, 199, 89, 0.32);
+                --kintsugi-gold: #E5C158;
+                --kintsugi-gold-hover: #F2D272;
+                --kintsugi-gold-light: rgba(229, 193, 88, 0.18);
+                --kintsugi-gold-border: rgba(229, 193, 88, 0.4);
+                --shadow-sm: 0 2px 10px rgba(0,0,0,0.35);
+                --shadow-md: 0 10px 30px rgba(0,0,0,0.45);
+                --shadow-lg: 0 20px 50px rgba(0,0,0,0.55);
+            }
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .fluid-canvas-container {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none; overflow: hidden; z-index: 0;
+            opacity: 0.22; transition: opacity 0.7s ease;
+        }
+        @media (prefers-color-scheme: dark) {
+            .fluid-canvas-container { opacity: 0.34; }
+        }
+        #fluidCanvas {
+            width: 100%; height: 100%; filter: blur(85px); -webkit-filter: blur(85px);
+            transform: scale(1.35); transform-origin: center;
+        }
+
+        .content-wrapper { position: relative; z-index: 1; }
+
+        /* 顶部导航栏 (完全透明顶部栏) */
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+            border-bottom: none; padding: 18px 32px;
+        }
+        .nav-container {
+            max-width: 1180px; margin: 0 auto;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .brand {
+            display: flex; align-items: center; gap: 12px;
+            font-weight: 700; font-size: 18px; text-decoration: none;
+            color: var(--text-primary); letter-spacing: -0.02em;
+        }
+        .brand img {
+            width: 34px; height: 34px; border-radius: 9px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.12);
+        }
+        .brand-badge {
+            font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
+            background-color: var(--kintsugi-gold-light); color: var(--kintsugi-gold);
+            border: 1px solid var(--kintsugi-gold-border); text-transform: uppercase;
+            letter-spacing: 0.08em; font-family: var(--font-mono);
+        }
+        .nav-links {
+            display: flex; gap: 24px; align-items: center; font-size: 14px; font-weight: 500;
+        }
+        .nav-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s ease; }
+        .nav-links a:hover, .nav-links a.active { color: var(--text-primary); }
+        .nav-cta {
+            background-color: var(--text-primary); color: var(--bg) !important;
+            padding: 7px 18px; border-radius: 20px; font-weight: 600; font-size: 13px;
+            transition: opacity 0.2s, transform 0.2s; box-shadow: var(--shadow-sm);
+        }
+        .nav-cta:hover { opacity: 0.88; transform: scale(1.02); }
+
+        .golden-tag {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 2px; color: var(--kintsugi-gold);
+            font-family: var(--font-mono); display: inline-block; margin-bottom: 8px;
+        }
+
+        .page-header {
+            max-width: 1180px; margin: 40px auto 32px; padding: 0 24px; text-align: center;
+        }
+        .page-header h1 {
+            font-size: 46px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 16px;
+        }
+        .page-header p {
+            font-size: 18px; color: var(--text-secondary); max-width: 780px; margin: 0 auto;
+        }
+
+        /* 终端安装代码卡片 */
+        .install-grid {
+            max-width: 1180px; margin: 0 auto 50px; padding: 0 24px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+        }
+        @media (max-width: 768px) { .install-grid { grid-template-columns: 1fr; } }
+        .code-card {
+            background-color: #121216; border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: var(--radius-md); padding: 20px; color: #F5F5F7;
+            font-family: var(--font-mono); font-size: 13px; box-shadow: var(--shadow-md);
+        }
+        .code-card .header {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 10px; margin-bottom: 14px;
+            color: #8E8E93; font-size: 12px;
+        }
+        .code-card pre { line-height: 1.7; overflow-x: auto; }
+        .prompt { color: #34C759; font-weight: 700; }
+        .cmd { color: #FFFFFF; font-weight: 600; }
+        .comment { color: #6E6E73; }
+
+        /* 子命令矩阵网格 */
+        .cmd-grid {
+            max-width: 1180px; margin: 0 auto 70px; padding: 0 24px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 22px;
+        }
+        .cmd-card {
+            background-color: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 26px; box-shadow: var(--shadow-sm);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        }
+        .cmd-title {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+        }
+        .cmd-name {
+            font-family: var(--font-mono); font-size: 17px; font-weight: 700; color: var(--accent-green);
+        }
+        .cmd-badge {
+            font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+            background-color: var(--kintsugi-gold-light); color: var(--kintsugi-gold);
+            font-family: var(--font-mono);
+        }
+        .cmd-desc { font-size: 14px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.6; }
+        .cmd-example {
+            background-color: rgba(0, 0, 0, 0.04); border-radius: 6px;
+            padding: 8px 12px; font-family: var(--font-mono); font-size: 12px; color: var(--text-primary);
+        }
+
+        footer {
+            border-top: none; padding: 50px 24px 70px; margin-top: 80px;
+            text-align: center; color: var(--text-tertiary); font-size: 13px;
+            background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+        }
+        .footer-links {
+            display: flex; justify-content: center; gap: 26px; margin-bottom: 20px; flex-wrap: wrap;
+        }
+        .footer-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s; }
+        .footer-links a:hover { color: var(--text-primary); }
+    </style>
+</head>
+<body>
+
+    <div class="fluid-canvas-container" aria-hidden="true">
+        <canvas id="fluidCanvas" width="480" height="320"></canvas>
+    </div>
+
+    <div class="content-wrapper">
+        <nav>
+            <div class="nav-container">
+                <a href="index.html" class="brand">
+                    <img src="assets/AppIcon.png" alt="TTZip Icon">
+                    <span>TTZip</span>
+                    <span class="brand-badge">CLI Suite</span>
+                </a>
+                <div class="nav-links">
+                    <a href="index.html">返回首页</a>
+                    <a href="performance.html">实测性能</a>
+                    <a href="cli.html" class="active" style="color: var(--kintsugi-gold); font-weight: 700;">CLI & TUI</a>
+                    <a href="formats.html">16 种格式</a>
+                    <a href="privacy.html">隐私政策</a>
+                    <a href="https://github.com/wittkung/TTZip" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://apps.apple.com/app/id6742512345" class="nav-cta">Mac App Store</a>
+                </div>
+            </div>
+        </nav>
+
+        <header class="page-header">
+            <span class="golden-tag">Terminal Native Tooling</span>
+            <h1>ttzip-cli 终端命令套件</h1>
+            <p>10 大原子子命令、零依赖 ANSI/VT100 终端交互式 TUI 浏览器与 UNIX 管道流式流水线支持。</p>
+        </header>
+
+        <!-- 安装与配置 -->
+        <div class="install-grid">
+            <div class="code-card">
+                <div class="header">
+                    <span>Homebrew 一键安装</span>
+                    <span>macOS 14+</span>
+                </div>
+                <pre><span class="comment"># 方式 1: 直接官方 Formula 安装</span>
+<span class="prompt">❯</span> <span class="cmd">brew install wittkung/ttzip/ttzip-cli</span>
+
+<span class="comment"># 方式 2: 添加专属 Tap 源</span>
+<span class="prompt">❯</span> <span class="cmd">brew tap wittkung/ttzip</span>
+<span class="prompt">❯</span> <span class="cmd">brew install ttzip-cli</span></pre>
+            </div>
+
+            <div class="code-card">
+                <div class="header">
+                    <span>Shell 自动补全生成</span>
+                    <span>Zsh / Bash / Fish</span>
+                </div>
+                <pre><span class="comment"># 1. 为 Zsh 生成自动补全脚本</span>
+<span class="prompt">❯</span> <span class="cmd">ttzip-cli completion zsh > ~/.zsh/completion/_ttzip-cli</span>
+
+<span class="comment"># 2. 为 Fish 生成自动补全</span>
+<span class="prompt">❯</span> <span class="cmd">ttzip-cli completion fish > ~/.config/fish/completions/ttzip-cli.fish</span></pre>
+            </div>
+        </div>
+
+        <!-- 10 大子命令卡片矩阵 -->
+        <div class="cmd-grid">
+            <div class="cmd-card">
+                <div class="cmd-title">
+                    <span class="cmd-name">explore</span>
+                    <span class="cmd-badge">TUI Interactive</span>
+                </div>
+                <div class="cmd-desc">启动零依赖 ANSI 交互式终端归档浏览器。支持使用 Vim 快捷键（j/k 移动、Enter 展开、Space 多选、e 提取、p 语法速览）。</div>
+                <div class="cmd-example">ttzip-cli explore bundle.tar.zst</div>
+            </div>
+
+            <div class="cmd-card">
+                <div class="cmd-title">
+                    <span class="cmd-name">compress (c)</span>
+                    <span class="cmd-badge">Core Engine</span>
+                </div>
+                <div class="cmd-desc">高吞吐多线程压缩。支持 16 种格式、0~9 压缩级别、AES-256 硬件加密及标准输出 <code>-</code> 管道流式传输。</div>
+                <div class="cmd-example">ttzip-cli compress ./src/ -f zst -l 3 -o out.tar.zst</div>
+            </div>
+
+            <div class="cmd-card">
+                <div class="cmd-title">
+                    <span class="cmd-name">extract (x)</span>
+                    <span class="cmd-badge">Stream-First</span>
+                </div>
+                <div class="cmd-desc">高速流式解压与密码探测。支持标准输入 <code>-</code> 零磁盘中转流式管道与 uchardet 自动编码修复。</div>
+                <div class="cmd-example">curl -s url | ttzip-cli extract - -o ./data/</div>
+            </div>
+
+            <div class="cmd-card">
+                <div class="cmd-title">
+                    <span class="cmd-name">list (l)</span>
+                    <span class="cmd-badge">Direct Parsing</span>
+                </div>
+                <div class="cmd-desc">极速列出包内条目，支持 <code>--json</code> 机器可读格式与 <code>--csv</code> 导出，包含原始尺寸、压缩尺寸与 CRC 校验码。</div>
+                <div class="cmd-example">ttzip-cli list archive.zip --json</div>
+            </div>
+
+            <div class="cmd-card">
+                <div class="cmd-title">
+                    <span class="cmd-name">tree (t)</span>
+                    <span class="cmd-badge">Visual Hierarchy</span>
+                </div>
+                <div class="cmd-desc">以 Unicode 树状拓扑渲染归档目录结构，支持指定 <code>--depth</code> 最大层级深度与只读文件过滤。</div>
+                <div class="cmd-example">ttzip-cli tree archive.7z --depth 3</div>
+            </div>
+
+            <div class="cmd-card">
+                <div class="cmd-title">
+                    <span class="cmd-name">test (t)</span>
+                    <span class="cmd-badge">Integrity Check</span>
+                </div>
+                <div class="cmd-desc">免解压完整性验证。并发计算 CRC32 / CRC64 / SHA-256 校验码，校验数据块与 Central Directory。</div>
+                <div class="cmd-example">ttzip-cli test archive.zip -v</div>
+            </div>
+
+            <div class="cmd-card">
+                <div class="cmd-title">
+                    <span class="cmd-name">bench (b)</span>
+                    <span class="cmd-badge">Hardware Monotonic</span>
+                </div>
+                <div class="cmd-desc">全矩阵硬件基准测试。执行真实内存与磁盘 I/O 压测，输出微秒级延时、CPU 核心利用率与 MB/s 吞吐。</div>
+                <div class="cmd-example">ttzip-cli bench -f zst --matrix</div>
+            </div>
+
+            <div class="cmd-card">
+                <div class="cmd-title">
+                    <span class="cmd-name">inspect (i)</span>
+                    <span class="cmd-badge">Format Diagnostics</span>
+                </div>
+                <div class="cmd-desc">归档魔数与底层结构深度体检。诊断 Zip64 扩展头、Header 加密状态及 Zip-Slip 路径穿越安全隐患。</div>
+                <div class="cmd-example">ttzip-cli inspect untrusted.zip</div>
+            </div>
+
+            <div class="cmd-card">
+                <div class="cmd-title">
+                    <span class="cmd-name">health (h)</span>
+                    <span class="cmd-badge">Engine Status</span>
+                </div>
+                <div class="cmd-desc">检查 CPU 特性支持状态（ARM64 PMULL、NEON、AES）、静态库链接版本及内存分页池健康度。</div>
+                <div class="cmd-example">ttzip-cli health</div>
+            </div>
+
+            <div class="cmd-card">
+                <div class="cmd-title">
+                    <span class="cmd-name">man</span>
+                    <span class="cmd-badge">UNIX Standard</span>
+                </div>
+                <div class="cmd-desc">渲染 mdoc 规范的 UNIX 标准手册页，可与 <code>man ttzip-cli</code> 无缝集成。</div>
+                <div class="cmd-example">ttzip-cli man</div>
+            </div>
+        </div>
+
+        <footer>
+            <div class="footer-links">
+                <a href="index.html">返回首页</a>
+                <a href="performance.html">实测性能</a>
+                <a href="formats.html">16 种格式</a>
+                <a href="privacy.html">隐私政策</a>
+                <a href="terms.html">服务条款 (EULA)</a>
+                <a href="https://github.com/wittkung/TTZip" target="_blank" rel="noopener">GitHub 仓库</a>
+            </div>
+            <p>TTZip — 禅意极简美学 × Apple Silicon 原生架构。</p>
+            <p style="margin-top: 10px; font-size: 12px;">© 2026 Witt Kung. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        // 竹青流体背景
+        (function() {
+            const canvas = document.getElementById('fluidCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            let phase = Math.random() * 100, lastTime = performance.now();
+            const speed = 0.3;
+            const isDarkMode = () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            function render(now) {
+                const delta = (now - lastTime) / 1000;
+                if (delta >= 0.03) {
+                    phase += Math.min(delta, 0.1) * speed;
+                    lastTime = now;
+                    const w = canvas.width, h = canvas.height;
+                    ctx.clearRect(0, 0, w, h);
+                    const isDark = isDarkMode();
+                    const x1 = w / 2 + Math.cos(phase * 0.65) * (w * 0.3), y1 = h / 2 + Math.sin(phase * 1.05) * (h * 0.2);
+                    const x2 = w / 2 + Math.sin(phase * 0.45) * (w * 0.4), y2 = h / 2 + Math.cos(phase * 0.95) * (h * 0.3);
+                    const x3 = w / 2 + Math.cos(phase * 0.35) * (w * 0.25), y3 = h / 2 + Math.sin(phase * 0.55) * (h * 0.4);
+                    const radius = Math.min(w, h) * 0.6;
+                    const baseColor = isDark ? "#34C759" : "#2E8B57";
+                    ctx.globalAlpha = 1.0; ctx.fillStyle = baseColor; ctx.beginPath(); ctx.arc(x1, y1, radius * 0.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 0.8; ctx.fillStyle = baseColor; ctx.beginPath(); ctx.arc(x2, y2, radius * 0.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 0.6; ctx.fillStyle = baseColor; ctx.beginPath(); ctx.arc(x3, y3, radius * 0.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                }
+                requestAnimationFrame(render);
+            }
+            requestAnimationFrame(render);
+        })();
+    </script>
+</body>
+</html>

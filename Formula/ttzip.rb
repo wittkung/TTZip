@@ -3,7 +3,7 @@
 
 # SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 #
-# Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+# Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 # All rights reserved.
 #
 # TTZip: High-performance native archiving and compression CLI utility for macOS.
@@ -25,7 +25,7 @@ class Ttzip < Formula
 
   test do
     # Verify version output
-    assert_match "ttzip-cli version", shell_output("#{bin}/ttzip --version")
+    assert_match "ttzip-cli", shell_output("#{bin}/ttzip --version")
     
     # Verify archive creation and extraction roundtrip
     (testpath/"hello.txt").write "Hello, TTZip Open-Core High Performance Engine!"

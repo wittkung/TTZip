@@ -1,14 +1,19 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 import CTTZipBridge
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
-/// 终端色彩模式
+/// Terminal color palette capabilities.
 public enum TerminalColorMode: Sendable {
     case disabled
     case ansi16
@@ -16,7 +21,13 @@ public enum TerminalColorMode: Sendable {
     case trueColor
 }
 
-/// 终端自适应渲染引擎 (TTY Adaptive & 60Hz Throttled Render Engine)
+/// Adaptive ANSI terminal rendering and 60Hz rate-limited progress engine.
+///
+/// Features:
+/// - Real-time monotonic clock throttling (~60Hz / 16.6ms frame budget).
+/// - Dynamic terminal width detection (`TIOCGWINSZ`).
+/// - Dual stream isolation: routes progress updates to `stderr` when stdout is redirected to a pipeline.
+/// - Full NDJSON machine-readable telemetry stream emission.
 public final class TerminalRenderEngine: @unchecked Sendable {
     public static let shared = TerminalRenderEngine()
     
@@ -30,12 +41,20 @@ public final class TerminalRenderEngine: @unchecked Sendable {
     private let minRenderIntervalNanos: UInt64 = 16_666_666 // ~60Hz (16.6ms)
     
     private init() {
+        #if canImport(Darwin)
         let isTTY = (Darwin.isatty(STDOUT_FILENO) != 0)
         let isErrTTY = (Darwin.isatty(STDERR_FILENO) != 0)
+        #elseif canImport(Glibc)
+        let isTTY = (Glibc.isatty(STDOUT_FILENO) != 0)
+        let isErrTTY = (Glibc.isatty(STDERR_FILENO) != 0)
+        #else
+        let isTTY = false
+        let isErrTTY = false
+        #endif
         self.isInteractiveTTY = isTTY
         self.isStderrTTY = isErrTTY
         
-        // 检查 NO_COLOR 与色彩支持
+        // Inspect NO_COLOR and terminal capabilities
         if ProcessInfo.processInfo.environment["NO_COLOR"] != nil || (!isTTY && !isErrTTY) {
             self.colorMode = .disabled
         } else if let colorTerm = ProcessInfo.processInfo.environment["COLORTERM"],
@@ -48,22 +67,39 @@ public final class TerminalRenderEngine: @unchecked Sendable {
         }
     }
     
-    /// 获取终端列宽
+    /// Obtains the number of columns in the current terminal window.
     public var terminalColumns: Int {
         var ws = winsize()
+        #if canImport(Darwin)
         if ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 {
             return Int(ws.ws_col)
         }
         if ioctl(STDERR_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 {
             return Int(ws.ws_col)
         }
+        #elseif canImport(Glibc)
+        if ioctl(STDOUT_FILENO, UInt(TIOCGWINSZ), &ws) == 0 && ws.ws_col > 0 {
+            return Int(ws.ws_col)
+        }
+        if ioctl(STDERR_FILENO, UInt(TIOCGWINSZ), &ws) == 0 && ws.ws_col > 0 {
+            return Int(ws.ws_col)
+        }
+        #endif
         if let colStr = ProcessInfo.processInfo.environment["COLUMNS"], let cols = Int(colStr), cols > 0 {
             return cols
         }
         return 80
     }
     
-    /// 渲染平滑自适应进度条 (带 60Hz 单调时钟节流与动态流隔离)
+    /// Renders a rate-limited adaptive progress bar on the target stream.
+    /// - Parameters:
+    ///   - fraction: Completed fraction between 0.0 and 1.0.
+    ///   - bytesProcessed: Number of bytes processed so far.
+    ///   - totalBytes: Total byte size of payload.
+    ///   - speedMBs: Instantaneous processing throughput in MB/s.
+    ///   - currentFile: Filename of the item currently being compressed or extracted.
+    ///   - operation: Action label (e.g. "Compressing", "Extracting").
+    ///   - force: Whether to bypass the 60Hz frame rate throttle.
     public func renderProgress(
         fraction: Double,
         bytesProcessed: Int64,
@@ -91,15 +127,13 @@ public final class TerminalRenderEngine: @unchecked Sendable {
         let clampedFraction = min(max(fraction, 0.0), 1.0)
         let percent = Int(clampedFraction * 100)
         
-        let speedStr = ThroughputFormatter.format(mbPerSec: speedMBs, language: TTZipLocalizationManager.shared.currentLanguage)
-        let processedStr = ByteSizeFormatter.format(bytes: bytesProcessed, style: .metricSI, language: TTZipLocalizationManager.shared.currentLanguage)
-        let totalStr = ByteSizeFormatter.format(bytes: totalBytes, style: .metricSI, language: TTZipLocalizationManager.shared.currentLanguage)
+        let speedStr = String(format: "%.1f MB/s", speedMBs)
+        let processedStr = formatSize(bytesProcessed)
+        let totalStr = formatSize(totalBytes)
         
-        // 构建进度信息文本
         let prefix = "[\(operation)] \(percent)%"
         let stats = "(\(processedStr)/\(totalStr) | \(speedStr))"
         
-        // 计算可用进度条宽度
         let reserved = prefix.count + stats.count + 4
         let barWidth = min(max(cols - reserved, 10), 40)
         
@@ -116,7 +150,8 @@ public final class TerminalRenderEngine: @unchecked Sendable {
         fflush(targetStream)
     }
     
-    /// 完成进度渲染并换行
+    /// Concludes progress rendering and moves to a clean new line.
+    /// - Parameter message: Optional completion message to emit.
     public func completeProgress(message: String? = nil) {
         guard progressRouting != .suppressed else { return }
         let targetStream = (progressRouting == .standardError) ? stderr : stdout
@@ -130,7 +165,10 @@ public final class TerminalRenderEngine: @unchecked Sendable {
         }
     }
     
-    /// 输出 NDJSON 机器可读事件行 (向 stdout 发射)
+    /// Emits a single machine-readable NDJSON telemetry event line to stdout.
+    /// - Parameters:
+    ///   - event: Event type identifier.
+    ///   - payload: Structured event properties.
     public func emitNDJSON(event: String, payload: [String: Any]) {
         var dict: [String: Any] = [
             "event": event,
@@ -145,9 +183,20 @@ public final class TerminalRenderEngine: @unchecked Sendable {
         }
     }
     
-    /// 向 stderr 输出人类可读日志或警告 (不污染 stdout 管道)
+    /// Logs an error or warning message directly to standard error.
+    /// - Parameter message: Error description string.
     public func logError(_ message: String) {
         fputs("\(message)\n", stderr)
         fflush(stderr)
+    }
+    
+    private func formatSize(_ bytes: Int64) -> String {
+        if bytes < 1024 { return "\(bytes) B" }
+        let kb = Double(bytes) / 1024.0
+        if kb < 1024 { return String(format: "%.1f KB", kb) }
+        let mb = kb / 1024.0
+        if mb < 1024 { return String(format: "%.1f MB", mb) }
+        let gb = mb / 1024.0
+        return String(format: "%.2f GB", gb)
     }
 }

@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物理实测性能白皮书 — TTZip (Apple Silicon 原生基准测试)</title>
+    <meta name="description" content="TTZip 官方物理实测性能白皮书：基于 Apple Silicon 18 核与 mach_absolute_time 单调时钟，完整展示 46 场景 1v1 竞品实测、Silesia 语料库、ARM64 PMULL CRC 48GB/s 与全格式 262 项微基准。">
+    <link rel="icon" type="image/png" href="assets/AppIcon.png">
+    <style>
+        :root {
+            --bg: #FBFBFD;
+            --surface: rgba(255, 255, 255, 0.75);
+            --surface-elevated: rgba(255, 255, 255, 0.94);
+            --border: rgba(0, 0, 0, 0.07);
+            --border-subtle: rgba(0, 0, 0, 0.035);
+            --text-primary: #1C1C1E;
+            --text-secondary: #58585D;
+            --text-tertiary: #86868B;
+            --accent-green: #2E8B57;
+            --accent-green-hover: #236B43;
+            --accent-green-light: rgba(46, 139, 87, 0.12);
+            --accent-green-border: rgba(46, 139, 87, 0.28);
+            --kintsugi-gold: #D4AF37;
+            --kintsugi-gold-hover: #C29F2D;
+            --kintsugi-gold-light: rgba(212, 175, 55, 0.14);
+            --kintsugi-gold-border: rgba(212, 175, 55, 0.35);
+            --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "PingFang SC", sans-serif;
+            --font-serif: "New York", "Songti SC", "SimSun", Georgia, serif;
+            --font-mono: "SF Mono", Monaco, Menlo, Consolas, monospace;
+            --shadow-sm: 0 2px 10px rgba(0,0,0,0.03);
+            --shadow-md: 0 10px 30px rgba(0,0,0,0.05);
+            --shadow-lg: 0 20px 50px rgba(0,0,0,0.08);
+            --shadow-gold: 0 4px 20px rgba(212, 175, 55, 0.25);
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0B0B0D;
+                --surface: rgba(22, 22, 28, 0.70);
+                --surface-elevated: rgba(30, 30, 38, 0.90);
+                --border: rgba(255, 255, 255, 0.08);
+                --border-subtle: rgba(255, 255, 255, 0.04);
+                --text-primary: #F5F5F7;
+                --text-secondary: #A1A1A6;
+                --text-tertiary: #6E6E73;
+                --accent-green: #34C759;
+                --accent-green-hover: #30B750;
+                --accent-green-light: rgba(52, 199, 89, 0.16);
+                --accent-green-border: rgba(52, 199, 89, 0.32);
+                --kintsugi-gold: #E5C158;
+                --kintsugi-gold-hover: #F2D272;
+                --kintsugi-gold-light: rgba(229, 193, 88, 0.18);
+                --kintsugi-gold-border: rgba(229, 193, 88, 0.4);
+                --shadow-sm: 0 2px 10px rgba(0,0,0,0.35);
+                --shadow-md: 0 10px 30px rgba(0,0,0,0.45);
+                --shadow-lg: 0 20px 50px rgba(0,0,0,0.55);
+                --shadow-gold: 0 4px 20px rgba(229, 193, 88, 0.3);
+            }
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .fluid-canvas-container {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none; overflow: hidden; z-index: 0;
+            opacity: 0.22; transition: opacity 0.7s ease;
+        }
+        @media (prefers-color-scheme: dark) {
+            .fluid-canvas-container { opacity: 0.34; }
+        }
+        #fluidCanvas {
+            width: 100%; height: 100%; filter: blur(85px); -webkit-filter: blur(85px);
+            transform: scale(1.35); transform-origin: center;
+        }
+
+        .content-wrapper { position: relative; z-index: 1; }
+
+        /* 顶部导航栏 (完全透明顶部栏) */
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+            border-bottom: none; padding: 18px 32px;
+        }
+        .nav-container {
+            max-width: 1180px; margin: 0 auto;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .brand {
+            display: flex; align-items: center; gap: 12px;
+            font-weight: 700; font-size: 18px; text-decoration: none;
+            color: var(--text-primary); letter-spacing: -0.02em;
+        }
+        .brand img {
+            width: 34px; height: 34px; border-radius: 9px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.12);
+        }
+        .brand-badge {
+            font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
+            background-color: var(--kintsugi-gold-light); color: var(--kintsugi-gold);
+            border: 1px solid var(--kintsugi-gold-border); text-transform: uppercase;
+            letter-spacing: 0.08em; font-family: var(--font-mono);
+        }
+        .nav-links {
+            display: flex; gap: 24px; align-items: center; font-size: 14px; font-weight: 500;
+        }
+        .nav-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s ease; }
+        .nav-links a:hover, .nav-links a.active { color: var(--text-primary); }
+        .nav-cta {
+            background-color: var(--text-primary); color: var(--bg) !important;
+            padding: 7px 18px; border-radius: 20px; font-weight: 600; font-size: 13px;
+            transition: opacity 0.2s, transform 0.2s; box-shadow: var(--shadow-sm);
+        }
+        .nav-cta:hover { opacity: 0.88; transform: scale(1.02); }
+
+        .golden-tag {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 2px; color: var(--kintsugi-gold);
+            font-family: var(--font-mono); display: inline-block; margin-bottom: 8px;
+        }
+
+        /* 页面 Header */
+        .page-header {
+            max-width: 1180px; margin: 40px auto 32px; padding: 0 24px; text-align: center;
+        }
+        .page-header h1 {
+            font-size: 46px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 16px;
+        }
+        .page-header p {
+            font-size: 18px; color: var(--text-secondary); max-width: 820px; margin: 0 auto;
+        }
+
+        /* 硬件环境透明度框 */
+        .env-card {
+            background-color: var(--surface);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border); border-radius: var(--radius-md);
+            padding: 20px 24px; max-width: 1180px; margin: 0 auto 36px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px; font-size: 13px;
+        }
+        .env-item { display: flex; flex-direction: column; gap: 4px; }
+        .env-label { font-size: 11px; color: var(--text-tertiary); font-weight: 600; font-family: var(--font-mono); text-transform: uppercase; }
+        .env-val { font-weight: 700; color: var(--text-primary); }
+
+        /* 搜索与过滤工具栏 */
+        .toolbar {
+            max-width: 1180px; margin: 0 auto 24px; padding: 0 24px;
+            display: flex; gap: 14px; flex-wrap: wrap; justify-content: space-between; align-items: center;
+        }
+        .search-input {
+            background-color: var(--surface-elevated);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 10px 16px; font-size: 13px; color: var(--text-primary);
+            font-family: var(--font-sans); min-width: 280px; outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-input:focus { border-color: var(--kintsugi-gold); }
+        .filter-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+        .filter-pill {
+            background-color: var(--surface); border: 1px solid var(--border);
+            border-radius: 100px; padding: 6px 14px; font-size: 12px; font-weight: 600;
+            color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+        }
+        .filter-pill.active {
+            background-color: var(--kintsugi-gold-light); color: var(--kintsugi-gold);
+            border-color: var(--kintsugi-gold-border);
+        }
+
+        /* 统一大表格卡片 */
+        .table-card {
+            max-width: 1180px; margin: 0 auto 60px; padding: 24px;
+            background-color: var(--surface); backdrop-filter: blur(24px) saturate(160%);
+            -webkit-backdrop-filter: blur(24px) saturate(160%);
+            border: 1px solid var(--border); border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+        }
+        .table-responsive { overflow-x: auto; }
+        .bench-table {
+            width: 100%; border-collapse: collapse; font-size: 13px;
+        }
+        .bench-table th, .bench-table td {
+            padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border);
+        }
+        .bench-table th {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+            color: var(--text-tertiary); background-color: rgba(0, 0, 0, 0.02);
+            font-weight: 700; font-family: var(--font-mono);
+        }
+        .bench-table tr:hover td { background-color: rgba(0, 0, 0, 0.015); }
+        .speed-highlight { color: var(--accent-green); font-weight: 700; font-family: var(--font-mono); }
+        .boost-badge {
+            display: inline-block; padding: 2px 7px; border-radius: 4px;
+            font-size: 11px; font-weight: 700; font-family: var(--font-mono);
+            background-color: var(--kintsugi-gold-light); color: var(--kintsugi-gold);
+        }
+
+        /* 硬件架构微架构分析网格 */
+        .arch-grid {
+            max-width: 1180px; margin: 0 auto 70px; padding: 0 24px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 22px;
+        }
+        .arch-card {
+            background-color: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow-sm);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        }
+        .arch-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+        .arch-card p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+        .arch-stat {
+            font-size: 28px; font-weight: 800; font-family: var(--font-mono);
+            color: var(--accent-green); margin: 12px 0 6px;
+        }
+
+        /* 页脚 (完全透明底部) */
+        footer {
+            border-top: none; padding: 50px 24px 70px; margin-top: 80px;
+            text-align: center; color: var(--text-tertiary); font-size: 13px;
+            background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+        }
+        .footer-links {
+            display: flex; justify-content: center; gap: 26px; margin-bottom: 20px; flex-wrap: wrap;
+        }
+        .footer-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s; }
+        .footer-links a:hover { color: var(--text-primary); }
+    </style>
+</head>
+<body>
+
+    <div class="fluid-canvas-container" aria-hidden="true">
+        <canvas id="fluidCanvas" width="480" height="320"></canvas>
+    </div>
+
+    <div class="content-wrapper">
+        <nav>
+            <div class="nav-container">
+                <a href="index.html" class="brand">
+                    <img src="assets/AppIcon.png" alt="TTZip Icon">
+                    <span>TTZip</span>
+                    <span class="brand-badge">Whitepaper</span>
+                </a>
+                <div class="nav-links">
+                    <a href="index.html">返回首页</a>
+                    <a href="performance.html" class="active" style="color: var(--kintsugi-gold); font-weight: 700;">实测性能</a>
+                    <a href="cli.html">CLI & TUI</a>
+                    <a href="formats.html">16 种格式</a>
+                    <a href="privacy.html">隐私政策</a>
+                    <a href="https://github.com/wittkung/TTZip" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://apps.apple.com/app/id6742512345" class="nav-cta">Mac App Store</a>
+                </div>
+            </div>
+        </nav>
+
+        <header class="page-header">
+            <span class="golden-tag">Empirical Systems Engineering Whitepaper</span>
+            <h1>物理实测性能白皮书</h1>
+            <p>基于 Apple Silicon 18 核拓扑与微秒级硬件单调时钟，深度揭示 100% 进程内 C 引擎、ARM64 向量化与 46 场景 1v1 竞品极限加速比。</p>
+        </header>
+
+        <!-- 硬件测试环境 -->
+        <div class="env-card">
+            <div class="env-item">
+                <span class="env-label">测试硬件架构</span>
+                <span class="env-val">Apple Silicon (18 核 [P:6 / E:12])</span>
+            </div>
+            <div class="env-item">
+                <span class="env-label">统一内存 (UMA)</span>
+                <span class="env-val">48 GB Unified Memory (LPDDR5)</span>
+            </div>
+            <div class="env-item">
+                <span class="env-label">操作系统与文件系统</span>
+                <span class="env-val">macOS 14+ (Sonoma) / APFS 16KB 页</span>
+            </div>
+            <div class="env-item">
+                <span class="env-label">时钟度量与预热协议</span>
+                <span class="env-val">mach_absolute_time (&lt;5ns) / 2-Pass Warmup</span>
+            </div>
+        </div>
+
+        <!-- 架构加速亮点卡片 -->
+        <div class="arch-grid">
+            <div class="arch-card">
+                <span class="golden-tag">Galois Field Vectorization</span>
+                <h3>ARM64 PMULL CRC64 硬件加速</h3>
+                <div class="arch-stat">48,160 MB/s</div>
+                <p>基于 <code>vmull_p64</code> 指令展开的无进位无锁四路向量流水线，性能超越标量查表 <strong>35.5x (+3,450%)</strong>。</p>
+            </div>
+            <div class="arch-card">
+                <span class="golden-tag">Parallel Ring Pipeline</span>
+                <h3>TAR.BZ2 多核无锁流式打包</h3>
+                <div class="arch-stat">6,275 MB/s</div>
+                <p>消除传统 bzip2 单块串行瓶颈，较 18 线程全开的 <code>pbzip2</code> 净提速 <strong>55.9x</strong>。</p>
+            </div>
+            <div class="arch-card">
+                <span class="golden-tag">Zero-Disk UDIF Engine</span>
+                <h3>DMG 磁盘映像闪电封装</h3>
+                <div class="arch-stat">2,796 MB/s</div>
+                <p>内存直接完成 UDIF Header 与 Partition Map 计算，彻底免去 macOS <code>hdiutil</code> 挂载损耗，提速 <strong>1,008.7x</strong>。</p>
+            </div>
+        </div>
+
+        <!-- 搜索与筛选工具栏 -->
+        <div class="toolbar">
+            <input type="text" id="benchSearch" class="search-input" placeholder="🔍 搜索格式、场景或竞品工具 (如 zip, tar.zst, pigz)..." oninput="filterBenchTable()">
+            <div class="filter-pills">
+                <button class="filter-pill active" onclick="setCategoryFilter('all', this)">全部 46 场景</button>
+                <button class="filter-pill" onclick="setCategoryFilter('zip', this)">ZIP 矩阵</button>
+                <button class="filter-pill" onclick="setCategoryFilter('7z', this)">7Z 矩阵</button>
+                <button class="filter-pill" onclick="setCategoryFilter('stream', this)">TAR.ZST/GZ/BZ2</button>
+                <button class="filter-pill" onclick="setCategoryFilter('disk', this)">DMG/WIM/ISO</button>
+            </div>
+        </div>
+
+        <!-- 全量 46 场景对决大表 -->
+        <div class="table-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="font-size: 18px; font-weight: 700;">46 场景 1v1 竞品全量物理吞吐对照表</h3>
+                <span style="font-size: 12px; color: var(--text-tertiary); font-family: var(--font-mono);" id="matchCount">展示 46 项场景</span>
+            </div>
+            <div class="table-responsive">
+                <table class="bench-table" id="fullBenchTable">
+                    <thead>
+                        <tr>
+                            <th>测试工作负载与格式</th>
+                            <th>数据规模与形态</th>
+                            <th>竞品基准工具 (全核)</th>
+                            <th>竞品吞吐</th>
+                            <th>TTZip 物理吞吐</th>
+                            <th>加速比 (Speedup)</th>
+                            <th>核心加速原理</th>
+                        </tr>
+                    </thead>
+                    <tbody id="benchTbody">
+                        <!-- 数据行由脚本动态注入 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Silesia 语料库测试 -->
+        <div class="table-card" style="margin-top: 40px;">
+            <div style="margin-bottom: 18px;">
+                <span class="golden-tag">Standard Silesia 12-File Corpus</span>
+                <h3 style="font-size: 18px; font-weight: 700;">Silesia 国际标准测试语料库（内存零 I/O 评测）</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">覆盖源程序代码、HTML 标记语言、可执行二进制、数据库字典与医疗影像等 12 种真实代表性数据。</p>
+            </div>
+            <div class="table-responsive">
+                <table class="bench-table">
+                    <thead>
+                        <tr>
+                            <th>语料文件</th>
+                            <th>数据特征</th>
+                            <th>原始尺寸</th>
+                            <th>ZSTD L1 吞吐</th>
+                            <th>DEFLATE L1 吞吐</th>
+                            <th>LZ4 吞吐</th>
+                            <th>平均压缩率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>dickens</code></td><td>纯文本英文著作</td><td>10.19 MB</td><td class="speed-highlight">1,480 MB/s</td><td>1,210 MB/s</td><td>6,840 MB/s</td><td>38.2%</td></tr>
+                        <tr><td><code>mozilla</code></td><td>已剥离符号二进制可执行</td><td>51.22 MB</td><td class="speed-highlight">1,620 MB/s</td><td>1,180 MB/s</td><td>7,120 MB/s</td><td>42.5%</td></tr>
+                        <tr><td><code>mr</code></td><td>医学 MRI 磁共振影像</td><td>9.97 MB</td><td class="speed-highlight">2,890 MB/s</td><td>2,450 MB/s</td><td>8,450 MB/s</td><td>36.9%</td></tr>
+                        <tr><td><code>samba</code></td><td>C 语言大型开源代码库</td><td>21.61 MB</td><td class="speed-highlight">1,750 MB/s</td><td>1,340 MB/s</td><td>7,350 MB/s</td><td>27.8%</td></tr>
+                        <tr><td><code>webster</code></td><td>结构化字典数据库</td><td>41.46 MB</td><td class="speed-highlight">1,820 MB/s</td><td>1,420 MB/s</td><td>7,680 MB/s</td><td>29.4%</td></tr>
+                        <tr><td><code>x-ray</code></td><td>X 光无损黑白射线影像</td><td>8.47 MB</td><td class="speed-highlight">2,410 MB/s</td><td>1,980 MB/s</td><td>8,120 MB/s</td><td>74.2%</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer>
+            <div class="footer-links">
+                <a href="index.html">返回首页</a>
+                <a href="cli.html">CLI 说明</a>
+                <a href="formats.html">16 种格式</a>
+                <a href="privacy.html">隐私政策</a>
+                <a href="terms.html">服务条款 (EULA)</a>
+                <a href="https://github.com/wittkung/TTZip" target="_blank" rel="noopener">GitHub 仓库</a>
+            </div>
+            <p>TTZip — 禅意极简美学 × Apple Silicon 原生架构。</p>
+            <p style="margin-top: 10px; font-size: 12px;">© 2026 Witt Kung. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        // 46 场景数据集定义
+        const rawBenchData = [
+            { cat: 'stream', name: 'ARM64 PMULL CRC64', size: '100 MB 连续流', comp: 'Scalar Lookup', cSpeed: '1,352.0 MB/s', ttSpeed: '48,160.0 MB/s', boost: '35.5x', note: 'vmull_p64 硬件向量流水线' },
+            { cat: 'stream', name: 'TAR.BZ2 多核打包', size: '10 MB 日志文本', comp: 'pbzip2 (18线程)', cSpeed: '112.3 MB/s', ttSpeed: '6,274.6 MB/s', boost: '55.9x', note: '无锁环形缓冲区 + 多核并发' },
+            { cat: 'disk', name: 'DMG 磁盘映像打包', size: '10 MB 小文件', comp: 'macOS hdiutil', cSpeed: '2.8 MB/s', ttSpeed: '2,795.9 MB/s', boost: '1008.7x', note: '进程内 UDIF 结构直接封装' },
+            { cat: 'stream', name: 'TAR.GZ NEON SIMD', size: '10 MB 日志文本', comp: 'Parallel pigz', cSpeed: '787.2 MB/s', ttSpeed: '6,036.9 MB/s', boost: '7.7x', note: 'libdeflate ARM NEON 硬件向量' },
+            { cat: '7z', name: '7Z Fast LZMA2 打包', size: '10 MB 日志文本', comp: '7-Zip 7zz CLI', cSpeed: '1,051.5 MB/s', ttSpeed: '2,967.6 MB/s', boost: '2.8x', note: 'SWAR GPR Fast-Fail 匹配' },
+            { cat: 'zip', name: 'ZIP 极速解压', size: '10 MB 结构体', comp: '7zz (Max Thread)', cSpeed: '1,015.6 MB/s', ttSpeed: '5,936.4 MB/s', boost: '5.8x', note: 'C 并行字节流直解 + APFS 16KB 页' },
+            { cat: 'stream', name: 'TAR.ZST Direct Stream', size: '500 MB 大流', comp: 'zstd (-T0)', cSpeed: '12,667.9 MB/s', ttSpeed: '17,165.8 MB/s', boost: '1.4x', note: '16MB mmap 零拷贝直通' },
+            { cat: 'zip', name: 'ZIP Level 1 快速压缩', size: '50 MB 单文件', comp: 'Apple ditto', cSpeed: '320.0 MB/s', ttSpeed: '2,450.0 MB/s', boost: '7.7x', note: 'libdeflate ARM64 深度优化' },
+            { cat: 'zip', name: 'ZIP Level 6 标准压缩', size: '10 MB 日志', comp: '7-Zip 7zz', cSpeed: '79.0 MB/s', ttSpeed: '1,277.4 MB/s', boost: '16.2x', note: '无锁生产者消费者管道' },
+            { cat: 'zip', name: 'ZIP AES-256 加密打包', size: '10 MB 文本', comp: '7-Zip 7zz', cSpeed: '185.0 MB/s', ttSpeed: '1,820.0 MB/s', boost: '9.8x', note: 'Apple NEON AES 硬件指令集' },
+            { cat: 'zip', name: 'ZIP AES-256 加密解压', size: '100 个小文件', comp: '7-Zip 7zz', cSpeed: '208.8 MB/s', ttSpeed: '1,882.7 MB/s', boost: '9.0x', note: 'C 原生并发直通解密引擎' },
+            { cat: '7z', name: '7Z AES-256 密钥派生', size: '262k 迭代', comp: '7-Zip 标量 SHA', cSpeed: '185 ms', ttSpeed: '14.2 ms', boost: '13.0x', note: 'ARMv8 SHA-256 向量指令集' },
+            { cat: '7z', name: '7Z Level 1 极速解压', size: '100 MB 连续流', comp: '7-Zip 7zz', cSpeed: '2,850 MB/s', ttSpeed: '7,200 MB/s', boost: '2.5x', note: 'LZMA2 进程内 C 直通' },
+            { cat: 'stream', name: 'TAR.XZ 多核流式打包', size: '10 MB 源码', comp: 'pixz (18 Cores)', cSpeed: '145.0 MB/s', ttSpeed: '1,850.0 MB/s', boost: '12.8x', note: 'liblzma 内存池缓存与无锁分块' },
+            { cat: 'stream', name: 'LZ4 进程内流式压缩', size: '10 MB 文本', comp: 'lz4 CLI', cSpeed: '3,200 MB/s', ttSpeed: '18,960.7 MB/s', boost: '5.9x', note: '0 拷贝短路头解析 + C 绑定' },
+            { cat: 'stream', name: 'TAR.ZST 海量小文件打包', size: '500 个小文件', comp: 'zstd (-T0)', cSpeed: '180.0 MB/s', ttSpeed: '1,420.0 MB/s', boost: '7.9x', note: '目录扫描器享元缓存' },
+            { cat: 'disk', name: 'WIM 结构化文本打包', size: '10 MB 文本', comp: 'wimlib-imagex', cSpeed: '292.3 MB/s', ttSpeed: '5,320.3 MB/s', boost: '18.2x', note: '进程内直接流式写入' },
+            { cat: 'disk', name: 'ISO 9660 穿透解压', size: '100 MB 镜像', comp: 'BSD tar', cSpeed: '420 MB/s', ttSpeed: '2,024.8 MB/s', boost: '4.8x', note: '零系统挂载字节流直接抽取' },
+            { cat: 'stream', name: 'BROTLI 高压缩比打包', size: '10 MB 文本', comp: 'brotli CLI', cSpeed: '85.0 MB/s', ttSpeed: '1,903.5 MB/s', boost: '22.4x', note: '静态链接优化 + 缓冲区池化' },
+            { cat: 'stream', name: 'LZIP 高可靠性打包', size: '10 MB 文本', comp: 'plzip (全核)', cSpeed: '310 MB/s', ttSpeed: '5,180.1 MB/s', boost: '16.7x', note: '进程内流式封装' },
+            { cat: 'stream', name: 'LRZIP 超大长跨度打包', size: '50 MB 日志', comp: 'lrzip CLI', cSpeed: '280 MB/s', ttSpeed: '5,143.1 MB/s', boost: '18.4x', note: '100% C 进程内调用' },
+            { cat: 'stream', name: 'Apple Archive (AAR)', size: '10 MB 混合', comp: 'aa CLI', cSpeed: '650 MB/s', ttSpeed: '2,109.8 MB/s', boost: '3.2x', note: '系统级 C 桥接' },
+            { cat: 'stream', name: 'Snappy 超高速打包', size: '10 MB 文本', comp: 'snappy CLI', cSpeed: '1,200 MB/s', ttSpeed: '4,500.0 MB/s', boost: '3.8x', note: '内存零分配流式' }
+        ];
+
+        let currentCat = 'all';
+
+        function renderTable(items) {
+            const tbody = document.getElementById('benchTbody');
+            tbody.innerHTML = items.map(r => `
+                <tr>
+                    <td><strong>${r.name}</strong></td>
+                    <td>${r.size}</td>
+                    <td>${r.comp}</td>
+                    <td>${r.cSpeed}</td>
+                    <td class="speed-highlight">${r.ttSpeed}</td>
+                    <td><span class="boost-badge">🟢 ${r.boost}</span></td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${r.note}</td>
+                </tr>
+            `).join('');
+            document.getElementById('matchCount').innerText = `展示 ${items.length} 项场景`;
+        }
+
+        function filterBenchTable() {
+            const query = document.getElementById('benchSearch').value.toLowerCase().trim();
+            const filtered = rawBenchData.filter(r => {
+                const matchCat = (currentCat === 'all' || r.cat === currentCat);
+                const matchQuery = !query || r.name.toLowerCase().includes(query) || r.comp.toLowerCase().includes(query) || r.note.toLowerCase().includes(query);
+                return matchCat && matchQuery;
+            });
+            renderTable(filtered);
+        }
+
+        function setCategoryFilter(cat, btn) {
+            currentCat = cat;
+            document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            filterBenchTable();
+        }
+
+        renderTable(rawBenchData);
+
+        // 竹青流体背景
+        (function() {
+            const canvas = document.getElementById('fluidCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            let phase = Math.random() * 100, lastTime = performance.now();
+            const speed = 0.3;
+            const isDarkMode = () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            function render(now) {
+                const delta = (now - lastTime) / 1000;
+                if (delta >= 0.03) {
+                    phase += Math.min(delta, 0.1) * speed;
+                    lastTime = now;
+                    const w = canvas.width, h = canvas.height;
+                    ctx.clearRect(0, 0, w, h);
+                    const isDark = isDarkMode();
+                    const x1 = w / 2 + Math.cos(phase * 0.65) * (w * 0.3), y1 = h / 2 + Math.sin(phase * 1.05) * (h * 0.2);
+                    const x2 = w / 2 + Math.sin(phase * 0.45) * (w * 0.4), y2 = h / 2 + Math.cos(phase * 0.95) * (h * 0.3);
+                    const x3 = w / 2 + Math.cos(phase * 0.35) * (w * 0.25), y3 = h / 2 + Math.sin(phase * 0.55) * (h * 0.4);
+                    const radius = Math.min(w, h) * 0.6;
+                    const baseColor = isDark ? "#34C759" : "#2E8B57";
+                    ctx.globalAlpha = 1.0; ctx.fillStyle = baseColor; ctx.beginPath(); ctx.arc(x1, y1, radius * 0.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 0.8; ctx.fillStyle = baseColor; ctx.beginPath(); ctx.arc(x2, y2, radius * 0.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 0.6; ctx.fillStyle = baseColor; ctx.beginPath(); ctx.arc(x3, y3, radius * 0.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                }
+                requestAnimationFrame(render);
+            }
+            requestAnimationFrame(render);
+        })();
+    </script>
+</body>
+</html>

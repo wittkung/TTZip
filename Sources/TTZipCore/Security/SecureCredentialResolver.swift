@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
@@ -13,8 +13,10 @@ import Darwin
 import Glibc
 #endif
 
-/// 安全密码与凭据解析中枢 (Secure Credential Resolver)
-/// 实施 6 级凭据判定梯队与 ISO C11 敏感内存物理擦除，彻底消除进程列表泄漏隐患
+/// Secure passphrase and credential resolution engine.
+///
+/// Implements a 6-tier credential resolution hierarchy with zero-fill memory wiping
+/// (`secure_zero_memory`) to prevent sensitive key leakage in process listings or heap dumps.
 public enum SecureCredentialResolver: Sendable {
     
     /// 解析归档所需密码

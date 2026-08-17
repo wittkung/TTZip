@@ -1,16 +1,16 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 
-/// 标准 BSD mdoc(7) Troff 手册页生成器 (BSD Man Page Generator)
+/// Standard BSD mdoc(7) manual page generator.
 ///
-/// 从 `CLICommandSpec` 单一真理源动态派生规范的 12-Section BSD mdoc 格式手册页，
-/// 兼容 `man(1)`、`mandoc(1)` 与 `groff(1)`，遵循 BSD mdoc 规范章节顺序与宏语法。
+/// Derives a standard 12-section BSD mdoc manual page dynamically from `CLICommandSpec`
+/// for full compatibility with `man(1)`, `mandoc(1)`, and `groff(1)`.
 public enum ManPageGenerator {
     
     /// 生成 `ttzip-cli(1)` 标准 mdoc 手册页
@@ -152,7 +152,7 @@ public enum ManPageGenerator {
         
         // 11. AUTHORS
         out += ".Sh AUTHORS\n"
-        out += ".An Weitao Kung Aq Mt kevintungs@163.com\n"
+        out += ".An Witt Kung Aq Mt witt.w.kung@gmail.com\n"
         
         return out
     }

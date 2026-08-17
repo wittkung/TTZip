@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
@@ -12,8 +12,10 @@ import Darwin
 import Glibc
 #endif
 
-/// POSIX 终端 Raw Mode 管理器 (Terminal Raw Mode Manager)
-/// 封装 termios 系统调用，提供非阻塞字符读取与 RAII 安全自动复原机制
+/// POSIX terminal raw mode manager.
+///
+/// Wraps `termios` system calls to provide non-canonical, unbuffered character input
+/// with RAII terminal state restoration and signal trap recovery.
 public final class TerminalRawModeManager: @unchecked Sendable {
     public static let shared = TerminalRawModeManager()
     

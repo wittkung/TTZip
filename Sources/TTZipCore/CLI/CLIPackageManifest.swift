@@ -1,21 +1,28 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 
-/// Release 打包构建配置
+/// Release packaging and compilation configuration parameters.
 public struct CLIPackageConfig: Sendable, Equatable {
+    /// Semantic release version string.
     public let version: String
+    /// Target Mach-O binary architecture.
     public let targetArchitecture: TargetArch
+    /// Whether to strip debug symbols from the Mach-O binary.
     public let stripSymbols: Bool
+    /// Whether to generate associated `.dSYM` debug bundles.
     public let generateDsym: Bool
+    /// Target output artifact directory.
     public let outputDirectory: String
+    /// Target Homebrew Formula file path.
     public let homebrewFormulaPath: String
     
+    /// Target processor architecture configuration.
     public enum TargetArch: String, Sendable, CaseIterable {
         case universal = "universal"
         case arm64 = "arm64"
@@ -39,7 +46,7 @@ public struct CLIPackageConfig: Sendable, Equatable {
     }
 }
 
-/// Release 打包产物清册与校验和 (符合 contracts/release_packaging_manifest.json)
+/// Release artifact manifest and cryptographic verification record.
 public struct CLIPackageManifest: Sendable, Codable, Equatable {
     public let version: String
     public let tarballName: String

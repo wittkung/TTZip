@@ -1,16 +1,16 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 
-/// 动态 Shell 自动补全脚本生成器 (Dynamic Shell Auto-Completion Generator)
+/// Dynamic shell auto-completion script generator.
 ///
-/// 从 `CLICommandSpec` 单一真理源动态派生 Zsh、Bash、Fish 与 Nushell 补全脚本，
-/// 保证命令行语法演进时补全脚本 0 维护漂移。
+/// Derives production-ready Zsh, Bash, Fish, and Nushell completion scripts dynamically
+/// from `CLICommandSpec` as the single source of truth.
 public enum ShellCompletionGenerator {
     
     /// 按目标 Shell 派生补全脚本

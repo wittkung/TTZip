@@ -35,6 +35,7 @@ scratch_bench/
 build_app/
 build_dist/
 build/
+dist/
 *.bin
 test*.7z
 test*.zip

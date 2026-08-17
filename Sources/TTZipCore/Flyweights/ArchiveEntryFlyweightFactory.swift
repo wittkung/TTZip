@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
@@ -8,10 +8,11 @@
 import Foundation
 import os
 
-/// 享元模式 (Flyweight Pattern): ArchiveEntry 内部状态驻留共享工厂
-/// 针对包含海量文件（如 node_modules 或数十万个文件的 Zip/7z）的归档包，
-/// 使上万个 ArchiveEntry / ArchiveLeafFile 共享相同的扩展名、MIME 类型、路径与相对目录前缀，
-/// 大幅降低内存占用与堆分配频率（省内存 70%+）。
+/// Flyweight Pattern: Shared intrinsic string and metadata interning pool for archive entries.
+///
+/// Reduces memory footprint by up to 70%+ when browsing massive archives (e.g. `node_modules`
+/// or deep hierarchies with 500,000+ files) by canonicalizing shared path prefixes, extensions,
+/// and MIME types.
 public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
     public static let shared = ArchiveEntryFlyweightFactory()
     

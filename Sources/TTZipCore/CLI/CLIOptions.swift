@@ -1,184 +1,197 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 目标文件冲突覆盖策略
+/// Target file collision and overwrite resolution policy.
 public enum FileCollisionPolicy: String, Sendable, CaseIterable {
+    /// Interactively prompt the user on standard input.
     case prompt
+    /// Always overwrite existing destination files.
     case always
+    /// Never overwrite existing destination files (skip).
     case never
+    /// Overwrite only if the source entry is newer than the existing file.
     case newer
+    /// Rename the existing file with a backup suffix before extracting.
     case backup
 }
 
-/// 强类型的 CLI 解析选项数据模型 (符合 POSIX / GNU 规范)
+/// Strongly-typed command-line option configuration model conforming to POSIX / GNU utility standards.
 public struct CLIOptions: Sendable {
-    /// 位置参数列表
+    /// Positional arguments passed to the subcommand.
     public var positionals: [String] = []
     
-    /// 输出路径 (-o, --output)
+    /// Target output file or destination directory path (`-o`, `--output`).
     public var outputPath: String? = nil
     
-    /// 归档或解密密码 (-p, --password)
+    /// Passphrase for encryption or decryption (`-p`, `--password`).
     public var password: String? = nil
     
-    /// 密码文件路径 (--password-file, -P)
+    /// Path to file containing passphrase (`-P`, `--password-file`).
     public var passwordFile: String? = nil
     
-    /// 压缩格式 (如 "zip", "7z", "tar.zst", "ALL") (-f, --format)
+    /// Target compression format identifier (e.g. "zip", "7z", "tar.zst", "ALL") (`-f`, `--format`).
     public var format: String? = nil
     
-    /// 分卷包尺寸 (如 "100m", "1g") (-s, --split)
+    /// Multi-volume split size (e.g. "100m", "1g", "650mb") (`-s`, `--split`).
     public var splitSize: String? = nil
     
-    /// 压缩等级 (如 "store", "fast", "ultra", "1", "9") (-l, --level)
+    /// Compression level identifier (e.g. "store", "fast", "ultra", "1", "9") (`-l`, `--level`).
     public var level: String? = nil
     
-    /// 是否为模拟运行 (--dry-run)
+    /// Dry run mode: Simulate operations without writing changes to disk (`--dry-run`).
     public var dryRun: Bool = false
     
-    /// 是否输出机器可读 NDJSON 格式 (--json)
+    /// Emit machine-readable NDJSON telemetry stream on stdout (`--json`).
     public var jsonOutput: Bool = false
     
-    /// 是否禁用 ANSI 颜色 (--no-color)
+    /// Disable ANSI escape color sequences in terminal output (`--no-color`).
     public var noColor: Bool = false
     
-    /// 是否对所有提示自动确认 (-y, --yes, --assume-yes)
+    /// Assume yes on all interactive prompts (`-y`, `--yes`, `--assume-yes`).
     public var assumeYes: Bool = false
     
-    /// 强制操作 / 绕过 TTY 终端保护 (-f, --force)
+    /// Force execution or bypass terminal stdout safety checks (`-f`, `--force`).
     public var force: Bool = false
     
-    /// 覆盖冲突策略 ("prompt", "always", "never", "newer", "backup") (--overwrite)
+    /// File collision policy string (`"prompt"`, `"always"`, `"never"`, `"newer"`, `"backup"`) (`--overwrite`).
     public var overwritePolicy: String = "prompt"
     
-    /// 排除文件模式列表 (-x, --exclude)
+    /// Glob patterns for excluding matching archive entries (`-x`, `--exclude`).
     public var excludePatterns: [String] = []
     
-    /// 包含文件模式列表 (-i, --include)
+    /// Glob patterns for including only matching archive entries (`-i`, `--include`).
     public var includePatterns: [String] = []
     
-    /// 路径前缀截取级数 (--strip-components)
+    /// Number of leading directory components to strip on extraction (`--strip-components`).
     public var stripComponents: Int = 0
     
-    /// 是否排除版本控制相关文件 (--exclude-vcs)
+    /// Automatically exclude version control directories like `.git` and `.svn` (`--exclude-vcs`).
     public var excludeVCS: Bool = false
     
-    /// 是否排除 macOS 特有元数据文件 (.DS_Store, __MACOSX) (--no-mac-metadata)
+    /// Exclude macOS resource forks and `.DS_Store` files (`--no-mac-metadata`).
     public var noMacMetadata: Bool = false
     
-    /// 是否扁平化输出目录层级 (-j, --flatten, --junk-paths)
+    /// Flatten directory hierarchy during compression or extraction (`-j`, `--flatten`, `--junk-paths`).
     public var flattenPaths: Bool = false
     
-    /// 是否输出至标准输出流 (-O, -c, --to-stdout)
+    /// Stream decompressed entry content directly to standard output (`-O`, `-c`, `--to-stdout`).
     public var toStdout: Bool = false
     
-    /// 外部文件清单文件路径 (--files-from, -T)
+    /// Path to newline-delimited list of source file paths (`-T`, `--files-from`).
     public var filesFromPath: String? = nil
     
-    /// 文件清单是否以 NUL (\0) 分隔 (-0, --null)
+    /// Interpret file list as NUL (`\0`) delimited (`-0`, `--null`).
     public var nullDelimiter: Bool = false
     
-    /// 目录树渲染最大深度 (--depth, -d)
+    /// Maximum depth for visual directory tree expansion (`-d`, `--depth`).
     public var treeDepth: Int? = nil
     
-    /// 是否禁用分页器输出 (--no-pager)
+    /// Disable automatic terminal paging via `$PAGER` (`--no-pager`).
     public var noPager: Bool = false
     
-    /// 并发线程数 (-T, --threads)
+    /// Worker thread concurrency count (`-T`, `--threads`).
     public var threads: Int = 0
     
-    /// 交互语言 (--lang)
+    /// Application interaction language code (`--lang`).
     public var language: String? = nil
     
-    /// 竞品工具列表 (如 "pigz,7zz")
+    /// Comma-separated competitor tool identifiers for benchmarking (`--competitor`, `-c`).
     public var competitorTools: String? = nil
     
-    /// 测试数据集尺寸 (如 "500MB")
+    /// Benchmark dataset size string (e.g. "500MB") (`--huge`).
     public var hugeSize: String? = nil
     
-    /// 是否仅测试 500MB 巨型 Payload
+    /// Restrict benchmark execution to 500MB+ large payloads only (`--huge-only`).
     public var hugeOnly: Bool = false
     
-    /// 输入路径 (-i, --input)
+    /// Explicit input path override (`-i`, `--input`).
     public var inputPath: String? = nil
     
-    /// 是否开启零拷贝内存引擎
+    /// Enable zero-copy memory mapping for store-only workflows (`--zero-copy`).
     public var enableZeroCopy: Bool = false
     
-    /// 配置文件路径
+    /// Path to benchmark filter JSON configuration file (`--filter-config`).
     public var filterConfigPath: String? = nil
     
-    /// 滞后/错误时是否强行中止 (--strict, --stop-on-lag)
+    /// Abort execution if throughput drops below performance floor (`--strict`, `--stop-on-lag`).
     public var stopOnLag: Bool = false
     
-    /// 是否选择全部 16 种格式
+    /// Include all 16 supported formats in benchmarking (`--all-formats`).
     public var allFormats: Bool = false
     
-    /// 是否自动对标物理最强竞品
+    /// Automatically resolve and benchmark against the best available competitor tool (`--auto-best`).
     public var autoBestCompetitor: Bool = false
     
-    /// 是否开启大考 100% 霸榜校验
+    /// Verify performance dominance across all matrix dimensions (`--verify-dominance`).
     public var verifyAllDominance: Bool = false
     
-    // MARK: - 测试驱动与诊断选项
+    // MARK: - Test Harness & Diagnostic Options
     
-    /// 测试分层过滤 (--tier "0,1,2")
+    /// Comma-separated test tier filter (`--tier "0,1,2"`).
     public var tier: String? = nil
     
-    /// 测试过滤正则/关键字 (如 --filter "GoldenCorpus")
+    /// Test case filter regex or substring pattern (`--filter`).
     public var filterPattern: String? = nil
     
-    /// 详细度等级 (-1: 极简 -q, 0: 默认, 1: 详细 -v, 2: 全量调试 -vv)
+    /// Logging verbosity level (-1: quiet, 0: default, 1: verbose, 2: debug).
     public var verbosity: Int = 0
     
-    /// 是否保留沙盒与解压临时目录 (-k, --keep)
+    /// Preserve intermediate sandboxes and temporary test files (`-k`, `--keep`).
     public var keepTempFiles: Bool = false
     
-    /// 断言失败时是否保留现场/Dump (--dump-on-failure)
+    /// Dump memory/disk diagnostics upon test assertion failure (`--dump-on-failure`).
     public var dumpOnFailure: Bool = false
     
-    /// 是否仅执行进程内极速诊断测试 (--fast)
+    /// Execute fast in-process format diagnostic tests only (`--fast`).
     public var fast: Bool = false
     
-    /// JUnit XML 报告输出路径 (--report-junit <path>)
+    /// Target path for JUnit XML test report output (`--report-junit`).
     public var junitReportPath: String? = nil
     
-    /// JSON 结构化报告输出路径 (--report-json <path>, --json-report <path>)
+    /// Target path for JSON structured test report output (`--report-json`, `--json-report`).
     public var jsonReportPath: String? = nil
     
-    /// Markdown 报告输出路径 (--markdown-report <path>)
+    /// Target path for Markdown summary test report output (`--markdown-report`).
     public var markdownReportPath: String? = nil
     
-    /// 标准格式测试 (--standard <format>)
+    /// Target format for official standards compliance testing (`--standard <format>`).
     public var standardFormat: String? = nil
     
-    /// 差分预言机测试 (--differential <oracle>)
+    /// Target external oracle engine for differential testing (`--differential <oracle>`).
     public var differentialOracle: String? = nil
     
-    /// 是否执行确定性变异模糊测试 (--fuzz)
+    /// Enable malformed stream mutation fuzzing test mode (`--fuzz`).
     public var fuzz: Bool = false
     
-    /// 是否针对 Silesia 211MB 真实语料库进行基准测试 (--silesia)
+    /// Benchmark against the standard 211MB Silesia compression corpus (`--silesia`).
     public var silesia: Bool = false
     
-    // MARK: - 纯内存与 TurboBench / lzbench 对齐选项
+    // MARK: - In-Memory & TurboBench Alignment Options
     
-    /// 是否开启纯内存基准测试模式 (--in-memory, --mem)
+    /// Enable pure in-memory RAM benchmark execution (`--in-memory`, `--mem`).
     public var inMemory: Bool = false
     
-    /// 是否采用 TurboBench 标准 Markdown 表格输出格式 (--compat-turbobench, --turbobench)
+    /// Emit benchmark results in TurboBench/lzbench compatible Markdown format (`--compat-turbobench`, `--turbobench`).
     public var turboBenchCompat: Bool = false
     
-    /// 单个测试项的最短执行时间窗口（毫秒，默认 500ms）
+    /// Minimum run duration window per benchmark test case in milliseconds (default: 500ms).
     public var minDurationMs: Int = 500
     
-    /// 预热轮次（默认 2 轮）
+    /// Warmup execution iterations before taking monotonic measurements (default: 2).
     public var warmupPasses: Int = 2
     
-    /// 是否使用二进制单位 MiB/s 代替十进制 MB/s
+    /// Use binary units (`MiB/s`, `GiB/s`) instead of decimal units (`MB/s`, `GB/s`).
     public var binaryUnits: Bool = false
     
-    // MARK: - 领域实体转换辅助
+    // MARK: - Domain Property Conversion
     
+    /// Strong enum representation of `overwritePolicy`.
     public var collisionPolicy: FileCollisionPolicy {
         get {
             FileCollisionPolicy(rawValue: overwritePolicy) ?? .prompt
@@ -188,10 +201,11 @@ public struct CLIOptions: Sendable {
         }
     }
     
+    /// Creates a default `CLIOptions` instance with standard option defaults.
     public init() {}
 }
 
-/// 支持的 CLI 子命令
+/// Supported command-line subcommands and flags.
 public enum CLICommand: String, Sendable {
     case archive
     case create
@@ -226,6 +240,8 @@ public enum CLICommand: String, Sendable {
     case shortHelp = "-h"
     case unknown
     
+    /// Parses a raw command string into a typed `CLICommand` enum.
+    /// - Parameter commandString: Subcommand name or alias.
     public init(commandString: String) {
         let lower = commandString.lowercased()
         switch lower {
@@ -296,4 +312,3 @@ public enum CLICommand: String, Sendable {
         }
     }
 }
-

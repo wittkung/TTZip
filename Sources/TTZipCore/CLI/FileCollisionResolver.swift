@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
@@ -12,29 +12,38 @@ import Darwin
 import Glibc
 #endif
 
-/// 动作决议指令
+/// Resolved action for handling file collisions.
 public enum FileCollisionAction: Sendable {
+    /// Overwrite the existing destination file.
     case overwrite
+    /// Skip extracting or writing this entry.
     case skip
+    /// Rename existing file with a `.bak` extension and overwrite.
     case backup
+    /// Abort the entire extraction operation immediately.
     case abort
 }
 
-/// 文件覆盖与冲突解析处理器 (File Collision Resolver)
+/// Thread-safe file collision and overwrite resolution engine.
+///
+/// Implements interactive TTY prompting, mtime comparison heuristics, backup generation,
+/// and batch policy overrides during archive extraction.
 public final class FileCollisionResolver: @unchecked Sendable {
     private var activePolicy: FileCollisionPolicy
     private let lock = NSLock()
     
+    /// Initializes a resolver with the given base collision policy.
+    /// - Parameter policy: Initial resolution policy (default: `.prompt`).
     public init(policy: FileCollisionPolicy = .prompt) {
         self.activePolicy = policy
     }
     
-    /// 评估目标文件冲突并决定处理动作
+    /// Evaluates whether a destination file exists and determines the appropriate action.
     /// - Parameters:
-    ///   - destinationPath: 拟写入的目标磁盘路径
-    ///   - entrySize: 归档条目未压缩尺寸
-    ///   - entryMtime: 归档条目修改时间
-    /// - Returns: 解析后的行动指令
+    ///   - destinationPath: Absolute or relative destination filesystem path.
+    ///   - entrySize: Uncompressed byte size of the incoming archive entry.
+    ///   - entryMtime: Unix modification timestamp of the incoming archive entry.
+    /// - Returns: Computed `FileCollisionAction`.
     public func resolveCollision(
         destinationPath: String,
         entrySize: Int64 = 0,
@@ -73,7 +82,7 @@ public final class FileCollisionResolver: @unchecked Sendable {
             return .overwrite
             
         case .prompt:
-            // 若非交互式 TTY，默认安全跳过或覆盖
+            // If running non-interactively without a TTY, default safely to overwrite
             if isatty(STDIN_FILENO) == 0 {
                 return .overwrite
             }

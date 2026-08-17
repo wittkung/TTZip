@@ -1,6 +1,6 @@
 # TTZip Source-Available & Anti-Copycat Public License v1.0 (TTZip-SAL-1.0)
 # SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
-# Copyright (c) 2026 Weitao Kung (Witt Kung) <kevintungs@163.com>. All rights reserved.
+# Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>. All rights reserved.
 
 TTZip (including `ttzip-cli`, `TTZipCore`, `CTTZipBridge`, and the `TTZipApp` GUI application) is source-available software crafted for the global developer and systems engineering community. 
 
@@ -13,28 +13,28 @@ You are granted a free, worldwide, non-exclusive license to:
 - **Inspect & Audit**: View, study, and inspect 100% of the source code.
 - **Personal & Local CLI Use**: Download, compile, and run `ttzip-cli` and `TTZipApp` on your personal machines for personal, non-commercial daily tasks, development workflows, and research.
 - **Community Contributions**: Submit pull requests, bug fixes, SIMD optimizations, and performance improvements to the official repository (`wittkung/TTZip`).
-- **Upstream Open-Source Carve-Out (开源反哺豁免)**: Standalone, generic optimization routines (e.g. ARM64 PMULL polynomial multiplication, SWAR pattern matchers) developed within TTZip and contributed directly back to upstream open-source foundations (e.g., libarchive, XZ Utils, Zstandard, libdeflate) are explicitly licensed under the respective upstream project's permissive license (BSD 2-Clause, MIT, 0BSD, or Public Domain).
+- **Upstream Open-Source Carve-Out (Upstream Contribution Exemption)**: Standalone, generic optimization routines (e.g. ARM64 PMULL polynomial multiplication, SWAR pattern matchers) developed within TTZip and contributed directly back to upstream open-source foundations (e.g., libarchive, XZ Utils, Zstandard, libdeflate) are explicitly licensed under the respective upstream project's permissive license (BSD 2-Clause, MIT, 0BSD, or Public Domain).
 
 ---
 
-## 2. 🔴 Strict Redistribution & Anti-Copycat Prohibitions (无论免费或收费，绝对禁止第三方再分发与套壳)
+## 2. Strict Redistribution & Anti-Copycat Prohibitions
 
 You may **NOT** under any circumstances, directly or indirectly:
 
-1. **🔴 No Digital Application Store Publishing (严禁任何应用商店上架 — 无论收费或免费)**:
+1. **No Digital Application Store Publishing (Free or Paid)**:
    - You may **NOT** publish, upload, redistribute, or distribute compiled binaries, modified versions, or renamed forks of TTZip (or `ttzip-cli`) to the **Apple Mac App Store**, Microsoft Store, Steam, Setapp, Homebrew Cask (third-party), or any digital app marketplace, **REGARDLESS OF WHETHER DISTRIBUTED FREE OF CHARGE OR FOR A FEE**.
-2. **🔴 No White-Labeling, Free Copycats or Bundling (严禁套壳换皮、免费冲榜与捆绑导流)**:
+2. **No White-Labeling, Free Copycats or Bundling**:
    - You may **NOT** repackage, rename, or white-label TTZip as a standalone product (even for free) to siphon traffic, divert users, embed advertisements, promote third-party services, or bundle with other software.
-3. **🔴 No Commercial Paywalls or Resale (严禁商业收费与闭源转售)**:
+3. **No Commercial Paywalls or Resale**:
    - Sell, license, rent, monetize, or charge fees for `ttzip-cli`, `TTZipCore`, `CTTZipBridge`, `TTZipApp`, or any derived works.
-4. **🔴 No Commercial Wrapping / Cloud SaaS (严禁包装为商业云服务)**:
+4. **No Commercial Wrapping / Cloud SaaS**:
    - Wrap, embed, or bundle `ttzip-cli` or `TTZipCore` into any paid commercial SaaS cloud service, proprietary toolchain, or hardware appliance sold to third parties without an Enterprise Commercial License.
 
 ---
 
 ## 3. Official Exclusive Distribution & Enterprise Licensing
-- **Exclusive Official Distributor**: Witt Kung (and MetaStudyLine) retains the **EXCLUSIVE worldwide right** to publish and distribute pre-compiled binaries and official application builds on the Apple Mac App Store, Homebrew Tap (`wittkung/tap`), and official channels.
-- **Enterprise Commercial License**: Commercial entities wishing to integrate `ttzip` into proprietary commercial products, paid services, or enterprise-wide automated production environments must obtain a paid **Commercial Enterprise License** from the author (Contact: `kevintungs@163.com`).
+- **Exclusive Official Distributor**: Witt Kung retains the **EXCLUSIVE worldwide right** to publish and distribute pre-compiled binaries and official application builds on the Apple Mac App Store, Homebrew Tap (`wittkung/tap`), and official channels.
+- **Enterprise Commercial License**: Commercial entities wishing to integrate `ttzip` into proprietary commercial products, paid services, or enterprise-wide automated production environments must obtain a paid **Commercial Enterprise License** from the author (Contact: `witt.w.kung@gmail.com`).
 
 ---
 

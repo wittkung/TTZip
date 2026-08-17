@@ -1,21 +1,24 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 
-/// 归档可视化目录树渲染器 (Archive Visual Tree Renderer)
+/// Archive visual directory tree renderer.
+///
+/// Builds an in-memory prefix tree from flat archive entry paths and formats them
+/// as a Unicode tree hierarchy with file size annotations and depth capping.
 public enum ArchiveVisualTreeRenderer: Sendable {
     
-    /// 将归档条目渲染为精美的 Unicode 树状文本图谱
+    /// Renders archive entries into a formatted Unicode visual tree graph.
     /// - Parameters:
-    ///   - archivePath: 归档路径或名称
-    ///   - entries: 归档条目列表
-    ///   - maxDepth: 最大遍历深度限制（nil 代表无限制）
-    /// - Returns: 格式化好的整段树形文本
+    ///   - archivePath: Display name or file system path of the archive.
+    ///   - entries: Array of archive entries parsed from the archive container.
+    ///   - maxDepth: Optional maximum depth limit for hierarchical expansion.
+    /// - Returns: Fully formatted multi-line Unicode tree representation.
     public static func render(
         archivePath: String,
         entries: [ArchiveEntry],
@@ -44,7 +47,7 @@ public enum ArchiveVisualTreeRenderer: Sendable {
         return output
     }
     
-    // MARK: - 内部节点与渲染递归
+    // MARK: - Internal Tree Structure & Node Traversal
     
     private final class TreeNode {
         let name: String
@@ -121,7 +124,7 @@ public enum ArchiveVisualTreeRenderer: Sendable {
         maxDepth: Int?,
         output: inout String
     ) {
-        // 根节点无需打印自身标签
+        // Skip printing the anonymous virtual root node
         if !node.name.isEmpty {
             let connector = isLast ? "└── " : "├── "
             let icon = node.isDirectory ? "📁 " : "📄 "
@@ -129,7 +132,7 @@ public enum ArchiveVisualTreeRenderer: Sendable {
             output += "\(prefix)\(connector)\(icon)\(node.name)\(sizeInfo)\n"
         }
         
-        // 深度限制判定
+        // Check maximum depth truncation constraint
         if let max = maxDepth, currentDepth >= max {
             if !node.children.isEmpty && !node.name.isEmpty {
                 let nextPrefix = prefix + (isLast ? "    " : "│   ")
