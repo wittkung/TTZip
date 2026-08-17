@@ -264,6 +264,21 @@ public struct SettingsView: View {
                 .fill(TTZipTheme.hairlineBorder)
                 .frame(height: 0.5)
             
+            #if MAS_BUILD
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(isZh ? "Mac App Store 正版授权 (全功能已解锁)" : "Mac App Store Full License (Active)")
+                        .font(TTZipTheme.Typography.bodyMedium)
+                    Text(isZh ? "已通过 Mac App Store 购买激活，所有 16 种格式与 Apple Silicon 硬件加速已全部解锁。" : "Purchased from Mac App Store. All vector pipelines and 16 formats unlocked.")
+                        .font(TTZipTheme.Typography.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.title2)
+                    .foregroundStyle(TTZipTheme.bambooGreen)
+            }
+            #else
             if !isPro {
                 VStack(alignment: .leading, spacing: TTZipTheme.Spacing.xs) {
                     Text(isZh ? "输入激活序列号解除全功能与企业商业使用限制：" : "Enter activation license key:")
@@ -318,6 +333,7 @@ public struct SettingsView: View {
                     .font(TTZipTheme.Typography.caption)
                     .foregroundStyle(isPro ? TTZipTheme.bambooGreen : TTZipTheme.cinnabarRed)
             }
+            #endif
             
             Spacer().frame(height: 12)
             

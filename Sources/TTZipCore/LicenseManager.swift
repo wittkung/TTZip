@@ -99,12 +99,16 @@ public final class LicenseManager: @unchecked Sendable {
     
     /// 是否已激活正式授权
     public var isPro: Bool {
+        #if MAS_BUILD
+        return true
+        #else
         if LicenseManager.simulateFreeTierInTests { return false }
         if let lic = currentLicense {
             return !lic.isExpired
         }
         let procName = ProcessInfo.processInfo.processName.lowercased()
         return procName.contains("cli") || procName.contains("bench") || procName.contains("test") || procName.contains("xctest")
+        #endif
     }
     
     public func canUseFeature(_ feature: ProFeature) -> Bool {
