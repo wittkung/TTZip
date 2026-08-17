@@ -62,6 +62,17 @@ size_t ttzip_lz4_compress(const void* src, size_t src_size, void* dst, size_t ds
     if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
     if (src_size > INT_MAX || dst_capacity > INT_MAX) return 0;
     int accel = acceleration > 0 ? acceleration : 1;
+    
+    /* 启发式自适应分流：小块 (<= 64KB) 走 TLS 状态池复用通道，大块 (> 64KB) 走纯净直接压缩通道 */
+    if (src_size <= 64 * 1024) {
+        LZ4_stream_t* stream = ttzip_get_tls_lz4_stream();
+        if (stream) {
+            LZ4_resetStream_fast(stream);
+            int res = LZ4_compress_fast_continue(stream, (const char*)src, (char*)dst, (int)src_size, (int)dst_capacity, accel);
+            return res > 0 ? (size_t)res : 0;
+        }
+    }
+    
     int res = LZ4_compress_fast((const char*)src, (char*)dst, (int)src_size, (int)dst_capacity, accel);
     return res > 0 ? (size_t)res : 0;
 }
