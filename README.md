@@ -151,22 +151,23 @@ Detailed licensing and copyright attributions are maintained in [ACKNOWLEDGEMENT
 
 ---
 
+---
+
 ## 📄 License & Community Model
 
-TTZip is proud to support the global developer community while maintaining sustainable independent craftsmanship. We operate under a transparent **Dual-Tier Open Source & Fair-Code Model**:
+TTZip is proud to support the global developer community while **strictly prohibiting any third-party commercial exploitation, white-label wrapping, or unauthorized resale**.
 
-### 1. 🚀 Core Engine & CLI Tool (`Apache 2.0`)
-- **Modules**: `TTZipCore`, `CTTZipBridge`, `Sources/TTZipCLI` (`ttzip-cli`), and C hardware micro-kernels.
-- **License**: **[Apache 2.0](LICENSE)**.
-- **Your Freedom**: 100% free for everyone. You are completely free to use `ttzip-cli` in your terminal, build scripts, CI/CD pipelines, and internal workflows. Community PRs and SIMD optimizations are enthusiastically welcomed!
-
-### 2. 🎨 macOS GUI Client & Design System (`TTZip Source License`)
-- **Modules**: `TTZipApp` (SwiftUI views, Zen layout, Kintsugi Gold themes, visual design tokens).
-- **License**: **[TTZip Source License 1.0 (Source-Available)](LICENSE)**.
-- **Your Freedom**: Free to read, inspect, audit, and locally compile for personal use.
-- **🔴 One Rule (Anti-White-Labeling)**: You may **NOT** repackage, clone, or publish the TTZip GUI application to the **Apple Mac App Store**, Steam, Setapp, or commercial app markets for resale. Official Mac App Store distribution is reserved exclusively for the author to sustain development.
+### 🌟 Source-Available & Open Collaboration (`TTZip Non-Commercial License`)
+- **100% Transparent**: All source code (`ttzip-cli`, `TTZipCore`, `CTTZipBridge`, `TTZipApp`) is open for reading, learning, security auditing, and community contributions.
+- **Free for Personal Use**: You are free to run `ttzip-cli` and `TTZipApp` on your personal machines for personal, non-commercial daily tasks.
+- **🔴 Strict Commercial Ban (严禁商业套壳与倒卖)**:
+  1. **No Commercial Wrapping**: You may NOT embed, wrap, or bundle `ttzip-cli` or `TTZipCore` into any paid commercial software, SaaS service, or proprietary product.
+  2. **No App Store Resale**: You may NOT publish TTZip (or renamed forks) to the **Apple Mac App Store**, Steam, Setapp, or any commercial marketplace.
+  3. **Official Commercial Monopoly**: Official Mac App Store distribution and commercial monetization are reserved exclusively for the author.
+  4. **Enterprise Licensing**: Commercial companies wishing to integrate TTZip into proprietary commercial pipelines must purchase a **Commercial License**.
 
 Third-party component licenses and acknowledgements are documented in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
+
 
 
 

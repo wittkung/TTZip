@@ -1,37 +1,39 @@
-# TTZip Dual-Tier Open Source & Fair-Code License
+# TTZip Source-Available & Non-Commercial Public License
 # Copyright (c) 2026 Weitao Kung (Witt Kung). All rights reserved.
 
-TTZip is built with deep reverence for the global open-source community. To balance our mission of providing powerful, open terminal utilities for all developers while protecting our visual craft and independent sustainability against white-label app store parasitism, TTZip adopts a transparent **Dual-Tier Licensing Framework**:
+TTZip (including `ttzip-cli`, `TTZipCore`, `CTTZipBridge`, and the `TTZipApp` GUI application) is a source-available, open-collaboration software crafted for the global developer community. 
+
+To ensure the software remains free and open for personal use while **STRICTLY PROHIBITING any third-party commercial exploitation, white-label wrapping, or app store parasitism**, this software is distributed under the following terms:
 
 ---
 
-## Tier 1: Core Engine, Low-Level C Bridges & CLI Tool
-All code residing in:
-- `Sources/TTZipCore/` (Domain models, streaming engines, pipeline abstractions)
-- `Sources/CTTZipBridge/` (ARM64 NEON SIMD micro-kernels, C glue bindings)
-- `Sources/TTZipCLI/` (`ttzip-cli` standalone benchmark & terminal utility)
-- `Vendor/` (Upstream patches & wrappers)
-
-is licensed under the **Apache License, Version 2.0**:
-- **Freedom to Use**: You are free to use, run, integrate `ttzip-cli` into your daily workflows, CI/CD pipelines, build scripts, and server environments without restriction.
-- **Freedom to Contribute**: We enthusiastically welcome community contributions, performance benchmarks, upstream optimizations, and pull requests.
-
-Full Apache 2.0 text: https://www.apache.org/licenses/LICENSE-2.0
+## 1. Permitted Uses (Personal, Research & Community Co-Creation)
+You are granted a free, worldwide, non-exclusive license to:
+- **Inspect & Audit**: View, study, and inspect 100% of the source code.
+- **Personal & Local CLI Use**: Download, compile, and run `ttzip-cli` and `TTZipApp` on your personal machines for personal, non-commercial daily tasks, research, and learning.
+- **Community Contributions**: Submit pull requests, bug fixes, SIMD optimizations, and performance improvements to the official repository.
+- **Upstream Contributions**: Freely extract standalone, generic optimization routines for direct upstream contribution to permissively licensed foundations (e.g., libarchive, XZ Utils, zstd).
 
 ---
 
-## Tier 2: macOS Native GUI Application & Design System
-All code residing in:
-- `Sources/TTZipApp/` (SwiftUI views, AppKit navigation, glassmorphic UI, Zen layout)
-- `logo/`, Design Tokens & Visual Assets
+## 2. 🔴 Strict Commercial & Wrapping Prohibitions (严禁商业套壳与倒卖)
 
-is licensed under the **TTZip Source License 1.0 (Source-Available & Anti-Store Piracy)**:
+You may **NOT** under any circumstances, directly or indirectly:
 
-1. **Personal & Research Use**:
-   - You are free to view, inspect, study, and locally compile the macOS application from source code for personal, non-commercial use.
-2. **🔴 Strict Application Store Exclusivity (Anti-White-Labeling)**:
-   - You may **NOT** publish, redistribute, repackage, or distribute the TTZip GUI application, its derivatives, or its compiled binaries to any digital app marketplace (including the **Apple Mac App Store**, Microsoft Store, Steam, Setapp, or commercial package managers) for free or paid distribution.
-3. **Official Commercial Operator**:
-   - Witt Kung / MetaStudyLine reserves the exclusive right to publish and monetize the official macOS application on the Mac App Store, offer Pro lifetime licenses, and grant commercial enterprise licenses.
-4. **Trademark Protection**:
-   - The name "TTZip", the official icon, and the signature Kintsugi Gold Zen aesthetic are exclusive trademarks of Witt Kung.
+1. **No Commercial Resale or Paywalls (严禁收费牟利)**:
+   - Sell, license, rent, monetize, or charge fees for `ttzip-cli`, `TTZipCore`, `CTTZipBridge`, `TTZipApp`, or any derived works.
+2. **No Commercial Wrapping / White-Labeling (严禁商业套壳与集成)**:
+   - Wrap, embed, bundle, or integrate `ttzip-cli` or `TTZipCore` into any commercial software product, paid SaaS cloud service, proprietary toolchain, or hardware appliance sold to third parties.
+3. **No Digital Application Store Publishing (严禁上架应用商店)**:
+   - Publish, distribute, or upload `TTZipApp` or `ttzip-cli` (or any renamed/modified versions) to the **Apple Mac App Store**, Microsoft Store, Steam, Setapp, or any commercial app distribution marketplace.
+
+---
+
+## 3. Official Commercial Rights & Enterprise Licensing
+- **Official Rights**: Witt Kung (and MetaStudyLine) retains the exclusive worldwide right to commercialize, monetize, and distribute official binaries on the Mac App Store and other platforms.
+- **Enterprise Commercial License**: Commercial entities wishing to integrate `ttzip` into proprietary commercial products, paid services, or enterprise-wide automated production environments must obtain a paid **Commercial Enterprise License** from the author.
+
+---
+
+## 4. Trademark Protection
+"TTZip", the official icons, brand identities, and the signature Kintsugi Gold Zen design system are protected trademarks of Witt Kung.
