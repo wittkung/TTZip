@@ -9,16 +9,14 @@
     <style>
         :root {
             --bg: #FFFFFF;
-            --surface: rgba(245, 245, 247, 0.75);
+            --surface: rgba(245, 245, 247, 0.65);
             --surface-elevated: rgba(255, 255, 255, 0.85);
-            --border: rgba(229, 229, 234, 0.8);
+            --border: rgba(229, 229, 234, 0.6);
             --text-primary: #1D1D1F;
             --text-secondary: #6E6E73;
             --text-tertiary: #86868B;
             --accent-green: #2D7D46;
             --accent-green-light: rgba(45, 125, 70, 0.12);
-            --accent-gold: #D4AF37;
-            --accent-blue: #0071E3;
             --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", sans-serif;
             --font-mono: "SF Mono", Monaco, Menlo, Consolas, monospace;
         }
@@ -26,16 +24,14 @@
         @media (prefers-color-scheme: dark) {
             :root {
                 --bg: #000000;
-                --surface: rgba(28, 28, 30, 0.75);
+                --surface: rgba(28, 28, 30, 0.65);
                 --surface-elevated: rgba(44, 44, 46, 0.85);
-                --border: rgba(56, 56, 58, 0.8);
+                --border: rgba(56, 56, 58, 0.6);
                 --text-primary: #F5F5F7;
                 --text-secondary: #A1A1A6;
                 --text-tertiary: #6E6E73;
                 --accent-green: #34C759;
                 --accent-green-light: rgba(52, 199, 89, 0.18);
-                --accent-gold: #FFD60A;
-                --accent-blue: #0A84FF;
             }
         }
 
@@ -55,7 +51,7 @@
             position: relative;
         }
 
-        /* Fluid Background Canvas Container */
+        /* 100% TTZip App 同款流体背景容器 */
         .fluid-canvas-container {
             position: fixed;
             top: 0;
@@ -65,12 +61,12 @@
             pointer-events: none;
             overflow: hidden;
             z-index: 0;
-            opacity: 0.55;
+            opacity: 0.22;
             transition: opacity 0.7s ease;
         }
         @media (prefers-color-scheme: dark) {
             .fluid-canvas-container {
-                opacity: 0.65;
+                opacity: 0.38;
             }
         }
         #fluidCanvas {
@@ -78,32 +74,24 @@
             height: 100%;
             filter: blur(80px);
             -webkit-filter: blur(80px);
-            transform: scale(1.25);
+            transform: scale(1.3);
             transform-origin: center;
         }
 
-        /* Foreground Content Container */
+        /* 前景内容层 */
         .content-wrapper {
             position: relative;
             z-index: 1;
         }
 
-        /* Nav */
+        /* 完全透明顶部栏 (Transparent Top Nav) */
         nav {
             position: sticky;
             top: 0;
             z-index: 100;
-            backdrop-filter: blur(24px) saturate(180%);
-            -webkit-backdrop-filter: blur(24px) saturate(180%);
-            background-color: rgba(255, 255, 255, 0.7);
-            border-bottom: 1px solid var(--border);
-            padding: 12px 24px;
-            transition: background-color 0.3s;
-        }
-        @media (prefers-color-scheme: dark) {
-            nav {
-                background-color: rgba(0, 0, 0, 0.7);
-            }
+            background-color: transparent;
+            border-bottom: none;
+            padding: 16px 32px;
         }
         .nav-container {
             max-width: 1080px;
@@ -126,11 +114,11 @@
             width: 32px;
             height: 32px;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
         }
         .nav-links {
             display: flex;
-            gap: 20px;
+            gap: 24px;
             align-items: center;
             font-size: 14px;
         }
@@ -145,7 +133,7 @@
         .btn-mas {
             background-color: var(--text-primary);
             color: var(--bg) !important;
-            padding: 6px 16px;
+            padding: 7px 18px;
             border-radius: 20px;
             font-weight: 500;
             transition: opacity 0.2s, transform 0.2s;
@@ -158,7 +146,7 @@
         /* Hero */
         .hero {
             max-width: 960px;
-            margin: 90px auto 60px;
+            margin: 70px auto 60px;
             text-align: center;
             padding: 0 24px;
         }
@@ -380,7 +368,7 @@
 </head>
 <body>
 
-    <!-- Liquid Fluid Aurora Background (Shared TTZip & TTSubs Architecture) -->
+    <!-- 100% TTZip App 原生同款单色竹青流体动态画布 -->
     <div class="fluid-canvas-container" aria-hidden="true">
         <canvas id="fluidCanvas" width="480" height="320"></canvas>
     </div>
@@ -388,7 +376,7 @@
     <!-- Main Content -->
     <div class="content-wrapper">
 
-        <!-- Navigation -->
+        <!-- Navigation (Fully Transparent) -->
         <nav>
             <div class="nav-container">
                 <a href="#" class="brand">
@@ -536,7 +524,7 @@
 
     </div>
 
-    <!-- Liquid Fluid Aurora Canvas Engine -->
+    <!-- 100% 严格对齐 TTZipFluidBackgroundView.swift 的单色竹青谐波流体方程 -->
     <script>
         (function() {
             const canvas = document.getElementById('fluidCanvas');
@@ -546,7 +534,7 @@
 
             let phase = Math.random() * 100;
             let lastTime = performance.now();
-            const speed = 0.35;
+            const speed = 0.3; // 与 TTZip App speed: 0.3 绝对一致
 
             const isDarkMode = () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
@@ -562,53 +550,40 @@
 
                     const isDark = isDarkMode();
 
-                    // 4 颗流体极光球谐波运动轨迹方程
-                    const x1 = w / 2 + Math.cos(phase * 0.65) * (w * 0.35);
-                    const y1 = h / 2 + Math.sin(phase * 1.05) * (h * 0.28);
+                    // 100% 还原 TTZipFluidBackgroundView.swift 中的 3 颗竹青流体球轨道方程
+                    const x1 = w / 2 + Math.cos(phase * 0.65) * (w * 0.3);
+                    const y1 = h / 2 + Math.sin(phase * 1.05) * (h * 0.2);
 
-                    const x2 = w / 2 + Math.sin(phase * 0.45) * (w * 0.42);
-                    const y2 = h / 2 + Math.cos(phase * 0.95) * (h * 0.35);
+                    const x2 = w / 2 + Math.sin(phase * 0.45) * (w * 0.4);
+                    const y2 = h / 2 + Math.cos(phase * 0.95) * (h * 0.3);
 
-                    const x3 = w / 2 + Math.cos(phase * 0.35) * (w * 0.30);
-                    const y3 = h / 2 + Math.sin(phase * 0.55) * (h * 0.40);
+                    const x3 = w / 2 + Math.cos(phase * 0.35) * (w * 0.25);
+                    const y3 = h / 2 + Math.sin(phase * 0.55) * (h * 0.4);
 
-                    const x4 = w / 2 + Math.sin(phase * 0.80) * (w * 0.25);
-                    const y4 = h / 2 + Math.cos(phase * 0.60) * (h * 0.25);
+                    const radius = Math.min(w, h) * 0.6;
 
-                    const radius = Math.min(w, h) * 0.7;
+                    // TTZipTheme.bambooGreen 单一色调
+                    const baseColor = isDark ? "#34C759" : "#2D7D46";
 
-                    // TTZip 专属竹青 / 翠竹 / 苍翠 / 金缮色阶
-                    const c1 = isDark ? "#2D7D46" : "#459A60"; // Bamboo Green
-                    const c2 = isDark ? "#1E5931" : "#34C759"; // Emerald
-                    const c3 = isDark ? "#123820" : "#A2D8B0"; // Deep Forest
-                    const c4 = isDark ? "#D4AF37" : "#F5E19A"; // Kintsugi Gold
-
-                    // Blob 1: 核心竹青
-                    ctx.globalAlpha = isDark ? 0.85 : 0.60;
-                    ctx.fillStyle = c1;
+                    // Orb 1: 100% 不透明度
+                    ctx.globalAlpha = 1.0;
+                    ctx.fillStyle = baseColor;
                     ctx.beginPath();
-                    ctx.arc(x1, y1, radius * 0.55, 0, Math.PI * 2);
+                    ctx.arc(x1, y1, radius * 0.5, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Blob 2: 翡翠微光
-                    ctx.globalAlpha = isDark ? 0.70 : 0.50;
-                    ctx.fillStyle = c2;
+                    // Orb 2: 80% 不透明度
+                    ctx.globalAlpha = 0.8;
+                    ctx.fillStyle = baseColor;
                     ctx.beginPath();
-                    ctx.arc(x2, y2, radius * 0.50, 0, Math.PI * 2);
+                    ctx.arc(x2, y2, radius * 0.5, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Blob 3: 深邃暗流
-                    ctx.globalAlpha = isDark ? 0.60 : 0.45;
-                    ctx.fillStyle = c3;
+                    // Orb 3: 60% 不透明度
+                    ctx.globalAlpha = 0.6;
+                    ctx.fillStyle = baseColor;
                     ctx.beginPath();
-                    ctx.arc(x3, y3, radius * 0.65, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // Blob 4: 金缮微光环境层次
-                    ctx.globalAlpha = isDark ? 0.45 : 0.35;
-                    ctx.fillStyle = c4;
-                    ctx.beginPath();
-                    ctx.arc(x4, y4, radius * 0.45, 0, Math.PI * 2);
+                    ctx.arc(x3, y3, radius * 0.5, 0, Math.PI * 2);
                     ctx.fill();
 
                     ctx.globalAlpha = 1.0;
