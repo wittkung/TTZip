@@ -72,6 +72,7 @@ final class AppStorePackageAuditTests: XCTestCase {
         }
         
         XCTAssertEqual(plist["CFBundleExecutable"] as? String, "TTZip")
+        XCTAssertEqual(plist["CFBundleIdentifier"] as? String, "com.metastudyline.ttzip")
         XCTAssertEqual(plist["CFBundlePackageType"] as? String, "APPL")
         XCTAssertEqual(plist["LSApplicationCategoryType"] as? String, "public.app-category.utilities")
         
