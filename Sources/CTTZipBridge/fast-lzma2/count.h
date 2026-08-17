@@ -96,15 +96,38 @@ static unsigned ZSTD_NbCommonBytes(register size_t val)
 }
 
 
+#if defined(__ARM_NEON) || defined(__aarch64__)
+#include <arm_neon.h>
+#endif
+
 static size_t ZSTD_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* const pInLimit)
 {
     const BYTE* const pStart = pIn;
     const BYTE* const pInLoopLimit = pInLimit - (sizeof(size_t) - 1);
 
     if (pIn < pInLoopLimit) {
-        { size_t const diff = MEM_readST(pMatch) ^ MEM_readST(pIn);
-        if (diff) return ZSTD_NbCommonBytes(diff); }
+        size_t const diff = MEM_readST(pMatch) ^ MEM_readST(pIn);
+        if (diff) return ZSTD_NbCommonBytes(diff);
         pIn += sizeof(size_t); pMatch += sizeof(size_t);
+        
+#if defined(__aarch64__) && defined(__ARM_NEON)
+        while (pIn + 16 <= pInLimit) {
+            uint8x16_t const vIn = vld1q_u8(pIn);
+            uint8x16_t const vMatch = vld1q_u8(pMatch);
+            uint8x16_t const vDiff = veorq_u8(vIn, vMatch);
+            uint64_t const d0 = vgetq_lane_u64(vreinterpretq_u64_u8(vDiff), 0);
+            if (d0 != 0) {
+                pIn += (__builtin_ctzll(d0) >> 3);
+                return (size_t)(pIn - pStart);
+            }
+            uint64_t const d1 = vgetq_lane_u64(vreinterpretq_u64_u8(vDiff), 1);
+            if (d1 != 0) {
+                pIn += 8 + (__builtin_ctzll(d1) >> 3);
+                return (size_t)(pIn - pStart);
+            }
+            pIn += 16; pMatch += 16;
+        }
+#endif
         while (pIn < pInLoopLimit) {
             size_t const diff = MEM_readST(pMatch) ^ MEM_readST(pIn);
             if (!diff) { pIn += sizeof(size_t); pMatch += sizeof(size_t); continue; }

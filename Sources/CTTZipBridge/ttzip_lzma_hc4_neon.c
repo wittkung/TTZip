@@ -263,13 +263,19 @@ uint32_t ttzip_hc4_get_matches(ttzip_hc4_t* mf, ttzip_match_t* matches, uint32_t
         uint32_t delta = mf->pos - match_pos;
         if (delta > mf->dict_size || delta == 0) break;
         
+        uint32_t next_match = mf->chain[cur_match & (mf->dict_size - 1)];
+        if (next_match != 0 && next_match <= mf->buffer_size) {
+            __builtin_prefetch(mf->buffer + (next_match - 1), 0, 1);
+            __builtin_prefetch(&mf->chain[next_match & (mf->dict_size - 1)], 0, 1);
+        }
+        
         const uint8_t* candidate = mf->buffer + match_pos;
         
         uint16_t c16, m16;
         memcpy(&c16, cur, 2);
         memcpy(&m16, candidate, 2);
         if (c16 != m16 || candidate[max_len] != cur[max_len]) {
-            cur_match = mf->chain[cur_match & (mf->dict_size - 1)];
+            cur_match = next_match;
             continue;
         }
         
@@ -286,7 +292,7 @@ uint32_t ttzip_hc4_get_matches(ttzip_hc4_t* mf, ttzip_match_t* matches, uint32_t
             if (len >= mf->nice_len) break;
         }
         
-        cur_match = mf->chain[cur_match & (mf->dict_size - 1)];
+        cur_match = next_match;
     }
     
     mf->pos++;
