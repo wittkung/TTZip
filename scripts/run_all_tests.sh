@@ -1,39 +1,23 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+# All rights reserved.
+#
+# TTZip: High-performance native archiving and compression engine for macOS.
+
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${WORKSPACE_ROOT}"
 
 echo "=========================================="
 echo "🧪 Running TTZip Full Test & Verification Suite"
 echo "=========================================="
 
-cd "$(dirname "$0")/.."
-
-echo "--> Testing Tar Native Engine..."
-swift test --filter TarNativeEngineTests
-
-echo "--> Testing Tar Edge Cases..."
-swift test --filter TarVariantEdgeCasesTests
-
-echo "--> Testing 7z Native Engine..."
-swift test --filter SevenZipBridgeTests
-
-echo "--> Testing Security & Compliance..."
-swift test --filter SecurityAndComplianceTests
-
-echo "--> Testing Archive Extractor..."
-swift test --filter ArchiveExtractorTests
-
-echo "--> Testing Password Vault V4..."
-swift test --filter PasswordVaultV4Tests
-
-echo "--> Testing Archive Spec Integrity & Parser Safety..."
-swift test --filter ArchiveSpecIntegrityTests
-
-echo "--> Testing APFS Zero Copy Architecture..."
-swift test --filter ZipStoreZeroCopyTests
-
-echo "--> Testing AppViewState Sub-States..."
-swift test --filter AppViewStateSubStateTests
+"${SCRIPT_DIR}/run_local_ci_gate.sh" "$@"
 
 echo "=========================================="
-echo "✅ ALL TEST SUITES PASSED CLEANLY!"
+echo "✅ ALL TEST SUITES & GATES PASSED CLEANLY!"
 echo "=========================================="

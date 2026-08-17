@@ -55,16 +55,20 @@ struct parallel_gz_ctx {
 parallel_gz_ctx* init_parallel_gz(const char* path, int level) {
     parallel_gz_ctx *ctx = calloc(1, sizeof(parallel_gz_ctx));
     if (!ctx) return NULL;
-    ctx->fd = open(path, O_CREAT | O_TRUNC | O_WRONLY, 0644);
-    if (ctx->fd < 0) {
-        free(ctx);
-        return NULL;
+    if (strcmp(path, "-") == 0) {
+        ctx->fd = STDOUT_FILENO;
+    } else {
+        ctx->fd = open(path, O_CREAT | O_TRUNC | O_WRONLY, 0644);
+        if (ctx->fd < 0) {
+            free(ctx);
+            return NULL;
+        }
     }
     ctx->level = level;
     ctx->codec_type = PARALLEL_CODEC_GZ;
     ctx->current_buffer = malloc(GZ_CHUNK_SIZE);
     if (!ctx->current_buffer) {
-        close(ctx->fd);
+        if (ctx->fd != STDOUT_FILENO) close(ctx->fd);
         free(ctx);
         return NULL;
     }
@@ -262,7 +266,9 @@ static void finish_parallel_gz(parallel_gz_ctx *ctx) {
     }
     pthread_mutex_unlock(&ctx->mutex);
     
-    close(ctx->fd);
+    if (ctx->fd >= 0 && ctx->fd != STDOUT_FILENO) {
+        close(ctx->fd);
+    }
     free(ctx->current_buffer);
     dispatch_release(ctx->compress_queue);
     pthread_mutex_destroy(&ctx->mutex);

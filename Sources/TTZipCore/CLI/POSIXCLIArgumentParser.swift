@@ -107,6 +107,8 @@ public enum POSIXCLIArgumentParser {
                     options.noMacMetadata = false
                 case "flatten", "junk-paths":
                     options.flattenPaths = true
+                case "to-stdout", "stdout":
+                    options.toStdout = true
                 case "files-from":
                     if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
                         options.filesFromPath = v
@@ -257,11 +259,26 @@ public enum POSIXCLIArgumentParser {
                     case "k":
                         options.keepTempFiles = true
                     case "f":
-                        options.force = true
+                        if detectedCommand == .archive || detectedCommand == .create {
+                            let rest = String(flags[(flagIdx + 1)...])
+                            if !rest.isEmpty {
+                                options.format = rest
+                                flagIdx = flags.count
+                            } else if i + 1 < args.count && !args[i + 1].starts(with: "-") {
+                                options.format = args[i + 1]
+                                i += 1
+                            } else {
+                                options.force = true
+                            }
+                        } else {
+                            options.force = true
+                        }
                     case "j":
                         options.flattenPaths = true
                     case "0":
                         options.nullDelimiter = true
+                    case "O", "c":
+                        options.toStdout = true
                     case "n":
                         options.overwritePolicy = "never"
                     case "o":
@@ -320,6 +337,15 @@ public enum POSIXCLIArgumentParser {
                         }
                     case "i":
                         let rest = String(flags[(flagIdx + 1)...])
+                        let val = !rest.isEmpty ? rest : (i + 1 < args.count ? args[i + 1] : nil)
+                        if detectedCommand == .extract || detectedCommand == .cat || detectedCommand == .list || detectedCommand == .inspect {
+                            if let v = val, v == "-" || (!v.contains("*") && !v.contains("?")) {
+                                options.inputPath = v
+                                if rest.isEmpty { i += 1 }
+                                flagIdx = flags.count
+                                break
+                            }
+                        }
                         if !rest.isEmpty {
                             options.includePatterns.append(rest)
                             flagIdx = flags.count

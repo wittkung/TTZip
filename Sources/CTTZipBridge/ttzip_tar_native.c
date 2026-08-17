@@ -223,9 +223,16 @@ int ttzip_create_tar_native_c(
             return TTZIP_ERR_OPEN_FAILED;
         }
     } else {
-        if (archive_write_open_filename(a, output_path) != ARCHIVE_OK) {
-            archive_write_free(a);
-            return TTZIP_ERR_OPEN_FAILED;
+        if (strcmp(output_path, "-") == 0) {
+            if (archive_write_open_fd(a, STDOUT_FILENO) != ARCHIVE_OK) {
+                archive_write_free(a);
+                return TTZIP_ERR_OPEN_FAILED;
+            }
+        } else {
+            if (archive_write_open_filename(a, output_path) != ARCHIVE_OK) {
+                archive_write_free(a);
+                return TTZIP_ERR_OPEN_FAILED;
+            }
         }
     }
     
@@ -273,10 +280,18 @@ int ttzip_extract_tar_native_c(
     int flags = ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_SECURE_NODOTDOT | ARCHIVE_EXTRACT_UNLINK;
     archive_write_disk_set_options(ext, flags);
     
-    if (archive_read_open_filename(a, archive_path, 8 * 1024 * 1024) != ARCHIVE_OK) {
-        archive_write_free(ext);
-        archive_read_free(a);
-        return TTZIP_ERR_OPEN_FAILED;
+    if (strcmp(archive_path, "-") == 0) {
+        if (archive_read_open_fd(a, STDIN_FILENO, 8 * 1024 * 1024) != ARCHIVE_OK) {
+            archive_write_free(ext);
+            archive_read_free(a);
+            return TTZIP_ERR_OPEN_FAILED;
+        }
+    } else {
+        if (archive_read_open_filename(a, archive_path, 8 * 1024 * 1024) != ARCHIVE_OK) {
+            archive_write_free(ext);
+            archive_read_free(a);
+            return TTZIP_ERR_OPEN_FAILED;
+        }
     }
     
     char last_parent_dir[1024] = {0};

@@ -385,13 +385,18 @@ int ttzip_create_tar_zstd_direct_c(
         return ttzip_create_tar_zstd_raw_direct_c(output_path, input_paths[0]);
     }
     
-    unlink(output_path);
-    int out_fd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (out_fd < 0) return TTZIP_ERR_OPEN_FAILED;
+    int out_fd;
+    if (strcmp(output_path, "-") == 0) {
+        out_fd = STDOUT_FILENO;
+    } else {
+        unlink(output_path);
+        out_fd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (out_fd < 0) return TTZIP_ERR_OPEN_FAILED;
+    }
     
     ZSTD_CCtx* cctx = ZSTD_createCCtx();
     if (!cctx) {
-        close(out_fd);
+        if (out_fd != STDOUT_FILENO) close(out_fd);
         return TTZIP_ERR_OUT_OF_MEMORY;
     }
     
@@ -419,7 +424,7 @@ int ttzip_create_tar_zstd_direct_c(
     void* out_buf = malloc(out_cap);
     if (!out_buf) {
         ZSTD_freeCCtx(cctx);
-        close(out_fd);
+        if (out_fd != STDOUT_FILENO) close(out_fd);
         return TTZIP_ERR_OUT_OF_MEMORY;
     }
     ZSTD_outBuffer out = { out_buf, out_cap, 0 };
@@ -435,7 +440,7 @@ int ttzip_create_tar_zstd_direct_c(
         if (r != TTZIP_OK) {
             free(out_buf);
             ZSTD_freeCCtx(cctx);
-            close(out_fd);
+            if (out_fd != STDOUT_FILENO) close(out_fd);
             return r;
         }
     }
@@ -461,7 +466,7 @@ int ttzip_create_tar_zstd_direct_c(
     
     free(out_buf);
     ZSTD_freeCCtx(cctx);
-    close(out_fd);
+    if (out_fd != STDOUT_FILENO) close(out_fd);
     return TTZIP_OK;
 }
 
@@ -485,11 +490,16 @@ int ttzip_extract_tar_zstd_direct_c(
     
     ttzip_common_mkdir_p(dest_dir);
 
-    int in_fd = open(archive_path, O_RDONLY);
-    if (in_fd < 0) return TTZIP_ERR_OPEN_FAILED;
+    int in_fd;
+    if (strcmp(archive_path, "-") == 0) {
+        in_fd = STDIN_FILENO;
+    } else {
+        in_fd = open(archive_path, O_RDONLY);
+        if (in_fd < 0) return TTZIP_ERR_OPEN_FAILED;
+    }
 
     struct stat in_st;
-    if (fstat(in_fd, &in_st) != 0 || in_st.st_size == 0) {
+    if (in_fd != STDIN_FILENO && (fstat(in_fd, &in_st) != 0 || in_st.st_size == 0)) {
         close(in_fd);
         return TTZIP_ERR_FILE_NOT_FOUND;
     }
@@ -497,7 +507,7 @@ int ttzip_extract_tar_zstd_direct_c(
     // 采用 Direct In-Process ZSTD 解码器
     ZSTD_DCtx* dctx = ZSTD_createDCtx();
     if (!dctx) {
-        close(in_fd);
+        if (in_fd != STDIN_FILENO) close(in_fd);
         return TTZIP_ERR_OUT_OF_MEMORY;
     }
 
@@ -509,7 +519,7 @@ int ttzip_extract_tar_zstd_direct_c(
         if (in_buf) ttzip_aligned_free_16k(in_buf);
         if (out_buf) ttzip_aligned_free_16k(out_buf);
         ZSTD_freeDCtx(dctx);
-        close(in_fd);
+        if (in_fd != STDIN_FILENO) close(in_fd);
         return TTZIP_ERR_OUT_OF_MEMORY;
     }
 
@@ -729,6 +739,6 @@ int ttzip_extract_tar_zstd_direct_c(
     ttzip_aligned_free_16k(in_buf);
     ttzip_aligned_free_16k(out_buf);
     ZSTD_freeDCtx(dctx);
-    close(in_fd);
+    if (in_fd >= 0 && in_fd != STDIN_FILENO) close(in_fd);
     return ret_code;
 }

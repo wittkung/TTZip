@@ -137,6 +137,9 @@ void ttzip_install_signal_handlers(void) {
     
     sigaction(SIGBUS, &sa, NULL);
     sigaction(SIGSEGV, &sa, NULL);
+    
+    // 忽略 SIGPIPE，将管道中断转化为同步 EPIPE 错误以便优雅退出状态码 141
+    signal(SIGPIPE, SIG_IGN);
 }
 
 int ttzip_err_combine(int err1, int err2) {

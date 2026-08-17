@@ -7,13 +7,25 @@ public struct CLIOptionSpec: Sendable {
     public let description: String
     public let takesValue: Bool
     public let valueName: String?
+    public let valueChoices: [String]
+    public let isFilePath: Bool
     
-    public init(shortName: String? = nil, longName: String, description: String, takesValue: Bool = false, valueName: String? = nil) {
+    public init(
+        shortName: String? = nil,
+        longName: String,
+        description: String,
+        takesValue: Bool = false,
+        valueName: String? = nil,
+        valueChoices: [String] = [],
+        isFilePath: Bool = false
+    ) {
         self.shortName = shortName
         self.longName = longName
         self.description = description
         self.takesValue = takesValue
         self.valueName = valueName
+        self.valueChoices = valueChoices
+        self.isFilePath = isFilePath
     }
 }
 

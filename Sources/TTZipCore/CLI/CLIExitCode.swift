@@ -32,6 +32,9 @@ public enum CLIExitCode: Int32, Sendable {
     /// 用户按下 Ctrl+C (SIGINT = 128 + 2)
     case sigint = 130
     
+    /// 下游管道过早关闭中断 (SIGPIPE = 128 + 13)
+    case sigpipe = 141
+    
     /// 终止当前进程并返回标准状态码
     public func exit() -> Never {
         Darwin.exit(self.rawValue)

@@ -232,21 +232,20 @@ public enum CLICommandRouter {
             return .ok
             
         case .completion:
-            let shell = options.positionals.first?.lowercased() ?? "zsh"
-            switch shell {
-            case "bash":
-                print(CLICommandSpec.generateBashCompletion())
-            case "fish":
-                print(CLICommandSpec.generateFishCompletion())
-            case "nushell", "nu":
-                print(CLICommandSpec.generateNushellCompletion())
-            default:
-                print(CLICommandSpec.generateZshCompletion())
+            let shellRaw = options.positionals.first?.lowercased() ?? "zsh"
+            let targetShell: ShellTarget
+            switch shellRaw {
+            case "bash": targetShell = .bash
+            case "fish": targetShell = .fish
+            case "nushell", "nu": targetShell = .nushell
+            default: targetShell = .zsh
             }
+            let script = ShellCompletionGenerator.generate(for: targetShell)
+            print(script)
             return .ok
             
         case .man:
-            print(CLICommandSpec.generateManPage())
+            print(ManPageGenerator.generateManPage())
             return .ok
             
         case .version, .shortVersion:
@@ -330,6 +329,21 @@ public enum CLICommandRouter {
             }
         }
         
+        if outputPath == "-" {
+            if StreamPipeAdapter.isStdoutTTY() && !options.force {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: stdout is a terminal; binary output suppressed. Use -f/--force to override or redirect stdout.")
+                return .usage
+            }
+            if format == .zip || format == .sevenZip || format == .iso || format == .dmg {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: format '\(formatRaw ?? "zip")' requires random-access seeking and cannot stream directly to stdout. Use 'tar', 'tar.zst', or 'tar.gz' for UNIX pipelines.")
+                return .usage
+            }
+            if options.jsonOutput {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: --json telemetry cannot be combined with stdout binary stream (-o -).")
+                return .usage
+            }
+        }
+        
         do {
             let res = try await securityProxy.quickCompress(
                 inputs: inputPaths,
@@ -347,7 +361,7 @@ public enum CLICommandRouter {
                     "total_bytes": res.originalBytes,
                     "average_throughput_mbs": res.throughputMBs
                 ])
-            } else {
+            } else if outputPath != "-" {
                 TerminalRenderEngine.shared.completeProgress(message: String(format: "✅ Archive created: %@ (%.2fs, %.1f MB/s)", res.outputPath, res.durationSeconds, res.throughputMBs))
             }
             return .ok
@@ -375,13 +389,35 @@ public enum CLICommandRouter {
         )
         
         // 直通 stdout 流式解压模式
-        if destDir == "-" || options.outputPath == "-" {
+        if options.toStdout || destDir == "-" || options.outputPath == "-" {
             return await handleCatArchive(archivePath: archivePath, entryPath: nil, options: options)
+        }
+        
+        var effectivePath = archivePath
+        var cleanupPath: String? = nil
+        
+        if StreamPipeAdapter.isStandardStream(archivePath) {
+            do {
+                let spooled = try StreamPipeAdapter.readStdinToTemporaryFileIfNeeded()
+                effectivePath = spooled.path
+                if spooled.isTemporary {
+                    cleanupPath = spooled.path
+                }
+            } catch {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: failed to buffer stdin stream: \(error.localizedDescription)")
+                return .ioError
+            }
+        }
+        
+        defer {
+            if let tmp = cleanupPath {
+                StreamPipeAdapter.cleanupTemporaryFile(tmp)
+            }
         }
         
         do {
             let res = try await securityProxy.quickExtract(
-                archivePath: archivePath,
+                archivePath: effectivePath,
                 destinationDir: destDir,
                 password: pwd
             )
@@ -414,6 +450,28 @@ public enum CLICommandRouter {
             archiveName: archivePath
         )
         
+        var effectivePath = archivePath
+        var cleanupPath: String? = nil
+        
+        if StreamPipeAdapter.isStandardStream(archivePath) {
+            do {
+                let spooled = try StreamPipeAdapter.readStdinToTemporaryFileIfNeeded()
+                effectivePath = spooled.path
+                if spooled.isTemporary {
+                    cleanupPath = spooled.path
+                }
+            } catch {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: failed to buffer stdin stream: \(error.localizedDescription)")
+                return .ioError
+            }
+        }
+        
+        defer {
+            if let tmp = cleanupPath {
+                StreamPipeAdapter.cleanupTemporaryFile(tmp)
+            }
+        }
+        
         var errBuf = [CChar](repeating: 0, count: 512)
         var patterns: [UnsafePointer<CChar>?] = []
         if let entry = entryPath {
@@ -423,7 +481,7 @@ public enum CLICommandRouter {
         let patternCount = patterns.count
         let rc = patterns.withUnsafeBufferPointer { ptr -> Int32 in
             return ttzip_stream_archive_entries_to_fd(
-                archivePath,
+                effectivePath,
                 ptr.baseAddress,
                 patternCount,
                 STDOUT_FILENO,
@@ -436,6 +494,8 @@ public enum CLICommandRouter {
         
         if rc == 0 {
             return .ok
+        } else if rc == -141 || rc == 141 {
+            return .sigpipe
         } else if rc == -2 {
             let msg = errBuf.withUnsafeBufferPointer { ptr in
                 ptr.baseAddress.map { String(cString: $0) } ?? ""

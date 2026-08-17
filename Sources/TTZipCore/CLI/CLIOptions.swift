@@ -68,6 +68,9 @@ public struct CLIOptions: Sendable {
     /// 是否扁平化输出目录层级 (-j, --flatten, --junk-paths)
     public var flattenPaths: Bool = false
     
+    /// 是否输出至标准输出流 (-O, -c, --to-stdout)
+    public var toStdout: Bool = false
+    
     /// 外部文件清单文件路径 (--files-from, -T)
     public var filesFromPath: String? = nil
     

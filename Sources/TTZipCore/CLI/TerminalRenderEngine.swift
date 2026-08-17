@@ -1,4 +1,12 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
+import CTTZipBridge
 
 /// 终端色彩模式
 public enum TerminalColorMode: Sendable {
@@ -14,17 +22,21 @@ public final class TerminalRenderEngine: @unchecked Sendable {
     
     private let lock = NSLock()
     public let isInteractiveTTY: Bool
+    public let isStderrTTY: Bool
     public let colorMode: TerminalColorMode
+    public var progressRouting: StreamProgressRouting = .inlineTty
     
     private var lastRenderNanos: UInt64 = 0
     private let minRenderIntervalNanos: UInt64 = 16_666_666 // ~60Hz (16.6ms)
     
     private init() {
-        let isTTY = (isatty(STDOUT_FILENO) != 0)
+        let isTTY = (Darwin.isatty(STDOUT_FILENO) != 0)
+        let isErrTTY = (Darwin.isatty(STDERR_FILENO) != 0)
         self.isInteractiveTTY = isTTY
+        self.isStderrTTY = isErrTTY
         
         // 检查 NO_COLOR 与色彩支持
-        if ProcessInfo.processInfo.environment["NO_COLOR"] != nil || !isTTY {
+        if ProcessInfo.processInfo.environment["NO_COLOR"] != nil || (!isTTY && !isErrTTY) {
             self.colorMode = .disabled
         } else if let colorTerm = ProcessInfo.processInfo.environment["COLORTERM"],
                   colorTerm == "truecolor" || colorTerm == "24bit" {
@@ -42,13 +54,16 @@ public final class TerminalRenderEngine: @unchecked Sendable {
         if ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 {
             return Int(ws.ws_col)
         }
+        if ioctl(STDERR_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 {
+            return Int(ws.ws_col)
+        }
         if let colStr = ProcessInfo.processInfo.environment["COLUMNS"], let cols = Int(colStr), cols > 0 {
             return cols
         }
         return 80
     }
     
-    /// 渲染平滑自适应进度条 (带 60Hz 单调时钟节流)
+    /// 渲染平滑自适应进度条 (带 60Hz 单调时钟节流与动态流隔离)
     public func renderProgress(
         fraction: Double,
         bytesProcessed: Int64,
@@ -58,7 +73,10 @@ public final class TerminalRenderEngine: @unchecked Sendable {
         operation: String = "Processing",
         force: Bool = false
     ) {
-        guard isInteractiveTTY else { return }
+        guard progressRouting != .suppressed else { return }
+        let targetStream = (progressRouting == .standardError) ? stderr : stdout
+        let isTargetTTY = (progressRouting == .standardError) ? isStderrTTY : isInteractiveTTY
+        guard isTargetTTY else { return }
         
         let now = DispatchTime.now().uptimeNanoseconds
         lock.lock()
@@ -94,18 +112,21 @@ public final class TerminalRenderEngine: @unchecked Sendable {
         let bar = "\(filledBar)\(emptyBar)"
         let output = "\r\u{001B}[2K\(prefix) [\(bar)] \(stats)"
         
-        fputs(output, stdout)
-        fflush(stdout)
+        fputs(output, targetStream)
+        fflush(targetStream)
     }
     
     /// 完成进度渲染并换行
     public func completeProgress(message: String? = nil) {
-        if isInteractiveTTY {
-            fputs("\r\u{001B}[2K", stdout)
+        guard progressRouting != .suppressed else { return }
+        let targetStream = (progressRouting == .standardError) ? stderr : stdout
+        let isTargetTTY = (progressRouting == .standardError) ? isStderrTTY : isInteractiveTTY
+        if isTargetTTY {
+            fputs("\r\u{001B}[2K", targetStream)
             if let msg = message {
-                fputs("\(msg)\n", stdout)
+                fputs("\(msg)\n", targetStream)
             }
-            fflush(stdout)
+            fflush(targetStream)
         }
     }
     
