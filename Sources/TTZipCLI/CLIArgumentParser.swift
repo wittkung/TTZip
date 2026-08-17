@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
-/// 强类型 CLI 命令行参数解析器
+/// Strongly-typed command line argument parser
 public enum CLIArgumentParser {
     
-    /// 将原生参数数组解析为强类型 `CLIOptions`
+    /// Parse raw command-line string arguments into structured `CLIOptions`
     public static func parse(args: [String]) -> CLIOptions {
         var opts = CLIOptions()
         var idx = 0
@@ -91,7 +98,7 @@ public enum CLIArgumentParser {
                     idx += 1
                 }
                 
-            // MARK: - 测试驱动与诊断参数
+            // MARK: - Test-Driven & Diagnostic Arguments
             case "--filter", "-filter":
                 if idx + 1 < args.count {
                     opts.filterPattern = args[idx + 1]
@@ -128,7 +135,7 @@ public enum CLIArgumentParser {
                     idx += 1
                 }
 
-            // MARK: - 纯内存与 TurboBench / lzbench 对齐参数
+            // MARK: - Pure Memory & TurboBench / lzbench Arguments
             case "--in-memory", "--mem", "-im":
                 opts.inMemory = true
 
@@ -163,7 +170,7 @@ public enum CLIArgumentParser {
         return opts
     }
     
-    /// 将 CLI 参数的格式过滤字符串转化为 `[ArchiveCompressionFormat]` 数组
+    /// Parse format filter string into an array of `ArchiveCompressionFormat`
     public static func parseFormats(_ raw: String?) -> [ArchiveCompressionFormat]? {
         guard let fRaw = raw, !fRaw.isEmpty else { return nil }
         let lower = fRaw.lowercased()
@@ -196,7 +203,7 @@ public enum CLIArgumentParser {
         return parsed.isEmpty ? nil : parsed
     }
     
-    /// 将 CLI 参数的等级过滤字符串转化为 `[ArchiveCompressionLevel]` 数组
+    /// Parse compression level filter string into an array of `ArchiveCompressionLevel`
     public static func parseLevels(_ raw: String?) -> [ArchiveCompressionLevel]? {
         guard let lRaw = raw, !lRaw.isEmpty else { return nil }
         let parts = lRaw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }

@@ -1,100 +1,107 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
-/// 强类型的 CLI 解析选项数据模型
+/// Strongly-typed command line argument and option model
 public struct CLIOptions: Sendable {
-    /// 位置参数列表
+    /// Positional argument list
     public var positionals: [String] = []
     
-    /// 归档或解密密码
+    /// Archive encryption or decryption password
     public var password: String? = nil
     
-    /// 压缩格式 (如 "zip", "7z", "ALL")
+    /// Target compression format (e.g. "zip", "7z", "tar.zst", "ALL")
     public var format: String? = nil
     
-    /// 分卷包尺寸 (如 "100m", "1g")
+    /// Split volume size (e.g. "100m", "1g")
     public var splitSize: String? = nil
     
-    /// 压缩等级 (如 "store", "fast", "ultra", "1", "9")
+    /// Compression level (e.g. "store", "fast", "ultra", "1", "9")
     public var level: String? = nil
     
-    /// 竞品工具列表 (如 "pigz,7zz")
+    /// Competitor tool identifiers for benchmarks (e.g. "pigz,7zz")
     public var competitorTools: String? = nil
     
-    /// 测试数据集尺寸 (如 "500MB")
+    /// Benchmark dataset size (e.g. "500MB")
     public var hugeSize: String? = nil
     
-    /// 是否仅测试 500MB 巨型 Payload
+    /// Flag to test huge payloads only
     public var hugeOnly: Bool = false
     
-    /// 输入路径
+    /// Input file or directory path
     public var inputPath: String? = nil
     
-    /// 是否开启零拷贝内存引擎
+    /// Flag to enable zero-copy in-memory pipeline
     public var enableZeroCopy: Bool = false
     
-    /// 配置文件路径
+    /// Configuration file path for filtering benchmarks
     public var filterConfigPath: String? = nil
     
-    /// 滞后/错误时是否强行中止
+    /// Flag to terminate immediately upon lag or performance regression
     public var stopOnLag: Bool = false
     
-    /// 是否选择全部 16 种格式
+    /// Flag to test across all 16 supported formats
     public var allFormats: Bool = false
     
-    /// 是否自动对标物理最强竞品
+    /// Flag to automatically compare against the best physical competitor
     public var autoBestCompetitor: Bool = false
     
-    /// 是否开启大考 100% 霸榜校验
+    /// Flag to verify 100% throughput dominance across test suite
     public var verifyAllDominance: Bool = false
     
-    // MARK: - 测试驱动与诊断选项 (Feature 044: Libarchive Harness Alignment)
+    // MARK: - Test-Driven & Diagnostic Options
     
-    /// 测试过滤正则/关键字 (如 --filter "GoldenCorpus")
+    /// Regex or keyword filter pattern (e.g. --filter "GoldenCorpus")
     public var filterPattern: String? = nil
     
-    /// 详细度等级 (-1: 极简 -q, 0: 默认, 1: 详细 -v, 2: 全量调试 -vv)
+    /// Verbosity level (-1: quiet -q, 0: default, 1: verbose -v, 2: debug -vv)
     public var verbosity: Int = 0
     
-    /// 是否保留沙盒与解压临时目录 (-k, --keep-temp)
+    /// Flag to retain temporary sandbox files (-k, --keep-temp)
     public var keepTempFiles: Bool = false
     
-    /// 断言失败时是否保留现场/Dump (--dump-on-failure)
+    /// Flag to dump failure state on test assertion failure (--dump-on-failure)
     public var dumpOnFailure: Bool = false
     
-    /// 是否仅执行进程内极速诊断测试 (--fast)
+    /// Flag to execute fast in-process diagnostics only (--fast)
     public var fast: Bool = false
     
-    /// JSON 结构化报告输出路径 (--json-report <path>)
+    /// File path for JSON structured benchmark/test report (--json-report <path>)
     public var jsonReportPath: String? = nil
     
-    /// Markdown 报告输出路径 (--markdown-report <path>)
+    /// File path for Markdown benchmark/test report (--markdown-report <path>)
     public var markdownReportPath: String? = nil
     
-    /// 是否针对 Silesia 211MB 真实语料库进行基准测试 (--silesia)
+    /// Flag to run benchmark against the 211MB Silesia corpus (--silesia)
     public var silesia: Bool = false
     
-    // MARK: - 纯内存与 TurboBench / lzbench 对齐选项 (Feature 052)
+    // MARK: - Pure Memory & TurboBench / lzbench Alignment Options
     
-    /// 是否开启纯内存基准测试模式 (--in-memory, --mem)
+    /// Flag to enable in-memory benchmarking (--in-memory, --mem)
     public var inMemory: Bool = false
     
-    /// 是否采用 TurboBench 标准 Markdown 表格输出格式 (--compat-turbobench, --turbobench)
+    /// Flag to format output compatible with TurboBench Markdown tables
     public var turboBenchCompat: Bool = false
     
-    /// 单个测试项的最短执行时间窗口（毫秒，默认 500ms）
+    /// Minimum measurement window in milliseconds (default: 500ms)
     public var minDurationMs: Int = 500
     
-    /// 预热轮次（默认 2 轮）
+    /// Number of warmup passes prior to measurement (default: 2)
     public var warmupPasses: Int = 2
     
-    /// 是否使用二进制单位 MiB/s 代替十进制 MB/s
+    /// Flag to display binary units (MiB/s) instead of decimal (MB/s)
     public var binaryUnits: Bool = false
     
     public init() {}
 }
 
-/// 支持的 CLI 子命令
+/// Supported CLI subcommands
 public enum CLICommand: String, Sendable {
     case inspect
     case extract

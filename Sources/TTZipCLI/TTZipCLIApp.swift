@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
 @main
 struct TTZipCLIMain {
     static func main() async {
-        // 初始化底层 C 引擎子系统与信号拦截
+        // Initialize low-level C engine subsystems and signal handlers
         TTZipEngineFacade.initializeSubsystems()
         
         let rawArgs = Array(CommandLine.arguments.dropFirst())

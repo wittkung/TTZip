@@ -1,12 +1,19 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
-/// 独立的工业级本地测试驱动命令处理器 (对标 libarchive test_main.c)
+/// Standalone test harness command dispatcher (aligned with libarchive test_main.c)
 public enum TestCommand {
     
-    /// 执行测试调度主入口
+    /// Main entry point for executing CLI tests
     public static func run(options: CLIOptions) async {
-        // 向后兼容：若位置参数为存在的物理归档文件，执行文件完整性校验
+        // Backward compatibility: If positional argument is an existing archive file, verify integrity
         if let firstArg = options.positionals.first, FileManager.default.fileExists(atPath: firstArg) {
             await runFileIntegrity(path: firstArg)
             return
@@ -32,7 +39,7 @@ public enum TestCommand {
 
         var suiteResults: [[String: Any]] = []
         
-        // 1. 运行 Native In-Process 极速诊断矩阵 (16 种格式往返闭环验证)
+        // 1. Run in-process fast diagnostic matrix across 16 formats
         let nativeStartTime = Date()
         var nativePassed = 0
         var nativeFailed = 0
@@ -126,7 +133,7 @@ public enum TestCommand {
         #endif
         let cores = ProcessInfo.processInfo.activeProcessorCount
         
-        // 2. 组装强类型测试报告字典
+        // 2. Assemble structured test report dictionary
         let reportData: [String: Any] = [
             "sessionId": sessionID,
             "startTime": ISO8601DateFormatter().string(from: startTimestamp),
@@ -158,7 +165,7 @@ public enum TestCommand {
             "suites": suiteResults
         ]
         
-        // 3. 输出报告持久化
+        // 3. Persist test reports if requested
         if let jsonPath = options.jsonReportPath {
             TestReportGenerator.generateJSON(report: reportData, outputPath: jsonPath)
             if verbosity >= 0 {
@@ -187,7 +194,7 @@ public enum TestCommand {
             }
         }
         
-        // 4. 控制台汇总看板
+        // 4. Output summary dashboard
         if verbosity >= 0 {
             print("\n==========================================================================================")
             if totalFailed == 0 {

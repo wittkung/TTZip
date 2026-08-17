@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
@@ -20,7 +27,7 @@ extension CLIBenchmarkRunner {
         return 500 * 1024 * 1024
     }
 
-    /// 一键清除所有物理测试数据集、跑分残留与临时缓存，归还全部磁盘空间
+    /// Purge all benchmark datasets, test residues, and temporary caches to reclaim disk space
     public static func cleanBenchmarkCache() {
         ArchiveBenchmarkFacade.shared.cleanCache()
         let fm = FileManager.default
@@ -60,7 +67,7 @@ extension CLIBenchmarkRunner {
         }
 
         let freedMB = Double(freedBytes) / (1024.0 * 1024.0)
-        print("🧹 [测试缓存清理完成] 已清空物理测试数据集与所有跑分缓存 (共释放约 \(String(format: "%.1f", freedMB)) MB / \(String(format: "%.2f", freedMB / 1024.0)) GB 磁盘空间)。")
+        print("🧹 [Benchmark Cache Purged] Successfully cleared test datasets and caches (Reclaimed ~\(String(format: "%.1f", freedMB)) MB / \(String(format: "%.2f", freedMB / 1024.0)) GB disk space).")
         fflush(stdout)
     }
 

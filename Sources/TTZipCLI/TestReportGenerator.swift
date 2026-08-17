@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
-/// 测试报告生成与持久化引擎 (支持 Console ANSI、Markdown 与 JSON Schema 强类型输出)
+/// Test report generation and persistence engine (supports Console ANSI, Markdown, and JSON Schema outputs)
 public enum TestReportGenerator {
     
-    /// 生成 JSON 字符串并可持久化至目标路径
+    /// Generate structured JSON string and optionally persist to destination path
     @discardableResult
     public static func generateJSON(
         report: [String: Any],
@@ -24,7 +31,7 @@ public enum TestReportGenerator {
         return jsonString
     }
     
-    /// 生成格式化的 Markdown 报告并可持久化至目标路径
+    /// Generate formatted Markdown report and optionally persist to destination path
     @discardableResult
     public static func generateMarkdown(
         sessionID: String,
@@ -46,19 +53,19 @@ public enum TestReportGenerator {
         md += "> **Generated**: \(startTime) | **Duration**: \(String(format: "%.2f", durationMs)) ms | **Session**: `\(sessionID)`\n\n"
         md += "---\n\n"
         
-        // 1. KPI 概览看板
+        // 1. KPI Executive Summary Dashboard
         md += "## 1. Executive Summary\n\n"
         md += "| Metric | Value | Status |\n"
         md += "| :--- | :--- | :--- |\n"
         md += "| **Total Test Suites** | \(totalSuites) | 📦 |\n"
         md += "| **Total Test Cases** | \(totalCases) | 🧪 |\n"
-        md += "| **Passed Cases** | \(passedCases) | \u{001B}[0m🟢 |\n"
+        md += "| **Passed Cases** | \(passedCases) | 🟢 |\n"
         md += "| **Failed Cases** | \(failedCases) | \(failedCases == 0 ? "🟢 0" : "🔴 \(failedCases)") |\n"
         md += "| **Skipped Cases** | \(skippedCases) | ⚪ \(skippedCases) |\n"
         md += "| **Pass Rate** | \(String(format: "%.1f", passRate))% | \(passRate >= 100.0 ? "🏆 100%" : "⚠️") |\n"
         md += "| **Environment** | \(osVersion) (\(arch)) | 💻 |\n\n"
         
-        // 2. 套件明细列表
+        // 2. Test Suite Breakdown
         md += "## 2. Test Suite Breakdown\n\n"
         md += "| Suite Name | Passed | Failed | Skipped | Duration (ms) |\n"
         md += "| :--- | :--- | :--- | :--- | :--- |\n"

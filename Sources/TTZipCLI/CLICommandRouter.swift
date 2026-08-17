@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
-/// 命令行控制台观察者
+/// Command line progress and event observer
 public final class CLIEventAndProgressConsoleObserver: ArchiveProgressObserverProtocol, ArchiveEventObserverProtocol, @unchecked Sendable {
     public static let shared = CLIEventAndProgressConsoleObserver()
     private init() {}
@@ -15,30 +22,30 @@ public final class CLIEventAndProgressConsoleObserver: ArchiveProgressObserverPr
     public func onArchiveEvent(_ event: ArchiveEvent) {
         switch event {
         case .archiveCompleted(let path, let op, let duration, _):
-            print(String(format: " [CLI-Event] ✅ %@完成: %@ (耗时 %.2fs)", op.rawValue, (path as NSString).lastPathComponent, duration))
+            print(String(format: " [CLI-Event] ✅ %@ completed: %@ (elapsed %.2fs)", op.rawValue, (path as NSString).lastPathComponent, duration))
         case .extractionFailed(let path, let err):
-            print(" [CLI-Event] ❌ 解压失败: \((path as NSString).lastPathComponent) (\(err))")
+            print(" [CLI-Event] ❌ Extraction failed: \((path as NSString).lastPathComponent) (\(err))")
         case .securityThreatIntercepted(let path, let threat):
-            print(" [CLI-Event] ⚠️ 安全拦截: \((path as NSString).lastPathComponent) (\(threat))")
+            print(" [CLI-Event] ⚠️ Security threat intercepted: \((path as NSString).lastPathComponent) (\(threat))")
         case .passwordVaultUnlocked(let path, _, _):
-            print(" [CLI-Event] ⚡️ 口令解锁: \((path as NSString).lastPathComponent)")
+            print(" [CLI-Event] ⚡️ Vault password unlocked: \((path as NSString).lastPathComponent)")
         case .presetChanged(_, let newName):
-            print(" [CLI-Event] ⚙️ 预设变更: \(newName)")
+            print(" [CLI-Event] ⚙️ Preset changed: \(newName)")
         case .taskStateChanged(let taskId, let oldState, let newState):
-            print(" [CLI-Event] 🔄 任务状态变更 [\(taskId.uuidString.prefix(8))]: \(oldState) ➔ \(newState)")
+            print(" [CLI-Event] 🔄 Task state changed [\(taskId.uuidString.prefix(8))]: \(oldState) ➔ \(newState)")
         }
     }
 }
 
-/// 模块化的 CLI 命令分发路由器
+/// Modular CLI command router
 @MainActor
 public enum CLICommandRouter {
-    // MARK: - 【4.5 依赖注入模式 (Dependency Injection Pattern)】@Injected 核心服务注入
+    // MARK: - Dependency Injection Pattern: Core service injection
     @Injected static var facade: TTZipEngineFacading
     @Injected static var securityProxy: SecurityProtectionProxy
     @Injected static var taskDispatcher: ArchiveTaskDispatcher
     
-    /// 执行解析好的 CLI 命令
+    /// Route and execute parsed CLI command
     public static func route(command: CLICommand, options: CLIOptions) async {
         ArchiveProgressBroadcaster.shared.addObserver(CLIEventAndProgressConsoleObserver.shared)
         ArchiveEventCenter.shared.addObserver(CLIEventAndProgressConsoleObserver.shared)
@@ -48,7 +55,7 @@ public enum CLICommandRouter {
             if let path = options.positionals.first {
                 await inspectArchive(path: path, password: options.password)
             } else {
-                print("错误: 请提供归档文件路径。例: ttzip-cli inspect demo.zip [-p password]")
+                print("Error: Please provide archive path. Example: ttzip-cli inspect demo.zip [-p password]")
             }
             
         case .extract:
@@ -57,7 +64,7 @@ public enum CLICommandRouter {
                 let dest = options.positionals[1]
                 await extractArchive(archivePath: archive, destDir: dest, password: options.password)
             } else {
-                print("错误: 请提供归档文件与解压目标路径。例: ttzip-cli extract demo.zip /path/to/out [-p password]")
+                print("Error: Please provide archive and destination directory. Example: ttzip-cli extract demo.zip /path/to/out [-p password]")
             }
             
         case .create:
@@ -70,7 +77,7 @@ public enum CLICommandRouter {
                     options: options
                 )
             } else {
-                print("错误: 参数不足。例: ttzip-cli create archive.zip file1.txt file2.pdf [-f 7z] [-s 100m] [-l store] [-p pwd]")
+                print("Error: Insufficient arguments. Example: ttzip-cli create archive.zip file1.txt file2.pdf [-f 7z] [-s 100m] [-l store] [-p pwd]")
             }
             
         case .recover:
@@ -79,7 +86,7 @@ public enum CLICommandRouter {
                 let dictFile = options.positionals[1]
                 await recoverPassword(archivePath: archive, dictFilePath: dictFile)
             } else {
-                print("错误: 请提供归档路径与字典文件路径。例: ttzip-cli recover protected.7z dict.txt")
+                print("Error: Please provide archive and dictionary file path. Example: ttzip-cli recover protected.7z dict.txt")
             }
             
         case .bench:
@@ -97,12 +104,11 @@ public enum CLICommandRouter {
         case .test:
             await TestCommand.run(options: options)
 
-            
         case .repair:
             if options.positionals.count >= 2 {
                 await repairArchive(damaged: options.positionals[0], output: options.positionals[1])
             } else {
-                print("错误: 请提供损坏归档与目标路径。例: ttzip-cli repair damaged.zip fixed.zip")
+                print("Error: Please provide damaged archive and target output path. Example: ttzip-cli repair damaged.zip fixed.zip")
             }
             
         case .batch:
@@ -122,7 +128,7 @@ public enum CLICommandRouter {
         }
     }
     
-    // MARK: - 子命令分发处理逻辑
+    // MARK: - Subcommand Dispatch Handlers
     
     private static func handleBench(options: CLIOptions) async {
         let fm = FileManager.default
@@ -206,20 +212,20 @@ public enum CLICommandRouter {
         } else {
             toolsToUninstall = ["all"]
         }
-        print("🗑️ 启动竞品软件选择性/一键卸载助手...")
+        print("🗑️ Launching competitor toolchain uninstaller...")
         let results = await ToolchainInstaller.shared.uninstallCompetitorToolchains(tools: toolsToUninstall) { status in
             print("   [Uninstall] \(status)")
         }
-        print("\n卸载处理结果汇总:")
+        print("\nUninstallation Summary:")
         for (tool, ok) in results {
-            print(" - \(tool): \(ok ? "✅ 卸载成功/已清理" : "⚠️ 保持未动/未安装")")
+            print(" - \(tool): \(ok ? "✅ Successfully uninstalled" : "⚠️ Skipped / Not installed")")
         }
     }
     
     private static func handleBatchMacro(options: CLIOptions) async {
-        print("🔗 启动基于命令模式 (Command Pattern) 事务型宏命令 (Macro Command)...")
+        print("🔗 Launching Command Pattern Transactional Macro Batch Operation...")
         guard options.positionals.count >= 2 else {
-            print("错误: 批量任务需指定输出目录与至少一个输入源。例: ttzip-cli batch /path/to/out file1.txt file2.txt")
+            print("Error: Batch operation requires output directory and at least one input. Example: ttzip-cli batch /path/to/out file1.txt file2.txt")
             return
         }
         
@@ -234,12 +240,12 @@ public enum CLICommandRouter {
         
         do {
             let result = try await ArchiveBatchFacade.shared.batchCompressTransactional(tasks: tasks)
-            print("✅ 事务型宏命令批处理成功! 生成 \(result.artifactsCreated.count) 个产物。耗时: \(String(format: "%.2f", result.executionDuration))s")
+            print("✅ Transactional batch operation succeeded! Created \(result.artifactsCreated.count) artifacts in \(String(format: "%.2f", result.executionDuration))s")
         } catch let CommandError.macroExecutionFailed(idx, err, rollbacks) {
-            print("❌ 宏命令在第 [\(idx + 1)] 个步骤发生异常: \(err)")
-            print("↩️ 已自动触发逆序 Rollback 回滚，清理任何中间衍生文件。回滚结果: \(rollbacks.isEmpty ? "完全回滚成功" : rollbacks.joined(separator: "; "))")
+            print("❌ Macro command failed at step [\(idx + 1)]: \(err)")
+            print("↩️ Triggered rollback to clean intermediate files. Result: \(rollbacks.isEmpty ? "All intermediate files cleaned" : rollbacks.joined(separator: "; "))")
         } catch {
-            print("❌ 批量命令执行失败: \(error.localizedDescription)")
+            print("❌ Batch execution error: \(error.localizedDescription)")
         }
     }
     
@@ -248,28 +254,28 @@ public enum CLICommandRouter {
         ================================================================
         TTZip CLI v1.0.0 — Native Archiving & Compression Engine (macOS)
         ================================================================
-        用法:
-          ttzip-cli inspect <archive-path> [-p pwd]         查看归档目录树与元数据
-          ttzip-cli extract <archive> <dest-dir> [-p pwd]   安全解缩归档包至目标文件夹
-          ttzip-cli create <out> <files...> [-f 7z|zip] [-s 100m] [-p pwd] 打包压缩
-          ttzip-cli recover <archive> <dict.txt>           多核并行字典解密恢复
-          ttzip-cli bench [50MB|100MB|500MB|1GB]           全核 CPU 硬件极速基准压测
-          ttzip-cli bench_pk --all-formats --stop-on-lag    全 16 种格式 1v1 竞品擂台赛
-          ttzip-cli clean / purge                           一键清空测试数据集与全部缓存
-          ttzip-cli test <archive-path>                    计算 CRC32/SHA256 完整性
-          ttzip-cli repair <damaged> <repaired>            扫描并修复损坏归档数据块
-          ttzip-cli batch <outDir> <files...>              命令模式事务型多任务打包 (含失败自动回滚)
-          ttzip-cli preset                                查看生效压缩预设方案
-          ttzip-cli --version                              查看版本信息
+        Usage:
+          ttzip-cli inspect <archive-path> [-p pwd]         Inspect archive hierarchy & metadata
+          ttzip-cli extract <archive> <dest-dir> [-p pwd]   Extract archive safely to target folder
+          ttzip-cli create <out> <files...> [-f 7z|zip] [-s 100m] [-p pwd] Compress archive
+          ttzip-cli recover <archive> <dict.txt>           Parallel dictionary password recovery
+          ttzip-cli bench [50MB|100MB|500MB|1GB]           Full-core hardware peak benchmark
+          ttzip-cli bench_pk --all-formats --stop-on-lag    Full 16-format 1v1 competitor benchmark
+          ttzip-cli clean / purge                           Purge test datasets & temporary caches
+          ttzip-cli test <archive-path>                    Verify CRC32/SHA256 checksums
+          ttzip-cli repair <damaged> <repaired>            Scan and repair corrupted archive chunks
+          ttzip-cli batch <outDir> <files...>              Transactional batch compression
+          ttzip-cli preset                                Display active compression presets
+          ttzip-cli --version                              Display version information
         """)
     }
     
     private static func inspectArchive(path: String, password: String?) async {
-        print("🔍 正在读取归档元数据: \(path)...")
+        print("🔍 Inspecting archive metadata: \(path)...")
         do {
             let res = try await SmartLoggingProxy.shared.inspectArchive(archivePath: path, password: password)
             print("=================================================================")
-            // 运用【3.7 迭代器模式 (Iterator Pattern)】原生 Sequence 与 ArrayArchiveIterator 流式打印
+            // Stream print entries using Iterator Pattern
             let iterator = res.makeIterator()
             while let entry = iterator.next() {
                 let sizeStr = entry.isDirectory ? "<DIR>" : "\(entry.uncompressedSize) B"
@@ -278,27 +284,27 @@ public enum CLICommandRouter {
                 print("\(p) | \(s) | \(entry.detectedEncoding)")
             }
             print("=================================================================")
-            print("🌲 组合模式 (Composite Pattern) 树形层级结构 (DFS Iterator):")
+            print("🌲 Composite Pattern Directory Hierarchy (DFS):")
             print(res.treeNode.renderTree())
             print("=================================================================")
-            print("共计 \(res.entries.count) 个条目 (包含 \(res.treeNode.totalDirectoryCount()) 目录, \(res.treeNode.totalFileCount()) 文件)。")
+            print("Total: \(res.entries.count) entries (\(res.treeNode.totalDirectoryCount()) directories, \(res.treeNode.totalFileCount()) files).")
             print(res.securityReport.detailMessage)
         } catch {
-            print("❌ 检查失败: \(error.localizedDescription)")
+            print("❌ Inspection failed: \(error.localizedDescription)")
         }
     }
     
     private static func extractArchive(archivePath: String, destDir: String, password: String?) async {
-        print("📦 正在安全解压: \(archivePath) -> \(destDir)...")
+        print("📦 Extracting archive safely: \(archivePath) -> \(destDir)...")
         do {
             let res = try await securityProxy.quickExtract(
                 archivePath: archivePath,
                 destinationDir: destDir,
                 password: password
             )
-            print(String(format: "✅ 解压成功! 耗时: %.2fs", res.durationSeconds))
+            print(String(format: "✅ Extraction succeeded! Elapsed time: %.2fs", res.durationSeconds))
         } catch {
-            print("❌ 解压失败: \(error.localizedDescription)")
+            print("❌ Extraction failed: \(error.localizedDescription)")
         }
     }
     
@@ -307,7 +313,7 @@ public enum CLICommandRouter {
         inputPaths: [String],
         options: CLIOptions
     ) async {
-        print("⚡️ 正在通过 Apple Silicon 拓扑引擎打包压缩...")
+        print("⚡️ Compressing archive via Apple Silicon engine...")
         
         let formatRaw = options.format
         let splitSizeRaw = options.splitSize
@@ -358,61 +364,61 @@ public enum CLICommandRouter {
                 password: password,
                 splitSize: splitBytes
             )
-            print(String(format: "✅ 打包压缩成功: \(res.outputPath) (耗时 %.2fs, 吞吐率 %.1f MB/s)", res.durationSeconds, res.throughputMBs))
+            print(String(format: "✅ Compression succeeded: \(res.outputPath) (elapsed: %.2fs, throughput: %.1f MB/s)", res.durationSeconds, res.throughputMBs))
         } catch {
-            print("❌ 打包失败: \(error.localizedDescription)")
+            print("❌ Compression failed: \(error.localizedDescription)")
         }
     }
     
     private static func recoverPassword(archivePath: String, dictFilePath: String) async {
-        print("🔑 正在调度全核 CPU 执行密码破解与恢复: \(archivePath)...")
+        print("🔑 Recovering password via full-core parallel dictionary attack: \(archivePath)...")
         guard let dictContent = try? String(contentsOfFile: dictFilePath, encoding: .utf8) else {
-            print("❌ 无法读取字典文件: \(dictFilePath)")
+            print("❌ Could not read dictionary file: \(dictFilePath)")
             return
         }
         
         let dict = dictContent.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        print("📖 载入字典条目: \(dict.count) 个")
+        print("📖 Loaded \(dict.count) dictionary entries")
         
         do {
             let res = try await facade.recoverPassword(archivePath: archivePath, dictionary: dict)
             if let pwd = res.foundPassword {
-                print("🎉 破解成功！找到正确解密密码: [ \(pwd) ]")
-                print("⏱️ 耗时: \(String(format: "%.3f", res.durationSeconds)) 秒 · 尝试次数: \(res.totalAttempts) · 速率: \(String(format: "%.0f", res.attemptsPerSecond)) 密码/秒")
+                print("🎉 Password recovery succeeded! Found valid password: [ \(pwd) ]")
+                print("⏱️ Elapsed time: \(String(format: "%.3f", res.durationSeconds))s · Total attempts: \(res.totalAttempts) · Rate: \(String(format: "%.0f", res.attemptsPerSecond)) pwd/s")
             } else {
-                print("❌ 未能在字典中找到匹配密码 (已尝试 \(res.totalAttempts) 次)。")
+                print("❌ No matching password found in dictionary (attempted \(res.totalAttempts) candidates).")
             }
         } catch {
-            print("❌ 恢复引擎错误: \(error.localizedDescription)")
+            print("❌ Recovery engine error: \(error.localizedDescription)")
         }
     }
     
     private static func testIntegrity(path: String) async {
-        print("🛡️ 正在进行 16MB 页对齐硬件级哈希与完整性校验: \(path)...")
+        print("🛡️ Verifying 16MB page-aligned hardware hash and integrity: \(path)...")
         do {
             let res = try await TTZipEngineFacade.shared.verifyIntegrity(archivePath: path)
             print("CRC32 : \(res.crc32)")
             print("SHA256: \(res.sha256)")
-            print("✅ 数据散列计算成功，校验无损坏!")
+            print("✅ Hash verification succeeded. No corruption detected!")
         } catch {
-            print("❌ 哈希计算失败: \(error.localizedDescription)")
+            print("❌ Hash verification failed: \(error.localizedDescription)")
         }
     }
     
     private static func repairArchive(damaged: String, output: String) async {
-        print("🛠️ 正在进行归档损坏扫描与修复: \(damaged) -> \(output)...")
+        print("🛠️ Scanning and repairing corrupted archive: \(damaged) -> \(output)...")
         do {
             let count = try await TTZipEngineFacade.shared.repairArchive(damagedPath: damaged, outputPath: output)
-            print("✅ 修复完成！成功提取重构 \(count) 个可用文件数据块至 \(output)")
+            print("✅ Repair complete! Successfully recovered \(count) valid file chunks to \(output)")
         } catch {
-            print("❌ 修复失败: \(error.localizedDescription)")
+            print("❌ Repair failed: \(error.localizedDescription)")
         }
     }
     
     private static func printPresets() {
-        print("📋 当前生效的常用压缩预设:")
+        print("📋 Active Compression Presets:")
         for preset in PresetManager.shared.presets {
-            print(" - [\(preset.name)] 格式:\(preset.format.rawValue) 分卷:\(preset.splitVolumeDescription)")
+            print(" - [\(preset.name)] Format: \(preset.format.rawValue) Split: \(preset.splitVolumeDescription)")
         }
     }
 }

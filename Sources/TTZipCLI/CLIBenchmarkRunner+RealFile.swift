@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import QuartzCore
 import TTZipCore
@@ -14,7 +21,7 @@ extension CLIBenchmarkRunner {
         let fm = FileManager.default
         let expandedPath = NSString(string: inputPath).expandingTildeInPath
         guard fm.fileExists(atPath: expandedPath) else {
-            print("❌ 错误: 传入的文件或目录路径不存在: \(inputPath)")
+            print("❌ Error: Target file or directory does not exist: \(inputPath)")
             return
         }
 
@@ -33,7 +40,7 @@ extension CLIBenchmarkRunner {
 
         let sizeMB = Double(totalOriginalBytes) / (1024 * 1024)
         print("\n========================================================================================================================")
-        print("⚔️ 真实实操全场景压测 [目标: \(expandedPath)] [总体积: \(String(format: "%.2f MB", sizeMB))] [密码: \(password != nil ? "已指定" : "无")]")
+        print("⚔️ Real-World Scenario Benchmark [Target: \(expandedPath)] [Total Size: \(String(format: "%.2f MB", sizeMB))] [Password: \(password != nil ? "Enabled" : "None")]")
         print("========================================================================================================================")
 
         let allFormats: [ArchiveCompressionFormat] = [
@@ -70,16 +77,16 @@ extension CLIBenchmarkRunner {
                 }
                 
                 print("\n------------------------------------------------------------------------------------------------------------------------")
-                print("🎯 [测试场景] 格式: \(fmt.rawValue.uppercased()) | 级别: L\(lvl.rawValue)")
+                print("🎯 [Benchmark Scenario] Format: \(fmt.rawValue.uppercased()) | Level: L\(lvl.rawValue)")
                 print("------------------------------------------------------------------------------------------------------------------------")
 
-                let hc1 = padColumn("软件 / 算法", 24)
-                let hc2 = padColumn("打包速率 (MB/s)", 16)
-                let hc3 = padColumn("解压速率 (MB/s)", 16)
-                let hc4 = padColumn("耗时 (打包/解压)", 18)
-                let hc5 = padColumn("产物体积", 12)
-                let hc6 = padColumn("哈希与完整性", 12)
-                let hc7 = padColumn("性能定位", 22)
+                let hc1 = padColumn("Tool / Algorithm", 24)
+                let hc2 = padColumn("Comp Speed (MB/s)", 18)
+                let hc3 = padColumn("Extract Speed (MB/s)", 20)
+                let hc4 = padColumn("Time (Comp/Ext)", 18)
+                let hc5 = padColumn("Payload Size", 14)
+                let hc6 = padColumn("Integrity", 14)
+                let hc7 = padColumn("Relative Speedup", 22)
                 print("\(hc1) | \(hc2) | \(hc3) | \(hc4) | \(hc5) | \(hc6) | \(hc7)")
                 print("------------------------------------------------------------------------------------------------------------------------")
 
@@ -113,7 +120,7 @@ extension CLIBenchmarkRunner {
                     )
                     ttCompTime = max(0.001, PlatformMonotonicTimer.nowSeconds() - compStart)
                 } catch {
-                    ttStatusName = "❌ TTZip 打包失败"
+                    ttStatusName = "❌ TTZip Comp Failed"
                 }
 
                 do {
@@ -134,7 +141,7 @@ extension CLIBenchmarkRunner {
                     ttValid = res.isValid
                     ttCrcStr = res.crc32 ?? "OK"
                 } catch {
-                    ttStatusName = "❌ TTZip 解压失败"
+                    ttStatusName = "❌ TTZip Ext Failed"
                 }
 
                 let ttCompMBs = sizeMB / ttCompTime
@@ -196,27 +203,27 @@ extension CLIBenchmarkRunner {
                     let eMBs = sizeMB / eTime
                     let compRatio = ttCompMBs / max(0.1, cMBs)
                     let extRatio = ttExtMBs / max(0.1, eMBs)
-                    let labelStr = String(format: "TTZip 领先 %.1fx / %.1fx", compRatio, extRatio)
+                    let labelStr = String(format: "TTZip Leads %.1fx / %.1fx", compRatio, extRatio)
 
                     competitorRows.append(("⚡ 7-Zip 7zz CLI", cMBs, eMBs, cTime, eTime, Double(aSize)/(1024*1024), crcStr, valid, labelStr))
                 }
 
                 let rc1 = padColumn(ttStatusName, 24)
-                let rc2 = padColumn(String(format: "%.1f MB/s", ttCompMBs), 16)
-                let rc3 = padColumn(String(format: "%.1f MB/s", ttExtMBs), 16)
+                let rc2 = padColumn(String(format: "%.1f MB/s", ttCompMBs), 18)
+                let rc3 = padColumn(String(format: "%.1f MB/s", ttExtMBs), 20)
                 let rc4 = padColumn(String(format: "%.3fs / %.3fs", ttCompTime, ttExtTime), 18)
-                let rc5 = padColumn(ttCrcStr, 12)
-                let rc6 = padColumn(ttValid ? "✅ 100% 匹配" : "❌ 不匹配", 12)
-                let rc7 = padColumn("基准 (1.0x / 1.0x)", 22)
+                let rc5 = padColumn(String(format: "%.2f MB", sizeMB), 14)
+                let rc6 = padColumn(ttValid ? "✅ Matched" : "❌ Mismatch", 14)
+                let rc7 = padColumn("Baseline (1.0x / 1.0x)", 22)
                 print("\(rc1) | \(rc2) | \(rc3) | \(rc4) | \(rc5) | \(rc6) | \(rc7)")
 
                 for comp in competitorRows {
                     let kc1 = padColumn(comp.name, 24)
-                    let kc2 = padColumn(String(format: "%.1f MB/s", comp.compMBs), 16)
-                    let kc3 = padColumn(String(format: "%.1f MB/s", comp.extMBs), 16)
+                    let kc2 = padColumn(String(format: "%.1f MB/s", comp.compMBs), 18)
+                    let kc3 = padColumn(String(format: "%.1f MB/s", comp.extMBs), 20)
                     let kc4 = padColumn(String(format: "%.3fs / %.3fs", comp.compTime, comp.extTime), 18)
-                    let kc5 = padColumn(comp.crc, 12)
-                    let kc6 = padColumn(comp.valid ? "✅ 100% 匹配" : "❌ 不匹配", 12)
+                    let kc5 = padColumn(String(format: "%.2f MB", comp.sizeMB), 14)
+                    let kc6 = padColumn(comp.valid ? "✅ Matched" : "❌ Mismatch", 14)
                     let kc7 = padColumn(comp.label, 22)
                     print("\(kc1) | \(kc2) | \(kc3) | \(kc4) | \(kc5) | \(kc6) | \(kc7)")
                 }

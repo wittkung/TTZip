@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import QuartzCore
 import TTZipCore
 
 public enum CLIBenchmarkRunner {
     public static func runExhaustiveBenchmark(formatFilter: String? = nil, levelFilter: String? = nil) async {
-        print("🔥 启动全维度全组合矩阵物理压测引擎 (Format x Level x Encryption x Payload)...")
+        print("🔥 Initializing exhaustive multidimensional benchmark matrix (Format x Level x Encryption x Payload)...")
         
         var selectedFormats: [ArchiveCompressionFormat]? = nil
         if let fmtRaw = formatFilter, !fmtRaw.isEmpty {
@@ -29,17 +36,17 @@ public enum CLIBenchmarkRunner {
         
         do {
             print("\n========================================================================================================================")
-            print("📊 7Z / ZIP / TAR.GZ / TAR.ZST / ZST 全维度全组合极客极限性能测试汇总表 (Apple Silicon M-Series Native)")
+            print("📊 Full-Matrix Multidimensional Peak Performance Benchmark (Apple Silicon M-Series Native)")
             print("========================================================================================================================")
-            let hDim = "场景维度"
-            let hFmt = "格式"
-            let hLvl = "压缩级别"
-            let hEnc = "加密"
-            let hComp = "打包/压缩吞吐"
-            let hDecomp = "解压/释放吞吐"
-            let hTime = "耗时(打包/解压)"
-            let hRatio = "压缩体积比"
-            let hSha = "完整性校验"
+            let hDim = "Dimension"
+            let hFmt = "Format"
+            let hLvl = "Level"
+            let hEnc = "Enc"
+            let hComp = "Compress MB/s"
+            let hDecomp = "Extract MB/s"
+            let hTime = "Time (C/D)"
+            let hRatio = "Ratio"
+            let hSha = "Integrity"
             
             print("\(hDim.padding(toLength: 26, withPad: " ", startingAt: 0)) | \(hFmt.padding(toLength: 6, withPad: " ", startingAt: 0)) | \(hLvl.padding(toLength: 10, withPad: " ", startingAt: 0)) | \(hEnc.padding(toLength: 6, withPad: " ", startingAt: 0)) | \(hComp.padding(toLength: 14, withPad: " ", startingAt: 0)) | \(hDecomp.padding(toLength: 14, withPad: " ", startingAt: 0)) | \(hTime.padding(toLength: 18, withPad: " ", startingAt: 0)) | \(hRatio.padding(toLength: 10, withPad: " ", startingAt: 0)) | \(hSha)")
             print("------------------------------------------------------------------------------------------------------------------------")
@@ -60,21 +67,21 @@ public enum CLIBenchmarkRunner {
             }
             print("========================================================================================================================\n")
         } catch {
-            print("❌ 全维度矩阵测试失败: \(error.localizedDescription)")
+            print("❌ Exhaustive matrix benchmark failed: \(error.localizedDescription)")
         }
     }
     
     public static func runCompetitorBenchmark(config: BenchmarkRunConfig) async {
-        let fmtStr = config.selectedFormats?.map { $0.rawValue }.joined(separator: ",") ?? "全量 16 种格式 (7Z,ZIP,TAR,ZSTD...)"
-        print("⚔️ 启动竞品性能 PK 对比引擎 [目标软件: \(config.selectedTools?.joined(separator: ",") ?? "全量已安装竞品")] [格式: \(fmtStr)]...")
+        let fmtStr = config.selectedFormats?.map { $0.rawValue }.joined(separator: ",") ?? "All 16 Formats (7Z, ZIP, TAR, ZSTD...)"
+        print("⚔️ Launching competitor benchmark battle [Tools: \(config.selectedTools?.joined(separator: ",") ?? "All Installed Competitors")] [Formats: \(fmtStr)]...")
         if let fc = config.filterConfigPath {
-            print("🎯 [针对性测试配置生效]: \(fc)")
+            print("🎯 [Targeted Test Configuration Active]: \(fc)")
         }
         if config.stopOnLagOrError {
-            print("🚨 [严格中断模式已激活]: 任何单项场景若被竞品超越或解压核验未通过，将立即强行中断测试退出！")
+            print("🚨 [Strict Interruption Mode Active]: Any test lag vs competitor or failure will terminate benchmark immediately.")
         }
         if config.verifyAllDominance {
-            print("🏆 [全量霸榜大考模式已激活]: 统一测试 16 种格式全量对标，必须 100% 全胜！")
+            print("🏆 [All-Format Dominance Verification Active]: 100% win rate across all 16 formats required.")
         }
         
         let hugeBytes = parseSizeBytes(config.hugeSizeFilter)
@@ -101,11 +108,11 @@ public enum CLIBenchmarkRunner {
                 }
             }
             print("\n================================================================================================ Protocol Output")
-            print("🏁 竞品 1v1 对抗测试全面完成！")
+            print("🏁 1v1 Competitor Benchmark Complete!")
             CompetitorReportWriter.saveCompetitorReport(rows: rows)
             print("========================================================================================================================\n")
         } catch {
-            print("❌ 竞品 1v1 对抗测试强行中止/中断: \(error.localizedDescription)")
+            print("❌ 1v1 Competitor Benchmark Interrupted: \(error.localizedDescription)")
         }
     }
 
@@ -144,14 +151,14 @@ public enum CLIBenchmarkRunner {
         default: size = .small
         }
         
-        print("🚀 正在初始化全核硬件基准压测 Payload (目标模组: \(size.rawValue))...")
+        print("🚀 Initializing full-core hardware benchmark payload (Module: \(size.rawValue))...")
         do {
             let results = try await ArchiveBenchmarkFacade.shared.runAllPresetsSuite(size: size)
             
             print("\n=========================================================================================")
-            print("📊 TTZip 原生极限性能基准测试结果 (Apple Silicon M-Series Unified Memory)")
+            print("📊 TTZip Native Peak Benchmark Results (Apple Silicon Unified Memory)")
             print("=========================================================================================")
-            print(String(format: "%-15s | %-12s | %-12s | %-10s | %-10s", "格式算法", "压缩速率", "实测解压", "体积压缩比", "加速倍数"))
+            print(String(format: "%-15s | %-12s | %-12s | %-10s | %-10s", "Algorithm", "Comp Speed", "Extract Speed", "Ratio", "Speedup"))
             print("=========================================================================================")
             for res in results {
                 print(String(format: "%-15s | %-10.1f MB/s | %-10.1f MB/s | %-9.1f %% | %-8.1f x",
@@ -162,10 +169,10 @@ public enum CLIBenchmarkRunner {
                              res.speedupMultiplier))
             }
             print("=========================================================================================")
-            print("✅ 硬件压测矩阵计算完成！")
+            print("✅ Hardware benchmark matrix computation completed!")
             fflush(stdout)
         } catch {
-            print("❌ 压测失败: \(error.localizedDescription)")
+            print("❌ Benchmark execution failed: \(error.localizedDescription)")
             fflush(stdout)
         }
     }
@@ -181,9 +188,9 @@ public enum CLIBenchmarkRunner {
             do {
                 try await block()
                 let elapsed = PlatformMonotonicTimer.nowSeconds() - start
-                print("   ✅ [\(name)] 完成，耗时: \(String(format: "%.3f", elapsed)) 秒")
+                print("   ✅ [\(name)] completed in: \(String(format: "%.3f", elapsed))s")
             } catch {
-                print("   ❌ [\(name)] 失败: \(error)")
+                print("   ❌ [\(name)] failed: \(error)")
             }
         }
         
@@ -233,10 +240,10 @@ public enum CLIBenchmarkRunner {
         return string + String(repeating: " ", count: width - displayWidth)
     }
 
-    // MARK: - 纯内存与 TurboBench / lzbench 对齐基准测试 (Feature 052)
+    // MARK: - In-Memory & TurboBench / lzbench Benchmark Suite
 
     public static func runInMemoryBenchmark(options: CLIOptions) async {
-        print("⚡ 启动纯内存基准测试引擎 (TurboBench / lzbench 工业级时钟校准)...")
+        print("⚡ Initializing in-memory benchmark engine (TurboBench / lzbench calibrated clock)...")
 
         let formats: [String]
         if let fmtRaw = options.format, !fmtRaw.isEmpty {
@@ -284,10 +291,10 @@ public enum CLIBenchmarkRunner {
 
             if let jsonPath = options.jsonReportPath {
                 try engine.exportJSONReport(report: report, to: jsonPath)
-                print("📄 JSON 基准测试报告已导出: \(jsonPath)")
+                print("📄 JSON benchmark report exported: \(jsonPath)")
             }
         } catch {
-            print("❌ 纯内存基准测试失败: \(error.localizedDescription)")
+            print("❌ In-memory benchmark failed: \(error.localizedDescription)")
         }
     }
 }
