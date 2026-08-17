@@ -181,6 +181,10 @@ public struct MainView: View {
             let targetPath = viewModel.selectedDiskItem?.path ?? viewModel.currentArchivePath ?? ""
             ExtractModalView(archivePath: targetPath, isPresented: $viewModel.showExtractModal)
         }
+        .sheet(isPresented: $viewModel.showArchiveInspectorModal) {
+            let targetPath = viewModel.inspectingArchivePath ?? viewModel.selectedDiskItem?.path ?? viewModel.currentArchivePath ?? ""
+            ArchiveInspectorContainerView(archivePath: targetPath)
+        }
         .overlay {
             if viewModel.showPasswordPrompt, let targetPath = viewModel.pendingEncryptedPath {
                 ZStack {
@@ -209,6 +213,12 @@ public struct MainView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TTZipQuickExtractArchive"))) { notif in
             if let path = notif.object as? String {
                 Task { await viewModel.quickExtractArchive(archivePath: path) }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TTZipOpenArchiveInspector"))) { notif in
+            if let path = notif.object as? String {
+                viewModel.overlayState.inspectingArchivePath = path
+                viewModel.overlayState.showArchiveInspectorModal = true
             }
         }
     }

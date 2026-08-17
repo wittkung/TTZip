@@ -158,6 +158,14 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         get { overlayState.selectedPathsToCompress }
         set { overlayState.selectedPathsToCompress = newValue }
     }
+    public var showArchiveInspectorModal: Bool {
+        get { overlayState.showArchiveInspectorModal }
+        set { overlayState.showArchiveInspectorModal = newValue }
+    }
+    public var inspectingArchivePath: String? {
+        get { overlayState.inspectingArchivePath }
+        set { overlayState.inspectingArchivePath = newValue }
+    }
     
     @Published public var recentArchives: [RecentArchiveRecord] = []
     

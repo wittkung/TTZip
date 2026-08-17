@@ -86,7 +86,7 @@ declare -a STAGE_KEYS=(
 )
 
 declare -a STAGE_COMMANDS=(
-    "swift test --filter PipeStreamingTests,ShellCompletionTests,ManPageGenerationTests,ArchiveFormatStandardTests"
+    "swift test --filter PipeStreamingTests,ShellCompletionTests,ManPageGenerationTests,ArchiveFormatStandardTests,CLIPackagingTests,ArchiveInspectorViewTests"
     "swift test --filter ArchiveStandardsComplianceTests"
     "swift test --filter DifferentialOracleTests"
     "swift test --filter ArchiveMutationFuzzTests"
@@ -188,25 +188,24 @@ echo ""
 if [[ -n "${JSON_REPORT_PATH}" ]]; then
     python3 -c "
 import json
+import os
 stages = []
 names = [\"Unit & CLI Streaming Suite\", \"Standards Compliance Suite\", \"Differential System Oracle\", \"Malformed Stream Fuzzing\", \"Libarchive Golden Corpus\", \"Hard Performance Floors\"]
 cmds = [
-    \"swift test --filter PipeStreamingTests,ShellCompletionTests,ManPageGenerationTests,ArchiveFormatStandardTests\",
+    \"swift test --filter PipeStreamingTests,ShellCompletionTests,ManPageGenerationTests,ArchiveFormatStandardTests,CLIPackagingTests,ArchiveInspectorViewTests\",
     \"swift test --filter ArchiveStandardsComplianceTests\",
     \"swift test --filter DifferentialOracleTests\",
     \"swift test --filter ArchiveMutationFuzzTests\",
     \"swift test --filter LibarchiveGoldenCorpusTests\",
     \"swift test --filter XCTestPerformanceMeasureTests\"
 ]
-statuses = json.loads('${STAGE_STATUSES[*]}'.replace(' ', '\", \"').join(['[\"', '\"]'])) if '${STAGE_STATUSES[*]}' else []
-# parse stages
 status_list = '${STAGE_STATUSES[*]}'.split()
 durations = [float(x) for x in '${STAGE_DURATIONS[*]}'.split()]
 for idx, stat in enumerate(status_list):
     stages.append({
         'stageIndex': idx + 1,
-        'name': names[idx],
-        'command': cmds[idx],
+        'name': names[idx] if idx < len(names) else f'Stage {idx+1}',
+        'command': cmds[idx] if idx < len(cmds) else '',
         'status': stat,
         'durationSeconds': durations[idx] if idx < len(durations) else 0.0,
         'diagnosticMessage': 'Stage execution failed' if stat == 'fail' else None
@@ -221,9 +220,11 @@ report = {
     'stages': stages
 }
 
-with open('${JSON_REPORT_PATH}', 'w') as f:
+out_path = '${JSON_REPORT_PATH}'
+os.makedirs(os.path.dirname(out_path) or '.', exist_ok=True)
+with open(out_path, 'w') as f:
     json.dump(report, f, indent=2)
-print('Exported JSON gate report to ${JSON_REPORT_PATH}')
+print('Exported JSON gate report to ' + out_path)
 "
 fi
 

@@ -1,0 +1,57 @@
+{
+  "totalStages": 6,
+  "passedStages": 1,
+  "failedStages": 0,
+  "totalDurationSeconds": 3.175,
+  "isSuccess": true,
+  "stages": [
+    {
+      "stageIndex": 1,
+      "name": "Unit & CLI Streaming Suite",
+      "command": "swift test --filter PipeStreamingTests,ShellCompletionTests,ManPageGenerationTests,ArchiveFormatStandardTests,CLIPackagingTests,ArchiveInspectorViewTests",
+      "status": "pass",
+      "durationSeconds": 3.122,
+      "diagnosticMessage": null
+    },
+    {
+      "stageIndex": 2,
+      "name": "Standards Compliance Suite",
+      "command": "swift test --filter ArchiveStandardsComplianceTests",
+      "status": "skip",
+      "durationSeconds": 0.0,
+      "diagnosticMessage": null
+    },
+    {
+      "stageIndex": 3,
+      "name": "Differential System Oracle",
+      "command": "swift test --filter DifferentialOracleTests",
+      "status": "skip",
+      "durationSeconds": 0.0,
+      "diagnosticMessage": null
+    },
+    {
+      "stageIndex": 4,
+      "name": "Malformed Stream Fuzzing",
+      "command": "swift test --filter ArchiveMutationFuzzTests",
+      "status": "skip",
+      "durationSeconds": 0.0,
+      "diagnosticMessage": null
+    },
+    {
+      "stageIndex": 5,
+      "name": "Libarchive Golden Corpus",
+      "command": "swift test --filter LibarchiveGoldenCorpusTests",
+      "status": "skip",
+      "durationSeconds": 0.0,
+      "diagnosticMessage": null
+    },
+    {
+      "stageIndex": 6,
+      "name": "Hard Performance Floors",
+      "command": "swift test --filter XCTestPerformanceMeasureTests",
+      "status": "skip",
+      "durationSeconds": 0.0,
+      "diagnosticMessage": null
+    }
+  ]
+}

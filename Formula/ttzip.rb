@@ -1,8 +1,18 @@
+# typed: false
+# frozen_string_literal: true
+
+# SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+#
+# Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+# All rights reserved.
+#
+# TTZip: High-performance native archiving and compression CLI utility for macOS.
+
 class Ttzip < Formula
   desc "Ultra-high-performance native archiving and compression CLI engine for macOS"
   homepage "https://github.com/wittkung/TTZip"
   version "1.0.0"
-  license "BSD-3-Clause"
+  license :cannot_be_redistributed
 
   if Hardware::CPU.arm? || Hardware::CPU.intel?
     url "https://github.com/wittkung/TTZip/releases/download/v1.0.0/ttzip-cli-v1.0.0-macos-universal.tar.gz"

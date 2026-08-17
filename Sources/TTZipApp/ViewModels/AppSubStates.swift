@@ -69,5 +69,9 @@ public final class OverlayState: ObservableObject {
     @Published public var selectedDiskItem: DiskItemInfo? = nil
     @Published public var selectedPathsToCompress: [String] = []
     
+    // Archive Inspector & Diagnostics
+    @Published public var showArchiveInspectorModal: Bool = false
+    @Published public var inspectingArchivePath: String? = nil
+    
     public init() {}
 }

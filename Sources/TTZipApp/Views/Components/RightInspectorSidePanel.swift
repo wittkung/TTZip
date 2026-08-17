@@ -27,6 +27,19 @@ public struct RightInspectorSidePanel: View {
                 
                 Spacer()
                 
+                if let item = viewModel.selectedDiskItem, item.isArchive {
+                    Button(action: {
+                        viewModel.overlayState.inspectingArchivePath = item.path
+                        viewModel.overlayState.showArchiveInspectorModal = true
+                    }) {
+                        Image(systemName: "doc.badge.gearshape")
+                            .font(.system(size: 15))
+                            .foregroundStyle(TTZipTheme.archiveAmber)
+                    }
+                    .buttonStyle(.plain)
+                    .help("查看归档权威标准与合规诊断...")
+                }
+                
                 if viewModel.selectedDiskItem != nil {
                     Button(action: {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {

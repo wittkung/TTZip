@@ -313,6 +313,13 @@ public struct MillerColumnItemContextMenu: View {
                 
                 Button {
                     onSelectItem(item, columnIndex, false, false, dirURL)
+                    NotificationCenter.default.post(name: NSNotification.Name("TTZipOpenArchiveInspector"), object: item.path)
+                } label: {
+                    Label("TTZip: 归档标准与合规诊断...", systemImage: "doc.badge.gearshape")
+                }
+                
+                Button {
+                    onSelectItem(item, columnIndex, false, false, dirURL)
                     NotificationCenter.default.post(name: NSNotification.Name("TTZipEncryptedArchivePromptRequired"), object: item.path)
                 } label: {
                     Label("TTZip: 输入/验证解压口令", systemImage: "key.fill")

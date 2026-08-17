@@ -1,4 +1,12 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
+import os
 
 /// 享元模式 (Flyweight Pattern): ArchiveEntry 内部状态驻留共享工厂
 /// 针对包含海量文件（如 node_modules 或数十万个文件的 Zip/7z）的归档包，
@@ -7,7 +15,7 @@ import Foundation
 public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
     public static let shared = ArchiveEntryFlyweightFactory()
     
-    private let lock = NSLock()
+    private var unfairLock = os_unfair_lock_s()
     
     // 享元内部状态共享池
     private var pathPool: [String: String] = [:]
@@ -84,8 +92,8 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
     /// 驻留共享路径字符串
     public func internPath(_ path: String) -> String {
         guard !path.isEmpty else { return "" }
-        lock.lock()
-        defer { lock.unlock() }
+        os_unfair_lock_lock(&unfairLock)
+        defer { os_unfair_lock_unlock(&unfairLock) }
         if let existing = pathPool[path] {
             return existing
         }
@@ -100,8 +108,8 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
     public func internExtension(_ ext: String) -> String {
         let lowerExt = ext.lowercased()
         guard !lowerExt.isEmpty else { return "" }
-        lock.lock()
-        defer { lock.unlock() }
+        os_unfair_lock_lock(&unfairLock)
+        defer { os_unfair_lock_unlock(&unfairLock) }
         if let existing = extensionPool[lowerExt] {
             return existing
         }
@@ -112,8 +120,8 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
     /// 驻留共享 MIME 类型
     public func internMimeType(_ mime: String) -> String {
         guard !mime.isEmpty else { return "application/octet-stream" }
-        lock.lock()
-        defer { lock.unlock() }
+        os_unfair_lock_lock(&unfairLock)
+        defer { os_unfair_lock_unlock(&unfairLock) }
         if let existing = mimeTypePool[mime] {
             return existing
         }
@@ -124,8 +132,8 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
     /// 驻留共享目录前缀
     public func internDirectoryPrefix(_ prefix: String) -> String {
         guard !prefix.isEmpty else { return "" }
-        lock.lock()
-        defer { lock.unlock() }
+        os_unfair_lock_lock(&unfairLock)
+        defer { os_unfair_lock_unlock(&unfairLock) }
         if let existing = directoryPrefixPool[prefix] {
             return existing
         }
@@ -160,8 +168,8 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
 
     /// 清空享元池（主要用于单元测试与内存释放）
     public func clearPools() {
-        lock.lock()
-        defer { lock.unlock() }
+        os_unfair_lock_lock(&unfairLock)
+        defer { os_unfair_lock_unlock(&unfairLock) }
         pathPool.removeAll(keepingCapacity: false)
         extensionPool.removeAll(keepingCapacity: false)
         mimeTypePool.removeAll(keepingCapacity: false)
@@ -176,8 +184,8 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
     
     /// 当前享元池内部状态节点总数统计
     public var poolCounts: (paths: Int, extensions: Int, mimeTypes: Int, prefixes: Int) {
-        lock.lock()
-        defer { lock.unlock() }
+        os_unfair_lock_lock(&unfairLock)
+        defer { os_unfair_lock_unlock(&unfairLock) }
         return (pathPool.count, extensionPool.count, mimeTypePool.count, directoryPrefixPool.count)
     }
     
