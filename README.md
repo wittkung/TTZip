@@ -217,8 +217,8 @@ TTZip is proud to support the global developer community under the **TTZip Sourc
 3. **No Commercial Resale or Cloud SaaS**: You may NOT embed TTZip into paid commercial products or SaaS services without an Enterprise Commercial License.
 
 ### 💼 Enterprise Commercial Licensing
-Commercial entities wishing to integrate TTZip into proprietary commercial products, paid services, or enterprise-wide automated production environments must purchase a **Commercial Enterprise License**. Inquiries: `kevintungs@163.com`.
+Commercial entities wishing to integrate TTZip into proprietary commercial products, paid services, or enterprise-wide automated production environments must purchase a **Commercial Enterprise License**. Inquiries: `witt.w.kung@gmail.com`.
 
 ---
 
-© 2026 Weitao Kung (Witt Kung). All rights reserved.
+© 2026 Witt Kung. All rights reserved.
