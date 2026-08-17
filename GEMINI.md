@@ -237,7 +237,7 @@ TTZip 践行 28 大设计模式（详见 `.agents/skills/design-patterns-guide/S
      8. **敏感内存防死存储消除 (Dead-Store Elimination Immunity)**：密码与密钥缓冲区释放前，严禁依赖普通 `memset`，必须使用 `volatile` 函数指针（如 `secure_zero_memory` / `memset_v`）强制物理擦除。
      9. **流程敬畏与 Draft 隔离 (Issue-First & Draft Isolation)**：架构存在分歧时，讨论重心必须收敛在 Issue 中；未达成共识前 PR 必须挂起为 Draft，绝不抢跑推送发散代码。
      10. **跨架构确定性不可侵犯 (Determinism Invariant Immunity)**：除专用自研格式外，通用基础库优化绝不改变跨架构哈希索引与序列生成逻辑，保证 `.zst` 等二进制比特流 100% 跨平台幂等。
-     11. **物理实测真实性断言 (Grounded Benchmarking Mandate)**：所有 Benchmark 数据均为物理单调时钟实测并标明 CPU 型号、核心数、RAM、OS、文件系统、编译器版本与 `-O3` 优化标志，严禁理论推演充当实测数据。
+     11. **物理实测真实性与性能数据绝对零造假断言 (Grounded Benchmarking & Zero-Fabrication Mandate)**：所有 Benchmark 数据必须为物理单调时钟实测并标明 CPU 型号、核心数、RAM、OS、文件系统、编译器版本与 `-O3` 优化标志。**绝对禁止任何形式的性能数据编造、理论推演插值或未跑测试假填表**。对话或报告中出现的每一个吞吐量（MB/s / GB/s）、单次延迟（ns/op）和加速比数值，必须 100% 映射上一条物理命令的真实控制台输出，未测项必须显式标明未实测并当场运行。
      12. **形式化数学与边界安全证明 (Formal Boundary & Invariant Proofs)**：必须给出模对齐、步长收敛与残差集合推导，证明零越界、零欠读。
      14. **无构建系统裸编译通过性 (Direct Compilation Immunity)**：必须通过 `$CC -Wall -Werror lib/*.c programs/*.c` 直接编译验证，系统库（pthread/m）必须有条件编译宏防护，脱离 CMake 时透明降级为单线程。
      15. **解压与消费侧语义闭环 (Decompression Semantic Symmetry)**：贡献流式/容器压缩特性时，必须闭环阐明标准解压器（gzip/tar）透传与库原生 API 在应用层的循环消费语义。
