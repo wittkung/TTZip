@@ -7,6 +7,7 @@
 #include "include/CTTZipBridge_APFS.h"
 #include "include/CTTZipBridge_ZipWrite.h"
 #include "include/CTTZipBridge_Zstd.h"
+#include "include/CTTZipUtils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -263,6 +264,121 @@ int ttzip_extract_archive_advanced(
 
 int ttzip_extract_archive(const char* archive_path, const char* destination_dir) {
     return ttzip_extract_archive_advanced(archive_path, destination_dir, false, NULL);
+}
+
+int ttzip_stream_archive_entries_to_fd(
+    const char* archive_path,
+    const char* const* entry_patterns,
+    size_t pattern_count,
+    int target_fd,
+    const char* password,
+    bool force_binary,
+    char* err_buf,
+    size_t err_len
+) {
+    if (!archive_path) return TTZIP_ERR_INVALID_PARAM;
+    setlocale(LC_ALL, "en_US.UTF-8");
+
+    struct archive* a = archive_read_new();
+    if (!a) return TTZIP_ERR_OUT_OF_MEMORY;
+
+    archive_read_support_format_all(a);
+    archive_read_support_filter_all(a);
+
+    if (password && password[0] != '\0') {
+        archive_read_add_passphrase(a, password);
+    }
+
+    int open_rc;
+    if (strcmp(archive_path, "-") == 0) {
+        open_rc = archive_read_open_fd(a, STDIN_FILENO, 65536);
+    } else {
+        open_rc = archive_read_open_filename(a, archive_path, 65536);
+    }
+
+    if (open_rc != ARCHIVE_OK) {
+        if (err_buf && err_len > 0) {
+            snprintf(err_buf, err_len, "%s", archive_error_string(a));
+        }
+        archive_read_free(a);
+        return TTZIP_ERR_OPEN_FAILED;
+    }
+
+    bool is_target_tty = (isatty(target_fd) != 0);
+    struct archive_entry* entry;
+    int r;
+    bool found = false;
+
+    while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK) {
+        const char* pathname = archive_entry_pathname(entry);
+        if (!pathname || pathname[0] == '\0') continue;
+
+        mode_t mode = archive_entry_filetype(entry);
+        if (S_ISDIR(mode)) {
+            archive_read_data_skip(a);
+            continue;
+        }
+
+        bool match = false;
+        if (pattern_count == 0) {
+            match = true;
+        } else {
+            for (size_t i = 0; i < pattern_count; i++) {
+                const char* target = entry_patterns[i];
+                if (!target) continue;
+                if (strcmp(pathname, target) == 0 ||
+                    (pathname[0] == '.' && pathname[1] == '/' && strcmp(pathname + 2, target) == 0) ||
+                    (strcmp(pathname, target + 1) == 0 && target[0] == '/')) {
+                    match = true;
+                    break;
+                }
+            }
+        }
+
+        if (!match) {
+            archive_read_data_skip(a);
+            continue;
+        }
+
+        found = true;
+
+        if (is_target_tty && !force_binary) {
+            const void* sample_buff = NULL;
+            size_t sample_size = 0;
+            la_int64_t sample_offset = 0;
+            int blk_rc = archive_read_data_block(a, &sample_buff, &sample_size, &sample_offset);
+            if (blk_rc == ARCHIVE_OK && sample_size > 0) {
+                if (ttzip_is_buffer_binary(sample_buff, sample_size > 4096 ? 4096 : sample_size)) {
+                    if (err_buf && err_len > 0) {
+                        snprintf(err_buf, err_len, "Entry '%s' contains binary data. Use --force (-f) to override.", pathname);
+                    }
+                    archive_read_close(a);
+                    archive_read_free(a);
+                    return -2; // TTY binary refused
+                }
+                ssize_t written = write(target_fd, sample_buff, sample_size);
+                (void)written;
+            }
+        }
+
+        int write_rc = archive_read_data_into_fd(a, target_fd);
+        if (write_rc != ARCHIVE_OK && write_rc != ARCHIVE_EOF) {
+            if (err_buf && err_len > 0) {
+                snprintf(err_buf, err_len, "%s", archive_error_string(a));
+            }
+            archive_read_close(a);
+            archive_read_free(a);
+            return ARCHIVE_FATAL;
+        }
+
+        if (pattern_count > 0) {
+            break;
+        }
+    }
+
+    archive_read_close(a);
+    archive_read_free(a);
+    return found ? TTZIP_OK : -1;
 }
 
 int ttzip_create_archive_tuned(

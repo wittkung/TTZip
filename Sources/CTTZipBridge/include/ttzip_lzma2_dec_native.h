@@ -29,6 +29,17 @@ int ttzip_lzma2_decode_block_native(
     size_t* out_decompressed_len
 );
 
+// 原生 LZMA1 块解码主入口 (支持 5 字节属性解析)
+int ttzip_lzma1_decode_block_native(
+    const uint8_t* src,
+    size_t src_len,
+    const uint8_t* props,
+    size_t props_len,
+    uint8_t* dst,
+    size_t dst_capacity,
+    size_t* out_decompressed_len
+);
+
 #ifdef __cplusplus
 }
 #endif

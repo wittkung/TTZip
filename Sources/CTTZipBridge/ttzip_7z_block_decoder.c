@@ -18,6 +18,8 @@ int ttzip_7z_decode_payload_parallel(
     const uint8_t* payload_start,
     size_t payload_len,
     uint64_t primary_method_id,
+    const uint8_t* coder_props,
+    size_t coder_props_len,
     const uint64_t* stream_sizes,
     size_t num_stream_sizes,
     const uint64_t* coder_unpack_sizes,
@@ -126,6 +128,26 @@ int ttzip_7z_decode_payload_parallel(
         size_t def_dec = ttzip_libdeflate_decompress(payload_start, payload_len, unpack_buf, total_unpack_bytes);
         if (def_dec > 0) {
             total_unpack_bytes = def_dec;
+        } else {
+            TTZIP_SLICE_SCOPE_END("2_7zDec_ParallelLZMA2Decode");
+            free(blocks);
+            ttzip_platform_aligned_free(unpack_buf);
+            return TTZIP_ERR_CORRUPT_HEADER;
+        }
+    } else if (primary_method_id == 0x030101 || primary_method_id == 0x30101) {
+        // 7z-LZMA1 原生解码 (Method ID 0x030101，支持 5 字节字典/上下文参数属性)
+        size_t actual_unpacked = 0;
+        int dec_res = ttzip_lzma1_decode_block_native(
+            payload_start,
+            payload_len,
+            coder_props,
+            coder_props_len,
+            unpack_buf,
+            total_unpack_bytes,
+            &actual_unpacked
+        );
+        if (dec_res == 0 && actual_unpacked > 0) {
+            total_unpack_bytes = actual_unpacked;
         } else {
             TTZIP_SLICE_SCOPE_END("2_7zDec_ParallelLZMA2Decode");
             free(blocks);

@@ -168,6 +168,9 @@ int ttzip_7z_parse_header_metadata(
                                                 p_off += iv_len;
                                             }
                                         }
+                                    } else if (mid != 0x06F10701 && props_sz > 0 && props_sz <= 32) {
+                                        memcpy(out_info->coder_props, hp + hpos, props_sz);
+                                        out_info->coder_props_len = (size_t)props_sz;
                                     }
                                     hpos += (size_t)props_sz;
                                 }

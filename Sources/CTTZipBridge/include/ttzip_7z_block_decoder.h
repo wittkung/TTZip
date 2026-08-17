@@ -46,6 +46,8 @@ int ttzip_7z_decode_payload_parallel(
     const uint8_t* payload_start,
     size_t payload_len,
     uint64_t primary_method_id,
+    const uint8_t* coder_props,
+    size_t coder_props_len,
     const uint64_t* stream_sizes,
     size_t num_stream_sizes,
     const uint64_t* coder_unpack_sizes,

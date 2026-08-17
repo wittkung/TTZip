@@ -22,6 +22,9 @@ double ttzip_estimate_buffer_entropy(const void* buf, size_t len);
 double ttzip_estimate_buffer_entropy_dynamic(const void* buf, size_t len);
 double ttzip_estimate_file_entropy_dynamic(const char* file_path);
 bool ttzip_is_ascii_fast(const void* buf, size_t len);
+bool ttzip_is_buffer_binary(const void* buf, size_t len);
+int ttzip_read_passphrase(const char* prompt, char* out_buf, size_t max_len);
+bool ttzip_path_strip_components(const char* path, int strip_count, char* out_buf, size_t out_len);
 
 #ifdef __cplusplus
 }

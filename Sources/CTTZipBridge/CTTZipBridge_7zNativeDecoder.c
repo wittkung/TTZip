@@ -123,6 +123,8 @@ int ttzip_7z_extract_native_parallel_c(
             payload_start,
             payload_len,
             info.primary_method_id,
+            info.coder_props,
+            info.coder_props_len,
             info.stream_sizes,
             info.num_stream_sizes,
             info.coder_unpack_sizes,

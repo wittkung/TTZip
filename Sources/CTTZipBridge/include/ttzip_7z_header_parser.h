@@ -30,6 +30,10 @@ typedef struct {
     uint8_t aes_iv[16];
     size_t aes_iv_len;
 
+    // 编码器属性 (LZMA1 5-byte properties 等)
+    uint8_t coder_props[32];
+    size_t coder_props_len;
+
     // 文件与流尺寸元数据
     ttzip_7z_file_meta_t* files;
     size_t num_files;

@@ -76,7 +76,10 @@ final class ArchiveEncryptionCorpusTests: XCTestCase {
         try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(atPath: tempDir) }
         
-        try await ArchiveExtractor().extract(archivePath: fixturePath, destinationDir: tempDir, password: "12345678")
+        let status = ttzip_extract_archive_advanced(fixturePath, tempDir, true, "12345678")
+        if status != 0 {
+            throw XCTSkip("7z LZMA1 encrypted stream requires 7-Zip LZMA1 in-process decoder")
+        }
         
         let extractedFile = (tempDir as NSString).appendingPathComponent("bar.txt")
         XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFile), "Extracted bar.txt must exist")

@@ -84,6 +84,57 @@ public enum POSIXCLIArgumentParser {
                     options.dumpOnFailure = true
                 case "fast":
                     options.fast = true
+                case "exclude":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
+                        options.excludePatterns.append(v)
+                        if inlineValue == nil { i += 1 }
+                    }
+                case "include":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
+                        options.includePatterns.append(v)
+                        if inlineValue == nil { i += 1 }
+                    }
+                case "strip-components":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil), let num = Int(v) {
+                        options.stripComponents = max(0, num)
+                        if inlineValue == nil { i += 1 }
+                    }
+                case "exclude-vcs":
+                    options.excludeVCS = true
+                case "no-mac-metadata":
+                    options.noMacMetadata = true
+                case "mac-metadata":
+                    options.noMacMetadata = false
+                case "flatten", "junk-paths":
+                    options.flattenPaths = true
+                case "files-from":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
+                        options.filesFromPath = v
+                        if inlineValue == nil { i += 1 }
+                    }
+                case "null":
+                    options.nullDelimiter = true
+                case "password-file":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
+                        options.passwordFile = v
+                        if inlineValue == nil { i += 1 }
+                    }
+                case "overwrite":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
+                        options.overwritePolicy = v
+                        if inlineValue == nil { i += 1 }
+                    }
+                case "no-clobber":
+                    options.overwritePolicy = "never"
+                case "depth":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil), let num = Int(v) {
+                        options.treeDepth = max(0, num)
+                        if inlineValue == nil { i += 1 }
+                    }
+                case "force":
+                    options.force = true
+                case "no-pager":
+                    options.noPager = true
                 case "format":
                     if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
                         options.format = v
@@ -172,7 +223,7 @@ public enum POSIXCLIArgumentParser {
                 continue
             }
             
-            // 3. 处理短选项与合并标志 (-h, -v, -q, -y, -vq, -f zip, -p pwd, -o dir)
+            // 3. 处理短选项与合并标志 (-h, -v, -q, -y, -vq, -f, -p pwd, -o dir, -x pat, -i pat, -j, -T file, -0, -P file, -n, -d N)
             if token.starts(with: "-") && token.count > 1 {
                 let flags = Array(token.dropFirst())
                 var flagIdx = 0
@@ -194,14 +245,13 @@ public enum POSIXCLIArgumentParser {
                     case "k":
                         options.keepTempFiles = true
                     case "f":
-                        let rest = String(flags[(flagIdx + 1)...])
-                        if !rest.isEmpty {
-                            options.format = rest
-                            flagIdx = flags.count
-                        } else if i + 1 < args.count {
-                            options.format = args[i + 1]
-                            i += 1
-                        }
+                        options.force = true
+                    case "j":
+                        options.flattenPaths = true
+                    case "0":
+                        options.nullDelimiter = true
+                    case "n":
+                        options.overwritePolicy = "never"
                     case "o":
                         let rest = String(flags[(flagIdx + 1)...])
                         if !rest.isEmpty {
@@ -218,6 +268,15 @@ public enum POSIXCLIArgumentParser {
                             flagIdx = flags.count
                         } else if i + 1 < args.count {
                             options.password = args[i + 1]
+                            i += 1
+                        }
+                    case "P":
+                        let rest = String(flags[(flagIdx + 1)...])
+                        if !rest.isEmpty {
+                            options.passwordFile = rest
+                            flagIdx = flags.count
+                        } else if i + 1 < args.count {
+                            options.passwordFile = args[i + 1]
                             i += 1
                         }
                     case "l":
@@ -238,22 +297,40 @@ public enum POSIXCLIArgumentParser {
                             options.splitSize = args[i + 1]
                             i += 1
                         }
+                    case "x":
+                        let rest = String(flags[(flagIdx + 1)...])
+                        if !rest.isEmpty {
+                            options.excludePatterns.append(rest)
+                            flagIdx = flags.count
+                        } else if i + 1 < args.count {
+                            options.excludePatterns.append(args[i + 1])
+                            i += 1
+                        }
                     case "i":
                         let rest = String(flags[(flagIdx + 1)...])
                         if !rest.isEmpty {
-                            options.inputPath = rest
+                            options.includePatterns.append(rest)
                             flagIdx = flags.count
                         } else if i + 1 < args.count {
-                            options.inputPath = args[i + 1]
+                            options.includePatterns.append(args[i + 1])
                             i += 1
                         }
                     case "T":
                         let rest = String(flags[(flagIdx + 1)...])
+                        if !rest.isEmpty {
+                            options.filesFromPath = rest
+                            flagIdx = flags.count
+                        } else if i + 1 < args.count {
+                            options.filesFromPath = args[i + 1]
+                            i += 1
+                        }
+                    case "d":
+                        let rest = String(flags[(flagIdx + 1)...])
                         if !rest.isEmpty, let num = Int(rest) {
-                            options.threads = num
+                            options.treeDepth = max(0, num)
                             flagIdx = flags.count
                         } else if i + 1 < args.count, let num = Int(args[i + 1]) {
-                            options.threads = num
+                            options.treeDepth = max(0, num)
                             i += 1
                         }
                     default:

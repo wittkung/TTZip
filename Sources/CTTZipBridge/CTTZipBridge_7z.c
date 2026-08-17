@@ -384,6 +384,11 @@ int ttzip_extract_7z_libarchive_c(
 ) {
     if (!archive_path || !dest_dir) return TTZIP_ERR_INVALID_PARAM;
     ttzip_common_mkdir_p(dest_dir);
+
+    int nat_res = ttzip_7z_extract_native_parallel_c(archive_path, dest_dir, password);
+    if (nat_res == TTZIP_OK) {
+        return TTZIP_OK;
+    }
     
     struct archive* a = archive_read_new();
     if (!a) return TTZIP_ERR_OUT_OF_MEMORY;

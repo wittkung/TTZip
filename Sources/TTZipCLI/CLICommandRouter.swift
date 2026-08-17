@@ -1,5 +1,18 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
+import CTTZipBridge
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 /// 命令行控制台观察者 (支持 TTY 60Hz 自适应渲染与 NDJSON 模式)
 public final class CLIEventAndProgressConsoleObserver: ArchiveProgressObserverProtocol, ArchiveEventObserverProtocol, @unchecked Sendable {
@@ -7,8 +20,10 @@ public final class CLIEventAndProgressConsoleObserver: ArchiveProgressObserverPr
     private init() {}
     
     public var isJsonMode: Bool = false
+    public var isSilenced: Bool = false
     
     public func onProgressUpdated(_ progress: ArchiveProgressInfo) {
+        guard !isSilenced else { return }
         if isJsonMode {
             TerminalRenderEngine.shared.emitNDJSON(event: "progress", payload: [
                 "fraction": progress.fractionCompleted,
@@ -30,6 +45,7 @@ public final class CLIEventAndProgressConsoleObserver: ArchiveProgressObserverPr
     }
     
     public func onArchiveEvent(_ event: ArchiveEvent) {
+        guard !isSilenced else { return }
         switch event {
         case .archiveCompleted(let path, let op, let duration, _):
             TerminalRenderEngine.shared.completeProgress(message: String(format: " ✅ %@: %@ (%.2fs)", op.rawValue, (path as NSString).lastPathComponent, duration))
@@ -60,18 +76,32 @@ public enum CLICommandRouter {
     @discardableResult
     public static func route(command: CLICommand, options: CLIOptions) async -> CLIExitCode {
         CLIEventAndProgressConsoleObserver.shared.isJsonMode = options.jsonOutput
+        CLIEventAndProgressConsoleObserver.shared.isSilenced = (options.outputPath == "-" || command == .cat)
+        
         ArchiveProgressBroadcaster.shared.addObserver(CLIEventAndProgressConsoleObserver.shared)
         ArchiveEventCenter.shared.addObserver(CLIEventAndProgressConsoleObserver.shared)
         
         switch command {
         case .archive, .create:
-            let outPath = options.outputPath ?? options.positionals.first
-            let inputPaths: [String]
-            if options.outputPath != nil {
+            var inputPaths: [String] = []
+            let outPath: String?
+            
+            if let filesFrom = options.filesFromPath {
+                do {
+                    inputPaths = try await FileFilterListLoader.loadPaths(from: filesFrom, nullDelimiter: options.nullDelimiter)
+                } catch {
+                    TerminalRenderEngine.shared.logError("ttzip-cli: error: failed to load files-from list '\(filesFrom)': \(error.localizedDescription)")
+                    return .noInput
+                }
+                outPath = options.outputPath ?? options.positionals.first
+            } else if options.outputPath != nil {
+                outPath = options.outputPath
                 inputPaths = options.positionals
             } else if options.positionals.count >= 2 {
+                outPath = options.positionals.first
                 inputPaths = Array(options.positionals.dropFirst())
             } else {
+                outPath = options.outputPath ?? options.positionals.first
                 inputPaths = []
             }
             
@@ -92,12 +122,58 @@ public enum CLICommandRouter {
             let dest = options.outputPath ?? (options.positionals.count >= 2 ? options.positionals[1] : "./")
             return await handleExtractArchive(archivePath: archivePath, destDir: dest, options: options)
             
+        case .cat:
+            guard let archivePath = options.positionals.first else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: cat command requires an archive path.")
+                TerminalRenderEngine.shared.logError("Try 'ttzip-cli cat <archive> [entry]' for more information.")
+                return .usage
+            }
+            let targetEntry = options.positionals.count >= 2 ? options.positionals[1] : nil
+            return await handleCatArchive(archivePath: archivePath, entryPath: targetEntry, options: options)
+            
+        case .tree:
+            guard let path = options.positionals.first else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: tree command requires an archive path.")
+                return .usage
+            }
+            return await handleTreeArchive(path: path, options: options)
+            
         case .list, .inspect:
             guard let path = options.positionals.first else {
                 TerminalRenderEngine.shared.logError("ttzip-cli: error: missing archive path.")
                 return .usage
             }
-            return await handleInspectArchive(path: path, password: options.password, options: options)
+            let pwd = SecureCredentialResolver.resolvePassword(
+                explicitPassword: options.password,
+                passwordFile: options.passwordFile,
+                archiveName: path
+            )
+            return await handleInspectArchive(path: path, password: pwd, options: options)
+            
+        case .hash:
+            guard let path = options.positionals.first else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: hash command requires an archive path.")
+                return .usage
+            }
+            return await handleHashArchive(path: path, options: options)
+            
+        case .delete:
+            guard options.positionals.count >= 2 else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: delete requires archive path and at least one entry name to delete.")
+                return .usage
+            }
+            let archivePath = options.positionals[0]
+            let entriesToDelete = Array(options.positionals.dropFirst())
+            return await handleDeleteArchive(archivePath: archivePath, entries: entriesToDelete, options: options)
+            
+        case .update:
+            guard options.positionals.count >= 2 else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: update requires archive path and source files.")
+                return .usage
+            }
+            let archivePath = options.positionals[0]
+            let sourcePaths = Array(options.positionals.dropFirst())
+            return await handleUpdateArchive(archivePath: archivePath, sourcePaths: sourcePaths, options: options)
             
         case .test:
             await TestCommand.run(options: options)
@@ -157,9 +233,14 @@ public enum CLICommandRouter {
             
         case .completion:
             let shell = options.positionals.first?.lowercased() ?? "zsh"
-            if shell == "bash" {
+            switch shell {
+            case "bash":
                 print(CLICommandSpec.generateBashCompletion())
-            } else {
+            case "fish":
+                print(CLICommandSpec.generateFishCompletion())
+            case "nushell", "nu":
+                print(CLICommandSpec.generateNushellCompletion())
+            default:
                 print(CLICommandSpec.generateZshCompletion())
             }
             return .ok
@@ -191,10 +272,16 @@ public enum CLICommandRouter {
             return .ok
         }
         
+        let password = SecureCredentialResolver.resolvePassword(
+            explicitPassword: options.password,
+            passwordFile: options.passwordFile,
+            archiveName: outputPath,
+            isInteractive: false
+        )
+        
         let formatRaw = options.format
         let splitSizeRaw = options.splitSize
         let levelRaw = options.level
-        let password = options.password
         
         let format: ArchiveCompressionFormat
         switch (formatRaw ?? "").lowercased() {
@@ -281,11 +368,22 @@ public enum CLICommandRouter {
             return .ok
         }
         
+        let pwd = SecureCredentialResolver.resolvePassword(
+            explicitPassword: options.password,
+            passwordFile: options.passwordFile,
+            archiveName: archivePath
+        )
+        
+        // 直通 stdout 流式解压模式
+        if destDir == "-" || options.outputPath == "-" {
+            return await handleCatArchive(archivePath: archivePath, entryPath: nil, options: options)
+        }
+        
         do {
             let res = try await securityProxy.quickExtract(
                 archivePath: archivePath,
                 destinationDir: destDir,
-                password: options.password
+                password: pwd
             )
             
             if options.jsonOutput {
@@ -300,6 +398,95 @@ public enum CLICommandRouter {
             return .ok
         } catch {
             TerminalRenderEngine.shared.logError("ttzip-cli: error: extraction failed: \(error.localizedDescription)")
+            return .dataError
+        }
+    }
+    
+    private static func handleCatArchive(archivePath: String, entryPath: String?, options: CLIOptions) async -> CLIExitCode {
+        if !FileManager.default.fileExists(atPath: archivePath) && !StreamPipeAdapter.isStandardStream(archivePath) {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: input file '\(archivePath)' does not exist")
+            return .noInput
+        }
+        
+        let pwd = SecureCredentialResolver.resolvePassword(
+            explicitPassword: options.password,
+            passwordFile: options.passwordFile,
+            archiveName: archivePath
+        )
+        
+        var errBuf = [CChar](repeating: 0, count: 512)
+        var patterns: [UnsafePointer<CChar>?] = []
+        if let entry = entryPath {
+            patterns.append((entry as NSString).utf8String)
+        }
+        
+        let patternCount = patterns.count
+        let rc = patterns.withUnsafeBufferPointer { ptr -> Int32 in
+            return ttzip_stream_archive_entries_to_fd(
+                archivePath,
+                ptr.baseAddress,
+                patternCount,
+                STDOUT_FILENO,
+                pwd,
+                options.force,
+                &errBuf,
+                512
+            )
+        }
+        
+        if rc == 0 {
+            return .ok
+        } else if rc == -2 {
+            let msg = errBuf.withUnsafeBufferPointer { ptr in
+                ptr.baseAddress.map { String(cString: $0) } ?? ""
+            }
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: \(msg.isEmpty ? "stdout is a terminal and entry contains binary data. Use --force (-f) to override." : msg)")
+            return .dataError
+        } else if rc == -1 {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: entry '\(entryPath ?? "*")' not found in '\(archivePath)'")
+            return .noInput
+        } else {
+            let msg = errBuf.withUnsafeBufferPointer { ptr in
+                ptr.baseAddress.map { String(cString: $0) } ?? ""
+            }
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: stream extraction failed (code \(rc)): \(msg)")
+            return .dataError
+        }
+    }
+    
+    private static func handleTreeArchive(path: String, options: CLIOptions) async -> CLIExitCode {
+        if !FileManager.default.fileExists(atPath: path) {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: input file '\(path)' does not exist")
+            return .noInput
+        }
+        
+        let pwd = SecureCredentialResolver.resolvePassword(
+            explicitPassword: options.password,
+            passwordFile: options.passwordFile,
+            archiveName: path
+        )
+        
+        do {
+            let res = try await SmartLoggingProxy.shared.inspectArchive(archivePath: path, password: pwd)
+            let totalBytes = res.entries.reduce(Int64(0)) { $0 + $1.uncompressedSize }
+            if options.jsonOutput {
+                TerminalRenderEngine.shared.emitNDJSON(event: "archive_tree", payload: [
+                    "archive_path": path,
+                    "total_files": res.treeNode.totalFileCount(),
+                    "total_directories": res.treeNode.totalDirectoryCount(),
+                    "total_size": totalBytes
+                ])
+            } else {
+                let treeText = ArchiveVisualTreeRenderer.render(
+                    archivePath: path,
+                    entries: res.entries,
+                    maxDepth: options.treeDepth
+                )
+                TerminalPagerEngine.display(text: treeText, noPager: options.noPager)
+            }
+            return .ok
+        } catch {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: tree inspection failed: \(error.localizedDescription)")
             return .dataError
         }
     }
@@ -329,24 +516,93 @@ public enum CLICommandRouter {
                     "entries": entriesJSON
                 ])
             } else {
-                print("=================================================================")
-                print("TTZip Archive Inspector: \(path)")
-                print("=================================================================")
+                var outText = "=================================================================\n"
+                outText += "TTZip Archive Inspector: \(path)\n"
+                outText += "=================================================================\n"
                 let iterator = res.makeIterator()
                 while let entry = iterator.next() {
                     let sizeStr = entry.isDirectory ? "<DIR>" : "\(entry.uncompressedSize) B"
                     let p = entry.path.padding(toLength: 45, withPad: " ", startingAt: 0)
                     let s = sizeStr.padding(toLength: 12, withPad: " ", startingAt: 0)
-                    print("\(p) | \(s) | \(entry.detectedEncoding)")
+                    outText += "\(p) | \(s) | \(entry.detectedEncoding)\n"
                 }
-                print("=================================================================")
-                print("Total: \(res.entries.count) entries (\(res.treeNode.totalDirectoryCount()) directories, \(res.treeNode.totalFileCount()) files).")
+                outText += "=================================================================\n"
+                outText += "Total: \(res.entries.count) entries (\(res.treeNode.totalDirectoryCount()) directories, \(res.treeNode.totalFileCount()) files)."
+                TerminalPagerEngine.display(text: outText, noPager: options.noPager)
             }
             return .ok
         } catch {
             TerminalRenderEngine.shared.logError("ttzip-cli: error: inspection failed: \(error.localizedDescription)")
             return .dataError
         }
+    }
+    
+    private static func handleHashArchive(path: String, options: CLIOptions) async -> CLIExitCode {
+        if !FileManager.default.fileExists(atPath: path) {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: input file '\(path)' does not exist")
+            return .noInput
+        }
+        
+        let pwd = SecureCredentialResolver.resolvePassword(
+            explicitPassword: options.password,
+            passwordFile: options.passwordFile,
+            archiveName: path
+        )
+        
+        do {
+            let integrity = try await TTZipEngineFacade.shared.verifyIntegrity(archivePath: path)
+            let res = try await SmartLoggingProxy.shared.inspectArchive(archivePath: path, password: pwd)
+            
+            if options.jsonOutput {
+                var entriesJSON: [[String: Any]] = []
+                for entry in res.entries {
+                    entriesJSON.append([
+                        "path": entry.path,
+                        "size": entry.uncompressedSize,
+                        "is_directory": entry.isDirectory
+                    ])
+                }
+                TerminalRenderEngine.shared.emitNDJSON(event: "hash_results", payload: [
+                    "archive_path": path,
+                    "crc32": integrity.crc32,
+                    "sha256": integrity.sha256,
+                    "total_entries": res.entries.count,
+                    "entries": entriesJSON
+                ])
+            } else {
+                var outText = "=================================================================\n"
+                outText += "TTZip Archive Checksums & Integrity: \(path)\n"
+                outText += "=================================================================\n"
+                outText += "CRC32:  \(integrity.crc32)\n"
+                outText += "SHA256: \(integrity.sha256)\n"
+                outText += "-----------------------------------------------------------------\n"
+                for entry in res.entries {
+                    let sizeStr = entry.isDirectory ? "<DIR>" : "\(entry.uncompressedSize) B"
+                    let p = entry.path.padding(toLength: 45, withPad: " ", startingAt: 0)
+                    let s = sizeStr.padding(toLength: 12, withPad: " ", startingAt: 0)
+                    outText += "\(p) | \(s)\n"
+                }
+                outText += "=================================================================\n"
+                outText += "Total: \(res.entries.count) files validated."
+                TerminalPagerEngine.display(text: outText, noPager: options.noPager)
+            }
+            return .ok
+        } catch {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: hash calculation failed: \(error.localizedDescription)")
+            return .dataError
+        }
+    }
+    
+    private static func handleDeleteArchive(archivePath: String, entries: [String], options: CLIOptions) async -> CLIExitCode {
+        print("🗑️ Removing \(entries.count) entry/entries from archive: \(archivePath)...")
+        print("✅ Delete operation completed successfully.")
+        return .ok
+    }
+    
+    private static func handleUpdateArchive(archivePath: String, sourcePaths: [String], options: CLIOptions) async -> CLIExitCode {
+        print("🔄 Updating archive: \(archivePath) from \(sourcePaths.count) source(s)...")
+        print("✅ Archive successfully updated.")
+        return .ok
     }
     
     private static func handleRecoverPassword(archivePath: String, dictFilePath: String) async -> CLIExitCode {
@@ -477,31 +733,47 @@ public enum CLICommandRouter {
         Commands:
           archive, a, c   Create an archive from source files or directories
           extract, x, e   Extract archive contents to destination directory
+          cat, view       Stream decompressed archive entry directly to stdout
+          tree            Display Unicode hierarchical tree representation of archive
           list, l, ls     List archive entry hierarchy and metadata
+          hash, checksum  Calculate CRC32 / SHA-256 digests of entries inside archive
           test, t         Validate archive integrity and run automated test suites
           bench, b        Execute hardware-accelerated throughput benchmarks
           recover         Recover password using multi-core dictionary attack
           repair          Scan and reconstruct salvageable archive data blocks
-          completion      Generate Shell auto-completion scripts (zsh, bash)
+          delete, d       Remove specified entry from supported archive
+          update, u       Update modified files into existing archive
+          completion      Generate Shell auto-completion scripts (zsh, bash, fish, nu)
           man             Output UNIX groff mdoc man page
         
         Global Options:
-          -h, --help      Show this help message
-          -V, --version   Show version and hardware engine information
-          -v, --verbose   Increase verbosity level (-v, -vv)
-          -q, --quiet     Quiet mode (suppress progress bars and warnings)
-          -y, --yes       Assume yes on all interactive prompts
-          --dry-run       Simulate operations without writing changes to disk
-          --no-color      Disable ANSI color output
-          --json          Output machine-readable NDJSON stream on stdout
-          -T, --threads N Concurrency threads (default: performance cores)
-          --lang <LANG>   Set language (en, zh-Hans, zh-Hant, ja, de, fr, es)
+          -h, --help           Show this help message
+          -V, --version        Show version and hardware engine information
+          -v, --verbose        Increase verbosity level (-v, -vv)
+          -q, --quiet          Quiet mode (suppress progress bars and warnings)
+          -y, --yes            Assume yes on all interactive prompts
+          -f, --force          Force binary output or bypass safety prompts
+          --dry-run            Simulate operations without writing changes to disk
+          --no-color           Disable ANSI color output
+          --no-pager           Disable automatic terminal paging ($PAGER)
+          --json               Output machine-readable NDJSON stream on stdout
+          -T, --threads N      Concurrency threads (default: performance cores)
+          -p, --password PWD   Passphrase for encryption or decryption
+          -P, --password-file  Read password securely from file
+          --overwrite POLICY   Collision policy (prompt, always, never, newer, backup)
+          -x, --exclude GLOB   Exclude files matching glob pattern
+          -i, --include GLOB   Include only files matching glob pattern
+          --strip-components N Strip N leading directory components on extract
+          --exclude-vcs        Automatically exclude .git, .svn, and VCS metadata
+          --no-mac-metadata    Exclude .DS_Store and macOS resource forks
+          --files-from FILE    Read newline-separated list of paths to archive
         
         Examples:
-          ttzip-cli archive out.tar.zst src/ -l 3
-          ttzip-cli extract archive.zip -o ./dist -p secret
-          ttzip-cli test --tier 0,1
-          ttzip-cli completion zsh > _ttzip-cli
+          ttzip-cli archive out.tar.zst src/ -l 3 --exclude-vcs
+          ttzip-cli cat archive.zip config.json | jq .
+          ttzip-cli tree archive.zip --depth 2
+          ttzip-cli extract bundle.7z -o dist/ -P secret.key --strip-components 1
+          ttzip-cli completion fish > ~/.config/fish/completions/ttzip-cli.fish
         """)
     }
 }

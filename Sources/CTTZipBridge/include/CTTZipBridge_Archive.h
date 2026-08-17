@@ -53,6 +53,20 @@ int ttzip_extract_archive(const char* archive_path, const char* destination_dir)
 int ttzip_extract_7z_libarchive_c(const char* archive_path, const char* dest_dir, const char* password);
 
 /**
+ * @brief 将归档内匹配路径的条目以流式直接解压输出至指定文件描述符 (如 STDOUT_FILENO, 零磁盘临时文件)
+ */
+int ttzip_stream_archive_entries_to_fd(
+    const char* archive_path,
+    const char* const* entry_patterns,
+    size_t pattern_count,
+    int target_fd,
+    const char* password,
+    bool force_binary,
+    char* err_buf,
+    size_t err_len
+);
+
+/**
  * @brief 高级参数调优归档压缩中枢
  */
 int ttzip_create_archive_tuned(

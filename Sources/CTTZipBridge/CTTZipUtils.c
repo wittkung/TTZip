@@ -12,6 +12,7 @@
 #include <arm_neon.h>
 #include <arm_acle.h>
 #include <zlib.h>
+#include <readpassphrase.h>
 
 #define AURA_IO_BUFFER_SIZE (4 * 1024 * 1024)
 
@@ -371,4 +372,68 @@ bool ttzip_is_ascii_fast(const void* buf, size_t len) {
         len--;
     }
     return true;
+}
+
+bool ttzip_is_buffer_binary(const void* buf, size_t len) {
+    if (!buf || len == 0) return false;
+    if (memchr(buf, 0, len) != NULL) return true;
+
+    const uint8_t* bytes = (const uint8_t*)buf;
+    size_t control_count = 0;
+    for (size_t i = 0; i < len; i++) {
+        uint8_t c = bytes[i];
+        if (c < 0x09 || (c >= 0x0B && c <= 0x0C) || (c >= 0x0E && c <= 0x1F) || c == 0x7F) {
+            control_count++;
+        }
+    }
+    return (control_count * 100 > len * 2);
+}
+
+int ttzip_read_passphrase(const char* prompt, char* out_buf, size_t max_len) {
+    if (!out_buf || max_len == 0) return -1;
+    char* res = readpassphrase(prompt ? prompt : "Password: ", out_buf, max_len, RPP_ECHO_OFF | RPP_REQUIRE_TTY);
+    if (!res) {
+        return -1;
+    }
+    return 0;
+}
+
+bool ttzip_path_strip_components(const char* path, int strip_count, char* out_buf, size_t out_len) {
+    if (!out_buf || out_len == 0) return false;
+    out_buf[0] = '\0';
+    if (!path || path[0] == '\0') return false;
+
+    if (strip_count <= 0) {
+        snprintf(out_buf, out_len, "%s", path);
+        return out_buf[0] != '\0';
+    }
+
+    const char* p = path;
+    for (int i = 0; i < strip_count; i++) {
+        while (*p == '/') {
+            p++;
+        }
+        if (*p == '\0') {
+            return false;
+        }
+        while (*p != '/' && *p != '\0') {
+            p++;
+        }
+        if (*p == '\0') {
+            return false;
+        }
+        while (*p == '/') {
+            p++;
+        }
+        if (*p == '\0') {
+            return false;
+        }
+    }
+
+    if (*p == '\0') {
+        return false;
+    }
+
+    snprintf(out_buf, out_len, "%s", p);
+    return out_buf[0] != '\0';
 }

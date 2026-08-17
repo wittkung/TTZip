@@ -58,22 +58,40 @@ static int ttzip_lzma2_decode_raw_lzma(
 
     lzma_stream strm = LZMA_STREAM_INIT;
     lzma_ret ret = lzma_raw_decoder(&strm, filters);
-    if (ret != LZMA_OK) {
-        return -2;
-    }
+    if (ret == LZMA_OK) {
+        strm.next_in = src;
+        strm.avail_in = src_len;
+        strm.next_out = dst;
+        strm.avail_out = dst_capacity;
 
-    strm.next_in = src;
-    strm.avail_in = src_len;
-    strm.next_out = dst;
-    strm.avail_out = dst_capacity;
-
-    ret = lzma_code(&strm, LZMA_FINISH);
-    if (ret == LZMA_STREAM_END || ret == LZMA_OK || strm.avail_out == 0 || (dst_capacity - strm.avail_out) > 0) {
-        *out_unpack_size = dst_capacity - strm.avail_out;
+        ret = lzma_code(&strm, LZMA_FINISH);
+        if (ret == LZMA_STREAM_END || ret == LZMA_OK || strm.avail_out == 0 || (dst_capacity - strm.avail_out) > 0) {
+            *out_unpack_size = dst_capacity - strm.avail_out;
+            lzma_end(&strm);
+            return 0;
+        }
         lzma_end(&strm);
-        return 0;
     }
-    lzma_end(&strm);
+
+    // Try LZMA1 fallback (Method ID 0x030101)
+    filters[0].id = LZMA_FILTER_LZMA1;
+    strm = (lzma_stream)LZMA_STREAM_INIT;
+    ret = lzma_raw_decoder(&strm, filters);
+    if (ret == LZMA_OK) {
+        strm.next_in = src;
+        strm.avail_in = src_len;
+        strm.next_out = dst;
+        strm.avail_out = dst_capacity;
+
+        ret = lzma_code(&strm, LZMA_FINISH);
+        if (ret == LZMA_STREAM_END || ret == LZMA_OK || strm.avail_out == 0 || (dst_capacity - strm.avail_out) > 0) {
+            *out_unpack_size = dst_capacity - strm.avail_out;
+            lzma_end(&strm);
+            return 0;
+        }
+        lzma_end(&strm);
+    }
+
     return -3;
 }
 
@@ -154,4 +172,65 @@ int ttzip_lzma2_decode_block_native(
     if (dst_pos == 0) return -2;
     *out_decompressed_len = dst_pos;
     return 0;
+}
+
+int ttzip_lzma1_decode_block_native(
+    const uint8_t* src,
+    size_t src_len,
+    const uint8_t* props,
+    size_t props_len,
+    uint8_t* dst,
+    size_t dst_capacity,
+    size_t* out_decompressed_len
+) {
+    if (!src || src_len == 0 || !dst || dst_capacity == 0 || !out_decompressed_len) {
+        return -1;
+    }
+    lzma_filter filters[2];
+    filters[0].id = LZMA_FILTER_LZMA1;
+    filters[0].options = NULL;
+    filters[1].id = LZMA_VLI_UNKNOWN;
+    filters[1].options = NULL;
+
+    lzma_options_lzma opts;
+    bool free_options = false;
+    if (props && props_len >= 5) {
+        if (lzma_properties_decode(&filters[0], NULL, props, props_len) == LZMA_OK) {
+            free_options = true;
+        } else {
+            if (!lzma_lzma_preset(&opts, 6)) {
+                filters[0].options = &opts;
+            }
+        }
+    } else {
+        if (!lzma_lzma_preset(&opts, 6)) {
+            filters[0].options = &opts;
+        }
+    }
+
+    lzma_stream strm = LZMA_STREAM_INIT;
+    lzma_ret ret = lzma_raw_decoder(&strm, filters);
+    if (ret != LZMA_OK) {
+        if (free_options && filters[0].options) {
+            free(filters[0].options);
+        }
+        return -2;
+    }
+
+    strm.next_in = src;
+    strm.avail_in = src_len;
+    strm.next_out = dst;
+    strm.avail_out = dst_capacity;
+
+    ret = lzma_code(&strm, LZMA_FINISH);
+    int res = -3;
+    if (ret == LZMA_STREAM_END || ret == LZMA_OK || strm.avail_out == 0 || (dst_capacity - strm.avail_out) > 0) {
+        *out_decompressed_len = dst_capacity - strm.avail_out;
+        res = 0;
+    }
+    lzma_end(&strm);
+    if (free_options && filters[0].options) {
+        free(filters[0].options);
+    }
+    return res;
 }

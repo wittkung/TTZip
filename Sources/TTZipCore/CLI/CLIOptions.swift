@@ -1,5 +1,14 @@
 import Foundation
 
+/// 目标文件冲突覆盖策略
+public enum FileCollisionPolicy: String, Sendable, CaseIterable {
+    case prompt
+    case always
+    case never
+    case newer
+    case backup
+}
+
 /// 强类型的 CLI 解析选项数据模型 (符合 POSIX / GNU 规范)
 public struct CLIOptions: Sendable {
     /// 位置参数列表
@@ -10,6 +19,9 @@ public struct CLIOptions: Sendable {
     
     /// 归档或解密密码 (-p, --password)
     public var password: String? = nil
+    
+    /// 密码文件路径 (--password-file, -P)
+    public var passwordFile: String? = nil
     
     /// 压缩格式 (如 "zip", "7z", "tar.zst", "ALL") (-f, --format)
     public var format: String? = nil
@@ -31,6 +43,42 @@ public struct CLIOptions: Sendable {
     
     /// 是否对所有提示自动确认 (-y, --yes, --assume-yes)
     public var assumeYes: Bool = false
+    
+    /// 强制操作 / 绕过 TTY 终端保护 (-f, --force)
+    public var force: Bool = false
+    
+    /// 覆盖冲突策略 ("prompt", "always", "never", "newer", "backup") (--overwrite)
+    public var overwritePolicy: String = "prompt"
+    
+    /// 排除文件模式列表 (-x, --exclude)
+    public var excludePatterns: [String] = []
+    
+    /// 包含文件模式列表 (-i, --include)
+    public var includePatterns: [String] = []
+    
+    /// 路径前缀截取级数 (--strip-components)
+    public var stripComponents: Int = 0
+    
+    /// 是否排除版本控制相关文件 (--exclude-vcs)
+    public var excludeVCS: Bool = false
+    
+    /// 是否排除 macOS 特有元数据文件 (.DS_Store, __MACOSX) (--no-mac-metadata)
+    public var noMacMetadata: Bool = false
+    
+    /// 是否扁平化输出目录层级 (-j, --flatten, --junk-paths)
+    public var flattenPaths: Bool = false
+    
+    /// 外部文件清单文件路径 (--files-from, -T)
+    public var filesFromPath: String? = nil
+    
+    /// 文件清单是否以 NUL (\0) 分隔 (-0, --null)
+    public var nullDelimiter: Bool = false
+    
+    /// 目录树渲染最大深度 (--depth, -d)
+    public var treeDepth: Int? = nil
+    
+    /// 是否禁用分页器输出 (--no-pager)
+    public var noPager: Bool = false
     
     /// 并发线程数 (-T, --threads)
     public var threads: Int = 0
@@ -117,6 +165,17 @@ public struct CLIOptions: Sendable {
     /// 是否使用二进制单位 MiB/s 代替十进制 MB/s
     public var binaryUnits: Bool = false
     
+    // MARK: - 领域实体转换辅助
+    
+    public var collisionPolicy: FileCollisionPolicy {
+        get {
+            FileCollisionPolicy(rawValue: overwritePolicy) ?? .prompt
+        }
+        set {
+            overwritePolicy = newValue.rawValue
+        }
+    }
+    
     public init() {}
 }
 
@@ -143,6 +202,11 @@ public enum CLICommand: String, Sendable {
     case preset
     case completion
     case man
+    case cat
+    case tree
+    case hash
+    case delete
+    case update
     case version = "--version"
     case shortVersion = "-v"
     case help = "--help"
@@ -170,7 +234,7 @@ public enum CLICommand: String, Sendable {
             self = .competitorBench
         case "inspect", "i", "info":
             self = .inspect
-        case "diff", "d":
+        case "diff":
             self = .diff
         case "recover":
             self = .recover
@@ -194,6 +258,16 @@ public enum CLICommand: String, Sendable {
             self = .completion
         case "man":
             self = .man
+        case "cat", "view":
+            self = .cat
+        case "tree":
+            self = .tree
+        case "hash", "checksum":
+            self = .hash
+        case "delete", "remove", "rm", "del", "d":
+            self = .delete
+        case "update", "u":
+            self = .update
         case "--version":
             self = .version
         case "-v", "-V":
@@ -207,3 +281,4 @@ public enum CLICommand: String, Sendable {
         }
     }
 }
+
