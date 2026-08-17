@@ -1,29 +1,37 @@
-BSD 3-Clause License
+# TTZip Dual-Tier Open Source & Fair-Code License
+# Copyright (c) 2026 Weitao Kung (Witt Kung). All rights reserved.
 
-Copyright (c) 2026, Weitao Kung (Witt Kung) <kevintungs@163.com>
-All rights reserved.
+TTZip is built with deep reverence for the global open-source community. To balance our mission of providing powerful, open terminal utilities for all developers while protecting our visual craft and independent sustainability against white-label app store parasitism, TTZip adopts a transparent **Dual-Tier Licensing Framework**:
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+---
 
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
+## Tier 1: Core Engine, Low-Level C Bridges & CLI Tool
+All code residing in:
+- `Sources/TTZipCore/` (Domain models, streaming engines, pipeline abstractions)
+- `Sources/CTTZipBridge/` (ARM64 NEON SIMD micro-kernels, C glue bindings)
+- `Sources/TTZipCLI/` (`ttzip-cli` standalone benchmark & terminal utility)
+- `Vendor/` (Upstream patches & wrappers)
 
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
+is licensed under the **Apache License, Version 2.0**:
+- **Freedom to Use**: You are free to use, run, integrate `ttzip-cli` into your daily workflows, CI/CD pipelines, build scripts, and server environments without restriction.
+- **Freedom to Contribute**: We enthusiastically welcome community contributions, performance benchmarks, upstream optimizations, and pull requests.
 
-3. Neither the name of the copyright holder nor the names of its
-   contributors may be used to endorse or promote products derived from
-   this software without specific prior written permission.
+Full Apache 2.0 text: https://www.apache.org/licenses/LICENSE-2.0
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+---
+
+## Tier 2: macOS Native GUI Application & Design System
+All code residing in:
+- `Sources/TTZipApp/` (SwiftUI views, AppKit navigation, glassmorphic UI, Zen layout)
+- `logo/`, Design Tokens & Visual Assets
+
+is licensed under the **TTZip Source License 1.0 (Source-Available & Anti-Store Piracy)**:
+
+1. **Personal & Research Use**:
+   - You are free to view, inspect, study, and locally compile the macOS application from source code for personal, non-commercial use.
+2. **🔴 Strict Application Store Exclusivity (Anti-White-Labeling)**:
+   - You may **NOT** publish, redistribute, repackage, or distribute the TTZip GUI application, its derivatives, or its compiled binaries to any digital app marketplace (including the **Apple Mac App Store**, Microsoft Store, Steam, Setapp, or commercial package managers) for free or paid distribution.
+3. **Official Commercial Operator**:
+   - Witt Kung / MetaStudyLine reserves the exclusive right to publish and monetize the official macOS application on the Mac App Store, offer Pro lifetime licenses, and grant commercial enterprise licenses.
+4. **Trademark Protection**:
+   - The name "TTZip", the official icon, and the signature Kintsugi Gold Zen aesthetic are exclusive trademarks of Witt Kung.

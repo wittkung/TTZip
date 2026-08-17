@@ -149,17 +149,25 @@ Detailed licensing and copyright attributions are maintained in [ACKNOWLEDGEMENT
 
 ---
 
-## 📄 License & Open-Core Model
+---
 
-### Open-Core Engine (BSD 3-Clause License)
-The core archiving and compression engine (`TTZipCore`, `CTTZipBridge`, and `ttzip-cli`) is open-source software licensed under the **[BSD 3-Clause License](LICENSE)**. You are free to inspect, modify, and embed it into your own Swift, C, and macOS applications.
+## 📄 License & Community Model
 
-### Distribution & Commercial Editions
-- **Open-Core Swift Package**: Freely available via Swift Package Manager (`SPM`) under the BSD 3-Clause License for developers and the open-source community.
-- **TTZip Desktop Client (Community Build)**: Free independent distribution build with Sparkle 2.0 automatic updates.
-- **TTZip Pro (Mac App Store)**: Premium commercial desktop client featuring seamless Apple Sandbox integration, macOS Finder contextual services, and enterprise Password Vault v4 management.
+TTZip is proud to support the global developer community while maintaining sustainable independent craftsmanship. We operate under a transparent **Dual-Tier Open Source & Fair-Code Model**:
+
+### 1. 🚀 Core Engine & CLI Tool (`Apache 2.0`)
+- **Modules**: `TTZipCore`, `CTTZipBridge`, `Sources/TTZipCLI` (`ttzip-cli`), and C hardware micro-kernels.
+- **License**: **[Apache 2.0](LICENSE)**.
+- **Your Freedom**: 100% free for everyone. You are completely free to use `ttzip-cli` in your terminal, build scripts, CI/CD pipelines, and internal workflows. Community PRs and SIMD optimizations are enthusiastically welcomed!
+
+### 2. 🎨 macOS GUI Client & Design System (`TTZip Source License`)
+- **Modules**: `TTZipApp` (SwiftUI views, Zen layout, Kintsugi Gold themes, visual design tokens).
+- **License**: **[TTZip Source License 1.0 (Source-Available)](LICENSE)**.
+- **Your Freedom**: Free to read, inspect, audit, and locally compile for personal use.
+- **🔴 One Rule (Anti-White-Labeling)**: You may **NOT** repackage, clone, or publish the TTZip GUI application to the **Apple Mac App Store**, Steam, Setapp, or commercial app markets for resale. Official Mac App Store distribution is reserved exclusively for the author to sustain development.
 
 Third-party component licenses and acknowledgements are documented in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
+
 
 
 
