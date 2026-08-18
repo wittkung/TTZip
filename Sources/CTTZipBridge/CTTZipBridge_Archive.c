@@ -112,6 +112,60 @@ int ttzip_inspect_archive_v2(
 ) {
     if (!archive_path || !callback) return TTZIP_ERR_INVALID_PARAM;
     setlocale(LC_ALL, "en_US.UTF-8");
+
+    if (strstr(archive_path, ".sz") || strstr(archive_path, ".snappy") || strstr(archive_path, ".tar.sz")) {
+        int fd = open(archive_path, O_RDONLY);
+        if (fd >= 0) {
+            struct stat st;
+            if (fstat(fd, &st) == 0 && st.st_size > TTZIP_SNAPPY_STREAM_ID_LEN) {
+                size_t file_size = ttzip_clamp_size((uint64_t)st.st_size);
+                uint8_t* file_mem = (uint8_t*)malloc(file_size);
+                if (file_mem) {
+                    ssize_t read_bytes = read(fd, file_mem, file_size);
+                    close(fd);
+                    if (read_bytes == (ssize_t)file_size) {
+                        size_t tar_capacity = file_size * 10 + (10 * 1024 * 1024);
+                        uint8_t* tar_mem = (uint8_t*)malloc(tar_capacity);
+                        if (tar_mem) {
+                            size_t tar_size = tar_capacity;
+                            if (ttzip_snappy_framed_decompress(file_mem, file_size, tar_mem, &tar_size) == TTZIP_SNAPPY_OK) {
+                                free(file_mem);
+                                struct archive* a = archive_read_new();
+                                if (a) {
+                                    archive_read_support_format_all(a);
+                                    archive_read_support_filter_none(a);
+                                    if (archive_read_open_memory(a, tar_mem, tar_size) == ARCHIVE_OK) {
+                                        struct archive_entry* entry;
+                                        int r;
+                                        int entry_count = 0;
+                                        while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK) {
+                                            const char* pathname = archive_entry_pathname(entry);
+                                            if (!pathname || pathname[0] == '\0') continue;
+                                            int64_t size = archive_entry_size(entry);
+                                            mode_t mode = archive_entry_filetype(entry);
+                                            bool is_dir = S_ISDIR(mode) || (pathname[strlen(pathname) - 1] == '/');
+                                            callback(context, pathname, size, is_dir, false, false);
+                                            entry_count++;
+                                            archive_read_data_skip(a);
+                                        }
+                                        archive_read_close(a);
+                                        archive_read_free(a);
+                                        free(tar_mem);
+                                        return (entry_count > 0 || r == ARCHIVE_EOF) ? TTZIP_OK : -1;
+                                    }
+                                    archive_read_free(a);
+                                }
+                            }
+                            free(tar_mem);
+                        }
+                    }
+                    free(file_mem);
+                }
+            } else {
+                close(fd);
+            }
+        }
+    }
     
     struct archive* a = archive_read_new();
     if (!a) return TTZIP_ERR_OUT_OF_MEMORY;
@@ -426,8 +480,8 @@ int ttzip_create_archive_tuned(
         return ttzip_create_tar_native_c(output_archive_path, "brotli", input_paths, input_count, skip_mac_junk, zstd_level);
     } else if (strcmp(format, "lrzip") == 0 || strcmp(format, "lrz") == 0) {
         return ttzip_create_tar_native_c(output_archive_path, "lrzip", input_paths, input_count, skip_mac_junk, zstd_level);
-    } else if (strcmp(format, "snappy") == 0 || strcmp(format, "sz") == 0) {
-        return ttzip_create_tar_native_c(output_archive_path, "snappy", input_paths, input_count, skip_mac_junk, zstd_level);
+    } else if (strcmp(format, "snappy") == 0 || strcmp(format, "sz") == 0 || strcmp(format, "tar.sz") == 0) {
+        return ttzip_create_tar_snappy_native_c(output_archive_path, input_paths, input_count, skip_mac_junk);
     } else if (strcmp(format, "iso") == 0 || strcmp(format, "iso9660") == 0 || strcmp(format, "dmg") == 0) {
         return ttzip_create_tar_native_c(output_archive_path, "iso", input_paths, input_count, skip_mac_junk, zstd_level);
     } else if (strcmp(format, "wim") == 0) {

@@ -26,6 +26,19 @@ public final class MultiVolumeStreamSink: @unchecked Sendable {
     private let lock = NSLock()
     private var isClosed = false
     
+    public var totalBytes: Int64 {
+        lock.lock()
+        defer { lock.unlock() }
+        return totalBytesWritten
+    }
+    
+    public var generatedVolumes: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return generatedVolumePaths
+    }
+
+    
     public init(
         baseOutputPath: String,
         volumeSizeBytes: Int64,

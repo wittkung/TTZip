@@ -17,7 +17,7 @@ final class AllFormatDiagnosticSuiteTests: XCTestCase {
     /// Formats currently supporting creation verification
     private static let supportedCreationFormats: Set<ArchiveCompressionFormat> = [
         .zip, .sevenZip, .tar, .tarGz, .gz, .tarZst, .zst, .tarBz2, .bz2, .tarXz, .xz,
-        .lzip, .lz4, .brotli, .lrzip, .aar, .wim, .dmg, .iso
+        .lzip, .lz4, .brotli, .lrzip, .snappy, .aar, .wim, .dmg, .iso
     ]
 
     private func assertDiagnosticPass(

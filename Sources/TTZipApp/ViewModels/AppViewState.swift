@@ -441,13 +441,33 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         self.activePreviewFileName = nil
     }
     
-    public func quickExtractArchive(archivePath: String, targetDir: String? = nil, password: String? = nil) async {
+    public func quickExtractArchive(
+        archivePath: String,
+        targetDir: String? = nil,
+        password: String? = nil,
+        isSmartExtract: Bool = true,
+        trashSourceAfterExtract: Bool = false
+    ) async {
         let archiveURL = URL(fileURLWithPath: archivePath)
         let archiveName = archiveURL.deletingPathExtension().lastPathComponent
         let parentDir = targetDir ?? archiveURL.deletingLastPathComponent().path
-        let destDir = (parentDir as NSString).appendingPathComponent(archiveName)
+        let parentURL = URL(fileURLWithPath: parentDir)
         
         let pwd = password ?? ArchivePasswordStore.shared.getPassword(for: archivePath) ?? activePassword
+        
+        var destDir: String
+        if isSmartExtract {
+            let entries = (try? await ArchiveReader().inspect(archivePath: archivePath, password: pwd)) ?? []
+            let smartRes = SmartExtractResolver.resolve(
+                entryPaths: entries.map { $0.path },
+                destinationParentURL: parentURL,
+                archiveStemName: archiveName
+            )
+            destDir = smartRes.finalExtractionURL.path
+        } else {
+            destDir = (parentDir as NSString).appendingPathComponent(archiveName)
+        }
+
         
         let stateMachine = createAndBindTaskStateMachine(taskName: "QuickExtract_\(archiveName)")
         try? stateMachine.start()
@@ -472,6 +492,9 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
                     self.statusMessage = "Extraction complete: \(archiveName)"
                 }
                 self.fileViewer.revealInFinder(at: destDir)
+                if trashSourceAfterExtract {
+                    try? FileManager.default.trashItem(at: archiveURL, resultingItemURL: nil)
+                }
             }
         } catch {
             await MainActor.run {
@@ -481,6 +504,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             }
         }
     }
+
     
     public func extractSingleEntry(archivePath: String, entryPath: String, isDirectory: Bool, destinationDir: String) async {
         let name = (entryPath as NSString).lastPathComponent

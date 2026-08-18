@@ -365,39 +365,60 @@ public struct ArchiveExplorerView: View {
         }
     }
     
+    private final class PathAccumulator: @unchecked Sendable {
+
+        private var paths: [String] = []
+        private let lock = NSLock()
+        
+        func append(_ path: String) {
+            lock.lock()
+            paths.append(path)
+            lock.unlock()
+        }
+        
+        var allPaths: [String] {
+            lock.lock()
+            defer { lock.unlock() }
+            return paths
+        }
+    }
+    
     private func handleDropFiles(providers: [NSItemProvider]) {
-        var droppedPaths: [String] = []
+        let accumulator = PathAccumulator()
         let group = DispatchGroup()
         
         for provider in providers {
             group.enter()
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
                 if let url = url, url.isFileURL {
-                    droppedPaths.append(url.path)
+                    accumulator.append(url.path)
                 }
                 group.leave()
             }
         }
         
         group.notify(queue: .main) {
-            guard !droppedPaths.isEmpty else { return }
+            let paths = accumulator.allPaths
+            guard !paths.isEmpty else { return }
             self.isMutatingArchive = true
-            self.syncStatusMessage = "Adding \(droppedPaths.count) items into archive..."
+            self.syncStatusMessage = "Adding \(paths.count) items into archive..."
+
             
             Task {
                 do {
                     try await InPlaceArchiveMutationEngine.shared.addFilesToArchive(
                         archivePath: self.archivePath,
-                        sourceFilePaths: droppedPaths,
+                        sourceFilePaths: paths,
                         destinationVirtualFolder: nil,
                         password: self.password
                     )
                     await MainActor.run {
                         self.isMutatingArchive = false
-                        self.syncStatusMessage = "Added items successfully"
+                        self.syncStatusMessage = "Archive updated successfully"
                         self.reloadArchiveEntries()
                     }
                 } catch {
+
                     await MainActor.run {
                         self.isMutatingArchive = false
                         self.syncStatusMessage = "Failed to add items: \(error.localizedDescription)"

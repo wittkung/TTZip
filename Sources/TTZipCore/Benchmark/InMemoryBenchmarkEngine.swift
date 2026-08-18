@@ -105,7 +105,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
         config: InMemoryBenchmarkConfig,
         progressCallback: (@Sendable (String) -> Void)?
     ) -> AlgorithmBenchmarkResult? {
-        let maxCompCap = srcSize + max(131072, srcSize / 8)
+        let maxCompCap = max(srcSize + max(131072, srcSize / 4), ttzip_snappy_max_compressed_length(srcSize) + 65536)
         guard let compRaw = NativeCoreArchitecture.allocateAlignedPageBuffer(capacity: maxCompCap),
               let decompRaw = NativeCoreArchitecture.allocateAlignedPageBuffer(capacity: srcSize) else {
             return nil
@@ -167,6 +167,19 @@ public final class InMemoryBenchmarkEngine: Sendable {
                                                UnsafeMutableRawPointer(d).assumingMemoryBound(to: CChar.self),
                                                Int32(sLen),
                                                Int32(dCap)))
+            }
+
+        case "snappy", "sz":
+            algoName = "Google-Snappy"
+            compFunc = { s, sLen, d, dCap, _ in
+                var outLen = dCap
+                let rc = ttzip_snappy_compress(s, sLen, d, &outLen)
+                return (rc == TTZIP_SNAPPY_OK.rawValue) ? outLen : 0
+            }
+            decompFunc = { s, sLen, d, dCap in
+                var outLen = dCap
+                let rc = ttzip_snappy_decompress(s, sLen, d, &outLen)
+                return (rc == TTZIP_SNAPPY_OK.rawValue) ? outLen : 0
             }
 
         default:

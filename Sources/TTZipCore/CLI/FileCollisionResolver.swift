@@ -115,8 +115,11 @@ public final class FileCollisionResolver: @unchecked Sendable {
         
         var charBuf = [CChar](repeating: 0, count: 64)
         if fgets(&charBuf, 64, tty) != nil {
-            let resp = String(cString: charBuf).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let resp = charBuf.withUnsafeBufferPointer { ptr in
+                ptr.baseAddress.map { String(cString: $0) } ?? ""
+            }.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             switch resp {
+
             case "y", "yes":
                 return .overwrite
             case "n", "no":

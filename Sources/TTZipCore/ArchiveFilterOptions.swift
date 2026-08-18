@@ -79,7 +79,32 @@ public struct ArchiveFilterOptions: Sendable, Equatable {
     
     public static let defaultClean = ArchiveFilterOptions(excludePatterns: [], includePatterns: [], stripComponents: 0, excludeVCS: false, noMacMetadata: true)
     public static let preserveAll = ArchiveFilterOptions(excludePatterns: [], includePatterns: [], stripComponents: 0, excludeVCS: false, noMacMetadata: false)
+    
+    /// Returns true if the entry path represents macOS or Windows system metadata artifacts.
+    public static func isSystemMetadata(path: String) -> Bool {
+        var normalized = path.replacingOccurrences(of: "\\", with: "/")
+        while normalized.hasPrefix("./") {
+            normalized.removeFirst(2)
+        }
+        normalized = normalized.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if normalized == "__MACOSX" || normalized.hasPrefix("__MACOSX/") {
+            return true
+        }
+        let fileName = (normalized as NSString).lastPathComponent
+        if fileName.hasPrefix("._") || fileName == ".DS_Store" || fileName == ".localized" || fileName == ".VolumeIcon.icns" {
+            return true
+        }
+        if fileName.hasPrefix(".Spotlight-V100") || fileName.hasPrefix(".Trashes") || fileName.hasPrefix(".fseventsd") || fileName.hasPrefix(".TemporaryItems") || fileName.hasPrefix("PaxHeader") {
+            return true
+        }
+        if fileName.caseInsensitiveCompare("Thumbs.db") == .orderedSame || fileName.caseInsensitiveCompare("desktop.ini") == .orderedSame || fileName.caseInsensitiveCompare("ehthumbs.db") == .orderedSame {
+            return true
+        }
+        return false
+    }
 }
+
+
 
 // MARK: - PrototypeCopyable Prototype Pattern Extension
 extension ArchiveFilterOptions: PrototypeCopyable {

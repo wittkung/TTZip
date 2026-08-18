@@ -213,9 +213,10 @@ extension CLIBenchmarkRunner {
                 let rc3 = padColumn(String(format: "%.1f MB/s", ttExtMBs), 20)
                 let rc4 = padColumn(String(format: "%.3fs / %.3fs", ttCompTime, ttExtTime), 18)
                 let rc5 = padColumn(String(format: "%.2f MB", sizeMB), 14)
-                let rc6 = padColumn(ttValid ? "✅ Matched" : "❌ Mismatch", 14)
+                let rc6 = padColumn(ttValid ? "✅ Matched (\(ttCrcStr))" : "❌ Mismatch", 14)
                 let rc7 = padColumn("Baseline (1.0x / 1.0x)", 22)
                 print("\(rc1) | \(rc2) | \(rc3) | \(rc4) | \(rc5) | \(rc6) | \(rc7)")
+
 
                 for comp in competitorRows {
                     let kc1 = padColumn(comp.name, 24)

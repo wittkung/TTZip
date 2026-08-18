@@ -460,8 +460,21 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// : SNAPPY
+    /// : SNAPPY (In-Process Native Google Snappy Engine)
     func testFormat_SNAPPY() async throws {
-        throw XCTSkip("SNAPPY format decompression is fully supported, native creation requires external filter, libsnappy 写过滤器，skipping creation")
+        let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.sz")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: out, format: .snappy, level: .level1, inputPaths: sampleFiles)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out))
+
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: out)
+        XCTAssertFalse(entries.isEmpty)
+
+        let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_snappy")
+        let extractor = ArchiveExtractor()
+        try await extractor.extract(archivePath: out, destinationDir: extractDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc2.json")))
     }
 }

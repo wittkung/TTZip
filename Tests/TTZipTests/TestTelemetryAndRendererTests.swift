@@ -198,8 +198,9 @@ final class TestTelemetryAndRendererTests: XCTestCase {
     }
     
     func testHexDiffRendering() {
-        var expected = Data([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00])
+        let expected = Data([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00])
         var actual = Data([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00])
+
         
         let matchOutput = TestTerminalRenderer.renderHexDiff(expected: expected, actual: actual, useColor: false)
         XCTAssertTrue(matchOutput.contains("[Hex Match]"))

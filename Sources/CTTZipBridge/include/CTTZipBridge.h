@@ -43,6 +43,7 @@
 #include "ttzip_native_archive.h"
 #include "CTTZipBridge_ZipChunkedStream.h"
 #include "ttzip_crc64.h"
+#include "CTTZipBridge_Snappy.h"
 
 #ifdef __cplusplus
 extern "C" {

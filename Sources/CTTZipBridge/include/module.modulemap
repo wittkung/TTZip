@@ -20,6 +20,7 @@ module CTTZipBridge {
     header "CTTZipStreamCoder.h"
     header "CTTZipBridge_UnRAR.h"
     header "CTTZipBridge_LZFSE.h"
+    header "CTTZipBridge_Snappy.h"
     header "ttzip_lzma2_enc_native.h"
     header "ttzip_fl2_lzma2.h"
     header "ttzip_native_archive.h"

@@ -208,10 +208,9 @@ int ttzip_create_tar_native_c(
             if (archive_write_add_filter_by_name(a, "brotli") != ARCHIVE_OK) {
                 archive_write_add_filter_program(a, "brotli");
             }
-        } else if (strcmp(format_flag, "snappy") == 0 || strcmp(format_flag, "sz") == 0) {
-            if (archive_write_add_filter_by_name(a, "snappy") != ARCHIVE_OK) {
-                archive_write_add_filter_program(a, "snappy");
-            }
+        } else if (strcmp(format_flag, "snappy") == 0 || strcmp(format_flag, "sz") == 0 || strcmp(format_flag, "tar.sz") == 0) {
+            archive_write_free(a);
+            return ttzip_create_tar_snappy_native_c(output_path, input_paths, input_count, skip_mac_junk);
         } else {
             archive_write_add_filter_none(a);
         }
@@ -269,6 +268,10 @@ int ttzip_extract_tar_native_c(
     bool skip_mac_junk
 ) {
     if (!archive_path || !dest_dir) return TTZIP_ERR_INVALID_PARAM;
+    
+    if (strstr(archive_path, ".sz") || strstr(archive_path, ".snappy") || strstr(archive_path, ".tar.sz")) {
+        return ttzip_extract_tar_snappy_native_c(archive_path, dest_dir, skip_mac_junk);
+    }
     
     ttzip_common_mkdir_p(dest_dir);
     

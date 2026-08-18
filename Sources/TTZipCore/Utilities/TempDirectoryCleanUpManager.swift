@@ -25,6 +25,8 @@ public final class TempDirectoryCleanUpManager: Sendable {
         for item in items {
             let lowerName = item.lastPathComponent.lowercased()
             if lowerName.hasPrefix("ttzip") ||
+               lowerName.hasPrefix("ttzipedit_") ||
+               lowerName.hasPrefix("ttzip_edit_") ||
                lowerName.hasPrefix("pwd_test") ||
                lowerName.hasPrefix("tt_") ||
                lowerName.hasPrefix("measure_") ||

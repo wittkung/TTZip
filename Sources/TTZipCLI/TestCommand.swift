@@ -352,8 +352,9 @@ public enum TestCommand {
         let availableOracles = registry.availableOracles()
         let suiteStart = Date()
         var passedCount = 0
-        var failedCount = 0
+        let failedCount = 0
         var suiteCases: [[String: Any]] = []
+
         
         for oracle in availableOracles {
             if oracleStr.lowercased() != "all" && !oracle.lowercased().contains(oracleStr.lowercased()) {
@@ -375,6 +376,8 @@ public enum TestCommand {
             records.append(rec)
             passedCount += 1
             suiteCases.append(["caseName": name, "status": "passed", "durationMs": durSec * 1000.0])
+
+
             if options.verbosity >= 1 && !options.jsonOutput {
                 print("  \u{001B}[32m✓ [ORACLE]\u{001B}[0m Differential roundtrip verified against \(oracle)")
             }

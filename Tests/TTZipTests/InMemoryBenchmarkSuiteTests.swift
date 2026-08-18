@@ -111,4 +111,28 @@ final class InMemoryBenchmarkSuiteTests: XCTestCase {
         XCTAssertEqual(decoded.results.first?.algorithm, report.results.first?.algorithm)
         XCTAssertEqual(decoded.allPassed, true)
     }
+
+    func testSnappyInMemoryComparisonAgainstFastCodecs() async throws {
+        let config = InMemoryBenchmarkConfig(
+            selectedFormats: ["snappy", "lz4", "zip", "zstd"],
+            selectedLevels: [1],
+            bufferSizeBytes: 10 * 1024 * 1024, // 10MB
+            warmupPasses: 2,
+            minDurationMs: 200,
+            useBinaryUnits: false,
+            turboBenchOutput: true
+        )
+
+        let report = try await InMemoryBenchmarkEngine.shared.runInMemoryBenchmark(config: config)
+        let table = InMemoryBenchmarkEngine.shared.generateTurboBenchTable(report: report)
+        print("\n" + table + "\n")
+
+        XCTAssertTrue(report.allPassed)
+        XCTAssertEqual(report.results.count, 4)
+
+        if let snappyRes = report.results.first(where: { $0.algorithm == "Google-Snappy" }) {
+            XCTAssertTrue(snappyRes.integrityVerified)
+            print("🚀 [PHYSICAL BENCHMARK RESULT] Google Snappy: Comp=\(String(format: "%.1f", snappyRes.compressionSpeedMBs)) MB/s, Decomp=\(String(format: "%.1f", snappyRes.decompressionSpeedMBs)) MB/s, Ratio=\(String(format: "%.2fx", snappyRes.ratio))")
+        }
+    }
 }

@@ -54,13 +54,13 @@ public final class MIPSHardwareBenchmarkEngine: @unchecked Sendable {
         
         // 3. Measure Decompression Pass
         let decompStart = mach_absolute_time()
-        var decompressedBytes: size_t = 0
         
         for _ in 0..<iterations {
-            decompressedBytes = ttzip_libdeflate_decompress(rawCompressed, compressedBytes, rawDecompressed, bufferSize)
+            _ = ttzip_libdeflate_decompress(rawCompressed, compressedBytes, rawDecompressed, bufferSize)
         }
         let decompElapsed = max(0.0001, Self.elapsedSeconds(from: decompStart))
         let decompSpeedMBs = (Double(bufferSize * iterations) / (1024.0 * 1024.0)) / decompElapsed
+
         
         // 4. Calculate 7-Zip Standardized MIPS Ratings
         // Compression complexity constant: ~870 instructions/byte for standard dictionary

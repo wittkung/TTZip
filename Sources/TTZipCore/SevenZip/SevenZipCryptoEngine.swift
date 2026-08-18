@@ -95,52 +95,51 @@ public final class SevenZipCryptoEngine: SevenZipCryptoEngineProtocol, @unchecke
                 return nil
             }
             
-            var successFlag: Int32 = 1
+            let atomicFlag = SendableAtomicFlag()
             let dstBox = SendablePointerBox(pointer: dstBytePtr, size: totalSize)
             
             // Multi-core parallel chunk decryption
-            withUnsafeMutablePointer(to: &successFlag) { flagPtr in
-                DispatchQueue.concurrentPerform(iterations: numChunks) { chunkIdx in
-                    let offset = chunkIdx * chunkSize
-                    let length = min(chunkSize, totalSize - offset)
-                    
-                    let srcPtr = pointerBox.pointer.advanced(by: offset)
-                    let dstChunkPtr = dstBox.pointer.advanced(by: offset)
-                    
-                    var chunkIV = iv
-                    if chunkIdx > 0 {
-                        let prevCipherOffset = offset - 16
-                        chunkIV = Data(bytes: pointerBox.pointer.advanced(by: prevCipherOffset), count: 16)
+            DispatchQueue.concurrentPerform(iterations: numChunks) { chunkIdx in
+                let offset = chunkIdx * chunkSize
+                let length = min(chunkSize, totalSize - offset)
+                
+                let srcPtr = pointerBox.pointer.advanced(by: offset)
+                let dstChunkPtr = dstBox.pointer.advanced(by: offset)
+                
+                var chunkIV = iv
+                if chunkIdx > 0 {
+                    let prevCipherOffset = offset - 16
+                    chunkIV = Data(bytes: pointerBox.pointer.advanced(by: prevCipherOffset), count: 16)
+                }
+                
+                var outMoved: Int = 0
+                let op = encrypt ? CCOperation(kCCEncrypt) : CCOperation(kCCDecrypt)
+                
+                let status = key.withUnsafeBytes { keyBytes in
+                    chunkIV.withUnsafeBytes { ivBytes in
+                        CCCrypt(
+                            op,
+                            CCAlgorithm(kCCAlgorithmAES),
+                            0,
+                            keyBytes.baseAddress, 32,
+                            ivBytes.baseAddress,
+                            srcPtr, length,
+                            UnsafeMutableRawPointer(mutating: dstChunkPtr), length,
+                            &outMoved
+                        )
                     }
-                    
-                    var outMoved: Int = 0
-                    let op = encrypt ? CCOperation(kCCEncrypt) : CCOperation(kCCDecrypt)
-                    
-                    let status = key.withUnsafeBytes { keyBytes in
-                        chunkIV.withUnsafeBytes { ivBytes in
-                            CCCrypt(
-                                op,
-                                CCAlgorithm(kCCAlgorithmAES),
-                                0,
-                                keyBytes.baseAddress, 32,
-                                ivBytes.baseAddress,
-                                srcPtr, length,
-                                UnsafeMutableRawPointer(mutating: dstChunkPtr), length,
-                                &outMoved
-                            )
-                        }
-                    }
-                    
-                    if status != kCCSuccess {
-                        OSAtomicCompareAndSwap32Barrier(1, 0, flagPtr)
-                    }
+                }
+                
+                if status != kCCSuccess {
+                    atomicFlag.markFailure()
                 }
             }
             
-            if successFlag == 1 {
+            if atomicFlag.isSuccess {
                 return Data(bytes: dstBytePtr, count: totalSize)
             }
             return nil
         }
     }
 }
+

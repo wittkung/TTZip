@@ -8,6 +8,17 @@
 import Foundation
 import CTTZipBridge
 
+internal final class SendableAtomicFlag: @unchecked Sendable {
+    private var flag: Int32 = 1
+    var isSuccess: Bool {
+        return flag != 0
+    }
+    func markFailure() {
+        OSAtomicCompareAndSwap32Barrier(1, 0, &flag)
+    }
+}
+
+
 /// Multi-solid block concurrent LZMA2/Zstd decompressor scheduler.
 public final class SevenZipBlockParallelDecompressor: @unchecked Sendable {
     public static let shared = SevenZipBlockParallelDecompressor()
@@ -24,38 +35,38 @@ public final class SevenZipBlockParallelDecompressor: @unchecked Sendable {
         guard !blocks.isEmpty else { return false }
         
         let pointerBox = SendablePointerBox(pointer: archiveBytePtr, size: archiveFileSize)
-        var successFlag: Int32 = 1
+        let atomicFlag = SendableAtomicFlag()
         
-        withUnsafeMutablePointer(to: &successFlag) { flagPtr in
-            DispatchQueue.concurrentPerform(iterations: blocks.count) { blockIdx in
-                let block = blocks[blockIdx]
-                let srcOffset = Int(block.offset)
-                let cSize = Int(block.compressedSize)
-                let uSize = Int(block.uncompressedSize)
-                
-                if srcOffset + cSize > pointerBox.size { return }
-                let srcPtr = pointerBox.pointer.advanced(by: srcOffset)
-                
-                // 64-byte cache line aligned buffer
-                var alignedOutPtr: UnsafeMutableRawPointer? = nil
-                let pageSize = 64
-                let alignedLength = ((uSize + pageSize - 1) / pageSize) * pageSize
-                posix_memalign(&alignedOutPtr, pageSize, alignedLength)
-                
-                guard let dstRawPtr = alignedOutPtr else { return }
-                let dstBytePtr = dstRawPtr.assumingMemoryBound(to: UInt8.self)
-                
-                // Two-pass block decompression fallback
-                let decompSize = ttzip_quantum_decompress_two_pass(srcPtr, cSize, dstBytePtr, uSize)
-                var actualSize = (decompSize == uSize) ? uSize : 0
-                if decompSize != uSize {
-                    let zstdDecomp = ttzip_zstd_decompress(srcPtr, cSize, dstBytePtr, uSize)
-                    if zstdDecomp == 0 {
-                        OSAtomicCompareAndSwap32Barrier(1, 0, flagPtr)
-                    } else {
-                        actualSize = zstdDecomp
-                    }
+        DispatchQueue.concurrentPerform(iterations: blocks.count) { blockIdx in
+            let block = blocks[blockIdx]
+            let srcOffset = Int(block.offset)
+            let cSize = Int(block.compressedSize)
+            let uSize = Int(block.uncompressedSize)
+            
+            if srcOffset + cSize > pointerBox.size { return }
+            let srcPtr = pointerBox.pointer.advanced(by: srcOffset)
+            
+            // 64-byte cache line aligned buffer
+            var alignedOutPtr: UnsafeMutableRawPointer? = nil
+            let pageSize = 64
+            let alignedLength = ((uSize + pageSize - 1) / pageSize) * pageSize
+            posix_memalign(&alignedOutPtr, pageSize, alignedLength)
+            
+            guard let dstRawPtr = alignedOutPtr else { return }
+            let dstBytePtr = dstRawPtr.assumingMemoryBound(to: UInt8.self)
+            
+            // Two-pass block decompression fallback
+            let decompSize = ttzip_quantum_decompress_two_pass(srcPtr, cSize, dstBytePtr, uSize)
+            var actualSize = (decompSize == uSize) ? uSize : 0
+            if decompSize != uSize {
+                let zstdDecomp = ttzip_zstd_decompress(srcPtr, cSize, dstBytePtr, uSize)
+                if zstdDecomp == 0 {
+                    atomicFlag.markFailure()
+                } else {
+                    actualSize = zstdDecomp
                 }
+            }
+
                 
                 if actualSize > 0 && !outputDir.isEmpty {
                     let blockFile = (outputDir as NSString).appendingPathComponent(String(format: "solid_block_%04d.tmp", blockIdx))
@@ -68,8 +79,8 @@ public final class SevenZipBlockParallelDecompressor: @unchecked Sendable {
                 
                 free(dstRawPtr)
             }
-        }
         
-        return successFlag == 1
+        return atomicFlag.isSuccess
     }
 }
+
