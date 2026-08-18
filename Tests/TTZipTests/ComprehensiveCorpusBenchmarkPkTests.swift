@@ -59,19 +59,10 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
                 let outZip = NSTemporaryDirectory() + "ttzip_unified_\(lvl)_\(UUID().uuidString).zip"
                 defer { try? FileManager.default.removeItem(atPath: outZip) }
                 let start = mach_absolute_time()
-                
-                let outSize: Int64
-                if lvl <= 8 {
-                    let res = try ZipExtremeBlockWriter.shared.createExtremeArchive(outputPath: outZip, inputPath: corpus.path, level: levelEnum)
-                    guard res else { throw NSError(domain: "Bench", code: 500) }
-                    outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
-                } else {
-                    let writer = ArchiveWriter()
-                    try await writer.createArchive(outputPath: outZip, format: .zip, level: levelEnum, inputPaths: [corpus.path])
-                    outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
-                }
-                
+                let writer = ArchiveWriter()
+                try await writer.createArchive(outputPath: outZip, format: .zip, level: levelEnum, inputPaths: [corpus.path])
                 let elapsed = Double(mach_absolute_time() - start) * 1e-9
+                let outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
                 let speed = (Double(corpus.sizeBytes) / 1024.0 / 1024.0) / max(0.0001, elapsed)
                 let ratio = Double(corpus.sizeBytes) / Double(max(1, outSize))
                 let savings = (1.0 - Double(outSize) / Double(corpus.sizeBytes)) * 100.0
