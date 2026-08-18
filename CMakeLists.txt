@@ -92,6 +92,7 @@ set(CTTZIP_CORE_SOURCES
     Sources/CTTZipBridge/ttzip_tar_native.c
     Sources/CTTZipBridge/ttzip_native_archive.c
     Sources/CTTZipBridge/ttzip_crc64.c
+    Sources/CTTZipBridge/ttzip_huffman_inplace.c
 )
 
 # 架构硬件加速分支

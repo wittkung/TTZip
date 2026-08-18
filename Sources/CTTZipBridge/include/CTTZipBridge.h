@@ -56,6 +56,7 @@
 #include "CTTZipBitGroom.h"
 #include "ttzip_blosclz.h"
 #include "ttzip_context_pool.h"
+#include "ttzip_huffman_inplace.h"
 
 #ifdef __cplusplus
 
