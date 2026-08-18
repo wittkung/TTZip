@@ -113,8 +113,8 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let padRight = max(xStep * 0.6, spanX * 0.12)
         let domainMaxX = min(100.0, ceil((maxX + padRight) / xStep) * xStep)
 
-        let minLogY = max(0.5, floor(log10(max(1.0, minY))))
-        let maxLogY = min(5.5, ceil(log10(max(10.0, maxY))) + 0.3)
+        let minLogY = log10(max(1.0, minY * 0.70))
+        let maxLogY = log10(max(10.0, maxY * 1.25))
 
         func mapX(_ savingsVal: Double) -> CGFloat {
             let clamped = max(domainMinX, min(savingsVal, domainMaxX))
@@ -129,15 +129,12 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             return marginBottom + CGFloat(norm) * plotH
         }
 
-        // 3. 绘制极淡水平网格线 (Y 轴对数速度刻度)
+        // 3. 绘制极淡水平网格线 (Y 轴对数速度刻度，紧致动态范围)
         let gridColor = CGColor(red: 241/255.0, green: 245/255.0, blue: 249/255.0, alpha: 1.0)
         let axisTextColor = NSColor(calibratedRed: 100/255.0, green: 116/255.0, blue: 139/255.0, alpha: 1.0)
 
         let candidateYTicks: [(val: Double, label: String)] = [
-            (1.0, "1 MB/s"),
-            (5.0, "5 MB/s"),
             (10.0, "10 MB/s"),
-            (20.0, "20 MB/s"),
             (50.0, "50 MB/s"),
             (100.0, "100 MB/s"),
             (200.0, "200 MB/s"),
@@ -147,8 +144,11 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             (5000.0, "5,000 MB/s"),
             (10000.0, "10 GB/s"),
             (20000.0, "20 GB/s"),
+            (30000.0, "30 GB/s"),
             (50000.0, "50 GB/s"),
+            (75000.0, "75 GB/s"),
             (100000.0, "100 GB/s"),
+            (150000.0, "150 GB/s"),
             (200000.0, "200 GB/s")
         ]
 
@@ -294,12 +294,13 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let cy = mapY(p.throughputMBs)
             let fam = SoftwareFamilyClassifier.classify(algorithm: p.algorithm)
 
-            let isHeroPill = fam.isHero && (p.algorithm.contains("ZIP Fast") || p.algorithm.contains("ZIP Ultra") || p.algorithm.contains("TAR.ZST") || p.algorithm.contains("7Z Fast") || p.algorithm.contains("LZ4"))
+            let isHeroPill = (fam == .ttzipExtreme && p.level == 1) || (fam == .ttzip && (p.level == 1 || p.level == 12)) || (p.algorithm.contains("ZIP Fast") && !p.algorithm.contains("pigz") && !p.algorithm.contains("7-zip") && !p.algorithm.contains("apple")) || p.algorithm.contains("TAR.ZST") || p.algorithm.contains("7Z Fast") || p.algorithm.contains("LZ4")
             let isHeroNormal = fam.isHero && !isHeroPill
 
             let cleanName: String
             if fam == .sevenZip {
-                cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02 (ZIP ", with: "7-zip-")
+                cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02 (mx=", with: "7-zip-mx=")
+                    .replacingOccurrences(of: "7-Zip 26.02 (ZIP ", with: "7-zip-")
                     .replacingOccurrences(of: "7-Zip 26.02 (7Z ", with: "7-zip-")
                     .replacingOccurrences(of: ")", with: "")
                     .lowercased()
@@ -310,7 +311,8 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                     .lowercased()
                     .replacingOccurrences(of: " ", with: "-")
             } else if fam == .openSource {
-                cleanName = p.algorithm.replacingOccurrences(of: "pigz (ZIP ", with: "pigz-")
+                cleanName = p.algorithm.replacingOccurrences(of: "pigz (-", with: "pigz-")
+                    .replacingOccurrences(of: "pigz (ZIP ", with: "pigz-")
                     .replacingOccurrences(of: ")", with: "")
                     .lowercased()
             } else if fam == .ttzipExtreme {
@@ -481,6 +483,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             }
 
             var bestRect = CGRect(x: cx - w / 2, y: cy + 14, width: w, height: h)
+            var foundSlot = false
             for slot in candidateSlots {
                 let testX = min(marginLeft + plotW - w, max(marginLeft, slot.x))
                 let testY = min(marginBottom + plotH - h, max(marginBottom, slot.y))
@@ -489,8 +492,15 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 let intersects = reservedAABBs.contains { $0.intersects(testRect.insetBy(dx: -4, dy: -3)) }
                 if !intersects {
                     bestRect = testRect
+                    foundSlot = true
                     break
                 }
+            }
+
+            // 若所有候选槽位均被占用且不是端点 Flagship 卡片，则隐藏文字标签（保留曲线上的散点），彻底杜绝文字堆叠
+            let isFlagshipEndpoint = (fam == .ttzipExtreme && item.point.level == 1) || (fam == .ttzip && (item.point.level == 1 || item.point.level == 12))
+            if !foundSlot && !isFlagshipEndpoint {
+                continue
             }
 
             reservedAABBs.append(bestRect)
