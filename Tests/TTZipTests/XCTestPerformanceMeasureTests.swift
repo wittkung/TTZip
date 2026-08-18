@@ -357,7 +357,10 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
             setUp: { sandbox in
                 let logFileURL = sandbox.fileURL(named: "sample_lz4_10m.log")
                 try TestFileGenerator.createRealisticLogFile(at: logFileURL, linesCount: 50000)
+                let warmupOut = sandbox.fileURL(named: "warmup_lz4.lz4").path
+                _ = try? await ArchiveWriter().createArchive(outputPath: warmupOut, format: .lz4, level: .fastest, inputPaths: [logFileURL.path])
             },
+
             block: { sandbox in
                 let logFileURL = sandbox.fileURL(named: "sample_lz4_10m.log")
                 let outArchive = sandbox.fileURL(named: "measure_lz4.lz4").path

@@ -56,11 +56,11 @@ const uint8_t s_offset_extra_bits[30] = {
 /* Fast reverse-lookup mapping tables */
 uint8_t s_length_slot[259];
 uint8_t s_offset_slot[32769];
-static bool s_slot_tables_initialized = false;
+#include <pthread.h>
 
-static void init_slot_tables(void) {
-    if (s_slot_tables_initialized) return;
-    
+static pthread_once_t s_slot_once = PTHREAD_ONCE_INIT;
+
+static void init_slot_tables_impl(void) {
     /* Precompute length to slot lookup */
     for (unsigned slot = 0; slot < 29; slot++) {
         unsigned base = s_length_base[slot];
@@ -79,9 +79,12 @@ static void init_slot_tables(void) {
             s_offset_slot[base + i] = (uint8_t)slot;
         }
     }
-
-    s_slot_tables_initialized = true;
 }
+
+static inline void init_slot_tables(void) {
+    pthread_once(&s_slot_once, init_slot_tables_impl);
+}
+
 
 #if defined(__APPLE__) || defined(__linux__) || defined(_WIN32)
 #define TTZIP_THREAD_LOCAL _Thread_local
@@ -89,12 +92,17 @@ static void init_slot_tables(void) {
 #define TTZIP_THREAD_LOCAL __thread
 #endif
 
-static TTZIP_THREAD_LOCAL ttzip_deflate_fast_mf_t s_tls_fast_mf;
-static TTZIP_THREAD_LOCAL ttzip_deflate_fast_lazy_mf_t s_tls_fast_lazy_mf;
-static TTZIP_THREAD_LOCAL ttzip_deflate_deep_lazy_mf_t s_tls_deep_lazy_mf;
-static TTZIP_THREAD_LOCAL ttzip_deflate_token_t s_tls_fixed_tokens[65536 + 64];
+typedef struct {
+    union {
+        ttzip_deflate_hybrid_fast_mf_t hybrid_fast_mf;
+        ttzip_deflate_fast_lazy_mf_t fast_lazy_mf;
+        ttzip_deflate_deep_lazy_mf_t deep_lazy_mf;
+    } mf;
+    ttzip_deflate_token_t fixed_tokens[131072 + 256];
+    uint8_t history_bounce_buffer[32768 + 131072];
+} ttzip_deflate_scratch_t;
 
-#define TTZIP_STREAM_CHUNK_SIZE 65536
+#define TTZIP_STREAM_CHUNK_SIZE 131072
 
 #include "CTTZipStreamCoder.h"
 
@@ -109,9 +117,8 @@ size_t ttzip_native_deflate_compress_block_with_history(
     const ttzip_native_deflate_options_t *options,
     bool is_final
 ) {
-    if (!s_slot_tables_initialized) {
-        init_slot_tables();
-    }
+    init_slot_tables();
+
 
     if (!in || in_size == 0) {
         ttzip_bitstream_t bs;
@@ -127,30 +134,11 @@ size_t ttzip_native_deflate_compress_block_with_history(
         return bs.overflow ? 0 : (size_t)(bs.out_next - out);
     }
 
+    ttzip_deflate_scratch_t *scratch = (ttzip_deflate_scratch_t *)malloc(sizeof(ttzip_deflate_scratch_t));
+    if (!scratch) return 0;
+
     ttzip_bitstream_t bs;
     ttzip_bs_init(&bs, out, out_capacity);
-
-    /* 0. Early entropy short-circuit for high-entropy / incompressible payloads */
-    if (in_size >= 65536) {
-        double entropy = 0.0, ratio = 1.0;
-        int routing = ttzip_probe_entropy_and_compressibility(in, in_size, 2048, &entropy, &ratio);
-        if (routing == 0) {
-            size_t p = 0;
-            while (p < in_size) {
-                size_t clen = (p + TTZIP_STREAM_CHUNK_SIZE <= in_size) ? TTZIP_STREAM_CHUNK_SIZE : (in_size - p);
-                bool c_final = (p + clen >= in_size) && is_final;
-                ttzip_bs_write_uncompressed_block(&bs, in + p, (uint16_t)clen, c_final);
-                if (bs.overflow) return 0;
-                p += clen;
-            }
-            if (is_final) {
-                ttzip_bs_flush_byte_align(&bs);
-            } else {
-                ttzip_bs_write_sync_flush(&bs);
-            }
-            return bs.overflow ? 0 : (size_t)(bs.out_next - out);
-        }
-    }
 
     size_t pos = 0;
     while (pos < in_size) {
@@ -167,8 +155,15 @@ size_t ttzip_native_deflate_compress_block_with_history(
             cur_hist_len = (pos >= 32768) ? 32768 : pos;
             cur_history = in + pos - cur_hist_len;
         } else if (history && history_size > 0) {
-            cur_history = history;
             cur_hist_len = history_size > 32768 ? 32768 : history_size;
+            if (history + history_size == in) {
+                cur_history = history + history_size - cur_hist_len;
+            } else {
+                memcpy(scratch->history_bounce_buffer, history + history_size - cur_hist_len, cur_hist_len);
+                memcpy(scratch->history_bounce_buffer + cur_hist_len, in_chunk, chunk_len);
+                in_chunk = scratch->history_bounce_buffer + cur_hist_len;
+                cur_history = scratch->history_bounce_buffer;
+            }
         }
 
         ttzip_symbol_freqs_t freqs;
@@ -178,42 +173,60 @@ size_t ttzip_native_deflate_compress_block_with_history(
         size_t num_tokens = 0;
         int tier = (options ? options->tier_level : 3);
 
-        if (tier <= 2) {
-            num_tokens = ttzip_deflate_fast_find_matches(
-                &s_tls_fast_mf, in_chunk, chunk_len, cur_history, cur_hist_len, s_tls_fixed_tokens, 65536, &freqs
+        if (tier == 1) {
+            /* Level 1: 64KB Direct 3-Byte Hash + 64-Bit SWAR Matchfinder */
+            num_tokens = ttzip_deflate_hybrid_fast_find_matches(
+                &scratch->mf.hybrid_fast_mf, in_chunk, chunk_len, cur_history, cur_hist_len, scratch->fixed_tokens, 131072, &freqs
             );
-        } else if (tier == 3) {
-            uint32_t depth = options ? options->max_chain_depth : 4;
-            uint32_t nice_len = options ? options->nice_match_len : 32;
+        } else if (tier >= 2 && tier <= 5) {
+            /* Level 2..5: 64KB 4-Way Compact Bucket Table (HT-4) with Early Cutoff */
+            uint32_t depth = options ? options->max_chain_depth : (tier == 2 ? 2 : (tier == 3 ? 2 : 4));
+            uint32_t nice_len = options ? options->nice_match_len : (tier == 2 ? 24 : (tier == 3 ? 32 : (tier == 4 ? 32 : 48)));
             num_tokens = ttzip_deflate_fast_lazy_find_matches(
-                &s_tls_fast_lazy_mf, in_chunk, chunk_len, cur_history, cur_hist_len, depth, nice_len, s_tls_fixed_tokens, 65536, &freqs
+                &scratch->mf.fast_lazy_mf, in_chunk, chunk_len, cur_history, cur_hist_len, depth, nice_len, scratch->fixed_tokens, 131072, &freqs
             );
         } else {
-            uint32_t depth = options ? options->max_chain_depth : 16;
-            uint32_t nice_len = options ? options->nice_match_len : 65;
-            uint32_t lookahead = options ? options->lookahead_steps : 2;
+            /* Level 6..9: 256KB Deep Hash Chain Lookahead Lazy Matchfinder */
+            uint32_t depth = options ? options->max_chain_depth : (tier == 6 ? 8 : (tier == 7 ? 16 : (tier == 8 ? 32 : 64)));
+            uint32_t nice_len = options ? options->nice_match_len : (tier == 6 ? 64 : (tier <= 8 ? 128 : 258));
+            uint32_t lookahead = options ? options->lookahead_steps : 1;
             num_tokens = ttzip_deflate_deep_lazy_find_matches(
-                &s_tls_deep_lazy_mf, in_chunk, chunk_len, cur_history, cur_hist_len, depth, nice_len, lookahead, s_tls_fixed_tokens, 65536, &freqs
+                &scratch->mf.deep_lazy_mf, in_chunk, chunk_len, cur_history, cur_hist_len, depth, nice_len, lookahead, scratch->fixed_tokens, 131072, &freqs
             );
         }
 
-        if (num_tokens >= (chunk_len * 98) / 100 && chunk_len <= 65535) {
-            /* Data is effectively incompressible (>98% literals): directly emit RFC 1951 uncompressed block (BTYPE=00) */
-            ttzip_bs_write_uncompressed_block(&bs, in_chunk, (uint16_t)chunk_len, chunk_is_final);
-            if (bs.overflow) return 0;
+
+
+
+        if (num_tokens >= (chunk_len * 98) / 100) {
+            /* Data is effectively incompressible (>98% literals): directly emit RFC 1951 uncompressed block(s) (BTYPE=00) */
+            size_t u_pos = 0;
+            while (u_pos < chunk_len) {
+                size_t u_len = chunk_len - u_pos;
+                if (u_len > 65535) u_len = 65535;
+                bool is_last_u = (u_pos + u_len == chunk_len);
+                ttzip_bs_write_uncompressed_block(&bs, in_chunk + u_pos, (uint16_t)u_len, is_last_u && chunk_is_final);
+                u_pos += u_len;
+            }
+            if (bs.overflow) {
+                free(scratch);
+                return 0;
+            }
             pos += chunk_len;
             continue;
         }
+
 
         bool use_dynamic = options ? options->dynamic_huffman : true;
         if (chunk_len < 4096 || num_tokens < 384) {
             use_dynamic = false;
         }
 
-        uint8_t lens_litlen[288];
-        uint32_t codewords_litlen[288];
-        uint8_t lens_offset[32];
-        uint32_t codewords_offset[32];
+        uint8_t lens_litlen[288] = {0};
+        uint32_t codewords_litlen[288] = {0};
+        uint8_t lens_offset[32] = {0};
+        uint32_t codewords_offset[32] = {0};
+
 
         if (use_dynamic) {
             ttzip_build_canonical_huffman_tree(freqs.litlen, 286, TTZIP_DEFLATE_MAX_CODEWORD_LEN, lens_litlen, codewords_litlen);
@@ -232,20 +245,20 @@ size_t ttzip_native_deflate_compress_block_with_history(
 
             size_t i = 0;
             while (i < num_tokens) {
-                uint16_t len0 = s_tls_fixed_tokens[i].length;
-                uint16_t off0 = s_tls_fixed_tokens[i].offset;
+                uint16_t len0 = scratch->fixed_tokens[i].length;
+                uint16_t off0 = scratch->fixed_tokens[i].offset;
 
                 if (len0 == 0) {
-                    if (i + 1 < num_tokens && s_tls_fixed_tokens[i + 1].length == 0) {
+                    if (i + 1 < num_tokens && scratch->fixed_tokens[i + 1].length == 0) {
                         uint8_t lit0 = (uint8_t)off0;
-                        uint8_t lit1 = (uint8_t)s_tls_fixed_tokens[i + 1].offset;
+                        uint8_t lit1 = (uint8_t)scratch->fixed_tokens[i + 1].offset;
                         uint32_t code0 = codewords_litlen[lit0];
                         unsigned len_bits0 = lens_litlen[lit0];
                         uint32_t code1 = codewords_litlen[lit1];
                         unsigned len_bits1 = lens_litlen[lit1];
 
-                        uint64_t dual_bits = (uint64_t)code0 | (((uint64_t)code1) << len_bits0);
-                        ttzip_bs_write_bits64(&bs, dual_bits, len_bits0 + len_bits1);
+                        uint32_t dual_bits = code0 | (code1 << len_bits0);
+                        ttzip_bs_write_bits(&bs, dual_bits, len_bits0 + len_bits1);
                         i += 2;
                     } else {
                         uint8_t lit = (uint8_t)off0;
@@ -259,29 +272,17 @@ size_t ttzip_native_deflate_compress_block_with_history(
                     uint8_t extra_len_bits = s_length_extra_bits[len_slot];
                     uint32_t extra_len_val = len0 - s_length_base[len_slot];
 
+                    uint32_t packed_len = len_code | (extra_len_val << len_bits);
+                    ttzip_bs_write_bits(&bs, packed_len, len_bits + extra_len_bits);
+
                     uint8_t off_slot = s_offset_slot[off0];
                     uint32_t off_code = codewords_offset[off_slot];
                     unsigned off_bits = lens_offset[off_slot];
                     uint8_t extra_off_bits = s_offset_extra_bits[off_slot];
                     uint32_t extra_off_val = off0 - s_offset_base[off_slot];
 
-                    uint64_t packed = (uint64_t)len_code;
-                    unsigned shift = len_bits;
-
-                    if (extra_len_bits > 0) {
-                        packed |= ((uint64_t)extra_len_val) << shift;
-                        shift += extra_len_bits;
-                    }
-
-                    packed |= ((uint64_t)off_code) << shift;
-                    shift += off_bits;
-
-                    if (extra_off_bits > 0) {
-                        packed |= ((uint64_t)extra_off_val) << shift;
-                        shift += extra_off_bits;
-                    }
-
-                    ttzip_bs_write_bits64(&bs, packed, shift);
+                    uint32_t packed_off = off_code | (extra_off_val << off_bits);
+                    ttzip_bs_write_bits(&bs, packed_off, off_bits + extra_off_bits);
                     i++;
                 }
             }
@@ -294,20 +295,20 @@ size_t ttzip_native_deflate_compress_block_with_history(
 
             size_t i = 0;
             while (i < num_tokens) {
-                uint16_t len0 = s_tls_fixed_tokens[i].length;
-                uint16_t off0 = s_tls_fixed_tokens[i].offset;
+                uint16_t len0 = scratch->fixed_tokens[i].length;
+                uint16_t off0 = scratch->fixed_tokens[i].offset;
 
                 if (len0 == 0) {
-                    if (i + 1 < num_tokens && s_tls_fixed_tokens[i + 1].length == 0) {
+                    if (i + 1 < num_tokens && scratch->fixed_tokens[i + 1].length == 0) {
                         uint8_t lit0 = (uint8_t)off0;
-                        uint8_t lit1 = (uint8_t)s_tls_fixed_tokens[i + 1].offset;
+                        uint8_t lit1 = (uint8_t)scratch->fixed_tokens[i + 1].offset;
                         uint32_t code0 = sc->codewords_litlen[lit0];
                         unsigned len_bits0 = sc->lens_litlen[lit0];
                         uint32_t code1 = sc->codewords_litlen[lit1];
                         unsigned len_bits1 = sc->lens_litlen[lit1];
 
-                        uint64_t dual_bits = (uint64_t)code0 | (((uint64_t)code1) << len_bits0);
-                        ttzip_bs_write_bits64(&bs, dual_bits, len_bits0 + len_bits1);
+                        uint32_t dual_bits = code0 | (code1 << len_bits0);
+                        ttzip_bs_write_bits(&bs, dual_bits, len_bits0 + len_bits1);
                         i += 2;
                     } else {
                         uint8_t lit = (uint8_t)off0;
@@ -321,29 +322,17 @@ size_t ttzip_native_deflate_compress_block_with_history(
                     uint8_t extra_len_bits = s_length_extra_bits[len_slot];
                     uint32_t extra_len_val = len0 - s_length_base[len_slot];
 
+                    uint32_t packed_len = len_code | (extra_len_val << len_bits);
+                    ttzip_bs_write_bits(&bs, packed_len, len_bits + extra_len_bits);
+
                     uint8_t off_slot = s_offset_slot[off0];
                     uint32_t off_code = sc->codewords_offset[off_slot];
                     unsigned off_bits = sc->lens_offset[off_slot];
                     uint8_t extra_off_bits = s_offset_extra_bits[off_slot];
                     uint32_t extra_off_val = off0 - s_offset_base[off_slot];
 
-                    uint64_t packed = (uint64_t)len_code;
-                    unsigned shift = len_bits;
-
-                    if (extra_len_bits > 0) {
-                        packed |= ((uint64_t)extra_len_val) << shift;
-                        shift += extra_len_bits;
-                    }
-
-                    packed |= ((uint64_t)off_code) << shift;
-                    shift += off_bits;
-
-                    if (extra_off_bits > 0) {
-                        packed |= ((uint64_t)extra_off_val) << shift;
-                        shift += extra_off_bits;
-                    }
-
-                    ttzip_bs_write_bits64(&bs, packed, shift);
+                    uint32_t packed_off = off_code | (extra_off_val << off_bits);
+                    ttzip_bs_write_bits(&bs, packed_off, off_bits + extra_off_bits);
                     i++;
                 }
             }
@@ -351,7 +340,11 @@ size_t ttzip_native_deflate_compress_block_with_history(
             ttzip_bs_write_bits(&bs, sc->codewords_litlen[256], sc->lens_litlen[256]);
         }
 
-        if (bs.overflow) return 0;
+
+        if (bs.overflow) {
+            free(scratch);
+            return 0;
+        }
         pos += chunk_len;
     }
 
@@ -361,10 +354,16 @@ size_t ttzip_native_deflate_compress_block_with_history(
         ttzip_bs_write_sync_flush(&bs);
     }
 
-    return bs.overflow ? 0 : (size_t)(bs.out_next - out);
+    size_t result = bs.overflow ? 0 : (size_t)(bs.out_next - out);
+    free(scratch);
+    return result;
+
+
 }
 
+
 #include "CTTZipDeflateEngine.h"
+#include "ttzip_zopfli_engine.h"
 #include "libdeflate.h"
 
 struct ttzip_deflate_compressor {
@@ -373,7 +372,7 @@ struct ttzip_deflate_compressor {
 
 ttzip_deflate_compressor_t *ttzip_deflate_compressor_alloc(int level) {
     if (level < 1) level = 1;
-    if (level > 9) level = 9;
+    if (level > 12) level = 12;
     ttzip_deflate_compressor_t *c = (ttzip_deflate_compressor_t *)calloc(1, sizeof(ttzip_deflate_compressor_t));
     if (!c) return NULL;
     c->level = level;
@@ -394,39 +393,81 @@ size_t ttzip_deflate_compress(
 ) {
     if (!c || !in || !out || out_capacity == 0) return 0;
     
+    if (c->level >= 10) {
+        TTZipZopfliOptions zopts;
+        ttzip_zopfli_init_options(&zopts, (int32_t)c->level);
+        return ttzip_zopfli_compress_block_with_history(
+            (const uint8_t *)in, in_size, NULL, 0, (uint8_t *)out, out_capacity, &zopts, 1
+        );
+    }
+
     ttzip_native_deflate_options_t opts;
     memset(&opts, 0, sizeof(opts));
     opts.dynamic_huffman = true;
     opts.tier_level = c->level;
 
     if (c->level == 1) {
-        opts.max_chain_depth = 1;
-        opts.nice_match_len = 16;
-        opts.lookahead_steps = 0;
-        opts.skip_intermediate_hashes = true;
-    } else if (c->level == 2) {
-        opts.max_chain_depth = 2;
+        opts.tier_level = 1;
+        opts.max_chain_depth = 0;
         opts.nice_match_len = 32;
         opts.lookahead_steps = 0;
         opts.skip_intermediate_hashes = true;
+    } else if (c->level == 2) {
+        opts.tier_level = 2;
+        opts.max_chain_depth = 2;
+        opts.nice_match_len = 24;
+        opts.lookahead_steps = 1;
+        opts.skip_intermediate_hashes = true;
     } else if (c->level == 3) {
+        opts.tier_level = 3;
+        opts.max_chain_depth = 2;
+        opts.nice_match_len = 32;
+        opts.lookahead_steps = 1;
+        opts.skip_intermediate_hashes = false;
+    } else if (c->level == 4) {
+        opts.tier_level = 4;
         opts.max_chain_depth = 4;
         opts.nice_match_len = 32;
         opts.lookahead_steps = 1;
         opts.skip_intermediate_hashes = false;
-    } else if (c->level <= 6) {
-        opts.max_chain_depth = 16;
-        opts.nice_match_len = 65;
-        opts.lookahead_steps = 2;
+    } else if (c->level == 5) {
+        opts.tier_level = 5;
+        opts.max_chain_depth = 4;
+        opts.nice_match_len = 48;
+        opts.lookahead_steps = 1;
         opts.skip_intermediate_hashes = false;
-    } else {
+    } else if (c->level == 6) {
+        opts.tier_level = 6;
+        opts.max_chain_depth = 8;
+        opts.nice_match_len = 64;
+        opts.lookahead_steps = 1;
+        opts.skip_intermediate_hashes = false;
+    } else if (c->level == 7) {
+        opts.tier_level = 7;
+        opts.max_chain_depth = 16;
+        opts.nice_match_len = 128;
+        opts.lookahead_steps = 1;
+        opts.skip_intermediate_hashes = false;
+    } else if (c->level == 8) {
+        opts.tier_level = 8;
         opts.max_chain_depth = 32;
         opts.nice_match_len = 128;
-        opts.lookahead_steps = 2;
+        opts.lookahead_steps = 1;
+        opts.skip_intermediate_hashes = false;
+    } else {
+        opts.tier_level = 9;
+        opts.max_chain_depth = 64;
+        opts.nice_match_len = 258;
+        opts.lookahead_steps = 1;
         opts.skip_intermediate_hashes = false;
     }
+
+
+
+
 
     return ttzip_native_deflate_compress_block_with_history(
         (const uint8_t *)in, in_size, NULL, 0, (uint8_t *)out, out_capacity, &opts, true
     );
 }
+

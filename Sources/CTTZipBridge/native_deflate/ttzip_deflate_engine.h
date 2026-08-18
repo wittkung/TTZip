@@ -35,30 +35,43 @@ extern "C" {
 typedef int16_t ttzip_mf_pos_t;
 
 /**
- * @brief Tier 1/2 Fast 2-Way direct pointer match finder cache (64 KB, 100% L1 D-Cache resident).
+ * @brief Tier 1 Fast Hybrid 3-Byte Direct + 4-Byte 2-Way SWAR match finder (128 KB, 100% L1 D-Cache resident).
  */
 typedef struct __attribute__((aligned(64))) {
-    const uint8_t *hash_tab[TTZIP_DEFLATE_FAST_HASH_SIZE][2];
+    uint16_t hash3_tab[32768];    /**< 64 KB: Direct 1-way lookup for 3-byte tokens. */
+    uint16_t hash4_tab[16384][2]; /**< 64 KB: 2-way bucket table for 4+ byte sequences. */
+    uint32_t base_offset;         /**< Rolling base offset for zero-cost relative rebasing. */
+} ttzip_deflate_hybrid_fast_mf_t;
+
+/**
+ * @brief Tier 2 Fast 2-Way bucket match finder cache (64 KB, 100% L1 D-Cache resident).
+ */
+typedef struct __attribute__((aligned(64))) {
+    int16_t hash_tab[16384][2];
 } ttzip_deflate_fast_mf_t;
 
-/**
- * @brief Tier 3 Fast-Lazy 3-byte direct + 4-byte 2-way match finder cache.
- */
-typedef struct __attribute__((aligned(64))) {
-    const uint8_t *hash3_tab[32768];
-    const uint8_t *hash4_tab[32768][2];
-} ttzip_deflate_fast_lazy_mf_t;
 
 /**
- * @brief Tier 4 Deep-Lazy Hash3 + Hash4 chained match finder cache (192 KB compact relative indices).
+ * @brief Tier 3 & 4 Fast-Lazy 4-Way Compact Bucket Table (64 KB, 100% L1 D-Cache resident).
  */
 typedef struct __attribute__((aligned(64))) {
-    const uint8_t *hash3_tab[32768];
-    const uint8_t *hash4_tab[32768];
-    const uint8_t *next_tab[32768];
-} ttzip_deflate_lazy_mf_t;
+    uint16_t hash_tab[8192][4];   /**< 64 KB: 4-way compact bucket table (16-bit relative offsets). */
+    uint32_t base_offset;         /**< Rolling base offset for zero-cost relative rebasing. */
+} ttzip_deflate_4way_lazy_mf_t;
 
-typedef ttzip_deflate_lazy_mf_t ttzip_deflate_deep_lazy_mf_t;
+typedef ttzip_deflate_4way_lazy_mf_t ttzip_deflate_fast_lazy_mf_t;
+
+/**
+ * @brief Tier 5 ~ 9 Deep-Lazy Chained match finder cache (256 KB signed 16-bit table).
+ */
+typedef struct __attribute__((aligned(64))) {
+    int16_t hash3_tab[32768];     /**< 64 KB: 3-byte singleton hash table. */
+    int16_t hash4_tab[65536];     /**< 128 KB: 4-byte hash chain heads. */
+    int16_t next_tab[32768];      /**< 64 KB: Hash chain links. */
+} ttzip_deflate_chain_lazy_mf_t;
+
+typedef ttzip_deflate_chain_lazy_mf_t ttzip_deflate_lazy_mf_t;
+typedef ttzip_deflate_chain_lazy_mf_t ttzip_deflate_deep_lazy_mf_t;
 
 /**
  * @brief Intermediate LZ77 token representing either a literal byte or a match pair.
@@ -82,7 +95,7 @@ extern const uint8_t  s_offset_extra_bits[30];
  * @brief Compression tuning options for native Deflate block compression.
  */
 typedef struct {
-    int32_t  tier_level;               /**< Compression tier (1..7). */
+    int32_t  tier_level;               /**< Compression tier (1..12). */
     uint32_t max_chain_depth;          /**< Maximum hash chain traversal depth. */
     uint32_t nice_match_len;           /**< Early match cutoff threshold. */
     uint32_t lookahead_steps;          /**< 0 = greedy, 1 = standard lazy, 2 = 2-step lazy. */
@@ -90,6 +103,28 @@ typedef struct {
     bool     dynamic_huffman;          /**< True to emit dynamic Huffman trees; false for static. */
     bool     enable_history_warmup;    /**< True to seed match finder with 32KB cross-tile history. */
 } ttzip_native_deflate_options_t;
+
+size_t ttzip_deflate_hybrid_fast_find_matches(
+    ttzip_deflate_hybrid_fast_mf_t *mf,
+    const uint8_t *in,
+    size_t in_size,
+    const uint8_t *history,
+    size_t history_size,
+    ttzip_deflate_token_t *tokens_out,
+    size_t max_tokens,
+    ttzip_symbol_freqs_t *freqs_out
+);
+
+size_t ttzip_deflate_fast_find_matches(
+    ttzip_deflate_fast_mf_t *mf,
+    const uint8_t *in,
+    size_t in_size,
+    const uint8_t *history,
+    size_t history_size,
+    ttzip_deflate_token_t *tokens_out,
+    size_t max_tokens,
+    ttzip_symbol_freqs_t *freqs_out
+);
 
 size_t ttzip_deflate_fast_lazy_find_matches(
     ttzip_deflate_fast_lazy_mf_t *mf,
@@ -117,6 +152,7 @@ size_t ttzip_deflate_deep_lazy_find_matches(
     size_t max_tokens,
     ttzip_symbol_freqs_t *freqs_out
 );
+
 
 /**
  * @brief Compresses a single block or tile using the native in-process Deflate engine.

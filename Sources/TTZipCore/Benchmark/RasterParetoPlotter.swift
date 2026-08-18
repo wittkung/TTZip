@@ -74,10 +74,10 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
 
-        // 边距设置 (开阔大气的排版空间)
+        // 边距设置 (预留充足的标签与坐标轴排版空间)
         let marginLeft: CGFloat = 130.0
-        let marginRight: CGFloat = 130.0
-        let marginTop: CGFloat = 170.0
+        let marginRight: CGFloat = 120.0
+        let marginTop: CGFloat = 160.0
         let marginBottom: CGFloat = 120.0
 
         let plotW = width - marginLeft - marginRight
@@ -86,35 +86,38 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         // =========================================================================
         // 2. 通用算法驱动的自适应多维坐标引擎 (Adaptive Universal Coordinate Engine)
         // =========================================================================
-        let allSizes = result.allPoints.map { p -> Double in
+        func getPointMB(_ p: ParetoPoint) -> Double {
             if p.compressedBytes > 0 {
                 return Double(p.compressedBytes) / (1024.0 * 1024.0)
             } else {
                 return 100.0 * (1.0 - p.spaceSavingsPct / 100.0)
             }
-        }.sorted()
+        }
+
+        let allSizes = result.allPoints.map { getPointMB($0) }.sorted()
         let allSpeeds = result.allPoints.map { $0.throughputMBs }.sorted()
 
         let rawMinSize = allSizes.first ?? 2.8
         let rawMaxSize = allSizes.last ?? 4.2
 
-        // 探测是否存在隔离的 Store 未压缩端点 (例如全量压缩在 3MB，但 Store 在 100MB)
-        let hasIsolatedStore = rawMaxSize >= 50.0 && rawMinSize <= 20.0 && (rawMaxSize - (allSizes.dropLast().last ?? rawMinSize)) > 20.0
+        // 严格检测未压缩 Store 孤立端点 (例如压缩档位全部在 <= 20MB，而 Store 在 >= 50MB)
+        let storeSizes = allSizes.filter { $0 >= 50.0 }
+        let compSizes = allSizes.filter { $0 < 50.0 }
+        let hasIsolatedStore = !storeSizes.isEmpty && !compSizes.isEmpty && (compSizes.last ?? 0) <= 30.0
 
-        let activeSizes = hasIsolatedStore ? Array(allSizes.dropLast()) : allSizes
+        let activeSizes = hasIsolatedStore ? compSizes : allSizes
         let compMin = activeSizes.first ?? rawMinSize
         let compMax = activeSizes.last ?? rawMaxSize
 
         let compSpan = max(1e-4, compMax - compMin)
-        let xMargin = max(0.015, compSpan * 0.12)
-        let xDomainMin = max(0.001, compMin - xMargin)
+        let xMargin = max(0.005, compSpan * 0.08)
+        let xDomainMin = max(0.0001, compMin - xMargin)
         let xDomainMax = compMax + xMargin
 
-        func mapX(_ savingsVal: Double) -> CGFloat {
-            let sizeMB = 100.0 * (1.0 - savingsVal / 100.0)
+        func mapX(sizeMB: Double) -> CGFloat {
             if hasIsolatedStore {
                 if sizeMB >= 50.0 {
-                    return marginLeft + 0.03 * plotW
+                    return marginLeft + 0.04 * plotW
                 }
                 let norm = (xDomainMax - sizeMB) / max(1e-4, xDomainMax - xDomainMin)
                 return marginLeft + (CGFloat(0.12) + CGFloat(max(0.0, min(1.0, norm))) * 0.86) * plotW
@@ -124,7 +127,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             }
         }
 
-        // Y 轴完全通用对数坐标映射
+        // Y 轴通用对数坐标映射
         let rawMinSpeed = max(0.1, allSpeeds.first ?? 0.3)
         let rawMaxSpeed = max(10.0, allSpeeds.last ?? 1000.0)
 
@@ -161,7 +164,8 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             (2000.0, "2.0 GB/s"),
             (5000.0, "5.0 GB/s"),
             (10000.0, "10.0 GB/s"),
-            (20000.0, "20.0 GB/s")
+            (20000.0, "20.0 GB/s"),
+            (50000.0, "50.0 GB/s")
         ]
 
         var activeYTicks: [(val: Double, label: String, canvasY: CGFloat)] = []
@@ -169,7 +173,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         for tick in standardYTicks {
             if tick.val >= pow(10.0, logMin) * 0.95 && tick.val <= pow(10.0, logMax) * 1.05 {
                 let y = mapY(tick.val)
-                if y - lastY >= 26.0 {
+                if y - lastY >= 24.0 {
                     activeYTicks.append((tick.val, tick.label, y))
                     lastY = y
                 }
@@ -187,7 +191,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             ctx.setLineWidth(1.2)
             ctx.strokeLineSegments(between: [CGPoint(x: marginLeft - 5, y: y), CGPoint(x: marginLeft, y: y)])
 
-            let font = NSFont.systemFont(ofSize: 13, weight: .regular)
+            let font = NSFont.systemFont(ofSize: 12, weight: .regular)
             let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: axisTextColor]
             let str = NSAttributedString(string: tick.label, attributes: attrs)
             let size = str.size()
@@ -204,18 +208,29 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             candidateSizeTicks.append(100.0)
         }
 
-        let targetTickCount = 7
-        let rawStep = compSpan / Double(targetTickCount - 1)
-        let stepMagnitude = pow(10.0, floor(log10(max(1e-6, rawStep))))
-        let residual = rawStep / stepMagnitude
         let niceStep: Double
-        if residual <= 1.5 { niceStep = 1.0 * stepMagnitude }
-        else if residual <= 3.5 { niceStep = 2.0 * stepMagnitude }
-        else if residual <= 7.5 { niceStep = 5.0 * stepMagnitude }
-        else { niceStep = 10.0 * stepMagnitude }
+        if compSpan <= 0.08 {
+            niceStep = 0.01
+        } else if compSpan <= 0.20 {
+            niceStep = 0.02
+        } else if compSpan <= 0.50 {
+            niceStep = 0.05
+        } else if compSpan <= 1.2 {
+            niceStep = 0.1
+        } else if compSpan <= 2.5 {
+            niceStep = 0.2
+        } else if compSpan <= 6.0 {
+            niceStep = 0.5
+        } else if compSpan <= 15.0 {
+            niceStep = 1.0
+        } else if compSpan <= 30.0 {
+            niceStep = 2.0
+        } else {
+            niceStep = 5.0
+        }
 
         var tickVal = ceil(xDomainMin / niceStep) * niceStep
-        while tickVal <= xDomainMax + (niceStep * 0.01) {
+        while tickVal <= xDomainMax + (niceStep * 0.001) {
             if tickVal >= xDomainMin && tickVal <= xDomainMax {
                 candidateSizeTicks.append(tickVal)
             }
@@ -230,13 +245,12 @@ public final class RasterParetoPlotter: @unchecked Sendable {
 
         var mappedTicks: [MappedTick] = []
         for sizeMB in candidateSizeTicks {
-            let savingsVal = 100.0 * (1.0 - sizeMB / 100.0)
-            let x = mapX(savingsVal)
+            let x = mapX(sizeMB: sizeMB)
             let lbl: String
             if sizeMB >= 50.0 && hasIsolatedStore {
                 lbl = String(format: "%.0f MB (Store)", sizeMB)
             } else if niceStep < 0.02 {
-                lbl = String(format: "%.3f MB", sizeMB)
+                lbl = String(format: "%.2f MB", sizeMB)
             } else if niceStep < 0.2 {
                 lbl = String(format: "%.2f MB", sizeMB)
             } else if niceStep < 2.0 {
@@ -252,7 +266,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         var activeXTicks: [MappedTick] = []
         var lastTickCanvasX: CGFloat = -1000.0
         for tick in mappedTicks {
-            if tick.canvasX - lastTickCanvasX >= 44.0 {
+            if tick.canvasX - lastTickCanvasX >= 52.0 {
                 activeXTicks.append(tick)
                 lastTickCanvasX = tick.canvasX
             }
@@ -265,7 +279,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             ctx.setLineWidth(1.2)
             ctx.strokeLineSegments(between: [CGPoint(x: x, y: marginBottom), CGPoint(x: x, y: marginBottom - 5)])
 
-            let font = NSFont.systemFont(ofSize: 13, weight: .regular)
+            let font = NSFont.systemFont(ofSize: 12, weight: .regular)
             let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: axisTextColor]
             let str = NSAttributedString(string: tick.label, attributes: attrs)
             let size = str.size()
@@ -290,7 +304,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let slashW: CGFloat = 8.0
             let slashH: CGFloat = 8.0
             let slashGap: CGFloat = 4.0
-            let breakX = marginLeft + CGFloat(0.07) * plotW
+            let breakX = marginLeft + CGFloat(0.08) * plotW
             ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
             ctx.fill(CGRect(x: breakX - 10, y: marginBottom - 6, width: 20, height: 12))
 
@@ -325,24 +339,19 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             groupedPoints[fam, default: []].append(p)
         }
 
-        // 6. 软件家族聚类与全量轨迹提取 (包含 Store 点位，直接从纵坐标轴起步连接至各压缩档位)
+        // 6. 软件家族聚类与全量轨迹提取 (按 level 由小到大连接，构成自然算法演进轨迹)
         var trajectories: [SoftwareFamilyTrajectory] = []
         for fam in SoftwareFamily.allCases {
             if let famPoints = groupedPoints[fam], !famPoints.isEmpty {
-                let sortedPoints = famPoints.sorted { (a, b) -> Bool in
-                    if a.spaceSavingsPct != b.spaceSavingsPct {
-                        return a.spaceSavingsPct < b.spaceSavingsPct
-                    }
-                    return a.throughputMBs < b.throughputMBs
-                }
-                let heroPill = fam.isHero ? (sortedPoints.filter { $0.spaceSavingsPct > 5.0 }.max(by: { $0.throughputMBs < $1.throughputMBs })) : nil
+                let sortedPoints = famPoints.sorted { $0.level < $1.level }
+                let heroPill = fam.isHero ? (sortedPoints.filter { getPointMB($0) < 50.0 }.max(by: { $0.throughputMBs < $1.throughputMBs })) : nil
                 trajectories.append(SoftwareFamilyTrajectory(family: fam, points: sortedPoints, heroPillPoint: heroPill))
             }
         }
 
-        // 6. 绘制各软件家族主实线轨迹 (纯直折线，全域连贯)
+        // 6. 绘制各软件家族主实线轨迹
         for traj in trajectories {
-            let pts = traj.points.map { CGPoint(x: mapX($0.spaceSavingsPct), y: mapY($0.throughputMBs)) }
+            let pts = traj.points.map { CGPoint(x: mapX(sizeMB: getPointMB($0)), y: mapY($0.throughputMBs)) }
             guard pts.count >= 2 else { continue }
 
             let polylinePath = CGMutablePath()
@@ -360,7 +369,80 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             ctx.strokePath()
         }
 
-        // 7. 预计算所有点位标签尺寸与优先级 (Hero Badge 优先)
+        // 6.1 绘制右上角学术图例 (Academic Legend Box)
+        let activeFamilies = trajectories.map { $0.family }
+        if activeFamilies.count >= 2 {
+            let legendFont = NSFont.systemFont(ofSize: 11, weight: .medium)
+            var legendEntries: [(name: String, color: NSColor)] = []
+            for fam in activeFamilies {
+                let col = NSColor(hexString: fam.brandColorHex) ?? NSColor.darkGray
+                let name: String
+                switch fam {
+                case .ttzip: name = "TTZip (ARM64 Native Engine)"
+                case .libdeflate: name = "libdeflate (libdeflate-1.22)"
+                case .sevenZip: name = "7-Zip (LZMA / Deflate)"
+                case .appleNative: name = "Apple Native (ditto / zip)"
+                case .minizipNg: name = "minizip-ng"
+                case .pigz: name = "pigz (Parallel Gzip)"
+                case .zstd: name = "zstd"
+                case .lz4: name = "lz4"
+                case .xz: name = "xz"
+                case .brotli: name = "brotli"
+                default: name = fam.rawValue
+                }
+                legendEntries.append((name, col))
+            }
+
+            let entryH: CGFloat = 18.0
+            let legendPad: CGFloat = 10.0
+            var maxTextW: CGFloat = 0.0
+            for entry in legendEntries {
+                let str = NSAttributedString(string: entry.name, attributes: [.font: legendFont])
+                maxTextW = max(maxTextW, str.size().width)
+            }
+
+            let legendW = maxTextW + 36.0 + legendPad * 2
+            let legendH = CGFloat(legendEntries.count) * entryH + legendPad * 2
+            let legendX = marginLeft + plotW - legendW
+            let legendY = marginBottom + plotH - legendH - 6.0
+
+            let legendRect = CGRect(x: legendX, y: legendY, width: legendW, height: legendH)
+            ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.92))
+            let legPath = CGPath(roundedRect: legendRect, cornerWidth: 6.0, cornerHeight: 6.0, transform: nil)
+            ctx.addPath(legPath)
+            ctx.fillPath()
+
+            ctx.setStrokeColor(CGColor(red: 226/255.0, green: 232/255.0, blue: 240/255.0, alpha: 1.0))
+            ctx.setLineWidth(1.0)
+            ctx.addPath(legPath)
+            ctx.strokePath()
+
+            for (idx, entry) in legendEntries.enumerated() {
+                let curY = legendY + legendH - legendPad - CGFloat(idx + 1) * entryH + 3.0
+                let lineY = curY + 6.0
+                ctx.setStrokeColor(entry.color.cgColor)
+                ctx.setLineWidth(2.0)
+                ctx.strokeLineSegments(between: [
+                    CGPoint(x: legendX + legendPad, y: lineY),
+                    CGPoint(x: legendX + legendPad + 18, y: lineY)
+                ])
+
+                ctx.setFillColor(entry.color.cgColor)
+                ctx.fillEllipse(in: CGRect(x: legendX + legendPad + 6, y: lineY - 3, width: 6, height: 6))
+
+                let textAttrs: [NSAttributedString.Key: Any] = [
+                    .font: legendFont,
+                    .foregroundColor: NSColor(calibratedRed: 51/255.0, green: 65/255.0, blue: 85/255.0, alpha: 1.0)
+                ]
+                let str = NSAttributedString(string: entry.name, attributes: textAttrs)
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+                str.draw(at: CGPoint(x: legendX + legendPad + 24, y: curY))
+                NSGraphicsContext.restoreGraphicsState()
+            }
+        }
+
+        // 7. 预计算所有点位标签尺寸与避让
         var reservedAABBs: [CGRect] = []
 
         struct PointLabelPlacement {
@@ -370,19 +452,16 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let isHeroBadge: Bool
             let labelText: String
             let textSize: CGSize
-            let pillWidth: CGFloat
-            let pillHeight: CGFloat
             let font: NSFont
             let textColor: NSColor
-            let isCapsuleFill: Bool
-            let badgeBgColor: NSColor
-            let badgeBorderColor: NSColor?
+            let cardBgColor: NSColor
+            let borderColor: NSColor
         }
 
         var placements: [PointLabelPlacement] = []
 
         for p in result.allPoints {
-            let cx = mapX(p.spaceSavingsPct)
+            let cx = mapX(sizeMB: getPointMB(p))
             let cy = mapY(p.throughputMBs)
             let fam = SoftwareFamilyClassifier.classify(algorithm: p.algorithm)
 
@@ -429,55 +508,46 @@ public final class RasterParetoPlotter: @unchecked Sendable {
 
             let font: NSFont
             let textColor: NSColor
-            let isCapsule: Bool
-            let bgCol: NSColor
-            let borderCol: NSColor?
+            let cardBg: NSColor
+            let borderCol: NSColor
 
             if fam.isHero {
                 font = NSFont.systemFont(ofSize: 11, weight: .bold)
                 textColor = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
-                isCapsule = false
-                bgCol = NSColor(calibratedWhite: 1.0, alpha: 0.90)
-                borderCol = nil
+                cardBg = NSColor(calibratedRed: 239/255.0, green: 246/255.0, blue: 255/255.0, alpha: 0.95)
+                borderCol = NSColor(calibratedRed: 191/255.0, green: 219/255.0, blue: 254/255.0, alpha: 1.0)
             } else {
                 font = NSFont.systemFont(ofSize: 10, weight: .semibold)
                 let brandHex = fam.brandColorHex
                 textColor = NSColor(hexString: brandHex) ?? NSColor.darkGray
-                isCapsule = false
-                bgCol = NSColor(calibratedWhite: 1.0, alpha: 0.85)
-                borderCol = nil
+                cardBg = NSColor(calibratedWhite: 1.0, alpha: 0.95)
+                borderCol = NSColor(calibratedRed: 226/255.0, green: 232/255.0, blue: 240/255.0, alpha: 1.0)
             }
 
             let str = NSAttributedString(string: cleanName, attributes: [.font: font])
             let strSize = str.size()
 
-            let pillW = strSize.width
-            let pillH = strSize.height
-
             placements.append(PointLabelPlacement(
                 point: p,
                 canvasX: cx,
                 canvasY: cy,
-                isHeroBadge: false,
+                isHeroBadge: fam.isHero,
                 labelText: cleanName,
                 textSize: strSize,
-                pillWidth: pillW,
-                pillHeight: pillH,
                 font: font,
                 textColor: textColor,
-                isCapsuleFill: isCapsule,
-                badgeBgColor: bgCol,
-                badgeBorderColor: borderCol
+                cardBgColor: cardBg,
+                borderColor: borderCol
             ))
         }
 
-        // 角色排序：Hero Badge 最优先占位，随后按 Y 轴吞吐由高到低
+        // 优先占位排序：Hero 优先，随后从高吞吐到低吞吐
         placements.sort { (a, b) -> Bool in
             if a.isHeroBadge != b.isHeroBadge { return a.isHeroBadge && !b.isHeroBadge }
             return a.canvasY > b.canvasY
         }
 
-        // 8. 绘制各数据散点与通过 AABB 贪心避让落盘的标签卡片
+        // 8. 绘制散点与带背景防重叠卡片的文字标签
         for item in placements {
             let cx = item.canvasX
             let cy = item.canvasY
@@ -498,72 +568,72 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 ctx.fillEllipse(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
             }
 
-            // 根据家族偏好分配主候选槽位，彻底消除密集列（如 96.5%）的横向文字交叉
-            let w = item.pillWidth
-            let h = item.pillHeight
+            let padX: CGFloat = 4.0
+            let padY: CGFloat = 2.0
+            let cardW = item.textSize.width + padX * 2
+            let cardH = item.textSize.height + padY * 2
+
             let candidateSlots: [(x: CGFloat, y: CGFloat)]
+            let isNearLeftEdge = cx < marginLeft + cardW + 20
+            let isNearRightEdge = cx > marginLeft + plotW - cardW - 20
+
             if item.point.spaceSavingsPct <= 5.0 {
-                // Store 点位槽位：强制靠右避让 Y 轴刻度文字
+                // Store 点位槽位：靠右避让
                 candidateSlots = [
-                    (cx + 14, cy - h / 2),
-                    (cx + 14, cy - h - 4),
-                    (cx + 14, cy + 4),
-                    (cx - w / 2, cy + 12),
-                    (cx - w / 2, cy - h - 12)
+                    (cx + 12, cy - cardH / 2),
+                    (cx + 12, cy + 4),
+                    (cx + 12, cy - cardH - 4)
                 ]
+            } else if fam == .ttzip {
+                // TTZip 槽位优先：右上、右侧、右下、上方；若近右边缘则优先放左侧
+                if isNearRightEdge {
+                    candidateSlots = [
+                        (cx - cardW - 10, cy - cardH / 2),
+                        (cx - cardW - 8, cy + 8),
+                        (cx - cardW - 8, cy - cardH - 8),
+                        (cx - cardW / 2, cy + 12),
+                        (cx - cardW / 2, cy - cardH - 12)
+                    ]
+                } else {
+                    candidateSlots = [
+                        (cx + 10, cy - cardH / 2),
+                        (cx + 10, cy + 8),
+                        (cx + 10, cy - cardH - 8),
+                        (cx - cardW / 2, cy + 12),
+                        (cx - cardW / 2, cy - cardH - 12),
+                        (cx - cardW - 10, cy - cardH / 2)
+                    ]
+                }
             } else {
-                switch fam {
-                case .ttzip:
+                // 竞品槽位优先：左侧、左上、左下；若近左边缘则优先放右侧
+                if isNearLeftEdge {
                     candidateSlots = [
-                        (cx - w / 2, cy - h - 12),       // Bottom-Center
-                        (cx + 12, cy - h / 2),           // Right
-                        (cx + 10, cy - h - 10),          // Bottom-Right
-                        (cx - w - 12, cy - h / 2),       // Left
-                        (cx - w - 10, cy - h - 10),      // Bottom-Left
-                        (cx - w / 2, cy + 12),           // Top-Center
-                        (cx + 10, cy + 10),              // Top-Right
-                        (cx - w - 10, cy + 10)           // Top-Left
+                        (cx + 12, cy - cardH / 2),
+                        (cx + 12, cy + 8),
+                        (cx + 12, cy - cardH - 8),
+                        (cx - cardW / 2, cy + 12),
+                        (cx - cardW / 2, cy - cardH - 12)
                     ]
-                case .pigz, .zstd, .lz4, .xz, .brotli:
+                } else {
                     candidateSlots = [
-                        (cx - w / 2, cy - h - 12),       // Bottom-Center
-                        (cx + 12, cy - h / 2),           // Right
-                        (cx - w - 12, cy - h / 2),       // Left
-                        (cx - w / 2, cy + 12),           // Top-Center
-                        (cx + 10, cy - h - 10),          // Bottom-Right
-                        (cx - w - 10, cy - h - 10)       // Bottom-Left
-                    ]
-                case .sevenZip, .appleNative, .libdeflate:
-                    candidateSlots = [
-                        (cx - w - 12, cy - h / 2),       // Left-Center
-                        (cx - w - 10, cy + 10),          // Top-Left
-                        (cx - w - 10, cy - h - 10),      // Bottom-Left
-                        (cx - w / 2, cy + 12),           // Top-Center
-                        (cx + 12, cy - h / 2),           // Right-Center
-                        (cx - w / 2, cy - h - 12)        // Bottom-Center
-                    ]
-                default:
-                    candidateSlots = [
-                        (cx - w / 2, cy - h - 10),
-                        (cx - w / 2, cy + 10),
-                        (cx + 10, cy - h / 2),
-                        (cx - w - 10, cy - h / 2),
-                        (cx + 8, cy - h - 8),
-                        (cx - w - 8, cy - h - 8),
-                        (cx + 8, cy + 8),
-                        (cx - w - 8, cy + 8)
+                        (cx - cardW - 10, cy - cardH / 2),
+                        (cx - cardW - 8, cy + 8),
+                        (cx - cardW - 8, cy - cardH - 8),
+                        (cx - cardW / 2, cy - cardH - 12),
+                        (cx - cardW / 2, cy + 12),
+                        (cx + 10, cy - cardH / 2)
                     ]
                 }
             }
 
-            var bestRect = CGRect(x: cx - w / 2, y: cy + 14, width: w, height: h)
+            var bestRect = CGRect(x: cx + 10, y: cy - cardH / 2, width: cardW, height: cardH)
             var foundSlot = false
             for slot in candidateSlots {
-                let testX = min(marginLeft + plotW - w, max(marginLeft, slot.x))
-                let testY = min(marginBottom + plotH - h, max(marginBottom, slot.y))
-                let testRect = CGRect(x: testX, y: testY, width: w, height: h)
+                let testX = min(marginLeft + plotW - cardW - 4, max(marginLeft + 6, slot.x))
+                let testY = min(marginBottom + plotH - cardH - 4, max(marginBottom + 4, slot.y))
+                let testRect = CGRect(x: testX, y: testY, width: cardW, height: cardH)
 
-                let intersects = reservedAABBs.contains { $0.intersects(testRect.insetBy(dx: -4, dy: -3)) }
+                let intersects = reservedAABBs.contains { $0.intersects(testRect.insetBy(dx: -2, dy: -2)) }
                 if !intersects {
                     bestRect = testRect
                     foundSlot = true
@@ -571,56 +641,37 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 }
             }
 
-            // 若所有候选槽位均被占用且不是端点 Flagship 卡片，则隐藏文字标签（保留曲线上的散点），彻底杜绝文字堆叠
-            let isFlagshipEndpoint = (fam == .ttzip && (item.point.level == 1 || item.point.level == 12))
+            // 关键端点强制显示，非关键拥挤点可隐藏文本标签以保持整洁
+            let isFlagshipEndpoint = (fam == .ttzip && (item.point.level == 1 || item.point.level == 12 || item.point.level == 0))
             if !foundSlot && !isFlagshipEndpoint {
                 continue
             }
 
             reservedAABBs.append(bestRect)
 
-            // 渲染药丸或文本
-            if item.isHeroBadge {
-                if item.isCapsuleFill {
-                    ctx.setFillColor(item.badgeBgColor.cgColor)
-                    let path = CGPath(roundedRect: bestRect, cornerWidth: h / 2, cornerHeight: h / 2, transform: nil)
-                    ctx.addPath(path)
-                    ctx.fillPath()
-                } else {
-                    ctx.setFillColor(item.badgeBgColor.cgColor)
-                    let path = CGPath(roundedRect: bestRect, cornerWidth: 5, cornerHeight: 5, transform: nil)
-                    ctx.addPath(path)
-                    ctx.fillPath()
+            // 绘制防遮挡小卡片背景与浅灰边框
+            ctx.setFillColor(item.cardBgColor.cgColor)
+            let cardPath = CGPath(roundedRect: bestRect, cornerWidth: 3.0, cornerHeight: 3.0, transform: nil)
+            ctx.addPath(cardPath)
+            ctx.fillPath()
 
-                    if let border = item.badgeBorderColor {
-                        ctx.setStrokeColor(border.cgColor)
-                        ctx.setLineWidth(1.0)
-                        ctx.addPath(path)
-                        ctx.strokePath()
-                    }
-                }
+            ctx.setStrokeColor(item.borderColor.cgColor)
+            ctx.setLineWidth(1.0)
+            ctx.addPath(cardPath)
+            ctx.strokePath()
 
-                let textAttrs: [NSAttributedString.Key: Any] = [.font: item.font, .foregroundColor: item.textColor]
-                let str = NSAttributedString(string: item.labelText, attributes: textAttrs)
-                NSGraphicsContext.saveGraphicsState()
-                NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-                let textX = bestRect.origin.x + (bestRect.width - item.textSize.width) / 2
-                let textY = bestRect.origin.y + (bestRect.height - item.textSize.height) / 2 - 1
-                str.draw(at: CGPoint(x: textX, y: textY))
-                NSGraphicsContext.restoreGraphicsState()
-            } else {
-                let textAttrs: [NSAttributedString.Key: Any] = [.font: item.font, .foregroundColor: item.textColor]
-                let str = NSAttributedString(string: item.labelText, attributes: textAttrs)
-                NSGraphicsContext.saveGraphicsState()
-                NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-                str.draw(at: CGPoint(x: bestRect.origin.x, y: bestRect.origin.y))
-                NSGraphicsContext.restoreGraphicsState()
-            }
+            // 绘制文字
+            let textAttrs: [NSAttributedString.Key: Any] = [.font: item.font, .foregroundColor: item.textColor]
+            let str = NSAttributedString(string: item.labelText, attributes: textAttrs)
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+            str.draw(at: CGPoint(x: bestRect.origin.x + padX, y: bestRect.origin.y + padY - 0.5))
+            NSGraphicsContext.restoreGraphicsState()
         }
 
-        // 9. 顶部品牌与主标题
+        // 9. 顶部品牌与自适应无裁切主标题
         let starStr = "✦ TTZip Engine 2026"
-        let starFont = NSFont.systemFont(ofSize: 15, weight: .semibold)
+        let starFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
         let starAttrs: [NSAttributedString.Key: Any] = [
             .font: starFont,
             .foregroundColor: NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
@@ -628,22 +679,33 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let starAttrStr = NSAttributedString(string: starStr, attributes: starAttrs)
 
         let headlineStr = title.isEmpty ? "macOS Compression Pareto Benchmark" : title
-        let headFont = NSFont.systemFont(ofSize: 32, weight: .bold)
-        let headAttrs: [NSAttributedString.Key: Any] = [
+        var titleFontSize: CGFloat = 26.0
+        var headFont = NSFont.systemFont(ofSize: titleFontSize, weight: .bold)
+        var headAttrs: [NSAttributedString.Key: Any] = [
             .font: headFont,
             .foregroundColor: NSColor(calibratedRed: 15/255.0, green: 23/255.0, blue: 42/255.0, alpha: 1.0)
         ]
-        let headAttrStr = NSAttributedString(string: headlineStr, attributes: headAttrs)
+        var headAttrStr = NSAttributedString(string: headlineStr, attributes: headAttrs)
+
+        // 动态收缩字体直至标题宽度适应画布且两侧至少保留 50pt 边距
+        while headAttrStr.size().width > width - 100.0 && titleFontSize > 14.0 {
+            titleFontSize -= 1.0
+            headFont = NSFont.systemFont(ofSize: titleFontSize, weight: .bold)
+            headAttrs[.font] = headFont
+            headAttrStr = NSAttributedString(string: headlineStr, attributes: headAttrs)
+        }
+
+        let titleX = max(40.0, (width - headAttrStr.size().width) / 2)
 
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-        starAttrStr.draw(at: CGPoint(x: (width - starAttrStr.size().width) / 2, y: height - 65))
-        headAttrStr.draw(at: CGPoint(x: (width - headAttrStr.size().width) / 2, y: height - 110))
+        starAttrStr.draw(at: CGPoint(x: (width - starAttrStr.size().width) / 2, y: height - 55))
+        headAttrStr.draw(at: CGPoint(x: titleX, y: height - 95))
         NSGraphicsContext.restoreGraphicsState()
 
         // 10. 底部居中 X 轴标题 (Compressed File Size MB) 与数据来源标注
         let xTitle = "Compressed File Size (MB, Smaller is Better ➔) · 100MB Corpus"
-        let xFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        let xFont = NSFont.systemFont(ofSize: 13, weight: .semibold)
         let xAttrs: [NSAttributedString.Key: Any] = [
             .font: xFont,
             .foregroundColor: NSColor(calibratedRed: 71/255.0, green: 85/255.0, blue: 105/255.0, alpha: 1.0)
@@ -651,7 +713,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let xAttrStr = NSAttributedString(string: xTitle, attributes: xAttrs)
 
         let sourceStr = title.contains("[") ? "Source: TTZip Benchmark Engine · \(title) · Apple Silicon M-Series (mach_absolute_time)" : "Source: TTZip Benchmark Engine · 100MB Corpus · Apple Silicon M-Series (mach_absolute_time)"
-        let sourceFont = NSFont.systemFont(ofSize: 12, weight: .regular)
+        let sourceFont = NSFont.systemFont(ofSize: 11, weight: .regular)
         let sourceAttrs: [NSAttributedString.Key: Any] = [
             .font: sourceFont,
             .foregroundColor: NSColor(calibratedRed: 148/255.0, green: 163/255.0, blue: 184/255.0, alpha: 1.0)
@@ -660,8 +722,8 @@ public final class RasterParetoPlotter: @unchecked Sendable {
 
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-        xAttrStr.draw(at: CGPoint(x: (width - xAttrStr.size().width) / 2, y: marginBottom - 52))
-        sourceAttrStr.draw(at: CGPoint(x: (width - sourceAttrStr.size().width) / 2, y: 30))
+        xAttrStr.draw(at: CGPoint(x: (width - xAttrStr.size().width) / 2, y: marginBottom - 48))
+        sourceAttrStr.draw(at: CGPoint(x: (width - sourceAttrStr.size().width) / 2, y: 26))
         NSGraphicsContext.restoreGraphicsState()
     }
     #endif

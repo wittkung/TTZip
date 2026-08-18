@@ -252,13 +252,16 @@ void ttzip_make_canonical_huffman_code_inplace(
     if (!freqs || !lens || !codewords || num_syms < 2) return;
     if (max_codeword_len > TTZIP_HUFF_MAX_CODE_LEN) max_codeword_len = TTZIP_HUFF_MAX_CODE_LEN;
 
+    memset(lens, 0, num_syms * sizeof(lens[0]));
+    memset(codewords, 0, num_syms * sizeof(codewords[0]));
+
     uint32_t* A = codewords;
     unsigned num_used_syms = sort_symbols_fast(num_syms, freqs, lens, A);
 
     if (num_used_syms == 0) {
-        memset(codewords, 0, num_syms * sizeof(uint32_t));
         return;
     }
+
 
     if (num_used_syms < 2) {
         unsigned sym = A[0] & TTZIP_HUFF_SYM_MASK;

@@ -98,18 +98,19 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 5000.0
     )
     
-    /// Tier 2: Maximum (Deep pattern matching Deflate Level 6 with Sync-Flush, throughput >= 2500 MB/s).
+    /// Tier 2: Maximum (Deep pattern matching Deflate Level 2 with Sync-Flush, throughput >= 2500 MB/s).
     public static let maximum = ZipCompressionProfile(
         id: "zip_tier_2_maximum",
         name: "Maximum (2)",
         level: .level2,
-        deflateLevel: 6,
+        deflateLevel: 2,
         zopfliIterations: 0,
         blockSplitting: false,
         maxBlockSplits: 0,
         earlyExitThreshold: 0.0001,
         targetThroughputFloorMBs: 2500.0
     )
+
     
     /// Tier 3: High Compression (Near-Optimal DP Deflate Level 12, bridging the 210x speed cliff, throughput >= 150 MB/s).
     public static let high = ZipCompressionProfile(

@@ -77,9 +77,13 @@ public final class HardwareCalibrator: @unchecked Sendable {
             if (lower.contains("tar.zst") || lower.contains("tarzst") || lower.contains("zst")) && v > 6000.0 {
                 dict.removeValue(forKey: k)
             }
-            if lower.contains("zip") && !lower.contains("_0_") && v > 2500.0 {
+            if lower.contains("zip_2") && v > 1200.0 {
                 dict.removeValue(forKey: k)
             }
+            if lower.contains("zip") && !lower.contains("_0_") && !lower.contains("_2_") && v > 2500.0 {
+                dict.removeValue(forKey: k)
+            }
+
             if lower.contains("tar") && !lower.contains("zst") && !lower.contains("gz") && !lower.contains("bz2") && !lower.contains("xz") && v > 6000.0 {
                 dict.removeValue(forKey: k)
             }

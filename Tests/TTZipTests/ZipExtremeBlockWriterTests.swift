@@ -54,6 +54,8 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         try procUnzip.run()
         let decompressedData = pipeOut.fileHandleForReading.readDataToEndOfFile()
         procUnzip.waitUntilExit()
+
+
         
         XCTAssertEqual(decompressedData.count, sampleData.count, "Decompressed data size must match original exactly")
         XCTAssertEqual(decompressedData, sampleData, "Decompressed data must be byte-for-byte identical")
@@ -92,6 +94,8 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
             blockSize: 512 * 1024
         )
         let t1 = mach_absolute_time()
+
+
         XCTAssertTrue(success)
         XCTAssertTrue(FileManager.default.fileExists(atPath: outZipPath))
         
@@ -117,10 +121,15 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         proc.standardError = pipe
         try proc.run()
         proc.waitUntilExit()
-        XCTAssertEqual(proc.terminationStatus, 0)
+        let outData = pipe.fileHandleForReading.readDataToEndOfFile()
+        let outStr = String(data: outData, encoding: .utf8) ?? ""
+        XCTAssertEqual(proc.terminationStatus, 0, "System unzip verification failed: \(outStr)")
     }
-    
+
+
+
     func testZopfliTier6AndTier7CompressionAndSystemUnzip() throws {
+
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_zopfli_test_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }

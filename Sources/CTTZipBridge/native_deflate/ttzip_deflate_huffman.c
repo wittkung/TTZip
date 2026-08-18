@@ -32,12 +32,13 @@ static inline uint32_t ttzip_reverse_bits32(uint32_t v) {
 }
 #endif
 
+#include <pthread.h>
+
 /* Process-wide static RFC 1951 Huffman code singleton */
 static ttzip_huffman_codes_t s_static_codes;
-static bool s_static_initialized = false;
+static pthread_once_t s_static_once = PTHREAD_ONCE_INIT;
 
-static void init_static_codes(void) {
-    if (s_static_initialized) return;
+static void init_static_codes_impl(void) {
     memset(&s_static_codes, 0, sizeof(s_static_codes));
 
     /* Literal/Length fixed bit lengths (RFC 1951 section 3.2.6) */
@@ -89,16 +90,13 @@ static void init_static_codes(void) {
             s_static_codes.codewords_offset[i] = ttzip_reverse_bits32(c) >> (32 - len);
         }
     }
-
-    s_static_initialized = true;
 }
 
 const ttzip_huffman_codes_t *ttzip_get_static_huffman_codes(void) {
-    if (!s_static_initialized) {
-        init_static_codes();
-    }
+    pthread_once(&s_static_once, init_static_codes_impl);
     return &s_static_codes;
 }
+
 
 /* In-Place 2-Queue length-limited Canonical Huffman construction (Van Leeuwen 1976 / Moffat-Katajainen 1995) */
 void ttzip_build_canonical_huffman_tree(const uint32_t *freqs,
@@ -272,11 +270,12 @@ bool ttzip_eval_huffman_bit_costs(
         }
     }
 
-    dynamic_bits += 280;
+    dynamic_bits += 150;
 
     if (out_static_bits) *out_static_bits = static_bits;
     if (out_dynamic_bits) *out_dynamic_bits = dynamic_bits;
 
     return static_bits <= dynamic_bits;
+
 }
 

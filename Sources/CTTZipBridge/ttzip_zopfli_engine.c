@@ -101,20 +101,30 @@ void ttzip_zopfli_init_options(TTZipZopfliOptions *options, int level) {
         options->max_block_splits = 0;
         options->early_exit_threshold = 0.0001;
     } else if (level == 4) {
+        options->num_iterations = 0;
+        options->block_splitting = 0;
+        options->max_block_splits = 0;
+        options->early_exit_threshold = 0.0001;
+    } else if (level == 10) {
         options->num_iterations = 2;
         options->block_splitting = 0;
         options->max_block_splits = 0;
         options->early_exit_threshold = 0.0001;
-    } else if (level == 5) {
+    } else if (level == 11) {
         options->num_iterations = 5;
         options->block_splitting = 0;
         options->max_block_splits = 0;
         options->early_exit_threshold = 0.00005; /* 0.005% */
-    } else {
+    } else if (level == 12) {
         options->num_iterations = 15;
         options->block_splitting = 1;
         options->max_block_splits = 15;
         options->early_exit_threshold = 0.00005; /* 0.005% */
+    } else {
+        options->num_iterations = 0;
+        options->block_splitting = 0;
+        options->max_block_splits = 0;
+        options->early_exit_threshold = 0.0001;
     }
 }
 
@@ -130,27 +140,89 @@ size_t ttzip_native_deflate_compress_chunk_with_history(
     int is_final
 ) {
     ttzip_native_deflate_options_t def_opt;
-    def_opt.tier_level = tier_level;
+    memset(&def_opt, 0, sizeof(def_opt));
+    def_opt.tier_level = (tier_level >= 1 && tier_level <= 12) ? tier_level : 1;
     def_opt.dynamic_huffman = true;
     def_opt.enable_history_warmup = true;
 
-    if (tier_level <= 1) {
+    if (tier_level == 0) {
+        /* Tier 0: Direct Store (RFC 1951 Uncompressed Blocks BTYPE=00 at >= 25 GB/s) */
+        size_t u_pos = 0;
+        uint8_t *out_ptr = out;
+        while (u_pos < in_size) {
+            size_t chunk = in_size - u_pos;
+            if (chunk > 65535) chunk = 65535;
+            bool is_last = (u_pos + chunk == in_size) && is_final;
+            out_ptr[0] = is_last ? 0x01 : 0x00;
+            uint16_t len16 = (uint16_t)chunk;
+            uint16_t nlen16 = ~len16;
+            memcpy(out_ptr + 1, &len16, 2);
+            memcpy(out_ptr + 3, &nlen16, 2);
+            memcpy(out_ptr + 5, in + u_pos, chunk);
+            out_ptr += (5 + chunk);
+            u_pos += chunk;
+        }
+        return (size_t)(out_ptr - out);
+    }
+
+    if (tier_level == 1) {
         def_opt.tier_level = 1;
         def_opt.max_chain_depth = 0;
         def_opt.nice_match_len = 32;
+        def_opt.lookahead_steps = 0;
+        def_opt.skip_intermediate_hashes = true;
     } else if (tier_level == 2) {
         def_opt.tier_level = 2;
-        def_opt.max_chain_depth = 0;
-        def_opt.nice_match_len = 64;
-    } else if (tier_level == 3 || tier_level == 7) {
+        def_opt.max_chain_depth = 1;
+        def_opt.nice_match_len = 16;
+        def_opt.lookahead_steps = 1;
+        def_opt.skip_intermediate_hashes = true;
+    } else if (tier_level == 3) {
         def_opt.tier_level = 3;
+        def_opt.max_chain_depth = 2;
+        def_opt.nice_match_len = 24;
+        def_opt.lookahead_steps = 1;
+        def_opt.skip_intermediate_hashes = false;
+    } else if (tier_level == 4) {
+        def_opt.tier_level = 4;
         def_opt.max_chain_depth = 4;
         def_opt.nice_match_len = 32;
-    } else {
-        def_opt.tier_level = 4;
+        def_opt.lookahead_steps = 1;
+        def_opt.skip_intermediate_hashes = false;
+    } else if (tier_level == 5) {
+        def_opt.tier_level = 5;
+        def_opt.max_chain_depth = 4;
+        def_opt.nice_match_len = 48;
+        def_opt.lookahead_steps = 1;
+        def_opt.skip_intermediate_hashes = false;
+    } else if (tier_level == 6) {
+        def_opt.tier_level = 6;
+        def_opt.max_chain_depth = 8;
+        def_opt.nice_match_len = 64;
+        def_opt.lookahead_steps = 1;
+        def_opt.skip_intermediate_hashes = false;
+    } else if (tier_level == 7) {
+        def_opt.tier_level = 7;
         def_opt.max_chain_depth = 16;
         def_opt.nice_match_len = 128;
+        def_opt.lookahead_steps = 1;
+        def_opt.skip_intermediate_hashes = false;
+    } else if (tier_level == 8) {
+        def_opt.tier_level = 8;
+        def_opt.max_chain_depth = 32;
+        def_opt.nice_match_len = 128;
+        def_opt.lookahead_steps = 1;
+        def_opt.skip_intermediate_hashes = false;
+    } else {
+        def_opt.tier_level = 9;
+        def_opt.max_chain_depth = 64;
+        def_opt.nice_match_len = 258;
+        def_opt.lookahead_steps = 1;
+        def_opt.skip_intermediate_hashes = false;
     }
+
+
+
 
     return ttzip_native_deflate_compress_block_with_history(
         in, in_size, history, history_size, out, out_capacity, &def_opt, is_final != 0
@@ -176,38 +248,10 @@ size_t ttzip_zopfli_compress_block_with_history(
         target_level = options->compression_level;
     }
 
-    /* Fast path (num_iterations <= 1): Dispatch to 100% native in-process Deflate or libdeflate */
-    if (!options || options->num_iterations <= 1) {
-        if (target_level == 2 || target_level == 6) {
-            /* Tier 2 (Maximum): Fast Deflate level 6 with sync-flush */
-            size_t c_len = ttzip_libdeflate_compress(in, in_size, out, out_capacity, 6);
-            if (c_len > 0) {
-                if (!is_final && c_len + 4 <= out_capacity) {
-                    out[c_len++] = 0x00;
-                    out[c_len++] = 0x00;
-                    out[c_len++] = 0xFF;
-                    out[c_len++] = 0xFF;
-                }
-                return c_len;
-            }
-        } else if (target_level == 3 || target_level == 9 || target_level == 12) {
-            /* Tier 3 (High Compression): Near-Optimal Deflate level 12 with sync-flush */
-            size_t c_len = ttzip_libdeflate_compress(in, in_size, out, out_capacity, 12);
-            if (c_len > 0) {
-                if (!is_final && c_len + 4 <= out_capacity) {
-                    out[c_len++] = 0x00;
-                    out[c_len++] = 0x00;
-                    out[c_len++] = 0xFF;
-                    out[c_len++] = 0xFF;
-                }
-                return c_len;
-            }
-        }
-
-        int tier = (target_level <= 1 ? 1 : 3);
-
+    /* Fast path (num_iterations <= 1 or Levels 1..9): Dispatch directly to 100% native in-process Deflate engine */
+    if (!options || options->num_iterations <= 1 || target_level <= 9) {
         return ttzip_native_deflate_compress_chunk_with_history(
-            in, in_size, history, history_size, out, out_capacity, tier, is_final
+            in, in_size, history, history_size, out, out_capacity, target_level, is_final
         );
     }
 

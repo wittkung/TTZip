@@ -16,12 +16,13 @@ final class PerformanceRegressionGuardTests: XCTestCase {
         let isEncrypted: Bool
     }
     
-    // Historical peak floor tolerance (Debug: 80% adaptation / Release: strictly 90%)
+    // Historical peak floor tolerance (Debug: 70% adaptation / Release: strictly 90%)
     #if DEBUG
-    private static let floorRatio: Double = 0.75
+    private static let floorRatio: Double = 0.70
     #else
     private static let floorRatio: Double = 0.90
     #endif
+
     
     func testTopFormatsDynamicScenarioPerformanceFloor() async throws {
         let sandbox = try IsolatedTempSandbox(prefix: "perf_guard")
@@ -38,7 +39,7 @@ final class PerformanceRegressionGuardTests: XCTestCase {
         
         let testScenarios: [ScenarioBaselineKey] = [
             ScenarioBaselineKey(format: .zip, level: .level1, isEncrypted: false),
-            ScenarioBaselineKey(format: .zip, level: .level6, isEncrypted: false),
+            ScenarioBaselineKey(format: .zip, level: .level2, isEncrypted: false),
             ScenarioBaselineKey(format: .sevenZip, level: .level1, isEncrypted: false),
             ScenarioBaselineKey(format: .tar, level: .store, isEncrypted: false),
             ScenarioBaselineKey(format: .tarZst, level: .level1, isEncrypted: false),

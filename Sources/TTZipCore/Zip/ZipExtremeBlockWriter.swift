@@ -105,6 +105,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                 let slabBox = SendableMutablePointerBox(pointer: totalOutputSlab, size: totalBlocks * maxChunkOut)
                 
                 DispatchQueue.concurrentPerform(iterations: totalBlocks) { blockIdx in
+
                     let offset = blockIdx * actualBlockSize
                     let currentChunkSize = min(actualBlockSize, ptrBox.size - offset)
                     let chunkPtr = ptrBox.pointer.advanced(by: offset)
@@ -132,13 +133,34 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                         isFinal ? 1 : 0
                     )
                     
-                    if compSize > 0 && compSize < currentChunkSize {
+                    if compSize > 0 {
                         resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: compSize))
                     } else {
-                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: chunkPtr, size: currentChunkSize))
+                        print("[WARNING] ExtremeBlockWriter: blockIdx \(blockIdx) failed compression, using uncompressed fallback (len: \(currentChunkSize))")
+                        var fallbackLen: Int = 0
+                        var uPos: Int = 0
+                        while uPos < currentChunkSize {
+                            let uLen = min(65535, currentChunkSize - uPos)
+                            let isLastU = (uPos + uLen == currentChunkSize)
+                            let bfinal: UInt8 = (isLastU && isFinal) ? 0x01 : 0x00
+                            outBuf[fallbackLen] = bfinal
+                            var u16len = UInt16(uLen)
+                            var u16nlen = ~u16len
+                            memcpy(outBuf.advanced(by: fallbackLen + 1), &u16len, 2)
+                            memcpy(outBuf.advanced(by: fallbackLen + 3), &u16nlen, 2)
+                            memcpy(outBuf.advanced(by: fallbackLen + 5), chunkPtr.advanced(by: uPos), uLen)
+                            fallbackLen += 5 + uLen
+                            uPos += uLen
+                        }
+                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: fallbackLen))
                     }
+
+
+
                 }
+
             }
+
             
             var totalComp: Int = 0
             for idx in 0..<totalBlocks {
@@ -157,6 +179,8 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
             compressedPayload = payload
             totalCompressedBytes = Int64(payload.count)
         }
+
+
 
 
         

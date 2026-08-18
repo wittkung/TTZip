@@ -14,50 +14,64 @@
 
 #include "ttzip_deflate_engine.h"
 #include <string.h>
+#include <stdio.h>
+
 
 #if defined(__arm64__) || defined(__aarch64__)
 #include <arm_neon.h>
+#endif
 
-static inline uint32_t ttzip_fast_match_len_arm64(const uint8_t *s1, const uint8_t *s2, uint32_t max_len) {
-    uint32_t len = 0;
-    if (max_len >= 8) {
-        uint64_t v1, v2;
-        memcpy(&v1, s1, 8);
-        memcpy(&v2, s2, 8);
-        uint64_t diff = v1 ^ v2;
-        if (diff != 0) {
-            return (uint32_t)__builtin_ctzll(diff) >> 3;
-        }
-        len = 8;
+/* 15-bit direct 3-byte multiplicative hash (32,768 singleton entries = 64 KB) */
+static inline uint32_t ttzip_fast_hash3(uint32_t seq) {
+    return (uint32_t)(((seq & 0x00FFFFFFU) * 0x1E35A7BDU) >> 17);
+}
+
+/* 14-bit multiplicative hash (16,384 2-way buckets = 64 KB) */
+static inline uint32_t ttzip_fast_hash(uint32_t seq) {
+    return (uint32_t)(seq * 0x1E35A7BDU) >> (32 - 14);
+}
+
+
+
+#if defined(__arm64__) || defined(__aarch64__)
+static inline void ttzip_matchfinder_init_neon(int16_t *data, size_t num_entries) {
+    int16x8_t *p = (int16x8_t *)data;
+    int16x8_t v = vdupq_n_s16(-32768);
+    size_t count = num_entries / 32;
+    do {
+        p[0] = v;
+        p[1] = v;
+        p[2] = v;
+        p[3] = v;
+        p += 4;
+    } while (--count);
+}
+
+static inline void ttzip_matchfinder_rebase_neon(int16_t *data, size_t num_entries) {
+    int16x8_t *p = (int16x8_t *)data;
+    int16x8_t v = vdupq_n_s16((int16_t)-32768);
+    size_t count = num_entries / 32;
+    do {
+        p[0] = vqaddq_s16(p[0], v);
+        p[1] = vqaddq_s16(p[1], v);
+        p[2] = vqaddq_s16(p[2], v);
+        p[3] = vqaddq_s16(p[3], v);
+        p += 4;
+    } while (--count);
+}
+#else
+static inline void ttzip_matchfinder_init_neon(int16_t *data, size_t num_entries) {
+    for (size_t i = 0; i < num_entries; i++) data[i] = -32768;
+}
+static inline void ttzip_matchfinder_rebase_neon(int16_t *data, size_t num_entries) {
+    for (size_t i = 0; i < num_entries; i++) {
+        data[i] = (int16_t)(0x8000 | (data[i] & ~(data[i] >> 15)));
     }
-    if (max_len >= 16) {
-        uint64_t v1, v2;
-        memcpy(&v1, s1 + 8, 8);
-        memcpy(&v2, s2 + 8, 8);
-        uint64_t diff = v1 ^ v2;
-        if (diff != 0) {
-            return 8 + ((uint32_t)__builtin_ctzll(diff) >> 3);
-        }
-        len = 16;
-    }
-    
-    while (len + 16 <= max_len) {
-        uint8x16_t v1 = vld1q_u8(s1 + len);
-        uint8x16_t v2 = vld1q_u8(s2 + len);
-        uint8x16_t eq = vceqq_u8(v1, v2);
-        uint64x2_t eq64 = vreinterpretq_u64_u8(eq);
-        uint64_t low = vgetq_lane_u64(eq64, 0);
-        uint64_t high = vgetq_lane_u64(eq64, 1);
-        if (low != ~0ULL) {
-            uint64_t diff = low ^ ~0ULL;
-            return len + ((uint32_t)__builtin_ctzll(diff) >> 3);
-        }
-        if (high != ~0ULL) {
-            uint64_t diff = high ^ ~0ULL;
-            return len + 8 + ((uint32_t)__builtin_ctzll(diff) >> 3);
-        }
-        len += 16;
-    }
+}
+#endif
+
+static inline uint32_t ttzip_lz_extend_fast_arm64(const uint8_t *s1, const uint8_t *s2, uint32_t start_len, uint32_t max_len) {
+    uint32_t len = start_len;
     while (len + 8 <= max_len) {
         uint64_t v1, v2;
         memcpy(&v1, s1 + len, 8);
@@ -68,29 +82,178 @@ static inline uint32_t ttzip_fast_match_len_arm64(const uint8_t *s1, const uint8
         }
         len += 8;
     }
-    while (len < max_len && s1[len] == s2[len]) {
-        len++;
-    }
-    return len;
-}
-#else
-static inline uint32_t ttzip_fast_match_len_arm64(const uint8_t *s1, const uint8_t *s2, uint32_t max_len) {
-    uint32_t len = 0;
     while (len < max_len && s1[len] == s2[len]) len++;
     return len;
 }
+
+/* Tier 1: 64KB Direct 3-Byte Match Finder with 64-Bit SWAR Verification for Structured JSON & High-Speed Streams */
+size_t ttzip_deflate_hybrid_fast_find_matches(
+    ttzip_deflate_hybrid_fast_mf_t *mf,
+    const uint8_t *in,
+    size_t in_size,
+    const uint8_t *history,
+    size_t history_size,
+    ttzip_deflate_token_t *tokens_out,
+    size_t max_tokens,
+    ttzip_symbol_freqs_t *freqs_out
+) {
+    /* Initialize 64KB direct 3-byte table with -32768 */
+    ttzip_matchfinder_init_neon((int16_t *)mf->hash3_tab, 32768);
+
+    size_t num_tokens = 0;
+    uint32_t consecutive_no_match = 0;
+    const uint8_t *in_next = in;
+    const uint8_t *in_end  = in + in_size;
+    const uint8_t *in_cur_base = in;
+
+    /* Warm up history dictionary if contiguous */
+    if (history && history_size > 0 && history + history_size == in) {
+        size_t h_len = history_size > 32768 ? 32768 : history_size;
+        const uint8_t *h_start = in - h_len;
+        in_cur_base = in - h_len;
+        for (const uint8_t *p = h_start; p + 3 <= in; p++) {
+            uint32_t s;
+            memcpy(&s, p, 4);
+            uint32_t h = ttzip_fast_hash3(s);
+            mf->hash3_tab[h] = (uint16_t)(int16_t)(p - in_cur_base);
+        }
+    }
+
+    const uint8_t *in_min_ptr = history ? (history_size > 32768 ? history + history_size - 32768 : history) : in;
+
+    if (in_size < 8) {
+        while (in_next < in_end && num_tokens < max_tokens) {
+            uint8_t lit = *in_next++;
+            tokens_out[num_tokens].length = 0;
+            tokens_out[num_tokens].offset = lit;
+            freqs_out->litlen[lit]++;
+            num_tokens++;
+        }
+        return num_tokens;
+    }
+
+    while (in_next + 8 <= in_end && num_tokens < max_tokens - 8) {
+        uint32_t cur_pos = (uint32_t)(in_next - in_cur_base);
+        while (cur_pos >= 32768) {
+            ttzip_matchfinder_rebase_neon((int16_t *)mf->hash3_tab, 32768);
+            in_cur_base += 32768;
+            cur_pos -= 32768;
+        }
+
+        const uint8_t *in_base = in_cur_base;
+        int16_t cutoff = (int16_t)(cur_pos - 32768);
+
+        uint32_t seq;
+        memcpy(&seq, in_next, 4);
+        uint32_t h = ttzip_fast_hash3(seq);
+
+        int16_t cand_pos = (int16_t)mf->hash3_tab[h];
+        mf->hash3_tab[h] = (uint16_t)cur_pos;
+
+#if defined(__arm64__) || defined(__aarch64__)
+        if (in_next + 12 <= in_end) {
+            uint32_t next_seq;
+            memcpy(&next_seq, in_next + 1, 4);
+            uint32_t next_h = ttzip_fast_hash3(next_seq);
+            __builtin_prefetch(&mf->hash3_tab[next_h], 1, 1);
+        }
 #endif
 
-/* 4-byte multiplicative hash with 12-bit distribution (4096 2-way buckets = 64 KB L1 Cache Fit) */
-static inline uint32_t ttzip_hash4(uint32_t seq) {
-    return (seq * 0x1E35A7BDU) >> (32 - TTZIP_DEFLATE_FAST_HASH_BITS);
+        if (cand_pos > cutoff && cand_pos < (int16_t)cur_pos) {
+            const uint8_t *matchptr = &in_base[cand_pos];
+            if (matchptr >= in_min_ptr && matchptr < in_next) {
+                uint32_t best_offset = (uint32_t)(in_next - matchptr);
+                if (best_offset >= 1 && best_offset <= 32768) {
+                    uint64_t w_cur, w_cand;
+                    memcpy(&w_cur, in_next, 8);
+                    memcpy(&w_cand, matchptr, 8);
+                    uint64_t diff = w_cur ^ w_cand;
+
+                    /* Check for 3-byte prefix match */
+                    if ((diff & 0x0000000000FFFFFFULL) == 0) {
+                        uint32_t max_len = (uint32_t)(in_end - in_next);
+                        if (max_len > TTZIP_DEFLATE_MAX_MATCH_LEN) max_len = TTZIP_DEFLATE_MAX_MATCH_LEN;
+
+                        uint32_t best_len;
+                        if (diff == 0) {
+                            best_len = ttzip_lz_extend_fast_arm64(in_next, matchptr, 8, max_len);
+                        } else {
+                            best_len = (uint32_t)__builtin_ctzll(diff) >> 3;
+                            if (best_len > max_len) best_len = max_len;
+                        }
+
+                        consecutive_no_match = 0;
+                        tokens_out[num_tokens].length = (uint16_t)best_len;
+                        tokens_out[num_tokens].offset = (uint16_t)best_offset;
+                        num_tokens++;
+
+                        uint8_t len_slot = s_length_slot[best_len];
+                        freqs_out->litlen[257 + len_slot]++;
+                        uint8_t off_slot = s_offset_slot[best_offset];
+                        freqs_out->offset[off_slot]++;
+
+                        in_next += best_len;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        consecutive_no_match++;
+        if (consecutive_no_match > 1) {
+            uint32_t step = (consecutive_no_match > 16) ? 32 : ((consecutive_no_match > 4) ? 16 : 4);
+            if (in_next + step + 8 <= in_end && num_tokens + step <= max_tokens) {
+                for (uint32_t k = 0; k < step; k++) {
+                    uint8_t lit = in_next[k];
+                    tokens_out[num_tokens + k].length = 0;
+                    tokens_out[num_tokens + k].offset = lit;
+                    freqs_out->litlen[lit]++;
+                }
+                num_tokens += step;
+                in_next += step;
+                continue;
+            }
+        }
+
+
+        if (in_next + 2 + 8 <= in_end && num_tokens + 2 <= max_tokens) {
+            uint8_t lit0 = in_next[0];
+            uint8_t lit1 = in_next[1];
+            tokens_out[num_tokens].length = 0;
+            tokens_out[num_tokens].offset = lit0;
+            tokens_out[num_tokens + 1].length = 0;
+            tokens_out[num_tokens + 1].offset = lit1;
+            freqs_out->litlen[lit0]++;
+            freqs_out->litlen[lit1]++;
+            num_tokens += 2;
+            in_next += 2;
+        } else {
+            uint8_t lit = *in_next++;
+            tokens_out[num_tokens].length = 0;
+            tokens_out[num_tokens].offset = lit;
+            freqs_out->litlen[lit]++;
+            num_tokens++;
+        }
+
+    }
+
+
+
+
+    /* Process trailing bytes */
+    while (in_next < in_end && num_tokens < max_tokens) {
+        uint8_t lit = *in_next++;
+        tokens_out[num_tokens].length = 0;
+        tokens_out[num_tokens].offset = lit;
+        freqs_out->litlen[lit]++;
+        num_tokens++;
+    }
+
+    return num_tokens;
 }
 
-typedef struct {
-    const uint8_t *table[TTZIP_DEFLATE_FAST_HASH_SIZE][2];
-} ttzip_fast_ptr_table_t;
+/* Tier 2: Fast 2-Way Greedy Match Finder with Full Chain Updates */
 
-/* Fast match finder main entry point */
 size_t ttzip_deflate_fast_find_matches(
     ttzip_deflate_fast_mf_t *mf,
     const uint8_t *in,
@@ -101,28 +264,32 @@ size_t ttzip_deflate_fast_find_matches(
     size_t max_tokens,
     ttzip_symbol_freqs_t *freqs_out
 ) {
-    ttzip_fast_ptr_table_t *ptab = (ttzip_fast_ptr_table_t *)mf;
-    memset(ptab, 0, sizeof(ttzip_fast_ptr_table_t));
+
+    ttzip_matchfinder_init_neon((int16_t *)mf->hash_tab, 32768);
 
     size_t num_tokens = 0;
     const uint8_t *in_next = in;
     const uint8_t *in_end  = in + in_size;
-    size_t unsucc_searches = 0;
+    const uint8_t *in_cur_base = in;
 
-    /* 1. Warm up history dictionary if contiguous in virtual memory */
+    /* Warm up history */
     if (history && history_size > 0 && history + history_size == in) {
         size_t h_len = history_size > 32768 ? 32768 : history_size;
         const uint8_t *h_start = in - h_len;
+        in_cur_base = in - h_len;
         for (const uint8_t *p = h_start; p + 4 <= in; p++) {
-            uint32_t seq;
-            memcpy(&seq, p, 4);
-            uint32_t h = ttzip_hash4(seq);
-            ptab->table[h][1] = ptab->table[h][0];
-            ptab->table[h][0] = p;
+            uint32_t s;
+            memcpy(&s, p, 4);
+            uint32_t h = ttzip_fast_hash(s) & 16383;
+            int16_t pos = (int16_t)(p - in_cur_base);
+            mf->hash_tab[h][1] = mf->hash_tab[h][0];
+            mf->hash_tab[h][0] = pos;
         }
     }
 
-    if (in_size < 4) {
+    const uint8_t *in_min_ptr = history ? (history_size > 32768 ? history + history_size - 32768 : history) : in;
+
+    if (in_size < 5) {
         while (in_next < in_end && num_tokens < max_tokens) {
             uint8_t lit = *in_next++;
             tokens_out[num_tokens].length = 0;
@@ -135,62 +302,95 @@ size_t ttzip_deflate_fast_find_matches(
 
     uint32_t seq;
     memcpy(&seq, in_next, 4);
-    uint32_t next_hash = ttzip_hash4(seq);
+    uint32_t next_h = ttzip_fast_hash(seq) & 16383;
 
-    while (in_next + 4 <= in_end && num_tokens < max_tokens - 1) {
-        uint32_t hash = next_hash;
+    while (in_next + 4 <= in_end && num_tokens < max_tokens - 2) {
+        uint32_t cur_pos = (uint32_t)(in_next - in_cur_base);
+        while (cur_pos >= 32768) {
+            ttzip_matchfinder_rebase_neon((int16_t *)mf->hash_tab, 32768);
+            in_cur_base += 32768;
+            cur_pos -= 32768;
+        }
+
+        const uint8_t *in_base = in_cur_base;
+        int16_t cutoff = (int16_t)(cur_pos - 32768);
+
+
+        uint32_t h = next_h;
         memcpy(&seq, in_next, 4);
+
         if (in_next + 5 <= in_end) {
             uint32_t next_seq;
             memcpy(&next_seq, in_next + 1, 4);
-            next_hash = ttzip_hash4(next_seq);
+            next_h = ttzip_fast_hash(next_seq) & 16383;
 #if defined(__arm64__) || defined(__aarch64__)
-            __builtin_prefetch(&ptab->table[next_hash][0], 1, 1);
+            __builtin_prefetch(&mf->hash_tab[next_h][0], 1, 1);
 #endif
         }
 
-        const uint8_t *cand0 = ptab->table[hash][0];
-        const uint8_t *cand1 = ptab->table[hash][1];
-        ptab->table[hash][1] = cand0;
-        ptab->table[hash][0] = in_next;
+        uint32_t bucket = *(uint32_t *)&mf->hash_tab[h][0];
+        int16_t cand0_pos = (int16_t)(bucket & 0xFFFF);
+        int16_t cand1_pos = (int16_t)(bucket >> 16);
+        *(uint32_t *)&mf->hash_tab[h][0] = (uint32_t)(uint16_t)cur_pos | ((uint32_t)(uint16_t)cand0_pos << 16);
 
         uint32_t max_len = (uint32_t)(in_end - in_next);
         if (max_len > TTZIP_DEFLATE_MAX_MATCH_LEN) max_len = TTZIP_DEFLATE_MAX_MATCH_LEN;
 
         uint32_t best_len = 0;
-        uint32_t best_offset = 0;
+        const uint8_t *best_matchptr = in_next;
 
-        /* Probe candidate 0 */
-        if (cand0 != NULL && in_next > cand0) {
-            size_t dist = (size_t)(in_next - cand0);
-            if (dist <= 32768) {
-                uint32_t mseq;
-                memcpy(&mseq, cand0, 4);
-                if (mseq == seq) {
-                    best_len = ttzip_fast_match_len_arm64(in_next, cand0, max_len);
-                    best_offset = (uint32_t)dist;
-                }
-            }
+        if (cand0_pos <= cutoff) {
+            goto fast_no_match;
         }
 
-        /* Probe candidate 1 */
-        if (best_len < 32 && cand1 != NULL && in_next > cand1) {
-            size_t dist = (size_t)(in_next - cand1);
-            if (dist <= 32768) {
-                uint32_t mseq;
-                memcpy(&mseq, cand1, 4);
-                if (mseq == seq) {
-                    uint32_t len1 = ttzip_fast_match_len_arm64(in_next, cand1, max_len);
-                    if (len1 > best_len) {
-                        best_len = len1;
-                        best_offset = (uint32_t)dist;
+        const uint8_t *matchptr = &in_base[cand0_pos];
+        if (matchptr < in_min_ptr) {
+            goto fast_no_match;
+        }
+
+        uint32_t mseq;
+        memcpy(&mseq, matchptr, 4);
+
+        if (mseq == seq) {
+            best_len = ttzip_lz_extend_fast_arm64(in_next, matchptr, 4, max_len);
+            best_matchptr = matchptr;
+
+            if (cand1_pos > cutoff && best_len < 64) {
+                const uint8_t *matchptr1 = &in_base[cand1_pos];
+                if (matchptr1 >= in_min_ptr) {
+                    uint32_t mseq1;
+                    memcpy(&mseq1, matchptr1, 4);
+                    if (mseq1 == seq &&
+                        in_next + best_len <= in_end &&
+                        matchptr1 + best_len <= in_end) {
+                        uint32_t tail1, tail_target;
+                        memcpy(&tail1, matchptr1 + best_len - 3, 4);
+                        memcpy(&tail_target, in_next + best_len - 3, 4);
+                        if (tail1 == tail_target) {
+                            uint32_t len1 = ttzip_lz_extend_fast_arm64(in_next, matchptr1, 4, max_len);
+                            if (len1 > best_len) {
+                                best_len = len1;
+                                best_matchptr = matchptr1;
+                            }
+                        }
                     }
                 }
             }
+        } else if (cand1_pos > cutoff) {
+            const uint8_t *matchptr1 = &in_base[cand1_pos];
+            if (matchptr1 >= in_min_ptr) {
+                uint32_t mseq1;
+                memcpy(&mseq1, matchptr1, 4);
+                if (mseq1 == seq) {
+                    best_len = ttzip_lz_extend_fast_arm64(in_next, matchptr1, 4, max_len);
+                    best_matchptr = matchptr1;
+                }
+            }
         }
 
-        if (best_len >= 3 && best_offset >= 1 && best_offset <= 32768) {
-            unsucc_searches = 0;
+
+        if (best_len >= 4) {
+            uint32_t best_offset = (uint32_t)(in_next - best_matchptr);
             tokens_out[num_tokens].length = (uint16_t)best_len;
             tokens_out[num_tokens].offset = (uint16_t)best_offset;
             num_tokens++;
@@ -200,51 +400,40 @@ size_t ttzip_deflate_fast_find_matches(
             uint8_t off_slot = s_offset_slot[best_offset];
             freqs_out->offset[off_slot]++;
 
-            /* Advance position */
+            /* Sample intermediate pos to maintain dictionary continuity */
+            if (in_next + 1 + 4 <= in_end) {
+                uint32_t s1;
+                memcpy(&s1, in_next + 1, 4);
+                uint32_t _h = ttzip_fast_hash(s1) & 16383;
+                uint16_t _pos = (uint16_t)((uintptr_t)(in_next + 1 - in_cur_base) & 0xFFFF);
+                uint32_t _b = *(uint32_t *)&mf->hash_tab[_h][0];
+                *(uint32_t *)&mf->hash_tab[_h][0] = (uint32_t)_pos | ((uint32_t)(uint16_t)(_b & 0xFFFF) << 16);
+            }
+
             in_next += best_len;
             if (in_next + 4 <= in_end) {
                 uint32_t s;
                 memcpy(&s, in_next, 4);
-                next_hash = ttzip_hash4(s);
+                next_h = ttzip_fast_hash(s) & 16383;
             }
-        } else {
-            unsucc_searches++;
-            if (__builtin_expect(unsucc_searches >= 256, 0)) {
-                /* High-entropy incompressible stream detected: fast-forward remaining bytes directly */
-                size_t rem = (size_t)(in_end - in_next);
-                if (rem > max_tokens - num_tokens) rem = max_tokens - num_tokens;
-                for (size_t i = 0; i < rem; i++) {
-                    uint8_t lit = in_next[i];
-                    tokens_out[num_tokens + i].length = 0;
-                    tokens_out[num_tokens + i].offset = lit;
-                    freqs_out->litlen[lit]++;
-                }
-                num_tokens += rem;
-                in_next += rem;
-                break;
-            }
+            continue;
+        }
 
-            uint32_t step = 1 + (uint32_t)(unsucc_searches >> 5);
-            if (step > 32) step = 32;
-            if (step > (uint32_t)(in_end - in_next - 4)) {
-                step = (uint32_t)(in_end - in_next - 4);
-                if (step == 0) step = 1;
-            }
-
-            for (uint32_t i = 0; i < step && in_next < in_end && num_tokens < max_tokens; i++) {
-                uint8_t lit = *in_next++;
-                tokens_out[num_tokens].length = 0;
-                tokens_out[num_tokens].offset = lit;
-                freqs_out->litlen[lit]++;
-                num_tokens++;
-            }
+    fast_no_match:
+        {
+            uint8_t lit = *in_next++;
+            tokens_out[num_tokens].length = 0;
+            tokens_out[num_tokens].offset = lit;
+            freqs_out->litlen[lit]++;
+            num_tokens++;
 
             if (in_next + 4 <= in_end) {
                 uint32_t s;
                 memcpy(&s, in_next, 4);
-                next_hash = ttzip_hash4(s);
+                next_h = ttzip_fast_hash(s) & 16383;
             }
         }
+
     }
 
     while (in_next < in_end && num_tokens < max_tokens) {
@@ -257,3 +446,6 @@ size_t ttzip_deflate_fast_find_matches(
 
     return num_tokens;
 }
+
+
+

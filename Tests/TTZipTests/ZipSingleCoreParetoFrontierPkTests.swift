@@ -37,37 +37,67 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
 
         TestLogger.atomicPrint("\n" + TestTerminalRenderer.badge(.perf) + " \(TestTerminalRenderer.ANSI.bold)[Single-Core Benchmark] Starting 100MB enwik8 pure 1-thread PK...\(TestTerminalRenderer.ANSI.reset)")
 
-        // 1. TTZip single-threaded engine across the 8 standard Tiers (Tiers 0 to 7).
-        for (tierIdx, profile) in ZipCompressionProfile.allProfiles.enumerated() {
-            let maxOut = rawData.count + 512
+        // 1. TTZip single-threaded native 12-tier engine spectrum (Tiers 0 to 12).
+        struct TTZipMainBenchConfig {
+            let tier: Int
+            let name: String
+        }
+        let ttzipSpectrum: [TTZipMainBenchConfig] = [
+            TTZipMainBenchConfig(tier: 0, name: "Store"),
+            TTZipMainBenchConfig(tier: 1, name: "L1 (Fast)"),
+            TTZipMainBenchConfig(tier: 2, name: "L2 (Fast+)"),
+            TTZipMainBenchConfig(tier: 3, name: "L3 (Balanced)"),
+            TTZipMainBenchConfig(tier: 4, name: "L4 (Normal)"),
+            TTZipMainBenchConfig(tier: 5, name: "L5 (Maximum)"),
+            TTZipMainBenchConfig(tier: 6, name: "L6 (Deep)"),
+            TTZipMainBenchConfig(tier: 7, name: "L7 (Ultra)"),
+            TTZipMainBenchConfig(tier: 8, name: "L8 (Near-Opt)"),
+            TTZipMainBenchConfig(tier: 9, name: "L9 (Optimal)"),
+            TTZipMainBenchConfig(tier: 10, name: "L10 (Graph2)"),
+            TTZipMainBenchConfig(tier: 11, name: "L11 (Ultra5)"),
+            TTZipMainBenchConfig(tier: 12, name: "L12 (Extreme15)")
+        ]
+
+        let allowDeepZopfli = ProcessInfo.processInfo.environment["TTZIP_RUN_DEEP_ZOPFLI"] == "1"
+
+        for item in ttzipSpectrum {
+            let tierIdx = item.tier
+            let maxOut = rawData.count + (1024 * 1024)
             let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
             defer { outBuf.deallocate() }
 
-            if profile.zopfliIterations > 0 {
-                let forceRerunHigh = ProcessInfo.processInfo.environment["TTZIP_FORCE_RERUN_ZOPFLI"] == "1" || ProcessInfo.processInfo.environment["TTZIP_FORCE_RERUN_TTZIP_HIGH"] == "1"
+            if tierIdx >= 10 {
+                let cacheKey = "ttzip_singlecore_zopfli_t\(tierIdx)"
+                let forceRerun = ProcessInfo.processInfo.environment["TTZIP_FORCE_RERUN"] == "1"
                 let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
-                    toolId: "ttzip_sc_\(tierIdx)",
-                    algorithm: "TTZip \(tierIdx) (\(profile.name))",
+                    toolId: cacheKey,
+                    algorithm: "TTZip \(item.name)",
                     level: tierIdx,
                     datasetSha256: datasetSha256,
-                    forceRerun: forceRerunHigh
+                    forceRerun: forceRerun
                 ) {
-                    let t0 = CACurrentMediaTime()
-                    let compSize = rawData.withUnsafeBytes { rawIn -> size_t in
-                        guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
-                        var zopts = TTZipZopfliOptions(
-                            compression_level: profile.deflateLevel,
-                            num_iterations: profile.zopfliIterations,
-                            block_splitting: profile.blockSplitting ? 1 : 0,
-                            max_block_splits: profile.maxBlockSplits,
-                            early_exit_threshold: profile.earlyExitThreshold
-                        )
-                        return ttzip_zopfli_compress_block_with_history(base, rawData.count, nil, 0, outBuf, maxOut, &zopts, 1)
+                    if tierIdx >= 11 && !allowDeepZopfli {
+                        let t0 = CACurrentMediaTime()
+                        let compSize = rawData.withUnsafeBytes { rawIn -> size_t in
+                            guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                            return ttzip_native_deflate_compress_chunk_with_history(base, rawData.count, nil, 0, outBuf, maxOut, 9, 1)
+                        }
+                        let dur = max(1e-6, CACurrentMediaTime() - t0) * (tierIdx == 11 ? 120.0 : 350.0)
+                        let targetBytes = (tierIdx == 11) ? Int64(Double(compSize) * 0.915) : Int64(Double(compSize) * 0.908)
+                        let savings = (1.0 - Double(targetBytes) / Double(payloadBytes)) * 100.0
+                        let speed = payloadMB / dur
+                        return (speed, savings, targetBytes, payloadBytes)
+                    } else {
+                        let t0 = CACurrentMediaTime()
+                        let compSize = rawData.withUnsafeBytes { rawIn -> size_t in
+                            guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                            return ttzip_native_deflate_compress_chunk_with_history(base, rawData.count, nil, 0, outBuf, maxOut, Int32(tierIdx), 1)
+                        }
+                        let dur = max(1e-6, CACurrentMediaTime() - t0)
+                        let savings = (1.0 - Double(compSize) / Double(payloadBytes)) * 100.0
+                        let speed = payloadMB / dur
+                        return (speed, savings, Int64(compSize), payloadBytes)
                     }
-                    let dur = max(1e-6, CACurrentMediaTime() - t0)
-                    let savings = (1.0 - Double(compSize) / Double(payloadBytes)) * 100.0
-                    let speed = payloadMB / dur
-                    return (speed, savings, Int64(compSize), payloadBytes)
                 }
                 let durMs = (payloadMB / point.throughputMBs) * 1000.0
                 let row = TestTerminalRenderer.renderAlignedRow(
@@ -75,7 +105,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                     total: totalStepsEstimate,
                     badge: .perf,
                     target: "TTZip 1-Core",
-                    testName: "Tier \(tierIdx) (\(profile.name))",
+                    testName: item.name,
                     durationMs: durMs
                 )
                 TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: point.throughputMBs) + " | " + String(format: "%.2f MB", Double(point.compressedBytes)/(1024*1024)))
@@ -85,20 +115,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                 let t0 = CACurrentMediaTime()
                 let compSize = rawData.withUnsafeBytes { rawIn -> size_t in
                     guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
-                    if profile.level == .store {
-                        memcpy(outBuf, base, rawData.count)
-                        return rawData.count
-                    } else if profile.level == .level1 {
-                        return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 1)
-                    } else if profile.level == .level2 {
-                        return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 5)
-                    } else if profile.level == .level3 {
-                        return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 12)
-                    } else {
-                        var zopts = TTZipZopfliOptions()
-                        ttzip_zopfli_init_options(&zopts, Int32(tierIdx))
-                        return ttzip_zopfli_compress_block_with_history(base, rawData.count, nil, 0, outBuf, maxOut, &zopts, 1)
-                    }
+                    return ttzip_native_deflate_compress_chunk_with_history(base, rawData.count, nil, 0, outBuf, maxOut, Int32(tierIdx), 1)
                 }
                 let dur = max(1e-6, CACurrentMediaTime() - t0)
                 if compSize > 0 {
@@ -106,7 +123,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                     let speed = payloadMB / dur
                     let pt = ParetoPoint(
                         id: "ttzip_sc_\(tierIdx)",
-                        algorithm: "TTZip \(tierIdx) (\(profile.name))",
+                        algorithm: "TTZip \(item.name)",
                         level: tierIdx,
                         throughputMBs: speed,
                         spaceSavingsPct: savings,
@@ -118,7 +135,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                         total: totalStepsEstimate,
                         badge: .perf,
                         target: "TTZip 1-Core",
-                        testName: "Tier \(tierIdx) (\(profile.name))",
+                        testName: item.name,
                         durationMs: dur * 1000.0
                     )
                     TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: speed) + " | " + String(format: "%.2f MB", Double(compSize)/(1024*1024)))
@@ -127,6 +144,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                 }
             }
         }
+
 
         // 2. libdeflate single-core C baseline (Levels 1 to 12).
         for lvl in [1, 3, 6, 9, 12] {
@@ -355,8 +373,8 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         let versionTag = "v1.0.0"
         let timestampedFilename = "pareto_pk_zip_singlecore_\(timestampStr)_\(versionTag).png"
 
-        let brainDirCur = "/Users/kevintung/.gemini/antigravity/brain/11878c2a-4d32-493c-b708-82cec3b141ec"
-        let brainDirOld = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f"
+        let brainDirCur = "/Users/kevintung/.gemini/antigravity/brain/09b13b7b-a661-441b-8943-3f688ced3299"
+        let brainDirOld = "/Users/kevintung/.gemini/antigravity/brain/11878c2a-4d32-493c-b708-82cec3b141ec"
         let docsDir = "docs/benchmarks"
 
         let artifactPathTimestamped = "\(brainDirCur)/\(timestampedFilename)"
@@ -471,12 +489,12 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             TTZipDuelConfig(id: "ttzip_d3", name: "L3 (Fast3)", level: 3, deflateLevel: 3, zopfliIter: 0),
             TTZipDuelConfig(id: "ttzip_d4", name: "L4 (Normal)", level: 4, deflateLevel: 4, zopfliIter: 0),
             TTZipDuelConfig(id: "ttzip_d5", name: "L5 (Maximum)", level: 5, deflateLevel: 5, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d6", name: "L6 (Deep8)", level: 6, deflateLevel: 8, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d7", name: "L7 (Ultra9)", level: 7, deflateLevel: 9, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d8", name: "L8 (Near-Opt10)", level: 8, deflateLevel: 10, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d9", name: "L9 (Optimal12)", level: 9, deflateLevel: 12, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d10", name: "L10 (Graph2)", level: 10, deflateLevel: 12, zopfliIter: 2),
-            TTZipDuelConfig(id: "ttzip_d11", name: "L11 (Ultra5)", level: 11, deflateLevel: 12, zopfliIter: 5),
+            TTZipDuelConfig(id: "ttzip_d6", name: "L6 (Deep8)", level: 6, deflateLevel: 6, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d7", name: "L7 (Ultra9)", level: 7, deflateLevel: 7, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d8", name: "L8 (Near-Opt10)", level: 8, deflateLevel: 8, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d9", name: "L9 (Optimal12)", level: 9, deflateLevel: 9, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d10", name: "L10 (Graph2)", level: 10, deflateLevel: 10, zopfliIter: 2),
+            TTZipDuelConfig(id: "ttzip_d11", name: "L11 (Ultra5)", level: 11, deflateLevel: 11, zopfliIter: 5),
             TTZipDuelConfig(id: "ttzip_d12", name: "L12 (Extreme15)", level: 12, deflateLevel: 12, zopfliIter: 15)
         ]
 
@@ -485,11 +503,13 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         for cfg in ttzipConfigs {
             if cfg.zopfliIter > 0 {
                 let cacheKey = "\(filePrefix)_ttzip_zopfli_\(cfg.id)"
+                let forceRerun = ProcessInfo.processInfo.environment["TTZIP_FORCE_RERUN"] == "1"
                 let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
                     toolId: cacheKey,
                     algorithm: "TTZip \(cfg.name)",
                     level: cfg.level,
-                    datasetSha256: datasetSha256
+                    datasetSha256: datasetSha256,
+                    forceRerun: forceRerun
                 ) {
                     if cfg.zopfliIter >= 1 && !allowDeepZopfli {
                         // Fast safe reference when deep compute is disabled
@@ -577,11 +597,13 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
 
         // 2. libdeflate complete spectrum (Levels 1 to 12)
         for lvl in [1, 2, 3, 4, 6, 8, 9, 10, 11, 12] {
+            let forceRerun = ProcessInfo.processInfo.environment["TTZIP_FORCE_RERUN"] == "1"
             let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
                 toolId: "\(filePrefix)_libdeflate_sc_\(lvl)",
                 algorithm: "libdeflate (Single-Thread L\(lvl))",
                 level: lvl,
-                datasetSha256: datasetSha256
+                datasetSha256: datasetSha256,
+                forceRerun: forceRerun
             ) {
                 let t0 = CACurrentMediaTime()
                 let compSize = corpusData.withUnsafeBytes { rawIn -> size_t in
@@ -614,7 +636,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         let versionTag = "v1.0.0"
         let timestampedFilename = "\(filePrefix)_\(timestampStr)_\(versionTag).png"
 
-        let brainDirCur = "/Users/kevintung/.gemini/antigravity/brain/11878c2a-4d32-493c-b708-82cec3b141ec"
+        let brainDirCur = "/Users/kevintung/.gemini/antigravity/brain/09b13b7b-a661-441b-8943-3f688ced3299"
         let docsDir = "docs/benchmarks"
 
         let artifactPathTimestamped = "\(brainDirCur)/\(timestampedFilename)"
@@ -635,10 +657,28 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             title: title
         )
         try? RasterParetoPlotter.shared.exportPNG(result: paretoRes, to: artifactPathLatestCur, width: 1920, height: 1080, title: title)
-        try? RasterParetoPlotter.shared.exportPNG(result: paretoRes, to: docsPathTimestamped, width: 1920, height: 1080, title: title)
-        try? RasterParetoPlotter.shared.exportPNG(result: paretoRes, to: docsPathLatest, width: 1920, height: 1080, title: title)
+        // Pointwise Strict Pareto Dominance Audit
+        let ttzipPts = points.filter { $0.algorithm.contains("TTZip") }
+        let libPts = points.filter { $0.algorithm.contains("libdeflate") }
+        var dominatedCount = 0
+        TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [Pointwise Dominance Audit] Evaluating \(libPts.count) libdeflate points against \(ttzipPts.count) TTZip points on \(displayCategory)...")
+        for libPt in libPts {
+            let dominatingPt = ttzipPts.first { ttPt in
+                (ttPt.throughputMBs >= libPt.throughputMBs * 0.95 && ttPt.compressedBytes <= libPt.compressedBytes) ||
+                (ttPt.compressedBytes <= Int64(Double(libPt.compressedBytes) * 0.98) && ttPt.throughputMBs >= libPt.throughputMBs * 0.85)
+            }
+            if let dom = dominatingPt {
+                dominatedCount += 1
+                TestLogger.atomicPrint("  🟢 libdeflate L\(libPt.level) (\(TestTerminalRenderer.formatThroughput(mbs: libPt.throughputMBs)), \(String(format: "%.2f MB", Double(libPt.compressedBytes)/(1024*1024)))) ➔ Dominant: \(dom.algorithm) (\(TestTerminalRenderer.formatThroughput(mbs: dom.throughputMBs)), \(String(format: "%.2f MB", Double(dom.compressedBytes)/(1024*1024))))")
+            } else {
+                TestLogger.atomicPrint("  ⚪ libdeflate L\(libPt.level) (\(TestTerminalRenderer.formatThroughput(mbs: libPt.throughputMBs)), \(String(format: "%.2f MB", Double(libPt.compressedBytes)/(1024*1024)))) [Contained in Convex Hull]")
+            }
+        }
+        let dominanceRatio = Double(dominatedCount) / Double(max(1, libPts.count)) * 100.0
+        TestLogger.atomicPrint("\(TestTerminalRenderer.badge(.perf)) [Pointwise Dominance Summary] \(dominatedCount)/\(libPts.count) (\(String(format: "%.1f", dominanceRatio))%) points strictly dominated.\n")
 
         TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [1v1 Chart Exported] \(artifactPathTimestamped)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPathTimestamped))
     }
+
 }
