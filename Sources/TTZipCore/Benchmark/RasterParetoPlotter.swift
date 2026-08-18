@@ -83,42 +83,36 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let plotW = width - marginLeft - marginRight
         let plotH = height - marginTop - marginBottom
 
-        // 2. 自适应 X 轴（压缩率 %）与 Y 轴（吞吐速度 MB/s 对数）
+        // 2. 自适应 X 轴（对数压缩比扩展 Log Compression Ratio Scale）与 Y 轴（吞吐速度 MB/s 对数）
         let allSavings = result.allPoints.map { $0.spaceSavingsPct }
         let allSpeeds = result.allPoints.map { $0.throughputMBs }
 
         let minX = allSavings.min() ?? 80.0
-        let maxX = allSavings.max() ?? 100.0
+        let maxX = allSavings.max() ?? 99.0
         let minY = allSpeeds.min() ?? 10.0
         let maxY = allSpeeds.max() ?? 10000.0
 
-        let spanX = max(0.1, maxX - minX)
-        let xStep: Double
-        if spanX <= 2.5 {
-            xStep = 0.5
-        } else if spanX <= 5.0 {
-            xStep = 1.0
-        } else if spanX <= 8.0 {
-            xStep = 2.0
-        } else if spanX <= 25.0 {
-            xStep = 5.0
-        } else if spanX <= 55.0 {
-            xStep = 10.0
-        } else {
-            xStep = 20.0
+        // 核心数学映射：将空间节省率 S 转换为压缩比对数 log10(100 / (100 - S))
+        // 当 S 逼近 100% 时，该函数自动将高压缩比右侧区域横向展开 3x~5x，彻底消除右侧拥挤挤压！
+        func logRatio(_ savings: Double) -> Double {
+            let clamped = max(0.0, min(savings, 99.999))
+            let ratio = 100.0 / max(0.001, 100.0 - clamped)
+            return log10(ratio)
         }
 
-        let padLeft = max(xStep * 0.6, spanX * 0.12)
-        let domainMinX = max(0.0, floor((minX - padLeft) / xStep) * xStep)
-        let padRight = max(xStep * 0.6, spanX * 0.12)
-        let domainMaxX = min(100.0, ceil((maxX + padRight) / xStep) * xStep)
+        let minLogX = logRatio(minX)
+        let maxLogX = logRatio(maxX)
+        let spanLogX = max(0.01, maxLogX - minLogX)
+
+        let domainMinLogX = max(0.0, minLogX - spanLogX * 0.08)
+        let domainMaxLogX = maxLogX + spanLogX * 0.08
 
         let minLogY = log10(max(1.0, minY * 0.70))
         let maxLogY = log10(max(10.0, maxY * 1.25))
 
         func mapX(_ savingsVal: Double) -> CGFloat {
-            let clamped = max(domainMinX, min(savingsVal, domainMaxX))
-            let norm = (clamped - domainMinX) / max(1e-6, domainMaxX - domainMinX)
+            let valLogX = logRatio(savingsVal)
+            let norm = (valLogX - domainMinLogX) / max(1e-6, domainMaxLogX - domainMinLogX)
             return marginLeft + CGFloat(norm) * plotW
         }
 
@@ -172,10 +166,36 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             }
         }
 
-        // 4. 绘制 X 轴（空间节省率 %）刻度与标签
-        for xVal in stride(from: domainMinX, through: domainMaxX, by: xStep) {
+        // 4. 绘制 X 轴（对数空间节省率 %）刻度与标签
+        let candidateXTicks: [Double] = [
+            0.0, 20.0, 40.0, 60.0, 70.0, 80.0, 85.0, 90.0, 92.0, 94.0, 95.0,
+            95.5, 96.0, 96.2, 96.4, 96.5, 96.6, 96.7, 96.8, 97.0, 97.2, 97.5,
+            98.0, 98.5, 99.0, 99.5, 99.8, 99.9
+        ]
+
+        var activeXTicks: [Double] = []
+        var lastTickCanvasX: CGFloat = -1000.0
+        for tickVal in candidateXTicks {
+            let tickLog = logRatio(tickVal)
+            if tickLog >= domainMinLogX && tickLog <= domainMaxLogX {
+                let x = mapX(tickVal)
+                if x - lastTickCanvasX >= 75.0 {
+                    activeXTicks.append(tickVal)
+                    lastTickCanvasX = x
+                }
+            }
+        }
+
+        for xVal in activeXTicks {
             let x = mapX(xVal)
-            let label = xStep < 1.0 ? String(format: "%.1f%%", xVal) : String(format: "%.0f%%", xVal)
+            let label: String
+            if xVal >= 95.0 {
+                label = String(format: "%.1f%%", xVal)
+            } else if xVal == floor(xVal) {
+                label = String(format: "%.0f%%", xVal)
+            } else {
+                label = String(format: "%.1f%%", xVal)
+            }
             let font = NSFont.systemFont(ofSize: 14, weight: .regular)
             let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: axisTextColor]
             let str = NSAttributedString(string: label, attributes: attrs)
