@@ -7,7 +7,7 @@
 
 /**
  * @file ttzip_deflate_engine.c
- * @brief Native in-process Apple Silicon Deflate block & streaming compression pipeline.
+ * @brief Native in-process Apple Silicon Deflate block & streaming compression pipeline (Instant Incremental).
  * @details Coordinates greedy/fast-lazy/deep-lazy LZ77 parsing, length/distance slot translation,
  *          dynamic/static canonical Huffman coding, and RFC 1951 continuous bitstream serialization.
  */

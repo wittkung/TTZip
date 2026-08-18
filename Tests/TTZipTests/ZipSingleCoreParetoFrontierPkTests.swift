@@ -89,9 +89,9 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                         memcpy(outBuf, base, rawData.count)
                         return rawData.count
                     } else if profile.level == .level1 {
-                        return ttzip_native_deflate_compress_chunk_with_history(base, rawData.count, nil, 0, outBuf, maxOut, 1, 1)
+                        return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 1)
                     } else if profile.level == .level2 {
-                        return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 6)
+                        return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 5)
                     } else if profile.level == .level3 {
                         return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 12)
                     } else {
@@ -167,7 +167,14 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         // 3. Official 7-Zip ARM64 single-threaded engine (/opt/homebrew/bin/7zz, -tzip -mmt=1).
         let sevenZipPath = "/opt/homebrew/bin/7zz"
         if FileManager.default.fileExists(atPath: sevenZipPath) {
-            let configs: [(Int, String)] = [(1, "7-Zip 1-Thread (Fast)"), (3, "7-Zip 1-Thread (Fast2)"), (5, "7-Zip 1-Thread (Normal)"), (7, "7-Zip 1-Thread (Max)"), (9, "7-Zip 1-Thread (Ultra)")]
+            let configs: [(Int, String)] = [
+                (0, "7-Zip 1-Thread (Store)"),
+                (1, "7-Zip 1-Thread (Fast)"),
+                (3, "7-Zip 1-Thread (Fast2)"),
+                (5, "7-Zip 1-Thread (Normal)"),
+                (7, "7-Zip 1-Thread (Max)"),
+                (9, "7-Zip 1-Thread (Ultra)")
+            ]
             for (mx, label) in configs {
                 let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
                     toolId: "7zip_sc_\(mx)",
@@ -203,7 +210,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             }
         }
 
-        // 4. Apple Native single-threaded tools (/usr/bin/ditto & /usr/bin/zip -1..-9).
+        // 4. Apple Native single-threaded tools (/usr/bin/ditto & /usr/bin/zip -0..-9).
         let dittoPoint = CompetitorBenchmarkCacheManager.shared.getOrRun(
             toolId: "apple_ditto_sc",
             algorithm: "Apple Native (ditto)",
@@ -236,7 +243,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         stepCounter += 1
         points.append(dittoPoint)
 
-        for zLvl in [1, 3, 6, 9] {
+        for zLvl in [0, 1, 3, 6, 9] {
             let zipPoint = CompetitorBenchmarkCacheManager.shared.getOrRun(
                 toolId: "apple_zip_sc_\(zLvl)",
                 algorithm: "Apple Native (zip -\(zLvl))",
@@ -270,10 +277,10 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             points.append(zipPoint)
         }
 
-        // 5. minizip-ng (/opt/homebrew/bin/minizip-ng, Single-Thread Levels 1, 6, 9).
+        // 5. minizip-ng (/opt/homebrew/bin/minizip-ng, Single-Thread Levels 0, 1, 6, 9).
         let minizipNgPath = "/opt/homebrew/bin/minizip-ng"
         if FileManager.default.fileExists(atPath: minizipNgPath) {
-            for mzLvl in [1, 6, 9] {
+            for mzLvl in [0, 1, 6, 9] {
                 let mzPoint = CompetitorBenchmarkCacheManager.shared.getOrRun(
                     toolId: "minizip_ng_sc_\(mzLvl)",
                     algorithm: "minizip-ng (Single-Thread L\(mzLvl))",
@@ -341,30 +348,212 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         stepCounter += 1
         points.append(libcompPoint)
 
-        // 7. Compute single-core Pareto frontier and export plot.
-        let artifactPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/pareto_pk_zip_singlecore.png"
-        let docsPath = "docs/benchmarks/pareto_pk_zip_singlecore.png"
-        let title = "ZIP / Deflate Single-Threaded Pareto Benchmark (1-Core: TTZip vs. libdeflate vs. Apple libcompression vs. 7-Zip)"
+        // 7. Compute single-core Pareto frontier and export plot with timestamp and version.
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HHmmss"
+        let timestampStr = formatter.string(from: Date())
+        let versionTag = "v1.0.0"
+        let timestampedFilename = "pareto_pk_zip_singlecore_\(timestampStr)_\(versionTag).png"
+
+        let brainDirCur = "/Users/kevintung/.gemini/antigravity/brain/11878c2a-4d32-493c-b708-82cec3b141ec"
+        let brainDirOld = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f"
+        let docsDir = "docs/benchmarks"
+
+        let artifactPathTimestamped = "\(brainDirCur)/\(timestampedFilename)"
+        let artifactPathLatestCur = "\(brainDirCur)/pareto_pk_zip_singlecore.png"
+        let artifactPathLatestOld = "\(brainDirOld)/pareto_pk_zip_singlecore.png"
+        let docsPathTimestamped = "\(docsDir)/\(timestampedFilename)"
+        let docsPathLatest = "\(docsDir)/pareto_pk_zip_singlecore.png"
+
+        let title = "ZIP / Deflate Single-Threaded Pareto Benchmark [\(timestampStr)] (1-Core: TTZip vs. libdeflate vs. Apple libcompression vs. 7-Zip)"
 
         var mutablePoints = points
         let paretoRes = ParetoFrontierCalculator.shared.computeParetoFrontier(points: &mutablePoints)
 
-        try? RasterParetoPlotter.shared.exportPNG(
+        // Export timestamped versioned artifact
+        try RasterParetoPlotter.shared.exportPNG(
             result: paretoRes,
-            to: artifactPath,
+            to: artifactPathTimestamped,
             width: 1920,
             height: 1080,
             title: title
         )
-        try? RasterParetoPlotter.shared.exportPNG(
-            result: paretoRes,
-            to: docsPath,
-            width: 1920,
-            height: 1080,
-            title: title
-        )
+        // Export latest alias artifacts
+        try? RasterParetoPlotter.shared.exportPNG(result: paretoRes, to: artifactPathLatestCur, width: 1920, height: 1080, title: title)
+        try? RasterParetoPlotter.shared.exportPNG(result: paretoRes, to: artifactPathLatestOld, width: 1920, height: 1080, title: title)
+        try? RasterParetoPlotter.shared.exportPNG(result: paretoRes, to: docsPathTimestamped, width: 1920, height: 1080, title: title)
+        try? RasterParetoPlotter.shared.exportPNG(result: paretoRes, to: docsPathLatest, width: 1920, height: 1080, title: title)
 
-        TTLogger.debug("🏆 Pure ZIP / Deflate single-core Pareto chart generated: \(artifactPath)")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPath))
+        TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [Chart Exported] \(artifactPathTimestamped)")
+
+        TTLogger.debug("🏆 Pure ZIP / Deflate single-core Pareto chart generated: \(artifactPathTimestamped)")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPathTimestamped))
+    }
+
+    func testTTZipVsLibdeflate1v1Duel() throws {
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            TestLogger.atomicPrint("Skipping 1v1 duel benchmark; set TTZIP_RUN_BENCHMARKS=1 to run.")
+            return
+        }
+
+        let realSamplePath = try EnwikFixtureCacheManager.obtainCorpusPath(named: "enwik8", allowSyntheticFallback: true)
+        let enwik8Data = try Data(contentsOf: URL(fileURLWithPath: realSamplePath))
+        let payloadBytes = Int64(enwik8Data.count)
+        let payloadMB = Double(payloadBytes) / 1024.0 / 1024.0
+
+        let corpusItem = CorpusItem(id: "enwik8", name: "enwik8", tier: .tier1Text, path: realSamplePath, sizeBytes: payloadBytes)
+        let fp = CorpusFingerprintManager.shared.computeFingerprint(for: corpusItem)
+        let datasetSha256 = fp?.sha256Hex ?? "unknown"
+
+        let maxOut = enwik8Data.count + (1024 * 1024)
+        let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
+        defer { outBuf.deallocate() }
+
+        var points: [ParetoPoint] = []
+        var stepCounter = 1
+        let totalStepsEstimate = 18
+
+        TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [1v1 Duel Benchmark] Starting 100MB TTZip vs. libdeflate pure compression shootout (No Store)...")
+
+        // 1. TTZip Active Compression Tiers (Tier 1 to 6 - Excludes Tier 0 Store)
+        for (tierIdx, profile) in ZipCompressionProfile.allProfiles.enumerated() {
+            guard tierIdx >= 1 && tierIdx <= 6 else { continue }
+
+            if profile.zopfliIterations > 0 {
+                let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
+                    toolId: "ttzip_sc_\(tierIdx)",
+                    algorithm: "TTZip \(tierIdx) (\(profile.name))",
+                    level: tierIdx,
+                    datasetSha256: datasetSha256
+                ) {
+                    let t0 = CACurrentMediaTime()
+                    let compSize = enwik8Data.withUnsafeBytes { rawIn -> size_t in
+                        guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                        var zopts = TTZipZopfliOptions()
+                        ttzip_zopfli_init_options(&zopts, Int32(tierIdx))
+                        return ttzip_zopfli_compress_block_with_history(base, enwik8Data.count, nil, 0, outBuf, maxOut, &zopts, 1)
+                    }
+                    let dur = max(1e-6, CACurrentMediaTime() - t0)
+                    let savings = (1.0 - Double(compSize) / Double(payloadBytes)) * 100.0
+                    let speed = payloadMB / dur
+                    return (speed, savings, Int64(compSize), payloadBytes)
+                }
+                let durMs = (payloadMB / point.throughputMBs) * 1000.0
+                let row = TestTerminalRenderer.renderAlignedRow(
+                    index: stepCounter,
+                    total: totalStepsEstimate,
+                    badge: .perf,
+                    target: "TTZip 1-Core",
+                    testName: "Tier \(tierIdx) (\(profile.name))",
+                    durationMs: durMs
+                )
+                TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: point.throughputMBs) + " | " + String(format: "%.2f MB", Double(point.compressedBytes)/(1024*1024)))
+                stepCounter += 1
+                points.append(point)
+            } else {
+                let t0 = CACurrentMediaTime()
+                let compSize = enwik8Data.withUnsafeBytes { rawIn -> size_t in
+                    guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                    if profile.level == .level1 {
+                        return ttzip_libdeflate_compress(base, enwik8Data.count, outBuf, maxOut, 1)
+                    } else if profile.level == .level2 {
+                        return ttzip_libdeflate_compress(base, enwik8Data.count, outBuf, maxOut, 5)
+                    } else {
+                        return ttzip_libdeflate_compress(base, enwik8Data.count, outBuf, maxOut, 12)
+                    }
+                }
+                let dur = max(1e-6, CACurrentMediaTime() - t0)
+                if compSize > 0 {
+                    let savings = (1.0 - Double(compSize) / Double(payloadBytes)) * 100.0
+                    let speed = payloadMB / dur
+                    let pt = ParetoPoint(
+                        id: "ttzip_duel_\(tierIdx)",
+                        algorithm: "TTZip \(tierIdx) (\(profile.name))",
+                        level: tierIdx,
+                        throughputMBs: speed,
+                        spaceSavingsPct: savings,
+                        compressedBytes: Int64(compSize),
+                        uncompressedBytes: payloadBytes
+                    )
+                    let row = TestTerminalRenderer.renderAlignedRow(
+                        index: stepCounter,
+                        total: totalStepsEstimate,
+                        badge: .perf,
+                        target: "TTZip 1-Core",
+                        testName: "Tier \(tierIdx) (\(profile.name))",
+                        durationMs: dur * 1000.0
+                    )
+                    TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: speed) + " | " + String(format: "%.2f MB", Double(compSize)/(1024*1024)))
+                    stepCounter += 1
+                    points.append(pt)
+                }
+            }
+        }
+
+        // 2. libdeflate complete spectrum (Levels 1 to 12)
+        for lvl in [1, 2, 3, 4, 6, 8, 9, 10, 11, 12] {
+            let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
+                toolId: "libdeflate_sc_\(lvl)",
+                algorithm: "libdeflate (Single-Thread L\(lvl))",
+                level: lvl,
+                datasetSha256: datasetSha256
+            ) {
+                let t0 = CACurrentMediaTime()
+                let compSize = enwik8Data.withUnsafeBytes { rawIn -> size_t in
+                    guard let base = rawIn.baseAddress else { return 0 }
+                    return ttzip_libdeflate_compress(base, enwik8Data.count, outBuf, maxOut, Int32(lvl))
+                }
+                let dur = max(1e-6, CACurrentMediaTime() - t0)
+                let savings = (1.0 - Double(compSize) / Double(payloadBytes)) * 100.0
+                let speed = payloadMB / dur
+                return (speed, savings, Int64(compSize), payloadBytes)
+            }
+            let durMs = (payloadMB / point.throughputMBs) * 1000.0
+            let row = TestTerminalRenderer.renderAlignedRow(
+                index: stepCounter,
+                total: totalStepsEstimate,
+                badge: .perf,
+                target: "libdeflate",
+                testName: "Level \(lvl)",
+                durationMs: durMs
+            )
+            TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: point.throughputMBs) + " | " + String(format: "%.2f MB", Double(point.compressedBytes)/(1024*1024)))
+            stepCounter += 1
+            points.append(point)
+        }
+
+        // 3. Compute 1v1 Pareto frontier and export plot
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HHmmss"
+        let timestampStr = formatter.string(from: Date())
+        let versionTag = "v1.0.0"
+        let timestampedFilename = "pareto_pk_ttzip_vs_libdeflate_\(timestampStr)_\(versionTag).png"
+
+        let brainDirCur = "/Users/kevintung/.gemini/antigravity/brain/11878c2a-4d32-493c-b708-82cec3b141ec"
+        let docsDir = "docs/benchmarks"
+
+        let artifactPathTimestamped = "\(brainDirCur)/\(timestampedFilename)"
+        let artifactPathLatestCur = "\(brainDirCur)/pareto_pk_ttzip_vs_libdeflate.png"
+        let docsPathTimestamped = "\(docsDir)/\(timestampedFilename)"
+        let docsPathLatest = "\(docsDir)/pareto_pk_ttzip_vs_libdeflate.png"
+
+        let title = "TTZip vs. libdeflate Single-Core DEFLATE Compression Duel [\(timestampStr)]"
+
+        var mutablePoints = points
+        let paretoRes = ParetoFrontierCalculator.shared.computeParetoFrontier(points: &mutablePoints)
+
+        try RasterParetoPlotter.shared.exportPNG(
+            result: paretoRes,
+            to: artifactPathTimestamped,
+            width: 1920,
+            height: 1080,
+            title: title
+        )
+        try? RasterParetoPlotter.shared.exportPNG(result: paretoRes, to: artifactPathLatestCur, width: 1920, height: 1080, title: title)
+        try? RasterParetoPlotter.shared.exportPNG(result: paretoRes, to: docsPathTimestamped, width: 1920, height: 1080, title: title)
+        try? RasterParetoPlotter.shared.exportPNG(result: paretoRes, to: docsPathLatest, width: 1920, height: 1080, title: title)
+
+        TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [1v1 Chart Exported] \(artifactPathTimestamped)")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPathTimestamped))
     }
 }

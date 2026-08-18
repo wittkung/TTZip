@@ -58,7 +58,10 @@ let package = Package(
         ),
         .target(
             name: "TTZipCore",
-            dependencies: ["CTTZipBridge"]
+            dependencies: ["CTTZipBridge"],
+            swiftSettings: [
+                .unsafeFlags(["-no-whole-module-optimization", "-enable-batch-mode"])
+            ]
         ),
         .executableTarget(
             name: "TTZipApp",
@@ -78,10 +81,17 @@ let package = Package(
         ),
         .testTarget(
             name: "TTZipTests",
-            dependencies: ["TTZipCore", "TTZipApp"],
+            dependencies: ["TTZipCore"],
             resources: [
                 .copy("Fixtures")
+            ],
+            swiftSettings: [
+                .unsafeFlags(["-no-whole-module-optimization", "-enable-batch-mode"])
             ]
+        ),
+        .testTarget(
+            name: "TTZipAppTests",
+            dependencies: ["TTZipCore", "TTZipApp"]
         )
     ]
 )

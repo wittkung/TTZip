@@ -564,7 +564,7 @@ final class CommandPatternTests: XCTestCase {
         let validZipPath = sweepDir.appendingPathComponent("valid_sample.zip").path
         _ = try await TTZipEngineFacade.shared.quickCompress(inputs: [sampleSource], outputPath: validZipPath)
         
-        let totalOps = TestBenchmarkTier.isBenchmarkMode ? 105 : 20
+        let totalOps = (ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil) ? 105 : 20
         for i in 1...totalOps {
             let targetPath = sweepDir.appendingPathComponent("target_\(i % 10).zip").path
             

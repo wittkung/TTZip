@@ -148,7 +148,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 }
             }
             let totalSpan = sizes.last! - sizes.first!
-            if totalSpan > 0 && (maxGap / totalSpan) >= 0.25 && splitIdx >= 0 {
+            if totalSpan > 20.0 && (maxGap / totalSpan) >= 0.35 && splitIdx >= 0 {
                 let lowMax = sizes[splitIdx]
                 let highMin = sizes[splitIdx + 1]
                 let lowBoundMin = max(1.0, sizes.first! - 0.15)
@@ -164,22 +164,16 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let yFold = detectYAxisFold(speeds: allSpeeds)
         let xFold = detectXAxisFold(sizes: allSizes)
 
-        let maxDomainSize = (allSizes.last ?? 100.0) + 1.0
-        let minDomainSize = max(1.0, (allSizes.first ?? 2.9) - 0.15)
+        let maxDomainSize = (allSizes.last ?? 100.0) + 0.15
+        let minDomainSize = max(1.0, (allSizes.first ?? 2.8) - 0.15)
 
         func mapX(_ savingsVal: Double) -> CGFloat {
-            // 将 spaceSavingsPct 映射为实际压缩文件大小 MB (越小越好，靠右为优)
-            // Store 档位 (savings <= 5% 或 接近 100MB) 直接落在纵坐标轴上 (x = marginLeft)
-            if savingsVal <= 5.0 {
-                return marginLeft
-            }
-
             let sizeMB = 100.0 * (1.0 - savingsVal / 100.0)
             if xFold.isFolded {
+                if savingsVal <= 5.0 {
+                    return marginLeft
+                }
                 // 自适应 3 段弹性展开算法 (充分展开右侧密集高压战场并拉开 L1 与 L2 间距)
-                // 1) 快速压缩区间 (5.0MB ~ 3.90MB, 占 25% 宽度): 包含 minizip(4.7MB), pigz-1(4.6MB), pigz-2/3(4.25MB), L1(4.11MB), L2(3.98MB)
-                // 2) 核心平衡区间 (3.90MB ~ 3.10MB, 占 42% 宽度): 包含 7z(3.53MB), pigz-4..9(3.37..3.24MB), L3(3.23MB)
-                // 3) 极限图论区间 (3.10MB ~ 2.80MB, 占 28% 宽度): 包含 L4(3.03MB), L5(2.87MB), L6(2.85MB), L7(2.82MB)
                 if sizeMB >= 3.90 {
                     let norm = (5.00 - sizeMB) / max(1e-4, 5.00 - 3.90)
                     return marginLeft + CGFloat(0.05 + max(0.0, min(1.0, norm)) * 0.25) * plotW
@@ -191,38 +185,60 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                     return marginLeft + CGFloat(0.72 + max(0.0, min(1.0, norm)) * 0.26) * plotW
                 }
             } else {
-                let norm = (maxDomainSize - sizeMB) / max(1e-4, maxDomainSize - minDomainSize)
+                let minDomain = max(1.0, (allSizes.first ?? 2.8) - 0.12)
+                let maxDomain = (allSizes.last ?? 4.2) + 0.12
+                let norm = (maxDomain - sizeMB) / max(1e-4, maxDomain - minDomain)
                 return marginLeft + CGFloat(max(0.0, min(1.0, norm))) * plotW
             }
         }
 
+        let maxObservedSpeed = allSpeeds.last ?? 16000.0
+        let hasUltraFastStore = maxObservedSpeed > 2500.0
+
         func mapY(_ speedVal: Double) -> CGFloat {
-            if yFold.isFolded {
-                if speedVal <= yFold.lowerClusterMax {
-                    let logV = log10(max(1e-4, speedVal))
-                    let logMin = log10(max(1e-4, yFold.lowerClusterMin))
-                    let logMax = log10(max(1e-4, yFold.lowerClusterMax))
-                    let norm = (logV - logMin) / max(1e-4, logMax - logMin)
-                    return marginBottom + CGFloat(max(0.0, min(1.0, norm)) * 0.44) * plotH
-                } else if speedVal >= yFold.upperClusterMin {
-                    let logV = log10(max(1e-4, speedVal))
-                    let logMin = log10(max(1e-4, yFold.upperClusterMin))
-                    let logMax = log10(max(1e-4, yFold.upperClusterMax))
-                    let norm = (logV - logMin) / max(1e-4, logMax - logMin)
-                    return marginBottom + CGFloat(0.52 + max(0.0, min(1.0, norm)) * 0.48) * plotH
+            let v = max(0.3, speedVal)
+            if hasUltraFastStore {
+                let h0: CGFloat = 0.25  // 0.5 ~ 50 MB/s
+                let h1: CGFloat = 0.55  // 50 ~ 2500 MB/s
+                let h2: CGFloat = 0.20  // 2500 ~ 16000 MB/s
+                
+                if v <= 50.0 {
+                    let logMin = log10(0.5)
+                    let logMax = log10(50.0)
+                    let logV = log10(v)
+                    let norm = (logV - logMin) / (logMax - logMin)
+                    return marginBottom + CGFloat(max(0.0, min(1.0, norm))) * h0 * plotH
+                } else if v <= 2500.0 {
+                    let logMin = log10(50.0)
+                    let logMax = log10(2500.0)
+                    let logV = log10(v)
+                    let norm = (logV - logMin) / (logMax - logMin)
+                    return marginBottom + (h0 + CGFloat(max(0.0, min(1.0, norm))) * h1) * plotH
                 } else {
-                    let logV = log10(max(1e-4, speedVal))
-                    let logLow = log10(max(1e-4, yFold.lowerClusterMax))
-                    let logHigh = log10(max(1e-4, yFold.upperClusterMin))
-                    let norm = (logV - logLow) / max(1e-4, logHigh - logLow)
-                    return marginBottom + CGFloat(0.44 + norm * 0.08) * plotH
+                    let logMin = log10(2500.0)
+                    let logMax = log10(16000.0)
+                    let logV = log10(min(16000.0, v))
+                    let norm = (logV - logMin) / (logMax - logMin)
+                    return marginBottom + ((h0 + h1) + CGFloat(max(0.0, min(1.0, norm))) * h2) * plotH
                 }
             } else {
-                let logMin = log10(max(1e-4, allSpeeds.first ?? 1.0))
-                let logMax = log10(max(1e-4, (allSpeeds.last ?? 1000.0) * 1.15))
-                let logV = log10(max(1e-4, speedVal))
-                let norm = (logV - logMin) / max(1e-4, logMax - logMin)
-                return marginBottom + CGFloat(norm) * plotH
+                // 纯压缩图 (无 Store 模式，速度 0.3 ~ 2000 MB/s): 纵轴全画幅 2 段自适应展开
+                let h0: CGFloat = 0.32  // 0.3 ~ 50 MB/s (占 32%)
+                let h1: CGFloat = 0.68  // 50 ~ 2000 MB/s (占 68% 宽裕高度)
+                let topCap = max(1800.0, maxObservedSpeed * 1.15)
+                if v <= 50.0 {
+                    let logMin = log10(0.3)
+                    let logMax = log10(50.0)
+                    let logV = log10(v)
+                    let norm = (logV - logMin) / (logMax - logMin)
+                    return marginBottom + CGFloat(max(0.0, min(1.0, norm))) * h0 * plotH
+                } else {
+                    let logMin = log10(50.0)
+                    let logMax = log10(topCap)
+                    let logV = log10(min(topCap, v))
+                    let norm = (logV - logMin) / (logMax - logMin)
+                    return marginBottom + (h0 + CGFloat(max(0.0, min(1.0, norm))) * h1) * plotH
+                }
             }
         }
 
@@ -231,22 +247,25 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let axisLineColor = CGColor(red: 148/255.0, green: 163/255.0, blue: 184/255.0, alpha: 1.0)
         let axisTextColor = NSColor(calibratedRed: 100/255.0, green: 116/255.0, blue: 139/255.0, alpha: 1.0)
 
-        var candidateYTicks: [(val: Double, label: String)] = []
-        if yFold.isFolded {
-            let lowerCandidate: [Double] = [0.2, 0.5, 0.7, 1.0, 2.0, 3.0, 5.0, 10.0]
-            for val in lowerCandidate where val >= yFold.lowerClusterMin * 0.95 && val <= yFold.lowerClusterMax * 1.05 {
-                candidateYTicks.append((val, String(format: "%.1f MB/s", val)))
-            }
-            let upperCandidate: [Double] = [1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 4000.0, 5000.0, 6000.0, 8000.0, 10000.0]
-            for val in upperCandidate where val >= yFold.upperClusterMin * 0.95 && val <= yFold.upperClusterMax * 1.05 {
-                let lbl = val >= 1000.0 ? String(format: "%.0f MB/s", val) : String(format: "%.1f MB/s", val)
-                candidateYTicks.append((val, lbl))
-            }
-        } else {
-            let standardCandidate: [Double] = [0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0]
-            for val in standardCandidate where val >= (allSpeeds.first ?? 1.0) * 0.8 && val <= (allSpeeds.last ?? 1000.0) * 1.2 {
-                candidateYTicks.append((val, String(format: "%.1f MB/s", val)))
-            }
+        let allYTicksCandidate: [(val: Double, label: String)] = [
+            (0.5, "0.5 MB/s"),
+            (1.0, "1.0 MB/s"),
+            (5.0, "5.0 MB/s"),
+            (10.0, "10.0 MB/s"),
+            (50.0, "50.0 MB/s"),
+            (100.0, "100.0 MB/s"),
+            (250.0, "250.0 MB/s"),
+            (500.0, "500.0 MB/s"),
+            (750.0, "750.0 MB/s"),
+            (1000.0, "1000.0 MB/s"),
+            (1500.0, "1500.0 MB/s"),
+            (2000.0, "2000.0 MB/s"),
+            (5000.0, "5000.0 MB/s"),
+            (10000.0, "10000.0 MB/s"),
+            (15000.0, "15000.0 MB/s")
+        ]
+        let candidateYTicks: [(val: Double, label: String)] = allYTicksCandidate.filter {
+            $0.val >= (allSpeeds.first ?? 0.3) * 0.7 && $0.val <= (allSpeeds.last ?? 16000.0) * 1.20
         }
 
         for tick in candidateYTicks {
@@ -280,12 +299,13 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 candidateSizeTicks.append(sz)
             }
         } else {
-            let minVal = allSizes.first ?? 2.9
-            let maxVal = allSizes.last ?? 100.0
-            var v = minVal
-            while v <= maxVal {
+            let minVal = allSizes.first ?? 2.8
+            let maxVal = allSizes.last ?? 4.2
+            let step = (maxVal - minVal) <= 3.0 ? 0.2 : 0.5
+            var v = ((minVal - 0.05) * 5.0).rounded() / 5.0
+            while v <= maxVal + 0.15 {
                 candidateSizeTicks.append(v)
-                v += 0.5
+                v += step
             }
         }
 
