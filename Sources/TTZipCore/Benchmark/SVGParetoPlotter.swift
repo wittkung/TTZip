@@ -191,21 +191,13 @@ public final class SVGParetoPlotter: @unchecked Sendable {
             let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
             let cleanName: String
             if fam == .sevenZip {
-                cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02", with: "7-zip").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+                cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02", with: "7-zip").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "").replacingOccurrences(of: "-mmt=on", with: "")
             } else if fam == .appleNative {
-                cleanName = "apple-ditto-zip"
+                cleanName = p.algorithm.replacingOccurrences(of: "Apple Native", with: "apple").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
             } else if fam == .ttzip {
-                if p.algorithm.contains("TAR.ZST") {
-                    cleanName = "ttzip-tar-zst (\(speedStr))"
-                } else if p.algorithm.contains("LZ4") {
-                    cleanName = "ttzip-lz4 (\(speedStr))"
-                } else if p.algorithm.contains("ZIP Fast") {
-                    cleanName = "ttzip-zip-l1 (\(speedStr))"
-                } else if p.algorithm.contains("ZIP Normal") {
-                    cleanName = "ttzip-zip-l6 (\(speedStr))"
-                } else {
-                    cleanName = "ttzip-7z-l1 (\(speedStr))"
-                }
+                let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
+                let baseAlgo = p.algorithm.replacingOccurrences(of: "TTZip", with: "ttzip").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+                cleanName = "\(baseAlgo) (\(speedStr))"
             } else {
                 cleanName = p.algorithm.lowercased()
             }

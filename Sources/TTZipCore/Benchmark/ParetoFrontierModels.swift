@@ -192,6 +192,7 @@ public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendabl
     case appleNative   = "Apple Native"
     case keka          = "Keka"
     case theUnarchiver = "The Unarchiver"
+    case openSource    = "OpenSource CLI"
     case other         = "Other"
 
     public var id: String { rawValue }
@@ -204,6 +205,7 @@ public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendabl
         case .appleNative:   return "#DC2626" // Crimson Red
         case .keka:          return "#0D9488" // Teal / Jade
         case .theUnarchiver: return "#9333EA" // Purple
+        case .openSource:    return "#059669" // Emerald Green
         case .other:         return "#64748B" // Slate
         }
     }
@@ -244,8 +246,10 @@ public struct SoftwareFamilyClassifier: Sendable {
             return .appleNative
         } else if lower.contains("keka") {
             return .keka
-        } else if lower.contains("unarchiver") {
+        } else if lower.contains("unar") || lower.contains("unarchiver") {
             return .theUnarchiver
+        } else if lower.contains("zstd") || lower.contains("lz4") || lower.contains("pigz") {
+            return .openSource
         } else {
             return .other
         }
@@ -262,10 +266,10 @@ public struct SoftwareFamilyClassifier: Sendable {
         for fam in SoftwareFamily.allCases {
             if var famPoints = groups[fam], !famPoints.isEmpty {
                 famPoints.sort { (a, b) -> Bool in
-                    if a.throughputMBs != b.throughputMBs {
-                        return a.throughputMBs < b.throughputMBs
+                    if a.spaceSavingsPct != b.spaceSavingsPct {
+                        return a.spaceSavingsPct < b.spaceSavingsPct
                     }
-                    return a.spaceSavingsPct < b.spaceSavingsPct
+                    return a.throughputMBs < b.throughputMBs
                 }
                 let heroPill = fam.isHero ? (famPoints.last(where: { $0.isParetoOptimal }) ?? famPoints.last) : nil
                 trajectories.append(SoftwareFamilyTrajectory(family: fam, points: famPoints, heroPillPoint: heroPill))

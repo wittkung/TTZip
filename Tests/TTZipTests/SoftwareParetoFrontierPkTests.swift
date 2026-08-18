@@ -60,94 +60,91 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         // =========================================================================
         // 1. TTZip (原生架构：Swift 6 + libdeflate + LZMA2 + Apple SIMD)
         // =========================================================================
-        // TTZip TAR.ZST (Direct In-Memory Pipeline)
-        let ttZstPath = tempDir.appendingPathComponent("ttzip_real.tar.zst").path
-        let t0_ttzst = CACurrentMediaTime()
-        try writer.createArchiveSync(outputPath: ttZstPath, format: .tarZst, level: .level1, inputPaths: [realSamplePath])
-        let ttZstDur = max(1e-6, CACurrentMediaTime() - t0_ttzst)
-        let ttZstSz = (try? FileManager.default.attributesOfItem(atPath: ttZstPath)[.size] as? Int64) ?? 0
-        let ttZstSavings = (1.0 - (Double(ttZstSz) / Double(payloadBytes))) * 100.0
-        let ttZstSpeed = payloadMB / ttZstDur
-        softwarePoints.append(ParetoPoint(id: "ttzip_tar_zst", algorithm: "TTZip (TAR.ZST)", level: 1, throughputMBs: ttZstSpeed, spaceSavingsPct: ttZstSavings, compressedBytes: ttZstSz, uncompressedBytes: payloadBytes))
+        // TTZip TAR.ZST L1 & L3
+        for lvl in [ArchiveCompressionLevel.level1, ArchiveCompressionLevel.level3] {
+            let pth = tempDir.appendingPathComponent("ttzip_real_zst_\(lvl.rawValue).tar.zst").path
+            let t0 = CACurrentMediaTime()
+            try writer.createArchiveSync(outputPath: pth, format: .tarZst, level: lvl, inputPaths: [realSamplePath])
+            let dur = max(1e-6, CACurrentMediaTime() - t0)
+            let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+            if sz > 0 {
+                let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                let speed = payloadMB / dur
+                let name = lvl == .level1 ? "TTZip (TAR.ZST L1)" : "TTZip (TAR.ZST L3)"
+                softwarePoints.append(ParetoPoint(id: "ttzip_tar_zst_\(lvl.rawValue)", algorithm: name, level: lvl.rawValue, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+            }
+        }
 
-        // TTZip ZIP L1 (Fast libdeflate)
-        let ttZipL1Path = tempDir.appendingPathComponent("ttzip_real_l1.zip").path
-        let t0_tt1 = CACurrentMediaTime()
-        try writer.createArchiveSync(outputPath: ttZipL1Path, format: .zip, level: .level1, inputPaths: [realSamplePath])
-        let ttZipL1Dur = max(1e-6, CACurrentMediaTime() - t0_tt1)
-        let ttZipL1Sz = (try? FileManager.default.attributesOfItem(atPath: ttZipL1Path)[.size] as? Int64) ?? 0
-        let ttZipL1Savings = (1.0 - (Double(ttZipL1Sz) / Double(payloadBytes))) * 100.0
-        let ttZipL1Speed = payloadMB / ttZipL1Dur
-        softwarePoints.append(ParetoPoint(id: "ttzip_zip_l1", algorithm: "TTZip (ZIP Fast)", level: 1, throughputMBs: ttZipL1Speed, spaceSavingsPct: ttZipL1Savings, compressedBytes: ttZipL1Sz, uncompressedBytes: payloadBytes))
+        // TTZip ZIP L1, L6, L9
+        for (lvl, lbl) in [(ArchiveCompressionLevel.level1, "TTZip (ZIP Fast)"), (ArchiveCompressionLevel.level6, "TTZip (ZIP Normal)"), (ArchiveCompressionLevel.level9, "TTZip (ZIP Ultra)")] {
+            let pth = tempDir.appendingPathComponent("ttzip_real_zip_\(lvl.rawValue).zip").path
+            let t0 = CACurrentMediaTime()
+            try writer.createArchiveSync(outputPath: pth, format: .zip, level: lvl, inputPaths: [realSamplePath])
+            let dur = max(1e-6, CACurrentMediaTime() - t0)
+            let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+            if sz > 0 {
+                let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                let speed = payloadMB / dur
+                softwarePoints.append(ParetoPoint(id: "ttzip_zip_\(lvl.rawValue)", algorithm: lbl, level: lvl.rawValue, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+            }
+        }
 
-        // TTZip ZIP L6 (Standard libdeflate)
-        let ttZipL6Path = tempDir.appendingPathComponent("ttzip_real_l6.zip").path
-        let t0_tt6 = CACurrentMediaTime()
-        try writer.createArchiveSync(outputPath: ttZipL6Path, format: .zip, level: .level6, inputPaths: [realSamplePath])
-        let ttZipL6Dur = max(1e-6, CACurrentMediaTime() - t0_tt6)
-        let ttZipL6Sz = (try? FileManager.default.attributesOfItem(atPath: ttZipL6Path)[.size] as? Int64) ?? 0
-        let ttZipL6Savings = (1.0 - (Double(ttZipL6Sz) / Double(payloadBytes))) * 100.0
-        let ttZipL6Speed = payloadMB / ttZipL6Dur
-        softwarePoints.append(ParetoPoint(id: "ttzip_zip_l6", algorithm: "TTZip (ZIP Normal)", level: 6, throughputMBs: ttZipL6Speed, spaceSavingsPct: ttZipL6Savings, compressedBytes: ttZipL6Sz, uncompressedBytes: payloadBytes))
+        // TTZip 7Z L1 & L5
+        for (lvl, lbl) in [(ArchiveCompressionLevel.level1, "TTZip (7Z Fast)"), (ArchiveCompressionLevel.level5, "TTZip (7Z Normal)")] {
+            let pth = tempDir.appendingPathComponent("ttzip_real_7z_\(lvl.rawValue).7z").path
+            let t0 = CACurrentMediaTime()
+            try writer.createArchiveSync(outputPath: pth, format: .sevenZip, level: lvl, inputPaths: [realSamplePath])
+            let dur = max(1e-6, CACurrentMediaTime() - t0)
+            let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+            if sz > 0 {
+                let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                let speed = payloadMB / dur
+                softwarePoints.append(ParetoPoint(id: "ttzip_7z_\(lvl.rawValue)", algorithm: lbl, level: lvl.rawValue, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+            }
+        }
 
-        // TTZip 7Z L1 (Parallel LZMA2 Fast)
-        let tt7zL1Path = tempDir.appendingPathComponent("ttzip_real_l1.7z").path
-        let t0_tt7z1 = CACurrentMediaTime()
-        try writer.createArchiveSync(outputPath: tt7zL1Path, format: .sevenZip, level: .level1, inputPaths: [realSamplePath])
-        let tt7z1Dur = max(1e-6, CACurrentMediaTime() - t0_tt7z1)
-        let tt7z1Sz = (try? FileManager.default.attributesOfItem(atPath: tt7zL1Path)[.size] as? Int64) ?? 0
-        let tt7z1Savings = (1.0 - (Double(tt7z1Sz) / Double(payloadBytes))) * 100.0
-        let tt7z1Speed = payloadMB / tt7z1Dur
-        softwarePoints.append(ParetoPoint(id: "ttzip_7z_l1", algorithm: "TTZip (7Z Fast)", level: 1, throughputMBs: tt7z1Speed, spaceSavingsPct: tt7z1Savings, compressedBytes: tt7z1Sz, uncompressedBytes: payloadBytes))
+        // TTZip LZ4 L1
+        let ttLz4Path = tempDir.appendingPathComponent("ttzip_real.lz4").path
+        let t0_ttlz4 = CACurrentMediaTime()
+        try writer.createArchiveSync(outputPath: ttLz4Path, format: .lz4, level: .level1, inputPaths: [realSamplePath])
+        let ttLz4Dur = max(1e-6, CACurrentMediaTime() - t0_ttlz4)
+        let ttLz4Sz = (try? FileManager.default.attributesOfItem(atPath: ttLz4Path)[.size] as? Int64) ?? 0
+        let ttLz4Savings = (1.0 - (Double(ttLz4Sz) / Double(payloadBytes))) * 100.0
+        let ttLz4Speed = payloadMB / ttLz4Dur
+        softwarePoints.append(ParetoPoint(id: "ttzip_lz4_l1", algorithm: "TTZip (LZ4 Fast)", level: 1, throughputMBs: ttLz4Speed, spaceSavingsPct: ttLz4Savings, compressedBytes: ttLz4Sz, uncompressedBytes: payloadBytes))
 
         // =========================================================================
-        // 2. 7-Zip 官方 ARM64 发行版 (/opt/homebrew/bin/7zz)
+        // 2. 7-Zip 官方 ARM64 发行版 (/opt/homebrew/bin/7zz, -mmt=on 全核满开)
         // =========================================================================
         let sevenZipPath = "/opt/homebrew/bin/7zz"
         if FileManager.default.fileExists(atPath: sevenZipPath) {
-            // 7-Zip (ZIP Fast -mx=1)
-            let szZip1Path = tempDir.appendingPathComponent("7zip_real_l1.zip").path
-            let sz1Dur = runProcess(sevenZipPath, ["a", "-tzip", "-mx=1", "-y", szZip1Path, realSamplePath])
-            let sz1Sz = (try? FileManager.default.attributesOfItem(atPath: szZip1Path)[.size] as? Int64) ?? 0
-            if sz1Sz > 0 {
-                let sz1Savings = (1.0 - (Double(sz1Sz) / Double(payloadBytes))) * 100.0
-                let sz1Speed = payloadMB / sz1Dur
-                softwarePoints.append(ParetoPoint(id: "7zip_zip_l1", algorithm: "7-Zip 26.02 (ZIP Fast)", level: 1, throughputMBs: sz1Speed, spaceSavingsPct: sz1Savings, compressedBytes: sz1Sz, uncompressedBytes: payloadBytes))
+            // 7-Zip ZIP (mx=1, 3, 6, 9)
+            for (mx, lbl) in [("1", "7-Zip 26.02 (ZIP Fast)"), ("3", "7-Zip 26.02 (ZIP Medium)"), ("6", "7-Zip 26.02 (ZIP Normal)"), ("9", "7-Zip 26.02 (ZIP Ultra)")] {
+                let pth = tempDir.appendingPathComponent("7zip_real_zip_\(mx).zip").path
+                let dur = runProcess(sevenZipPath, ["a", "-tzip", "-mx=\(mx)", "-mmt=on", "-y", pth, realSamplePath])
+                let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+                if sz > 0 {
+                    let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                    let speed = payloadMB / dur
+                    softwarePoints.append(ParetoPoint(id: "7zip_zip_\(mx)", algorithm: lbl, level: Int(mx) ?? 1, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+                }
             }
 
-            // 7-Zip (ZIP Normal -mx=6)
-            let szZip6Path = tempDir.appendingPathComponent("7zip_real_l6.zip").path
-            let sz6Dur = runProcess(sevenZipPath, ["a", "-tzip", "-mx=6", "-y", szZip6Path, realSamplePath])
-            let sz6Sz = (try? FileManager.default.attributesOfItem(atPath: szZip6Path)[.size] as? Int64) ?? 0
-            if sz6Sz > 0 {
-                let sz6Savings = (1.0 - (Double(sz6Sz) / Double(payloadBytes))) * 100.0
-                let sz6Speed = payloadMB / sz6Dur
-                softwarePoints.append(ParetoPoint(id: "7zip_zip_l6", algorithm: "7-Zip 26.02 (ZIP Normal)", level: 6, throughputMBs: sz6Speed, spaceSavingsPct: sz6Savings, compressedBytes: sz6Sz, uncompressedBytes: payloadBytes))
-            }
-
-            // 7-Zip (7Z Fast -mx=1)
-            let sz7z1Path = tempDir.appendingPathComponent("7zip_real_l1.7z").path
-            let sz7z1Dur = runProcess(sevenZipPath, ["a", "-t7z", "-mx=1", "-y", sz7z1Path, realSamplePath])
-            let sz7z1Sz = (try? FileManager.default.attributesOfItem(atPath: sz7z1Path)[.size] as? Int64) ?? 0
-            if sz7z1Sz > 0 {
-                let sz7z1Savings = (1.0 - (Double(sz7z1Sz) / Double(payloadBytes))) * 100.0
-                let sz7z1Speed = payloadMB / sz7z1Dur
-                softwarePoints.append(ParetoPoint(id: "7zip_7z_l1", algorithm: "7-Zip 26.02 (7Z Fast)", level: 1, throughputMBs: sz7z1Speed, spaceSavingsPct: sz7z1Savings, compressedBytes: sz7z1Sz, uncompressedBytes: payloadBytes))
-            }
-
-            // 7-Zip (7Z Ultra -mx=9)
-            let sz7z9Path = tempDir.appendingPathComponent("7zip_real_l9.7z").path
-            let sz7z9Dur = runProcess(sevenZipPath, ["a", "-t7z", "-mx=9", "-y", sz7z9Path, realSamplePath])
-            let sz7z9Sz = (try? FileManager.default.attributesOfItem(atPath: sz7z9Path)[.size] as? Int64) ?? 0
-            if sz7z9Sz > 0 {
-                let sz7z9Savings = (1.0 - (Double(sz7z9Sz) / Double(payloadBytes))) * 100.0
-                let sz7z9Speed = payloadMB / sz7z9Dur
-                softwarePoints.append(ParetoPoint(id: "7zip_7z_l9", algorithm: "7-Zip 26.02 (7Z Ultra)", level: 9, throughputMBs: sz7z9Speed, spaceSavingsPct: sz7z9Savings, compressedBytes: sz7z9Sz, uncompressedBytes: payloadBytes))
+            // 7-Zip 7Z (mx=1, 5, 9)
+            for (mx, lbl) in [("1", "7-Zip 26.02 (7Z Fast)"), ("5", "7-Zip 26.02 (7Z Normal)"), ("9", "7-Zip 26.02 (7Z Ultra)")] {
+                let pth = tempDir.appendingPathComponent("7zip_real_7z_\(mx).7z").path
+                let dur = runProcess(sevenZipPath, ["a", "-t7z", "-mx=\(mx)", "-mmt=on", "-y", pth, realSamplePath])
+                let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+                if sz > 0 {
+                    let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                    let speed = payloadMB / dur
+                    softwarePoints.append(ParetoPoint(id: "7zip_7z_\(mx)", algorithm: lbl, level: Int(mx) ?? 1, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+                }
             }
         }
 
         // =========================================================================
-        // 3. macOS 系统自带归档实用工具核心 (/usr/bin/ditto)
+        // 3. macOS 系统自带归档工具链 (/usr/bin/ditto, /usr/bin/zip -1, -3, -6, -9)
         // =========================================================================
         let dittoPath = "/usr/bin/ditto"
         if FileManager.default.fileExists(atPath: dittoPath) {
@@ -163,36 +160,48 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
 
         let zipPath = "/usr/bin/zip"
         if FileManager.default.fileExists(atPath: zipPath) {
-            // Apple zip -1
-            let zip1Path = tempDir.appendingPathComponent("apple_real_zip1.zip").path
-            let zip1Dur = runProcess(zipPath, ["-1", "-q", "-r", zip1Path, realSamplePath])
-            let zip1Sz = (try? FileManager.default.attributesOfItem(atPath: zip1Path)[.size] as? Int64) ?? 0
-            if zip1Sz > 0 {
-                let zip1Savings = (1.0 - (Double(zip1Sz) / Double(payloadBytes))) * 100.0
-                let zip1Speed = payloadMB / zip1Dur
-                softwarePoints.append(ParetoPoint(id: "apple_zip_l1", algorithm: "Apple Native (zip -1 Fast)", level: 1, throughputMBs: zip1Speed, spaceSavingsPct: zip1Savings, compressedBytes: zip1Sz, uncompressedBytes: payloadBytes))
-            }
-
-            // Apple zip -6
-            let zip6Path = tempDir.appendingPathComponent("apple_real_zip6.zip").path
-            let zip6Dur = runProcess(zipPath, ["-6", "-q", "-r", zip6Path, realSamplePath])
-            let zip6Sz = (try? FileManager.default.attributesOfItem(atPath: zip6Path)[.size] as? Int64) ?? 0
-            if zip6Sz > 0 {
-                let zip6Savings = (1.0 - (Double(zip6Sz) / Double(payloadBytes))) * 100.0
-                let zip6Speed = payloadMB / zip6Dur
-                softwarePoints.append(ParetoPoint(id: "apple_zip_l6", algorithm: "Apple Native (zip -6 Normal)", level: 6, throughputMBs: zip6Speed, spaceSavingsPct: zip6Savings, compressedBytes: zip6Sz, uncompressedBytes: payloadBytes))
+            for (lvl, lbl) in [("1", "Apple Native (zip -1 Fast)"), ("3", "Apple Native (zip -3 Medium)"), ("6", "Apple Native (zip -6 Normal)"), ("9", "Apple Native (zip -9 Ultra)")] {
+                let pth = tempDir.appendingPathComponent("apple_real_zip_\(lvl).zip").path
+                let dur = runProcess(zipPath, ["-\(lvl)", "-q", "-r", pth, realSamplePath])
+                let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+                if sz > 0 {
+                    let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                    let speed = payloadMB / dur
+                    softwarePoints.append(ParetoPoint(id: "apple_zip_\(lvl)", algorithm: lbl, level: Int(lvl) ?? 1, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+                }
             }
         }
 
-        // TTZip LZ4 (Tier 4: In-Memory / High-IOPS)
-        let ttLz4Path = tempDir.appendingPathComponent("ttzip_real.lz4").path
-        let t0_ttlz4 = CACurrentMediaTime()
-        try writer.createArchiveSync(outputPath: ttLz4Path, format: .lz4, level: .level1, inputPaths: [realSamplePath])
-        let ttLz4Dur = max(1e-6, CACurrentMediaTime() - t0_ttlz4)
-        let ttLz4Sz = (try? FileManager.default.attributesOfItem(atPath: ttLz4Path)[.size] as? Int64) ?? 0
-        let ttLz4Savings = (1.0 - (Double(ttLz4Sz) / Double(payloadBytes))) * 100.0
-        let ttLz4Speed = payloadMB / ttLz4Dur
-        softwarePoints.append(ParetoPoint(id: "ttzip_lz4_l1", algorithm: "TTZip (LZ4 Fast)", level: 1, throughputMBs: ttLz4Speed, spaceSavingsPct: ttLz4Savings, compressedBytes: ttLz4Sz, uncompressedBytes: payloadBytes))
+        // =========================================================================
+        // 4. 官方开源 CLI 工具链 (zstd -T0 多核满开, lz4 极速)
+        // =========================================================================
+        let zstdPath = "/opt/homebrew/bin/zstd"
+        if FileManager.default.fileExists(atPath: zstdPath) {
+            for (lvl, lbl) in [("1", "zstd CLI L1 (-T0)"), ("3", "zstd CLI L3 (-T0)"), ("19", "zstd CLI L19 (-T0)")] {
+                let pth = tempDir.appendingPathComponent("zstd_real_\(lvl).zst").path
+                let dur = runProcess(zstdPath, ["-\(lvl)", "-T0", "-f", "-q", realSamplePath, "-o", pth])
+                let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+                if sz > 0 {
+                    let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                    let speed = payloadMB / dur
+                    softwarePoints.append(ParetoPoint(id: "zstd_\(lvl)", algorithm: lbl, level: Int(lvl) ?? 1, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+                }
+            }
+        }
+
+        let lz4BinPath = "/opt/homebrew/bin/lz4"
+        if FileManager.default.fileExists(atPath: lz4BinPath) {
+            for (lvl, lbl) in [("1", "lz4 CLI L1 (Fast)"), ("9", "lz4 CLI L9 (HC)")] {
+                let pth = tempDir.appendingPathComponent("lz4_real_\(lvl).lz4").path
+                let dur = runProcess(lz4BinPath, ["-\(lvl)", "-f", "-q", realSamplePath, pth])
+                let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+                if sz > 0 {
+                    let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                    let speed = payloadMB / dur
+                    softwarePoints.append(ParetoPoint(id: "lz4_\(lvl)", algorithm: lbl, level: Int(lvl) ?? 1, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+                }
+            }
+        }
 
         // 4. 计算 4-Tier 格式矩阵综合效能评分 (Base-1000 GMean Index)
         let compositeReports = FormatMatrixScorer.computeCompositeScore(points: softwarePoints)
