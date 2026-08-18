@@ -65,6 +65,22 @@ ttzip_tuning_recommendation_t ttzip_heuristic_eval_cascade(
  */
 double ttzip_calc_autocorrelation_stride(const void* src, size_t len, size_t stride);
 
+typedef struct {
+    bool is_scientific_float;
+    uint8_t type_size;       // 4 for Float32, 8 for Float64
+    double stride_score;     // Autocorrelation score
+    double exponent_std_dev; // Exponent cluster standard deviation
+    double normalized_ratio; // Percentage in normalized float domain (0.0 .. 1.0)
+} ttzip_float_detect_result_t;
+
+/**
+ * @brief Automatically detects scientific floating-point data arrays via NEON stride & exponent clustering.
+ * @param[in] src Sample buffer pointer
+ * @param[in] len Length of sample (e.g., 16KB)
+ * @return Detection result struct
+ */
+ttzip_float_detect_result_t ttzip_detect_scientific_float_neon(const void* src, size_t len);
+
 #ifdef __cplusplus
 }
 #endif

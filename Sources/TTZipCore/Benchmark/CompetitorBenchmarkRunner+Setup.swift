@@ -30,10 +30,15 @@ extension CompetitorBenchmarkRunner {
             hugeSizeName = "\(hugeMb)MB Large Dataset (\(hugeMb)MB)"
         }
 
+        let dim5FloatSensorFile = cacheDir.appendingPathComponent("float32_sensor_50m.bin")
+        let dim6JsonLogFile = cacheDir.appendingPathComponent("structured_json_50m.json")
+
         let isDatasetCached = FileManager.default.fileExists(atPath: dim1Dir.path) &&
                               FileManager.default.fileExists(atPath: dim2LogFile.path) &&
                               FileManager.default.fileExists(atPath: dim3EntropyFile.path) &&
                               FileManager.default.fileExists(atPath: dim4HugeFile.path) &&
+                              FileManager.default.fileExists(atPath: dim5FloatSensorFile.path) &&
+                              FileManager.default.fileExists(atPath: dim6JsonLogFile.path) &&
                               (try? FileManager.default.attributesOfItem(atPath: dim4HugeFile.path)[.size] as? Int64) == hugeSizeBytes
 
         if !isDatasetCached && (customFilePaths == nil || customFilePaths!.isEmpty) {
@@ -52,12 +57,9 @@ extension CompetitorBenchmarkRunner {
                 try? logHandle.close()
             }
 
-            let randChunk = Data((0..<1024*1024).map { _ in UInt8.random(in: 0...255) })
-            FileManager.default.createFile(atPath: dim3EntropyFile.path, contents: nil)
-            if let randHandle = try? FileHandle(forWritingTo: dim3EntropyFile) {
-                for _ in 0..<100 { randHandle.write(randChunk) }
-                try? randHandle.close()
-            }
+            try? MultiModalDatasetGenerator.generateHighEntropyBinaryDataset(destinationPath: dim3EntropyFile.path, sizeBytes: 100 * 1024 * 1024)
+            try? MultiModalDatasetGenerator.generateFloat32SensorDataset(destinationPath: dim5FloatSensorFile.path, sizeBytes: 50 * 1024 * 1024)
+            try? MultiModalDatasetGenerator.generateStructuredJsonDataset(destinationPath: dim6JsonLogFile.path, recordCount: 300000)
 
             try? FileManager.default.removeItem(at: dim4HugeFile)
             let mkProc = Process()
@@ -78,7 +80,9 @@ extension CompetitorBenchmarkRunner {
             payloads = [
                 ("Small Files (10MB/100 files)", dim1Dir.path, (try? folderSize(dim1Dir.path)) ?? 0),
                 ("Log Text (10MB)", dim2LogFile.path, (try? FileManager.default.attributesOfItem(atPath: dim2LogFile.path)[.size] as? Int64) ?? 0),
-                ("High-Entropy Payload (100MB)", dim3EntropyFile.path, (try? FileManager.default.attributesOfItem(atPath: dim3EntropyFile.path)[.size] as? Int64) ?? 0),
+                ("Float32 Sensor Matrix (50MB)", dim5FloatSensorFile.path, (try? FileManager.default.attributesOfItem(atPath: dim5FloatSensorFile.path)[.size] as? Int64) ?? (50 * 1024 * 1024)),
+                ("Structured JSON (50MB)", dim6JsonLogFile.path, (try? FileManager.default.attributesOfItem(atPath: dim6JsonLogFile.path)[.size] as? Int64) ?? (50 * 1024 * 1024)),
+                ("High-Entropy Payload (100MB)", dim3EntropyFile.path, (try? FileManager.default.attributesOfItem(atPath: dim3EntropyFile.path)[.size] as? Int64) ?? (100 * 1024 * 1024)),
                 (hugeSizeName, dim4HugeFile.path, hugeSizeBytes)
             ]
         }

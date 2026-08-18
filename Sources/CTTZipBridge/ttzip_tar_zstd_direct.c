@@ -11,6 +11,7 @@
  */
 
 #include "include/ttzip_tar_zstd_direct.h"
+#include "include/ttzip_tar_native.h"
 #include "include/CTTZipBridge.h"
 #include "include/CTTZipBridge_Archive.h"
 #include "include/CTTZipCommon.h"
@@ -97,13 +98,12 @@ static int add_item_to_zstd_stream(
     struct stat st;
     if (lstat(full_path, &st) != 0) return TTZIP_ERR_FILE_NOT_FOUND;
     
-    char* formatted_rel = NULL;
+    char formatted_rel[1024];
     size_t rel_len = strlen(rel_path);
     if (S_ISDIR(st.st_mode) && rel_len > 0 && rel_path[rel_len - 1] != '/') {
-        if (asprintf(&formatted_rel, "%s/", rel_path) <= 0) return TTZIP_ERR_OUT_OF_MEMORY;
+        snprintf(formatted_rel, sizeof(formatted_rel), "%s/", rel_path);
     } else {
-        formatted_rel = strdup(rel_path);
-        if (!formatted_rel) return TTZIP_ERR_OUT_OF_MEMORY;
+        snprintf(formatted_rel, sizeof(formatted_rel), "%s", rel_path);
     }
     
     // 0. If path > 100 bytes, write standard Pax LongLink header
@@ -132,15 +132,15 @@ static int add_item_to_zstd_stream(
         }
 
         size_t total_payload = (name_len + 511) & ~(size_t)511;
-        uint8_t* name_buf = (uint8_t*)calloc(1, total_payload);
-        if (name_buf) {
+        if (total_payload <= sizeof(formatted_rel)) {
+            uint8_t name_buf[1024];
+            memset(name_buf, 0, total_payload);
             memcpy(name_buf, formatted_rel, fmt_len);
             ZSTD_inBuffer in_name = { name_buf, total_payload, 0 };
             while (in_name.pos < in_name.size) {
                 ZSTD_compressStream2(cctx, out, &in_name, ZSTD_e_continue);
                 if (out->pos >= out->size - 65536) flush_zstd_out(out, out_fd);
             }
-            free(name_buf);
         }
     }
 
@@ -153,36 +153,16 @@ static int add_item_to_zstd_stream(
         ZSTD_compressStream2(cctx, out, &in_hdr, ZSTD_e_continue);
         if (out->pos >= out->size - 65536) {
             int ret = flush_zstd_out(out, out_fd);
-            if (ret != TTZIP_OK) {
-                free(formatted_rel);
-                return ret;
-            }
+            if (ret != TTZIP_OK) return ret;
         }
     }
     
-    // 2. Regular file zero-copy direct write
+    // 2. Stream regular file data
     if (S_ISREG(st.st_mode) && st.st_size > 0) {
         int in_fd = open(full_path, O_RDONLY);
         if (in_fd >= 0) {
             size_t file_bytes = ttzip_clamp_size((uint64_t)st.st_size);
-            if (file_bytes <= 4096) {
-                uint8_t stack_buf[4096];
-                ssize_t rd = pread(in_fd, stack_buf, file_bytes, 0);
-                if (rd == (ssize_t)file_bytes) {
-                    ZSTD_inBuffer in_file = { stack_buf, file_bytes, 0 };
-                    while (in_file.pos < in_file.size) {
-                        ZSTD_compressStream2(cctx, out, &in_file, ZSTD_e_continue);
-                        if (out->pos >= out->size - 131072) {
-                            int ret = flush_zstd_out(out, out_fd);
-                            if (ret != TTZIP_OK) {
-                                close(in_fd);
-                                free(formatted_rel);
-                                return ret;
-                            }
-                        }
-                    }
-                }
-            } else {
+            if (file_bytes >= 64 * 1024) {
                 void* mapped = mmap(NULL, file_bytes, PROT_READ, MAP_SHARED, in_fd, 0);
                 if (mapped != MAP_FAILED) {
                     madvise(mapped, file_bytes, MADV_SEQUENTIAL | MADV_WILLNEED);
@@ -195,32 +175,34 @@ static int add_item_to_zstd_stream(
                             if (ret != TTZIP_OK) {
                                 munmap(mapped, file_bytes);
                                 close(in_fd);
-                                free(formatted_rel);
                                 return ret;
                             }
                         }
                     }
                     munmap(mapped, file_bytes);
-                } else {
-                    uint8_t read_chunk[4096];
-                    ssize_t rd = 0;
-                    while ((rd = read(in_fd, read_chunk, sizeof(read_chunk))) > 0) {
-                        ZSTD_inBuffer in_file = { read_chunk, (size_t)rd, 0 };
-                        while (in_file.pos < in_file.size) {
-                            ZSTD_compressStream2(cctx, out, &in_file, ZSTD_e_continue);
-                            if (out->pos >= out->size - 131072) {
-                                int ret = flush_zstd_out(out, out_fd);
-                                if (ret != TTZIP_OK) {
-                                    close(in_fd);
-                                    free(formatted_rel);
-                                    return ret;
-                                }
+                    close(in_fd);
+                    in_fd = -1;
+                }
+            }
+            
+            if (in_fd >= 0) {
+                uint8_t stack_buf[8192];
+                ssize_t rd = 0;
+                while ((rd = read(in_fd, stack_buf, sizeof(stack_buf))) > 0) {
+                    ZSTD_inBuffer in_file = { stack_buf, (size_t)rd, 0 };
+                    while (in_file.pos < in_file.size) {
+                        ZSTD_compressStream2(cctx, out, &in_file, ZSTD_e_continue);
+                        if (out->pos >= out->size - 131072) {
+                            int ret = flush_zstd_out(out, out_fd);
+                            if (ret != TTZIP_OK) {
+                                close(in_fd);
+                                return ret;
                             }
                         }
                     }
                 }
+                close(in_fd);
             }
-            close(in_fd);
         }
         
         // Tar 512-byte alignment padding
@@ -233,10 +215,7 @@ static int add_item_to_zstd_stream(
                 ZSTD_compressStream2(cctx, out, &in_pad, ZSTD_e_continue);
                 if (out->pos >= out->size - 65536) {
                     int ret = flush_zstd_out(out, out_fd);
-                    if (ret != TTZIP_OK) {
-                        free(formatted_rel);
-                        return ret;
-                    }
+                    if (ret != TTZIP_OK) return ret;
                 }
             }
         }
@@ -251,32 +230,23 @@ static int add_item_to_zstd_stream(
                 if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
                     continue;
                 }
-                char* sub_full = NULL;
-                char* sub_rel = NULL;
-                if (asprintf(&sub_full, "%s/%s", full_path, de->d_name) > 0) {
-                    if (formatted_rel[strlen(formatted_rel) - 1] == '/') {
-                        asprintf(&sub_rel, "%s%s", formatted_rel, de->d_name);
-                    } else {
-                        asprintf(&sub_rel, "%s/%s", formatted_rel, de->d_name);
-                    }
-                    if (sub_rel) {
-                        int r = add_item_to_zstd_stream(cctx, out, out_fd, sub_full, sub_rel, skip_mac_junk);
-                        free(sub_full);
-                        free(sub_rel);
-                        if (r != TTZIP_OK) {
-                            closedir(dir);
-                            free(formatted_rel);
-                            return r;
-                        }
-                    } else {
-                        if (sub_full) free(sub_full);
-                    }
+                char sub_full[1024];
+                char sub_rel[1024];
+                snprintf(sub_full, sizeof(sub_full), "%s/%s", full_path, de->d_name);
+                if (formatted_rel[strlen(formatted_rel) - 1] == '/') {
+                    snprintf(sub_rel, sizeof(sub_rel), "%s%s", formatted_rel, de->d_name);
+                } else {
+                    snprintf(sub_rel, sizeof(sub_rel), "%s/%s", formatted_rel, de->d_name);
+                }
+                int r = add_item_to_zstd_stream(cctx, out, out_fd, sub_full, sub_rel, skip_mac_junk);
+                if (r != TTZIP_OK) {
+                    closedir(dir);
+                    return r;
                 }
             }
             closedir(dir);
         }
     }
-    free(formatted_rel);
     return TTZIP_OK;
 }
 
@@ -670,10 +640,7 @@ int ttzip_extract_tar_zstd_direct_c(
 
             if (hdr_pos == 512) {
                 hdr_pos = 0;
-                bool is_all_zero = true;
-                for (int i = 0; i < 512; i++) {
-                    if (tar_hdr[i] != 0) { is_all_zero = false; break; }
-                }
+                bool is_all_zero = ttzip_tar_is_zero_block_512((const uint8_t*)tar_hdr);
                 if (is_all_zero) {
                     zero_block_count++;
                     if (zero_block_count >= 2) {

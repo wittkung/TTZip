@@ -60,6 +60,25 @@ extension ArchiveWriter {
             }
         }
             
+        // 0. Transparent Adaptive Store Auto-Downgrade Route (Zero Configuration Creep)
+        if format == .zip && level != .store && (password == nil || password!.isEmpty) && (splitVolumeSizeBytes == nil || splitVolumeSizeBytes == 0),
+           let firstInput = inputPaths.first, inputPaths.count == 1, totalBytes >= 64 * 1024 {
+            let eval = AdaptivePipelineOrchestrator.shared.evaluateFile(atPath: firstInput)
+            if eval.recommendDirectStore && eval.shannonEntropy > 7.65 {
+                let success = (try? ZipStoreStreamWriter.shared.createStoreArchive(
+                    outputPath: outputPath,
+                    inputPaths: inputPaths,
+                    skipMacJunk: options.skipMacJunk,
+                    enableZeroCopy: true,
+                    progressHandler: progressHandler
+                )) ?? false
+                if success {
+                    notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "Adaptive Store zero-copy archive created", progressHandler: progressHandler)
+                    return
+                }
+            }
+        }
+
         // 1. Level 0 Store Direct I/O Route (16MB SIMD page-aligned zero-copy)
         // 🔒 API CONTRACT: ZIP Store Dispatch Route (Hand-tuned Zero-Copy Pipeline)
         // SEE: .agents/rules/zip-engine-freeze.md
@@ -201,12 +220,19 @@ extension ArchiveWriter {
             }
         }
         
-        // Formats: Apple Archive, DMG, ISO, WIM
+        // Formats: Apple Archive, Brotli, DMG, ISO, WIM
         if format == .aar, let firstInput = inputPaths.first {
             if let ok = try? NativeAppleArchiveEngine.shared.compress(sourcePath: firstInput, outputPath: outputPath), ok {
                 let duration = max(0.001, Date().timeIntervalSince(startTime))
                 let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
                 progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "Apple Archive created", throughputMBs: throughput))
+                return
+            }
+        }
+        
+        if format == .brotli {
+            if let ok = try? NativeBrotliEngine.shared.createArchive(outputPath: outputPath, inputPaths: inputPaths, level: level, skipMacJunk: options.skipMacJunk, progressHandler: progressHandler), ok {
+                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "Brotli archive created", progressHandler: progressHandler)
                 return
             }
         }

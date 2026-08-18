@@ -26,9 +26,11 @@
 #include <sys/mman.h>
 
 static void write_reg_file_data(struct archive* a, const char* full_path, int64_t file_size) {
+    if (!a || !full_path || file_size <= 0) return;
     int fd = open(full_path, O_RDONLY);
     if (fd < 0) return;
     
+    // Fast Path 1: Large files (>= 64KB) -> mmap zero-copy
     if (file_size >= 64 * 1024) {
         size_t mapped_size = ttzip_clamp_size((uint64_t)file_size);
         void* mapped = mmap(NULL, mapped_size, PROT_READ, MAP_SHARED, fd, 0);
@@ -41,24 +43,11 @@ static void write_reg_file_data(struct archive* a, const char* full_path, int64_
         }
     }
     
-    char stack_buff[65536];
-    if (file_size > 0 && file_size <= (int64_t)sizeof(stack_buff)) {
-        ssize_t bytes_read = pread(fd, stack_buff, (size_t)file_size, 0);
-        if (bytes_read > 0) {
-            archive_write_data(a, stack_buff, (size_t)bytes_read);
-        }
-        close(fd);
-        return;
-    }
-    
-    size_t chunk_cap = 1048576;
-    char* buff = (char*)malloc(chunk_cap);
-    if (buff) {
-        ssize_t bytes_read;
-        while ((bytes_read = read(fd, buff, chunk_cap)) > 0) {
-            archive_write_data(a, buff, (size_t)bytes_read);
-        }
-        free(buff);
+    // Fast Path 2: 8KB stack buffer stream (lean stack footprint for deep directory trees)
+    char stack_buff[8192];
+    ssize_t bytes_read;
+    while ((bytes_read = read(fd, stack_buff, sizeof(stack_buff))) > 0) {
+        archive_write_data(a, stack_buff, (size_t)bytes_read);
     }
     close(fd);
 }
@@ -85,13 +74,9 @@ static int add_file_or_dir_to_archive(
     
     size_t rel_len = strlen(rel_path);
     if (S_ISDIR(st.st_mode) && rel_len > 0 && rel_path[rel_len - 1] != '/') {
-        char* dir_path = NULL;
-        if (asprintf(&dir_path, "%s/", rel_path) > 0 && dir_path) {
-            archive_entry_set_pathname(entry, dir_path);
-            free(dir_path);
-        } else {
-            archive_entry_set_pathname(entry, rel_path);
-        }
+        char dir_path[1024];
+        snprintf(dir_path, sizeof(dir_path), "%s/", rel_path);
+        archive_entry_set_pathname(entry, dir_path);
     } else {
         archive_entry_set_pathname(entry, rel_path);
     }
@@ -126,14 +111,11 @@ static int add_file_or_dir_to_archive(
                 if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
                     continue;
                 }
-                char* sub_full = NULL;
-                char* sub_rel = NULL;
-                if (asprintf(&sub_full, "%s/%s", full_path, de->d_name) > 0 &&
-                    asprintf(&sub_rel, "%s/%s", rel_path, de->d_name) > 0) {
-                    add_file_or_dir_to_archive(a, sub_full, sub_rel, skip_mac_junk);
-                }
-                if (sub_full) free(sub_full);
-                if (sub_rel) free(sub_rel);
+                char sub_full[1024];
+                char sub_rel[1024];
+                snprintf(sub_full, sizeof(sub_full), "%s/%s", full_path, de->d_name);
+                snprintf(sub_rel, sizeof(sub_rel), "%s/%s", rel_path, de->d_name);
+                add_file_or_dir_to_archive(a, sub_full, sub_rel, skip_mac_junk);
             }
             closedir(dir);
         }

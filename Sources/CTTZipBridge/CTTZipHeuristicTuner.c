@@ -137,3 +137,87 @@ ttzip_tuning_recommendation_t ttzip_heuristic_eval_cascade(
 
     return rec;
 }
+
+ttzip_float_detect_result_t ttzip_detect_scientific_float_neon(const void* src, size_t len) {
+    ttzip_float_detect_result_t res;
+    res.is_scientific_float = false;
+    res.type_size = 4;
+    res.stride_score = 0.0;
+    res.exponent_std_dev = 999.0;
+    res.normalized_ratio = 0.0;
+
+    if (!src || len < 64) return res;
+
+    size_t sample_len = len > 16384 ? 16384 : len;
+
+    // 1. Stride Autocorrelation check for 4-byte (Float32) and 8-byte (Float64)
+    double r1 = ttzip_calc_autocorrelation_stride(src, sample_len, 1);
+    double r4 = ttzip_calc_autocorrelation_stride(src, sample_len, 4);
+    double r8 = ttzip_calc_autocorrelation_stride(src, sample_len, 8);
+
+    uint8_t cand_size = 4;
+    double max_stride_score = r4;
+    if (r8 > r4 && r8 > 0.65) {
+        cand_size = 8;
+        max_stride_score = r8;
+    }
+    res.type_size = cand_size;
+    res.stride_score = max_stride_score;
+
+    if (cand_size == 4) {
+        size_t n_floats = sample_len / 4;
+        const uint32_t* u32 = (const uint32_t*)src;
+        size_t norm_count = 0;
+        double sum_e = 0.0;
+        double sum_e2 = 0.0;
+
+        for (size_t i = 0; i < n_floats; ++i) {
+            uint32_t exp_bits = (u32[i] >> 23) & 0xFF;
+            if (exp_bits >= 1 && exp_bits <= 254) {
+                norm_count++;
+                sum_e += (double)exp_bits;
+                sum_e2 += (double)(exp_bits * exp_bits);
+            }
+        }
+
+        res.normalized_ratio = (double)norm_count / (double)n_floats;
+        if (norm_count > 16) {
+            double mean_e = sum_e / (double)norm_count;
+            double variance_e = (sum_e2 / (double)norm_count) - (mean_e * mean_e);
+            res.exponent_std_dev = variance_e > 0 ? sqrt(variance_e) : 0.0;
+        }
+
+        // Decision threshold for Float32
+        if (res.normalized_ratio >= 0.90 && res.exponent_std_dev <= 25.0 && (r4 >= 0.40 || r4 > r1)) {
+            res.is_scientific_float = true;
+        }
+    } else {
+        size_t n_doubles = sample_len / 8;
+        const uint64_t* u64 = (const uint64_t*)src;
+        size_t norm_count = 0;
+        double sum_e = 0.0;
+        double sum_e2 = 0.0;
+
+        for (size_t i = 0; i < n_doubles; ++i) {
+            uint64_t exp_bits = (u64[i] >> 52) & 0x7FF;
+            if (exp_bits >= 1 && exp_bits <= 2046) {
+                norm_count++;
+                sum_e += (double)exp_bits;
+                sum_e2 += (double)(exp_bits * exp_bits);
+            }
+        }
+
+        res.normalized_ratio = (double)norm_count / (double)n_doubles;
+        if (norm_count > 16) {
+            double mean_e = sum_e / (double)norm_count;
+            double variance_e = (sum_e2 / (double)norm_count) - (mean_e * mean_e);
+            res.exponent_std_dev = variance_e > 0 ? sqrt(variance_e) : 0.0;
+        }
+
+        if (res.normalized_ratio >= 0.90 && res.exponent_std_dev <= 45.0 && (r8 >= 0.40 || r8 > r1)) {
+            res.is_scientific_float = true;
+        }
+    }
+
+    return res;
+}

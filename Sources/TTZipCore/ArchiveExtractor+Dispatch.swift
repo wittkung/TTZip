@@ -69,6 +69,14 @@ extension ArchiveExtractor {
             }
         }
         
+        // 4.1 Brotli (.br / .brotli / .tar.br) native decompression
+        if targetFormat == .brotli || pathLower.hasSuffix(".br") || pathLower.hasSuffix(".brotli") || pathLower.contains(".tar.br") {
+            if let ok = try? NativeBrotliEngine.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, skipMacJunk: options.skipMacJunk), ok {
+                Self.cleanupQuarantineAttributes(at: destinationDir)
+                return true
+            }
+        }
+        
         // 5. WIM archive extraction
         if targetFormat == .wim || pathLower.hasSuffix(".wim") {
             let status = ttzip_extract_archive_advanced(archivePath, destinationDir, options.skipMacJunk, password)
