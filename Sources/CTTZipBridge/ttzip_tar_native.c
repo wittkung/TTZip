@@ -41,9 +41,9 @@ static void write_reg_file_data(struct archive* a, const char* full_path, int64_
         }
     }
     
-    char stack_buff[4096];
+    char stack_buff[65536];
     if (file_size > 0 && file_size <= (int64_t)sizeof(stack_buff)) {
-        ssize_t bytes_read = read(fd, stack_buff, (size_t)file_size);
+        ssize_t bytes_read = pread(fd, stack_buff, (size_t)file_size, 0);
         if (bytes_read > 0) {
             archive_write_data(a, stack_buff, (size_t)bytes_read);
         }

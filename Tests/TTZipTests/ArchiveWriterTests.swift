@@ -225,4 +225,70 @@ final class ArchiveWriterTests: XCTestCase {
             try await group.waitForAll()
         }
     }
+
+    func testZipDifferentialWithSystemUnzip() async throws {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: "/usr/bin/unzip") else {
+            throw XCTSkip("/usr/bin/unzip not found")
+        }
+
+        let batchDir = (tempDirPath as NSString).appendingPathComponent("diff_batch")
+        try fileManager.createDirectory(atPath: batchDir, withIntermediateDirectories: true)
+
+        var expectedDataMap: [String: Data] = [:]
+        for i in 0..<100 {
+            let filename = "item_\(i).txt"
+            let filePath = (batchDir as NSString).appendingPathComponent(filename)
+            let content = "TTZip Cache-Aware Batch Diff Test Payload \(i) -- " + String(repeating: "ABC123_", count: 10)
+            let data = content.data(using: .utf8)!
+            try data.write(to: URL(fileURLWithPath: filePath))
+            expectedDataMap[filename] = data
+        }
+
+        let outputZip = (tempDirPath as NSString).appendingPathComponent("diff_output.zip")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(
+            outputPath: outputZip,
+            format: .zip,
+            level: .normal,
+            inputPaths: [batchDir]
+        )
+
+        XCTAssertTrue(fileManager.fileExists(atPath: outputZip))
+
+        // Run /usr/bin/unzip -t outputZip
+        let testProcess = Process()
+        testProcess.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        testProcess.arguments = ["-t", outputZip]
+        let pipe = Pipe()
+        testProcess.standardOutput = pipe
+        testProcess.standardError = pipe
+        try testProcess.run()
+        testProcess.waitUntilExit()
+
+        XCTAssertEqual(testProcess.terminationStatus, 0, "System unzip test (-t) must return 0 errors")
+
+        // Extract using /usr/bin/unzip
+        let destDir = (tempDirPath as NSString).appendingPathComponent("unzip_dest")
+        try fileManager.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+
+        let extractProcess = Process()
+        extractProcess.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        extractProcess.arguments = ["-q", outputZip, "-d", destDir]
+        try extractProcess.run()
+        extractProcess.waitUntilExit()
+
+        XCTAssertEqual(extractProcess.terminationStatus, 0, "System unzip extraction must succeed")
+
+        // Verify content bit-for-bit
+        for (filename, expectedData) in expectedDataMap {
+            var extractedPath = (destDir as NSString).appendingPathComponent("diff_batch/\(filename)")
+            if !fileManager.fileExists(atPath: extractedPath) {
+                extractedPath = (destDir as NSString).appendingPathComponent(filename)
+            }
+            XCTAssertTrue(fileManager.fileExists(atPath: extractedPath), "Extracted file \(filename) must exist")
+            let actualData = try Data(contentsOf: URL(fileURLWithPath: extractedPath))
+            XCTAssertEqual(actualData, expectedData, "Extracted content for \(filename) must match bit-for-bit")
+        }
+    }
 }

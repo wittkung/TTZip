@@ -16,5 +16,8 @@
 #include "CTTZipSysAlloc.h"
 #include "CTTZipCRC32Neon.h"
 #include "CTTZipSpawnPipelines.h"
+#include "CTTZipCacheTopology.h"
+#include "CTTZipFilterPipeline.h"
+#include "CTTZipSparseSlicing.h"
 
 #endif // CTTZipCoreArchitecture_h

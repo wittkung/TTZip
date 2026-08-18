@@ -49,3 +49,14 @@ void ttzip_core_aligned_free_16k(void* ptr) {
         ttzip_platform_aligned_free(ptr);
     }
 }
+
+void* ttzip_core_aligned_alloc_128b(size_t size) {
+    if (size == 0) return NULL;
+    return ttzip_platform_aligned_alloc(128, size);
+}
+
+void ttzip_core_aligned_free_128b(void* ptr) {
+    if (ptr) {
+        ttzip_platform_aligned_free(ptr);
+    }
+}

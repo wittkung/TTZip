@@ -165,29 +165,11 @@ static int add_item_to_zstd_stream(
         int in_fd = open(full_path, O_RDONLY);
         if (in_fd >= 0) {
             size_t file_bytes = ttzip_clamp_size((uint64_t)st.st_size);
-            void* mapped = mmap(NULL, file_bytes, PROT_READ, MAP_SHARED, in_fd, 0);
-            if (mapped != MAP_FAILED) {
-                madvise(mapped, file_bytes, MADV_SEQUENTIAL | MADV_WILLNEED);
-                
-                ZSTD_inBuffer in_file = { mapped, file_bytes, 0 };
-                while (in_file.pos < in_file.size) {
-                    ZSTD_compressStream2(cctx, out, &in_file, ZSTD_e_continue);
-                    if (out->pos >= out->size - 131072) {
-                        int ret = flush_zstd_out(out, out_fd);
-                        if (ret != TTZIP_OK) {
-                            munmap(mapped, file_bytes);
-                            close(in_fd);
-                            free(formatted_rel);
-                            return ret;
-                        }
-                    }
-                }
-                munmap(mapped, file_bytes);
-            } else {
-                uint8_t read_chunk[4096];
-                ssize_t rd = 0;
-                while ((rd = read(in_fd, read_chunk, sizeof(read_chunk))) > 0) {
-                    ZSTD_inBuffer in_file = { read_chunk, (size_t)rd, 0 };
+            if (file_bytes <= 65536) {
+                uint8_t stack_buf[65536];
+                ssize_t rd = pread(in_fd, stack_buf, file_bytes, 0);
+                if (rd == (ssize_t)file_bytes) {
+                    ZSTD_inBuffer in_file = { stack_buf, file_bytes, 0 };
                     while (in_file.pos < in_file.size) {
                         ZSTD_compressStream2(cctx, out, &in_file, ZSTD_e_continue);
                         if (out->pos >= out->size - 131072) {
@@ -196,6 +178,43 @@ static int add_item_to_zstd_stream(
                                 close(in_fd);
                                 free(formatted_rel);
                                 return ret;
+                            }
+                        }
+                    }
+                }
+            } else {
+                void* mapped = mmap(NULL, file_bytes, PROT_READ, MAP_SHARED, in_fd, 0);
+                if (mapped != MAP_FAILED) {
+                    madvise(mapped, file_bytes, MADV_SEQUENTIAL | MADV_WILLNEED);
+                    
+                    ZSTD_inBuffer in_file = { mapped, file_bytes, 0 };
+                    while (in_file.pos < in_file.size) {
+                        ZSTD_compressStream2(cctx, out, &in_file, ZSTD_e_continue);
+                        if (out->pos >= out->size - 131072) {
+                            int ret = flush_zstd_out(out, out_fd);
+                            if (ret != TTZIP_OK) {
+                                munmap(mapped, file_bytes);
+                                close(in_fd);
+                                free(formatted_rel);
+                                return ret;
+                            }
+                        }
+                    }
+                    munmap(mapped, file_bytes);
+                } else {
+                    uint8_t read_chunk[65536];
+                    ssize_t rd = 0;
+                    while ((rd = read(in_fd, read_chunk, sizeof(read_chunk))) > 0) {
+                        ZSTD_inBuffer in_file = { read_chunk, (size_t)rd, 0 };
+                        while (in_file.pos < in_file.size) {
+                            ZSTD_compressStream2(cctx, out, &in_file, ZSTD_e_continue);
+                            if (out->pos >= out->size - 131072) {
+                                int ret = flush_zstd_out(out, out_fd);
+                                if (ret != TTZIP_OK) {
+                                    close(in_fd);
+                                    free(formatted_rel);
+                                    return ret;
+                                }
                             }
                         }
                     }

@@ -25,6 +25,8 @@ extern "C" {
 int ttzip_core_apfs_preallocate_file(int fd, int64_t target_size);
 void* ttzip_core_aligned_alloc_16k(size_t size);
 void ttzip_core_aligned_free_16k(void* ptr);
+void* ttzip_core_aligned_alloc_128b(size_t size);
+void ttzip_core_aligned_free_128b(void* ptr);
 
 #ifdef __cplusplus
 }
