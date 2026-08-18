@@ -134,18 +134,19 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 2500.0
     )
     
-    /// Tier 5: Graph Fast (有限前瞻 DAG 最短路径图论剪枝，libdeflate L10，吞吐 >= 400 MB/s)
+    /// Tier 5: Graph Fast (轻量 2 轮 Zopfli 最短路径图论剪枝，吞吐 >= 35 MB/s)
     public static let graphFast = ZipCompressionProfile(
         id: "zip_tier_5_graph_fast",
         name: "Graph Fast (5)",
         level: .level5,
         deflateLevel: 10,
-        zopfliIterations: 1,
+        zopfliIterations: 2,
         blockSplitting: false,
         maxBlockSplits: 0,
         earlyExitThreshold: 0.0001,
-        targetThroughputFloorMBs: 400.0
+        targetThroughputFloorMBs: 35.0
     )
+
     
     /// Tier 6: Ultra Zopfli (100% 进程内全局 DAG 最短路径穷举，5 轮 Zopfli 迭代，吞吐 >= 4.0 MB/s)
     public static let ultraZopfli = ZipCompressionProfile(

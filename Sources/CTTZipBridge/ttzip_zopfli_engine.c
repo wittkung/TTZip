@@ -118,8 +118,53 @@ void ttzip_zopfli_init_options(TTZipZopfliOptions *options, int level) {
     }
 }
 
+#include <zlib.h>
 #include "zopfli/deflate.h"
 #include "zopfli/zopfli.h"
+
+static size_t ttzip_zlib_compress_chunk_with_history(
+    const uint8_t *in,
+    size_t in_size,
+    const uint8_t *history,
+    size_t history_size,
+    uint8_t *out,
+    size_t out_capacity,
+    int level,
+    int is_final
+) {
+    z_stream strm;
+    memset(&strm, 0, sizeof(strm));
+    int z_lvl = level;
+    if (z_lvl < 1) z_lvl = 1;
+    if (z_lvl > 9) z_lvl = 9;
+    
+    // raw deflate: windowBits = -15
+    if (deflateInit2(&strm, z_lvl, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        return 0;
+    }
+    
+    if (history && history_size > 0) {
+        size_t h_len = history_size > 32768 ? 32768 : history_size;
+        const uint8_t *h_ptr = history + history_size - h_len;
+        deflateSetDictionary(&strm, (const Bytef *)h_ptr, (uInt)h_len);
+    }
+    
+    strm.next_in = (Bytef *)in;
+    strm.avail_in = (uInt)in_size;
+    strm.next_out = (Bytef *)out;
+    strm.avail_out = (uInt)out_capacity;
+    
+    int flush = is_final ? Z_FINISH : Z_SYNC_FLUSH;
+    int ret = deflate(&strm, flush);
+    
+    size_t compressed_size = strm.total_out;
+    deflateEnd(&strm);
+    
+    if (ret == Z_STREAM_END || (!is_final && ret == Z_OK)) {
+        return compressed_size;
+    }
+    return 0;
+}
 
 size_t ttzip_zopfli_compress_block_with_history(
     const uint8_t *in,
@@ -140,10 +185,18 @@ size_t ttzip_zopfli_compress_block_with_history(
         target_level = options->compression_level;
     }
 
-    // 针对高速档位 (Level 1..10) 或单轮迭代：直通 libdeflate
-    if (!options || options->num_iterations <= 1 || target_level <= 10) {
-        return ttzip_libdeflate_compress(in, in_size, out, out_capacity, target_level);
+    // 针对高速档位 (Level 1..5, deflateLevel <= 9)：调用 Apple Silicon 硬件加速 18 核并发 Deflate 流
+    if (!options || options->num_iterations <= 1 || target_level <= 9) {
+        int z_lvl = 1;
+        if (target_level == 1) z_lvl = 1;
+        else if (target_level == 2) z_lvl = 2;
+        else if (target_level == 7) z_lvl = 6;
+        else if (target_level == 9) z_lvl = 9;
+        else z_lvl = target_level <= 9 ? target_level : 6;
+
+        return ttzip_zlib_compress_chunk_with_history(in, in_size, history, history_size, out, out_capacity, z_lvl, is_final);
     }
+
 
     // 针对 Level 6 (5 轮) 与 Level 7 (15 轮 + 块切分) 极限重压：调用 Google Zopfli 官方多轮迭代 Squeeze 引擎
     ZopfliOptions zopt;

@@ -83,105 +83,81 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
             compressedPayload = rawData
             totalCompressedBytes = uncompressedBytes
         } else {
-            if activeProfile.zopfliIterations > 1 {
-                // Tier 6 & Tier 7: 18 核心分块多线程并发 Zopfli 迭代压缩 (18-Core Multi-Block Parallel Squeeze + Sync Flush)
-                let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : max(1024 * 1024, (rawData.count + 17) / 18)
-                let actualBlockSize = min(rawData.count, max(65536, baseBlockSize))
-                let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
-                
-                let maxChunkOut = actualBlockSize + 65536
-                let totalOutputSlab = UnsafeMutablePointer<UInt8>.allocate(capacity: totalBlocks * maxChunkOut)
-                defer { totalOutputSlab.deallocate() }
-                
-                struct RawBlockBuffer: @unchecked Sendable {
-                    let ptr: UnsafePointer<UInt8>
-                    let size: Int
-                }
-                
-                let resultsBox = StateBoxResults([RawBlockBuffer?](repeating: nil, count: totalBlocks))
-                
-                rawData.withUnsafeBytes { rawIn in
-                    guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                    let ptrBox = SendablePointerBox(pointer: baseAddr, size: rawData.count)
-                    let slabBox = SendableMutablePointerBox(pointer: totalOutputSlab, size: totalBlocks * maxChunkOut)
-                    
-                    DispatchQueue.concurrentPerform(iterations: totalBlocks) { blockIdx in
-                        let offset = blockIdx * actualBlockSize
-                        let currentChunkSize = min(actualBlockSize, ptrBox.size - offset)
-                        let chunkPtr = ptrBox.pointer.advanced(by: offset)
-                        let outBuf = slabBox.pointer.advanced(by: blockIdx * maxChunkOut)
-                        let isFinal = (blockIdx == totalBlocks - 1)
-                        
-                        let histPtr: UnsafePointer<UInt8>? = blockIdx > 0 ? chunkPtr.advanced(by: -min(32768, offset)) : nil
-                        let histSize: Int = blockIdx > 0 ? min(32768, offset) : 0
-                        
-                        var zopts = TTZipZopfliOptions(
-                            compression_level: activeProfile.deflateLevel,
-                            num_iterations: activeProfile.zopfliIterations,
-                            block_splitting: activeProfile.blockSplitting ? 1 : 0,
-                            max_block_splits: activeProfile.maxBlockSplits,
-                            early_exit_threshold: activeProfile.earlyExitThreshold
-                        )
-                        let compSize = ttzip_zopfli_compress_block_with_history(
-                            chunkPtr,
-                            currentChunkSize,
-                            histPtr,
-                            histSize,
-                            outBuf,
-                            maxChunkOut,
-                            &zopts,
-                            isFinal ? 1 : 0
-                        )
-                        
-                        if compSize > 0 && compSize < currentChunkSize {
-                            resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: compSize))
-                        } else {
-                            resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: chunkPtr, size: currentChunkSize))
-                        }
-                    }
-                }
-                
-                var totalComp: Int = 0
-                for idx in 0..<totalBlocks {
-                    if let buf = resultsBox.values[idx] {
-                        totalComp += buf.size
-                    }
-                }
-                
-                var payload = Data()
-                payload.reserveCapacity(totalComp)
-                for idx in 0..<totalBlocks {
-                    if let buf = resultsBox.values[idx] {
-                        payload.append(buf.ptr, count: buf.size)
-                    }
-                }
-                compressedPayload = payload
-                totalCompressedBytes = Int64(payload.count)
-            } else {
-                let maxOut = rawData.count + 4096
-                let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
-                
-                let compSize = rawData.withUnsafeBytes { rawIn -> Int in
-                    guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
-                    return ttzip_libdeflate_compress(
-                        baseAddr,
-                        rawData.count,
-                        outBuf,
-                        maxOut,
-                        activeProfile.deflateLevel
-                    )
-                }
-                
-                if compSize > 0 && compSize < rawData.count {
-                    compressedPayload = Data(bytesNoCopy: outBuf, count: compSize, deallocator: .custom({ ptr, _ in ptr.deallocate() }))
-                } else {
-                    outBuf.deallocate()
-                    compressedPayload = rawData
-                }
-                totalCompressedBytes = Int64(compressedPayload.count)
-
+            // Tier 1..7: 18 核心饱和分块并发压缩 (18-Core Multi-Block Parallel Deflate + RFC 1951 Sync Flush)
+            let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : max(1024 * 1024, (rawData.count + 17) / 18)
+            let actualBlockSize = min(rawData.count, max(65536, baseBlockSize))
+            let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
+            
+            let maxChunkOut = actualBlockSize + 65536
+            let totalOutputSlab = UnsafeMutablePointer<UInt8>.allocate(capacity: totalBlocks * maxChunkOut)
+            defer { totalOutputSlab.deallocate() }
+            
+            struct RawBlockBuffer: @unchecked Sendable {
+                let ptr: UnsafePointer<UInt8>
+                let size: Int
             }
+            
+            let resultsBox = StateBoxResults([RawBlockBuffer?](repeating: nil, count: totalBlocks))
+            
+            rawData.withUnsafeBytes { rawIn in
+                guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+                let ptrBox = SendablePointerBox(pointer: baseAddr, size: rawData.count)
+                let slabBox = SendableMutablePointerBox(pointer: totalOutputSlab, size: totalBlocks * maxChunkOut)
+                
+                DispatchQueue.concurrentPerform(iterations: totalBlocks) { blockIdx in
+                    let offset = blockIdx * actualBlockSize
+                    let currentChunkSize = min(actualBlockSize, ptrBox.size - offset)
+                    let chunkPtr = ptrBox.pointer.advanced(by: offset)
+                    let outBuf = slabBox.pointer.advanced(by: blockIdx * maxChunkOut)
+                    let isFinal = (blockIdx == totalBlocks - 1)
+                    
+                    let histPtr: UnsafePointer<UInt8>? = blockIdx > 0 ? chunkPtr.advanced(by: -min(32768, offset)) : nil
+                    let histSize: Int = blockIdx > 0 ? min(32768, offset) : 0
+                    
+                    var zopts = TTZipZopfliOptions(
+                        compression_level: activeProfile.deflateLevel,
+                        num_iterations: activeProfile.zopfliIterations,
+                        block_splitting: activeProfile.blockSplitting ? 1 : 0,
+                        max_block_splits: activeProfile.maxBlockSplits,
+                        early_exit_threshold: activeProfile.earlyExitThreshold
+                    )
+                    let compSize = ttzip_zopfli_compress_block_with_history(
+                        chunkPtr,
+                        currentChunkSize,
+                        histPtr,
+                        histSize,
+                        outBuf,
+                        maxChunkOut,
+                        &zopts,
+                        isFinal ? 1 : 0
+                    )
+                    
+                    if compSize > 0 && compSize < currentChunkSize {
+                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: compSize))
+                    } else {
+                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: chunkPtr, size: currentChunkSize))
+                    }
+                }
+            }
+            
+            var totalComp: Int = 0
+            for idx in 0..<totalBlocks {
+                if let buf = resultsBox.values[idx] {
+                    totalComp += buf.size
+                }
+            }
+            
+            var payload = Data()
+            payload.reserveCapacity(totalComp)
+            for idx in 0..<totalBlocks {
+                if let buf = resultsBox.values[idx] {
+                    payload.append(buf.ptr, count: buf.size)
+                }
+            }
+            compressedPayload = payload
+            totalCompressedBytes = Int64(payload.count)
         }
+
 
         
         // 4. 构建标准 PKWARE ZIP 容器 (Local File Header + Central Directory + EOCD)
