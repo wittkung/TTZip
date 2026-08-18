@@ -44,6 +44,7 @@
 #include "CTTZipBridge_ZipChunkedStream.h"
 #include "ttzip_crc64.h"
 #include "CTTZipBridge_Snappy.h"
+#include "ttzip_branchless_decomp.h"
 
 #ifdef __cplusplus
 extern "C" {
