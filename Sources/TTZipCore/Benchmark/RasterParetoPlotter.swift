@@ -305,6 +305,13 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 cleanName = p.algorithm.replacingOccurrences(of: "pigz (ZIP ", with: "pigz-")
                     .replacingOccurrences(of: ")", with: "")
                     .lowercased()
+            } else if fam == .ttzipExtreme {
+                let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
+                let baseAlgo = p.algorithm.replacingOccurrences(of: "TTZip Extreme (ZIP ", with: "ttzip-extreme-")
+                    .replacingOccurrences(of: "TTZip Extreme (", with: "ttzip-extreme-")
+                    .replacingOccurrences(of: ")", with: "")
+                    .lowercased()
+                cleanName = "\(baseAlgo) (\(speedStr))"
             } else if fam == .ttzip {
                 let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
                 let baseAlgo = p.algorithm.replacingOccurrences(of: "TTZip (ZIP ", with: "ttzip-")
@@ -326,14 +333,25 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 font = NSFont.systemFont(ofSize: 12, weight: .bold)
                 textColor = NSColor.white
                 isCapsule = true
-                bgCol = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
+                if fam == .ttzipExtreme {
+                    bgCol = NSColor(calibratedRed: 2/255.0, green: 132/255.0, blue: 199/255.0, alpha: 1.0)
+                } else {
+                    bgCol = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
+                }
                 borderCol = nil
             } else if isHeroNormal {
                 font = NSFont.systemFont(ofSize: 11, weight: .bold)
-                textColor = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
-                isCapsule = false
-                bgCol = NSColor(calibratedRed: 239/255.0, green: 246/255.0, blue: 255/255.0, alpha: 0.95)
-                borderCol = NSColor(calibratedRed: 191/255.0, green: 219/255.0, blue: 254/255.0, alpha: 1.0)
+                if fam == .ttzipExtreme {
+                    textColor = NSColor(calibratedRed: 2/255.0, green: 132/255.0, blue: 199/255.0, alpha: 1.0)
+                    isCapsule = false
+                    bgCol = NSColor(calibratedRed: 240/255.0, green: 249/255.0, blue: 255/255.0, alpha: 0.95)
+                    borderCol = NSColor(calibratedRed: 186/255.0, green: 230/255.0, blue: 253/255.0, alpha: 1.0)
+                } else {
+                    textColor = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
+                    isCapsule = false
+                    bgCol = NSColor(calibratedRed: 239/255.0, green: 246/255.0, blue: 255/255.0, alpha: 0.95)
+                    borderCol = NSColor(calibratedRed: 191/255.0, green: 219/255.0, blue: 254/255.0, alpha: 1.0)
+                }
             } else {
                 font = NSFont.systemFont(ofSize: 11, weight: .regular)
                 let brandHex = fam.brandColorHex
@@ -388,6 +406,13 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 let dotRect = CGRect(x: cx - 6, y: cy - 6, width: 12, height: 12)
                 ctx.fillEllipse(in: dotRect)
                 ctx.strokeEllipse(in: dotRect)
+            } else if fam == .ttzipExtreme {
+                ctx.setFillColor(CGColor(red: 2/255.0, green: 132/255.0, blue: 199/255.0, alpha: 1.0))
+                ctx.setStrokeColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
+                ctx.setLineWidth(2.5)
+                let dotRect = CGRect(x: cx - 6, y: cy - 6, width: 12, height: 12)
+                ctx.fillEllipse(in: dotRect)
+                ctx.strokeEllipse(in: dotRect)
             } else {
                 let brandColor = NSColor(hexString: fam.brandColorHex) ?? NSColor.darkGray
                 ctx.setFillColor(brandColor.cgColor)
@@ -418,10 +443,18 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 ]
             case .openSource:
                 candidateSlots = [
-                    (cx - w / 2, cy + 14),           // 首选: Top-Center
-                    (cx + 12, cy + 10),              // S4: Top-Right
-                    (cx - w - 12, cy + 10),          // S5: Top-Left
+                    (cx - w / 2, cy - h - 14),       // 首选: Bottom-Center (在曲线下方，避开上方的 TTZip Extreme)
+                    (cx + 12, cy - h - 8),           // 次选: Bottom-Right
+                    (cx - w - 12, cy - h - 8),       // 次选: Bottom-Left
+                    (cx - w / 2, cy + 14),           // S0: Top-Center
                     (cx + 14, cy - h / 2)            // S2: Right-Center
+                ]
+            case .ttzipExtreme:
+                candidateSlots = [
+                    (cx - w / 2, cy + 14),           // 首选: Top-Center (在曲线上方)
+                    (cx + 14, cy + 10),              // 次选: Top-Right
+                    (cx - w - 12, cy + 10),          // 次选: Top-Left
+                    (cx + 14, cy - h / 2)            // 次选: Right-Center
                 ]
             case .ttzip:
                 candidateSlots = [

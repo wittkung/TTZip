@@ -195,12 +195,99 @@ int64_t ttzip_schunk_decompress_chunk(const ttzip_schunk_t* schunk, size_t chunk
     size_t available_cbytes = impl->payload_arena.size - chunk_offset;
 
     size_t dsize = 0;
+    size_t frame_csize = ZSTD_findFrameCompressedSize(src_ptr, available_cbytes);
+    if (ZSTD_isError(frame_csize) || frame_csize > available_cbytes) {
+        frame_csize = available_cbytes;
+    }
+
     if (impl->base.ddict_handle) {
-        dsize = ZSTD_decompress_usingDDict(impl->dctx, dst, dst_capacity, src_ptr, available_cbytes, (const ZSTD_DDict*)impl->base.ddict_handle);
+        dsize = ZSTD_decompress_usingDDict(impl->dctx, dst, dst_capacity, src_ptr, frame_csize, (const ZSTD_DDict*)impl->base.ddict_handle);
     } else {
-        dsize = ZSTD_decompressDCtx(impl->dctx, dst, dst_capacity, src_ptr, available_cbytes);
+        dsize = ZSTD_decompressDCtx(impl->dctx, dst, dst_capacity, src_ptr, frame_csize);
     }
 
     if (ZSTD_isError(dsize)) return -1;
     return (int64_t)dsize;
 }
+
+int64_t ttzip_schunk_get_slice_buffer(
+    const ttzip_schunk_t* schunk,
+    int64_t start_byte,
+    int64_t length,
+    void* dst,
+    size_t dst_capacity
+) {
+    if (!schunk || !dst || start_byte < 0 || length < 0) return -1;
+    if ((uint64_t)length > dst_capacity) return -1;
+    if (length == 0) return 0;
+    if ((uint64_t)(start_byte + length) > schunk->uncompressed_size) return -1;
+
+    const ttzip_schunk_internal_t* impl = (const ttzip_schunk_internal_t*)schunk;
+    size_t chunk_size = impl->base.chunk_size > 0 ? impl->base.chunk_size : 2 * 1024 * 1024;
+    size_t first_chunk = (size_t)(start_byte / chunk_size);
+    size_t last_chunk = (size_t)((start_byte + length - 1) / chunk_size);
+
+    uint8_t* dst_bytes = (uint8_t*)dst;
+    int64_t total_extracted = 0;
+
+    // Temporary chunk decompress buffer allocated on stack or thread-local if needed
+    for (size_t c = first_chunk; c <= last_chunk && c < impl->base.nchunks; ++c) {
+        int64_t chunk_global_start = (int64_t)(c * chunk_size);
+        int64_t chunk_global_end = chunk_global_start + (int64_t)chunk_size;
+        if (c == impl->base.nchunks - 1) {
+            chunk_global_end = (int64_t)impl->base.uncompressed_size;
+        }
+
+        int64_t slice_start = start_byte > chunk_global_start ? start_byte : chunk_global_start;
+        int64_t slice_end = (start_byte + length) < chunk_global_end ? (start_byte + length) : chunk_global_end;
+        size_t slice_len = (size_t)(slice_end - slice_start);
+        size_t dst_offset = (size_t)(slice_start - start_byte);
+        size_t in_chunk_offset = (size_t)(slice_start - chunk_global_start);
+
+        int64_t offset_entry = impl->base.coffsets[c];
+
+        // 1. Special-Value Bypass: Direct hardware line fill with 0 decompression cycles
+        if (offset_entry < 0 || ((uint64_t)offset_entry & TTZIP_SPECIAL_TAG_MSB) != 0) {
+            uint64_t u_entry = (uint64_t)offset_entry;
+            uint8_t code = (uint8_t)((u_entry >> 56) & 0x7F);
+            uint64_t pattern = u_entry & 0x00FFFFFFFFFFFFFFULL;
+
+            if (code == TTZIP_SPECIAL_ZERO) {
+                memset(dst_bytes + dst_offset, 0, slice_len);
+            } else if (code == TTZIP_SPECIAL_VALUE) {
+                for (size_t i = 0; i < slice_len; ++i) {
+                    dst_bytes[dst_offset + i] = (uint8_t)((pattern >> ((i % 8) * 8)) & 0xFF);
+                }
+            }
+            total_extracted += (int64_t)slice_len;
+            continue;
+        }
+
+        // 2. Normal Chunk Decompression: extract slice
+        size_t chunk_actual_uncompressed = (size_t)(chunk_global_end - chunk_global_start);
+        
+        // If the slice matches the entire chunk exactly, decompress directly to destination
+        if (in_chunk_offset == 0 && slice_len == chunk_actual_uncompressed) {
+            int64_t decomp_ret = ttzip_schunk_decompress_chunk(schunk, c, dst_bytes + dst_offset, slice_len);
+            if (decomp_ret < 0) return -1;
+            total_extracted += (int64_t)slice_len;
+        } else {
+            // Boundary / Sub-slice decompress
+            uint8_t* chunk_tmp = (uint8_t*)malloc(chunk_actual_uncompressed);
+            if (!chunk_tmp) return -1;
+
+            int64_t decomp_ret = ttzip_schunk_decompress_chunk(schunk, c, chunk_tmp, chunk_actual_uncompressed);
+            if (decomp_ret < 0) {
+                free(chunk_tmp);
+                return -1;
+            }
+
+            memcpy(dst_bytes + dst_offset, chunk_tmp + in_chunk_offset, slice_len);
+            free(chunk_tmp);
+            total_extracted += (int64_t)slice_len;
+        }
+    }
+
+    return total_extracted;
+}
+

@@ -52,6 +52,23 @@ int ttzip_schunk_train_dict(ttzip_schunk_t* schunk, const void* sample_data, siz
 int64_t ttzip_schunk_append_chunk(ttzip_schunk_t* schunk, const void* src, size_t nbytes);
 int64_t ttzip_schunk_decompress_chunk(const ttzip_schunk_t* schunk, size_t chunk_idx, void* dst, size_t dst_capacity);
 
+/**
+ * @brief Block-level lazy sub-chunk range slicing (extracts only intersecting 128KB micro-blocks).
+ * @param schunk Super-Chunk handle
+ * @param start_byte Global uncompressed byte offset
+ * @param length Number of bytes to extract
+ * @param dst Destination buffer
+ * @param dst_capacity Capacity of destination buffer
+ * @return Number of extracted bytes on success, negative error code on failure
+ */
+int64_t ttzip_schunk_get_slice_buffer(
+    const ttzip_schunk_t* schunk,
+    int64_t start_byte,
+    int64_t length,
+    void* dst,
+    size_t dst_capacity
+);
+
 #ifdef __cplusplus
 }
 #endif

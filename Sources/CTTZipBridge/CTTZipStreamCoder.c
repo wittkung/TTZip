@@ -14,6 +14,8 @@
 #include <limits.h>
 #include "lz4.h"
 
+#include <zlib.h>
+
 static TTZIP_THREAD_LOCAL struct libdeflate_compressor* g_tls_compressors[14] = { NULL };
 static TTZIP_THREAD_LOCAL struct libdeflate_decompressor* g_tls_decompressor = NULL;
 
@@ -48,6 +50,33 @@ size_t ttzip_libdeflate_decompress(const void* src, size_t src_size, void* dst, 
     size_t actual_out = 0;
     enum libdeflate_result res = libdeflate_deflate_decompress(decompressor, src, src_size, dst, dst_capacity, &actual_out);
     return (res == LIBDEFLATE_SUCCESS) ? actual_out : 0;
+}
+
+size_t ttzip_raw_deflate_block_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity, int level, bool is_final) {
+    if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
+    
+    z_stream strm;
+    memset(&strm, 0, sizeof(strm));
+    
+    int z_lvl = level > 0 ? (level > 9 ? 9 : level) : 6;
+    int ret = deflateInit2(&strm, z_lvl, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
+    if (ret != Z_OK) return 0;
+    
+    strm.next_in = (Bytef*)src;
+    strm.avail_in = (uInt)src_size;
+    strm.next_out = (Bytef*)dst;
+    strm.avail_out = (uInt)dst_capacity;
+    
+    int flush = is_final ? Z_FINISH : Z_SYNC_FLUSH;
+    ret = deflate(&strm, flush);
+    if (ret < 0 || (is_final && ret != Z_STREAM_END)) {
+        deflateEnd(&strm);
+        return 0;
+    }
+    
+    size_t comp_size = (size_t)strm.total_out;
+    deflateEnd(&strm);
+    return comp_size;
 }
 
 static TTZIP_THREAD_LOCAL LZ4_stream_t* g_tls_lz4_stream = NULL;

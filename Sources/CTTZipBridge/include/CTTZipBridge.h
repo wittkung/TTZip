@@ -52,6 +52,8 @@
 #include "CTTZipFilterPipeline.h"
 #include "CTTZipSuperChunk.h"
 #include "CTTZipHeuristicTuner.h"
+#include "CTTZipPluginRegistry.h"
+#include "CTTZipBitGroom.h"
 
 #ifdef __cplusplus
 

@@ -80,6 +80,7 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         // =========================================================================
         // 1. TTZip (原生架构：Swift 6 + libdeflate + 多核并发 + Apple NEON SIMD)
         // =========================================================================
+        // 1.1 TTZip Normal (单文件全局无损模式：追求极限压缩率)
         for (lvl, lbl) in [
             (ArchiveCompressionLevel.level1, "TTZip (ZIP Fast)"),
             (ArchiveCompressionLevel.level3, "TTZip (ZIP Fast2)"),
@@ -96,6 +97,25 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
                 let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
                 let speed = payloadMB / dur
                 zipPoints.append(ParetoPoint(id: "ttzip_zip_\(lvl.rawValue)", algorithm: lbl, level: lvl.rawValue, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+            }
+        }
+
+        // 1.2 TTZip Extreme (18 核满血分块极速模式：追求极限吞吐)
+        for (lvl, lbl) in [
+            (ArchiveCompressionLevel.level1, "TTZip Extreme (ZIP Fast)"),
+            (ArchiveCompressionLevel.level3, "TTZip Extreme (ZIP Fast2)"),
+            (ArchiveCompressionLevel.level6, "TTZip Extreme (ZIP Normal)"),
+            (ArchiveCompressionLevel.level9, "TTZip Extreme (ZIP Ultra)")
+        ] {
+            let pth = tempDir.appendingPathComponent("ttzip_extreme_zip_\(lvl.rawValue).zip").path
+            let t0 = CACurrentMediaTime()
+            let _ = try ZipExtremeBlockWriter.shared.createExtremeArchive(outputPath: pth, inputPath: realSamplePath, level: lvl, blockSize: 1024 * 1024)
+            let dur = max(1e-6, CACurrentMediaTime() - t0)
+            let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+            if sz > 0 {
+                let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                let speed = payloadMB / dur
+                zipPoints.append(ParetoPoint(id: "ttzip_extreme_zip_\(lvl.rawValue)", algorithm: lbl, level: lvl.rawValue, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
             }
         }
 

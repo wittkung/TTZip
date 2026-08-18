@@ -107,4 +107,38 @@ public enum Blosc2FilterBridge {
         }
         return success ? output : data
     }
+
+    /// Applies Bit-Grooming to a Float array preserving the specified Number of Significant Digits (NSD).
+    public static func bitGroom(floats: [Float], nsd: UInt8) -> [Float] {
+        guard !floats.isEmpty else { return floats }
+        var result = [Float](repeating: 0, count: floats.count)
+        floats.withUnsafeBufferPointer { srcPtr in
+            result.withUnsafeMutableBufferPointer { dstPtr in
+                ttzip_filter_bitgroom_float32_neon(
+                    srcPtr.baseAddress!,
+                    dstPtr.baseAddress!,
+                    floats.count,
+                    nsd
+                )
+            }
+        }
+        return result
+    }
+
+    /// Applies BitRound (nearest-even rounding) to a Float array preserving NSD.
+    public static func bitRound(floats: [Float], nsd: UInt8) -> [Float] {
+        guard !floats.isEmpty else { return floats }
+        var result = [Float](repeating: 0, count: floats.count)
+        floats.withUnsafeBufferPointer { srcPtr in
+            result.withUnsafeMutableBufferPointer { dstPtr in
+                ttzip_filter_bitround_float32_neon(
+                    srcPtr.baseAddress!,
+                    dstPtr.baseAddress!,
+                    floats.count,
+                    nsd
+                )
+            }
+        }
+        return result
+    }
 }

@@ -188,6 +188,7 @@ public struct ScenarioRecommendation: Codable, Sendable, Equatable {
 /// 软件家族品牌定义
 public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendable {
     case ttzip         = "TTZip"
+    case ttzipExtreme  = "TTZip Extreme"
     case sevenZip      = "7-Zip"
     case appleNative   = "Apple Native"
     case keka          = "Keka"
@@ -200,7 +201,8 @@ public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendabl
     /// 品牌主视觉色 (HEX)
     public var brandColorHex: String {
         switch self {
-        case .ttzip:         return "#2563EB" // Royal Blue (Hero)
+        case .ttzip:         return "#2563EB" // Royal Blue (Hero Normal)
+        case .ttzipExtreme:  return "#0284C7" // Electric Ocean Blue (Hero Extreme)
         case .sevenZip:      return "#D97706" // Amber / Warm Bronze
         case .appleNative:   return "#DC2626" // Crimson Red
         case .keka:          return "#0D9488" // Teal / Jade
@@ -211,13 +213,13 @@ public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendabl
     }
 
     /// 是否作为 Hero 软件渲染演进光晕带与突出药丸徽章
-    public var isHero: Bool { self == .ttzip }
+    public var isHero: Bool { self == .ttzip || self == .ttzipExtreme }
 
     /// 主轨迹线条宽度
     public var lineWidth: Double { isHero ? 2.8 : 2.2 }
 
     /// 轨迹光晕带宽度 (仅 Hero 具备)
-    public var haloRibbonWidth: Double { isHero ? 24.0 : 0.0 }
+    public var haloRibbonWidth: Double { isHero ? 22.0 : 0.0 }
 }
 
 /// 软件家族轨迹线模型
@@ -238,7 +240,9 @@ public struct SoftwareFamilyTrajectory: Sendable, Identifiable {
 public struct SoftwareFamilyClassifier: Sendable {
     public static func classify(algorithm: String) -> SoftwareFamily {
         let lower = algorithm.lowercased()
-        if lower.contains("ttzip") || lower.contains("ttz") {
+        if lower.contains("ttzip extreme") || lower.contains("ttz-extreme") || (lower.contains("extreme") && lower.contains("ttzip")) {
+            return .ttzipExtreme
+        } else if lower.contains("ttzip") || lower.contains("ttz") {
             return .ttzip
         } else if lower.contains("7-zip") || lower.contains("7zip") || lower.contains("7zz") || lower.contains("p7zip") {
             return .sevenZip
