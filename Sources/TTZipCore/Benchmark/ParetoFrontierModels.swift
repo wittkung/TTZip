@@ -304,7 +304,8 @@ public struct FritschCarlsonSplineCalculator: Sendable {
         var delta = [Double](repeating: 0, count: n - 1)
 
         for i in 0..<(n - 1) {
-            h[i] = max(1e-6, points[i + 1].x - points[i].x)
+            let dx = points[i + 1].x - points[i].x
+            h[i] = max(1.0, dx) // 保证像素间隔下界为 1px，杜绝除零导致斜率爆炸
             delta[i] = (points[i + 1].y - points[i].y) / h[i]
         }
 
@@ -312,23 +313,13 @@ public struct FritschCarlsonSplineCalculator: Sendable {
         d[0] = delta[0]
         d[n - 1] = delta[n - 2]
 
+        // 使用 Steffen / Brodlie 单调调和平均斜率计算 (Monotone Harmonic Limiter)
         for i in 1..<(n - 1) {
-            d[i] = (delta[i - 1] + delta[i]) / 2.0
-        }
-
-        for i in 0..<(n - 1) {
-            if abs(delta[i]) < 1e-9 {
-                d[i] = 0.0
-                d[i + 1] = 0.0
+            if delta[i - 1] * delta[i] <= 0.0 {
+                d[i] = 0.0 // 极值拐点处导数设为 0，防止过冲
             } else {
-                let alpha = d[i] / delta[i]
-                let beta = d[i + 1] / delta[i]
-                let norm = alpha * alpha + beta * beta
-                if norm > 9.0 {
-                    let tau = 3.0 / sqrt(norm)
-                    d[i] = tau * alpha * delta[i]
-                    d[i + 1] = tau * beta * delta[i]
-                }
+                let p = 2.0 * delta[i - 1] * delta[i] / (delta[i - 1] + delta[i])
+                d[i] = p
             }
         }
 
@@ -336,8 +327,11 @@ public struct FritschCarlsonSplineCalculator: Sendable {
         for i in 0..<(n - 1) {
             let p0 = points[i]
             let p1 = points[i + 1]
-            let cp1 = (x: p0.x + h[i] / 3.0, y: p0.y + (d[i] * h[i]) / 3.0)
-            let cp2 = (x: p1.x - h[i] / 3.0, y: p1.y - (d[i + 1] * h[i]) / 3.0)
+            let segH = points[i + 1].x - points[i].x
+            let cp1Y = p0.y + (d[i] * segH) / 3.0
+            let cp2Y = p1.y - (d[i + 1] * segH) / 3.0
+            let cp1 = (x: p0.x + segH / 3.0, y: cp1Y)
+            let cp2 = (x: p1.x - segH / 3.0, y: cp2Y)
             segments.append(CubicBezierSegment(startPoint: p0, controlPoint1: cp1, controlPoint2: cp2, endPoint: p1))
         }
         return segments

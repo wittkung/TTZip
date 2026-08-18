@@ -127,8 +127,9 @@ public final class SVGParetoPlotter: @unchecked Sendable {
         // 4. X 轴（空间节省率 %）刻度线与标签
         for xVal in stride(from: domainMinX, through: domainMaxX, by: xStep) {
             let px = mapX(xVal)
+            let label = xStep < 1.0 ? String(format: "%.1f%%", xVal) : String(format: "%.0f%%", xVal)
             svg += """
-              <text x="\(String(format: "%.1f", px))" y="\(Int(height - marginBottom + 30))" text-anchor="middle" class="axis-text">\(String(format: "%.0f%%", xVal))</text>
+              <text x="\(String(format: "%.1f", px))" y="\(Int(height - marginBottom + 30))" text-anchor="middle" class="axis-text">\(label)</text>
 
             """
         }
@@ -164,7 +165,7 @@ public final class SVGParetoPlotter: @unchecked Sendable {
                     pathStr += "C \(String(format: "%.1f", seg.controlPoint1.x)) \(String(format: "%.1f", seg.controlPoint1.y)), \(String(format: "%.1f", seg.controlPoint2.x)) \(String(format: "%.1f", seg.controlPoint2.y)), \(String(format: "%.1f", seg.endPoint.x)) \(String(format: "%.1f", seg.endPoint.y)) "
                 }
                 svg += """
-                  <path d="\(pathStr)" stroke="rgba(37, 99, 235, 0.18)" stroke-width="\(Int(traj.family.haloRibbonWidth))" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                  <path d="\(pathStr)" stroke="rgba(37, 99, 235, 0.16)" stroke-width="\(Int(traj.family.haloRibbonWidth))" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 
                 """
             }
@@ -196,22 +197,32 @@ public final class SVGParetoPlotter: @unchecked Sendable {
             let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
             let cleanName: String
             if fam == .sevenZip {
-                cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02", with: "7-zip").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "").replacingOccurrences(of: "-mmt=on", with: "")
-            } else if fam == .keka {
-                cleanName = p.algorithm.replacingOccurrences(of: "Keka", with: "keka").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+                cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02 (ZIP ", with: "7-zip-")
+                    .replacingOccurrences(of: "7-Zip 26.02 (7Z ", with: "7-zip-")
+                    .replacingOccurrences(of: ")", with: "")
+                    .lowercased()
             } else if fam == .appleNative {
-                cleanName = p.algorithm.replacingOccurrences(of: "Apple Native", with: "apple").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+                cleanName = p.algorithm.replacingOccurrences(of: "Apple Native (zip -", with: "apple-zip-")
+                    .replacingOccurrences(of: "Apple Native (", with: "apple-")
+                    .replacingOccurrences(of: ")", with: "")
+                    .lowercased()
+                    .replacingOccurrences(of: " ", with: "-")
             } else if fam == .openSource {
-                cleanName = p.algorithm.lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+                cleanName = p.algorithm.replacingOccurrences(of: "pigz (ZIP ", with: "pigz-")
+                    .replacingOccurrences(of: ")", with: "")
+                    .lowercased()
             } else if fam == .ttzip {
                 let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
-                let baseAlgo = p.algorithm.replacingOccurrences(of: "TTZip", with: "ttzip").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+                let baseAlgo = p.algorithm.replacingOccurrences(of: "TTZip (ZIP ", with: "ttzip-")
+                    .replacingOccurrences(of: "TTZip (", with: "ttzip-")
+                    .replacingOccurrences(of: ")", with: "")
+                    .lowercased()
                 cleanName = "\(baseAlgo) (\(speedStr))"
             } else {
                 cleanName = p.algorithm.lowercased()
             }
 
-            let isHeroPill = fam.isHero && (p.algorithm.contains("TAR.ZST") || p.algorithm.contains("ZIP Fast") || p.algorithm.contains("7Z Fast") || p.algorithm.contains("LZ4"))
+            let isHeroPill = fam.isHero && (p.algorithm.contains("ZIP Fast") || p.algorithm.contains("ZIP Ultra") || p.algorithm.contains("TAR.ZST") || p.algorithm.contains("7Z Fast") || p.algorithm.contains("LZ4"))
             let isHeroNormal = fam.isHero && !isHeroPill
 
             if isHeroPill {

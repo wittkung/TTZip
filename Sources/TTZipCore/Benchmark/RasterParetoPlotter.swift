@@ -167,7 +167,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         // 4. 绘制 X 轴（空间节省率 %）刻度与标签
         for xVal in stride(from: domainMinX, through: domainMaxX, by: xStep) {
             let x = mapX(xVal)
-            let label = String(format: "%.0f%%", xVal)
+            let label = xStep < 1.0 ? String(format: "%.1f%%", xVal) : String(format: "%.0f%%", xVal)
             let font = NSFont.systemFont(ofSize: 14, weight: .regular)
             let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: axisTextColor]
             let str = NSAttributedString(string: label, attributes: attrs)
@@ -226,40 +226,41 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                         control2: CGPoint(x: seg.controlPoint2.x, y: seg.controlPoint2.y)
                     )
                 }
-                ctx.addPath(ribbonPath)
-                ctx.setStrokeColor(CGColor(red: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 0.18))
+                ctx.setStrokeColor(CGColor(red: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 0.16))
                 ctx.setLineWidth(CGFloat(traj.family.haloRibbonWidth))
                 ctx.setLineCap(.round)
                 ctx.setLineJoin(.round)
+                ctx.addPath(ribbonPath)
                 ctx.strokePath()
             }
         }
 
-        // 6.2 绘制各软件家族主轨迹实线 (Solid Family Curves)
+        // 6.2 绘制各软件家族主实线轨迹
         for traj in trajectories {
             let pts = traj.points.map { (x: Double(mapX($0.spaceSavingsPct)), y: Double(mapY($0.throughputMBs))) }
-            if pts.count >= 2 {
-                let segments = FritschCarlsonSplineCalculator.calculateBezierSegments(points: pts)
-                let spinePath = CGMutablePath()
-                spinePath.move(to: CGPoint(x: pts[0].x, y: pts[0].y))
-                for seg in segments {
-                    spinePath.addCurve(
-                        to: CGPoint(x: seg.endPoint.x, y: seg.endPoint.y),
-                        control1: CGPoint(x: seg.controlPoint1.x, y: seg.controlPoint1.y),
-                        control2: CGPoint(x: seg.controlPoint2.x, y: seg.controlPoint2.y)
-                    )
-                }
-                let color = NSColor(hexString: traj.family.brandColorHex) ?? NSColor.black
-                ctx.addPath(spinePath)
-                ctx.setStrokeColor(color.cgColor)
-                ctx.setLineWidth(CGFloat(traj.family.lineWidth))
-                ctx.setLineCap(.round)
-                ctx.setLineJoin(.round)
-                ctx.strokePath()
+            guard pts.count >= 2 else { continue }
+            let segments = FritschCarlsonSplineCalculator.calculateBezierSegments(points: pts)
+
+            let splinePath = CGMutablePath()
+            splinePath.move(to: CGPoint(x: pts[0].x, y: pts[0].y))
+            for seg in segments {
+                splinePath.addCurve(
+                    to: CGPoint(x: seg.endPoint.x, y: seg.endPoint.y),
+                    control1: CGPoint(x: seg.controlPoint1.x, y: seg.controlPoint1.y),
+                    control2: CGPoint(x: seg.controlPoint2.x, y: seg.controlPoint2.y)
+                )
             }
+
+            let strokeColor = NSColor(hexString: traj.family.brandColorHex) ?? NSColor.darkGray
+            ctx.setStrokeColor(strokeColor.cgColor)
+            ctx.setLineWidth(CGFloat(traj.family.lineWidth))
+            ctx.setLineCap(.round)
+            ctx.setLineJoin(.round)
+            ctx.addPath(splinePath)
+            ctx.strokePath()
         }
 
-        // 7. 8-Slot 贪心 AABB 空间占用避让排布系统 (Deterministic Collision Avoidance)
+        // 7. 预计算所有点位标签尺寸与优先级 (Hero Badge 优先)
         var reservedAABBs: [CGRect] = []
 
         struct PointLabelPlacement {
@@ -285,21 +286,31 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let cy = mapY(p.throughputMBs)
             let fam = SoftwareFamilyClassifier.classify(algorithm: p.algorithm)
 
-            let isHeroPill = fam.isHero && (p.algorithm.contains("TAR.ZST") || p.algorithm.contains("ZIP Fast") || p.algorithm.contains("7Z Fast") || p.algorithm.contains("LZ4"))
+            let isHeroPill = fam.isHero && (p.algorithm.contains("ZIP Fast") || p.algorithm.contains("ZIP Ultra") || p.algorithm.contains("TAR.ZST") || p.algorithm.contains("7Z Fast") || p.algorithm.contains("LZ4"))
             let isHeroNormal = fam.isHero && !isHeroPill
 
             let cleanName: String
             if fam == .sevenZip {
-                cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02", with: "7-zip").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "").replacingOccurrences(of: "-mmt=on", with: "")
-            } else if fam == .keka {
-                cleanName = p.algorithm.replacingOccurrences(of: "Keka", with: "keka").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+                cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02 (ZIP ", with: "7-zip-")
+                    .replacingOccurrences(of: "7-Zip 26.02 (7Z ", with: "7-zip-")
+                    .replacingOccurrences(of: ")", with: "")
+                    .lowercased()
             } else if fam == .appleNative {
-                cleanName = p.algorithm.replacingOccurrences(of: "Apple Native", with: "apple").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+                cleanName = p.algorithm.replacingOccurrences(of: "Apple Native (zip -", with: "apple-zip-")
+                    .replacingOccurrences(of: "Apple Native (", with: "apple-")
+                    .replacingOccurrences(of: ")", with: "")
+                    .lowercased()
+                    .replacingOccurrences(of: " ", with: "-")
             } else if fam == .openSource {
-                cleanName = p.algorithm.lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+                cleanName = p.algorithm.replacingOccurrences(of: "pigz (ZIP ", with: "pigz-")
+                    .replacingOccurrences(of: ")", with: "")
+                    .lowercased()
             } else if fam == .ttzip {
                 let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
-                let baseAlgo = p.algorithm.replacingOccurrences(of: "TTZip", with: "ttzip").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+                let baseAlgo = p.algorithm.replacingOccurrences(of: "TTZip (ZIP ", with: "ttzip-")
+                    .replacingOccurrences(of: "TTZip (", with: "ttzip-")
+                    .replacingOccurrences(of: ")", with: "")
+                    .lowercased()
                 cleanName = "\(baseAlgo) (\(speedStr))"
             } else {
                 cleanName = p.algorithm.lowercased()
@@ -384,24 +395,54 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 ctx.fillEllipse(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
             }
 
-            // 8 方位贪心槽位测试
+            // 根据家族偏好分配主候选槽位，彻底消除密集列（如 96.5%）的横向文字交叉
             let w = item.pillWidth
             let h = item.pillHeight
-            let candidateOffsets: [(dx: CGFloat, dy: CGFloat)] = [
-                (0, 14),             // S0: Top-Center
-                (0, -(h + 10)),      // S1: Bottom-Center
-                (w * 0.4, 10),       // S2: Top-Right
-                (-w * 0.4, -(h + 8)),// S3: Bottom-Left
-                (-w * 0.4, 10),      // S4: Top-Left
-                (w * 0.4, -(h + 8)), // S5: Bottom-Right
-                (14, -h / 2),        // S6: Right-Center
-                (-(w + 14), -h / 2)  // S7: Left-Center
-            ]
+            let candidateSlots: [(x: CGFloat, y: CGFloat)]
+            switch fam {
+            case .appleNative:
+                candidateSlots = [
+                    (cx - w - 12, cy - h / 2),       // 首选: Left-Center
+                    (cx - w - 12, cy - h - 6),       // 次选: Bottom-Left
+                    (cx - w - 12, cy + 6),           // 次选: Top-Left
+                    (cx - w / 2, cy - h - 14),       // S1: Bottom-Center
+                    (cx + 14, cy - h / 2)            // 兜底: Right-Center
+                ]
+            case .sevenZip:
+                candidateSlots = [
+                    (cx - w - 12, cy - h / 2),       // 首选: Left-Center
+                    (cx - w - 12, cy + 8),           // 次选: Top-Left
+                    (cx - w - 12, cy - h - 8),       // 次选: Bottom-Left
+                    (cx + 14, cy - h / 2),           // S2: Right-Center
+                    (cx - w / 2, cy - h - 14)        // S1: Bottom-Center
+                ]
+            case .openSource:
+                candidateSlots = [
+                    (cx - w / 2, cy + 14),           // 首选: Top-Center
+                    (cx + 12, cy + 10),              // S4: Top-Right
+                    (cx - w - 12, cy + 10),          // S5: Top-Left
+                    (cx + 14, cy - h / 2)            // S2: Right-Center
+                ]
+            case .ttzip:
+                candidateSlots = [
+                    (cx + 14, cy - h / 2),           // 首选: Right-Center (向右舒展)
+                    (cx - w / 2, cy + 14),           // 次选: Top-Center
+                    (cx + 12, cy + 10),              // S4: Top-Right
+                    (cx - w / 2, cy - h - 14)        // S1: Bottom-Center
+                ]
+            default:
+                candidateSlots = [
+                    (cx - w / 2, cy + 14),
+                    (cx + 14, cy - h / 2),
+                    (cx - w - 14, cy - h / 2),
+                    (cx - w / 2, cy - h - 14)
+                ]
+            }
 
             var bestRect = CGRect(x: cx - w / 2, y: cy + 14, width: w, height: h)
-            for off in candidateOffsets {
-                let testX = min(marginLeft + plotW - w, max(marginLeft, cx + off.dx - (off.dx == 0 ? w / 2 : 0)))
-                let testY = min(marginBottom + plotH - h, max(marginBottom, cy + off.dy))
+            for slot in candidateSlots {
+                let testX = min(marginLeft + plotW - w, max(marginLeft, slot.x))
+                let testY = min(marginBottom + plotH - h, max(marginBottom, slot.y))
                 let testRect = CGRect(x: testX, y: testY, width: w, height: h)
 
                 let intersects = reservedAABBs.contains { $0.intersects(testRect.insetBy(dx: -4, dy: -3)) }
@@ -422,14 +463,16 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                     ctx.fillPath()
                 } else {
                     ctx.setFillColor(item.badgeBgColor.cgColor)
+                    let path = CGPath(roundedRect: bestRect, cornerWidth: 5, cornerHeight: 5, transform: nil)
+                    ctx.addPath(path)
+                    ctx.fillPath()
+
                     if let border = item.badgeBorderColor {
                         ctx.setStrokeColor(border.cgColor)
                         ctx.setLineWidth(1.0)
+                        ctx.addPath(path)
+                        ctx.strokePath()
                     }
-                    let path = CGPath(roundedRect: bestRect, cornerWidth: 6, cornerHeight: 6, transform: nil)
-                    ctx.addPath(path)
-                    ctx.fillPath()
-                    if item.badgeBorderColor != nil { ctx.strokePath() }
                 }
 
                 let textAttrs: [NSAttributedString.Key: Any] = [.font: item.font, .foregroundColor: item.textColor]
@@ -459,8 +502,8 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         ]
         let starAttrStr = NSAttributedString(string: starStr, attributes: starAttrs)
 
-        let headlineStr = "macOS Compression Pareto Benchmark"
-        let headFont = NSFont.systemFont(ofSize: 34, weight: .bold)
+        let headlineStr = title.isEmpty ? "macOS Compression Pareto Benchmark" : title
+        let headFont = NSFont.systemFont(ofSize: 32, weight: .bold)
         let headAttrs: [NSAttributedString.Key: Any] = [
             .font: headFont,
             .foregroundColor: NSColor(calibratedRed: 15/255.0, green: 23/255.0, blue: 42/255.0, alpha: 1.0)
