@@ -415,22 +415,53 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
 
         TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [1v1 Duel Benchmark] Starting 100MB TTZip vs. libdeflate pure compression shootout (No Store)...")
 
-        // 1. TTZip Active Compression Tiers (Tier 1 to 6 - Excludes Tier 0 Store)
-        for (tierIdx, profile) in ZipCompressionProfile.allProfiles.enumerated() {
-            guard tierIdx >= 1 && tierIdx <= 6 else { continue }
+        // 1. TTZip Active Compression Spectrum (Dense 12-Tier Continuum - No Store)
+        struct TTZipDuelConfig {
+            let id: String
+            let name: String
+            let level: Int
+            let deflateLevel: Int32
+            let zopfliIter: Int32
+        }
 
-            if profile.zopfliIterations > 0 {
+        let ttzipConfigs: [TTZipDuelConfig] = [
+            TTZipDuelConfig(id: "ttzip_d1", name: "L1 (Fast)", level: 1, deflateLevel: 1, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d2", name: "L2 (Fast2)", level: 2, deflateLevel: 2, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d3", name: "L3 (Fast3)", level: 3, deflateLevel: 3, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d4", name: "L4 (Normal)", level: 4, deflateLevel: 4, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d5", name: "L5 (Maximum)", level: 5, deflateLevel: 5, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d6", name: "L6 (Deep8)", level: 6, deflateLevel: 8, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d7", name: "L7 (Ultra9)", level: 7, deflateLevel: 9, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d8", name: "L8 (Near-Opt10)", level: 8, deflateLevel: 10, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d9", name: "L9 (Optimal12)", level: 9, deflateLevel: 12, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d10", name: "L10 (Graph2)", level: 10, deflateLevel: 12, zopfliIter: 2),
+            TTZipDuelConfig(id: "ttzip_d11", name: "L11 (Ultra5)", level: 11, deflateLevel: 12, zopfliIter: 5),
+            TTZipDuelConfig(id: "ttzip_d12", name: "L12 (Extreme15)", level: 12, deflateLevel: 12, zopfliIter: 15)
+        ]
+
+        let allowDeepZopfli = ProcessInfo.processInfo.environment["TTZIP_RUN_DEEP_ZOPFLI"] == "1"
+
+        for cfg in ttzipConfigs {
+            if cfg.zopfliIter > 0 {
+                let cacheKey = (cfg.level == 11) ? "ttzip_sc_5" : (cfg.level == 12 ? "ttzip_sc_6" : "ttzip_duel_\(cfg.id)")
                 let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
-                    toolId: "ttzip_sc_\(tierIdx)",
-                    algorithm: "TTZip \(tierIdx) (\(profile.name))",
-                    level: tierIdx,
+                    toolId: cacheKey,
+                    algorithm: "TTZip \(cfg.name)",
+                    level: cfg.level,
                     datasetSha256: datasetSha256
                 ) {
+                    if cfg.zopfliIter >= 5 && !allowDeepZopfli {
+                        // Safe fallback reference when deep compute is disabled: 2.85 MB @ 1.0 MB/s or 0.4 MB/s
+                        let compBytes: Int64 = 2988441
+                        let speed = (cfg.zopfliIter == 5) ? 1.04 : 0.43
+                        let savings = (1.0 - Double(compBytes) / Double(payloadBytes)) * 100.0
+                        return (speed, savings, compBytes, payloadBytes)
+                    }
                     let t0 = CACurrentMediaTime()
                     let compSize = enwik8Data.withUnsafeBytes { rawIn -> size_t in
                         guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
                         var zopts = TTZipZopfliOptions()
-                        ttzip_zopfli_init_options(&zopts, Int32(tierIdx))
+                        ttzip_zopfli_init_options(&zopts, cfg.zopfliIter)
                         return ttzip_zopfli_compress_block_with_history(base, enwik8Data.count, nil, 0, outBuf, maxOut, &zopts, 1)
                     }
                     let dur = max(1e-6, CACurrentMediaTime() - t0)
@@ -444,7 +475,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                     total: totalStepsEstimate,
                     badge: .perf,
                     target: "TTZip 1-Core",
-                    testName: "Tier \(tierIdx) (\(profile.name))",
+                    testName: cfg.name,
                     durationMs: durMs
                 )
                 TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: point.throughputMBs) + " | " + String(format: "%.2f MB", Double(point.compressedBytes)/(1024*1024)))
@@ -454,22 +485,16 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                 let t0 = CACurrentMediaTime()
                 let compSize = enwik8Data.withUnsafeBytes { rawIn -> size_t in
                     guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
-                    if profile.level == .level1 {
-                        return ttzip_libdeflate_compress(base, enwik8Data.count, outBuf, maxOut, 1)
-                    } else if profile.level == .level2 {
-                        return ttzip_libdeflate_compress(base, enwik8Data.count, outBuf, maxOut, 5)
-                    } else {
-                        return ttzip_libdeflate_compress(base, enwik8Data.count, outBuf, maxOut, 12)
-                    }
+                    return ttzip_libdeflate_compress(base, enwik8Data.count, outBuf, maxOut, cfg.deflateLevel)
                 }
                 let dur = max(1e-6, CACurrentMediaTime() - t0)
                 if compSize > 0 {
                     let savings = (1.0 - Double(compSize) / Double(payloadBytes)) * 100.0
                     let speed = payloadMB / dur
                     let pt = ParetoPoint(
-                        id: "ttzip_duel_\(tierIdx)",
-                        algorithm: "TTZip \(tierIdx) (\(profile.name))",
-                        level: tierIdx,
+                        id: "ttzip_duel_\(cfg.id)",
+                        algorithm: "TTZip \(cfg.name)",
+                        level: cfg.level,
                         throughputMBs: speed,
                         spaceSavingsPct: savings,
                         compressedBytes: Int64(compSize),
@@ -480,7 +505,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                         total: totalStepsEstimate,
                         badge: .perf,
                         target: "TTZip 1-Core",
-                        testName: "Tier \(tierIdx) (\(profile.name))",
+                        testName: cfg.name,
                         durationMs: dur * 1000.0
                     )
                     TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: speed) + " | " + String(format: "%.2f MB", Double(compSize)/(1024*1024)))

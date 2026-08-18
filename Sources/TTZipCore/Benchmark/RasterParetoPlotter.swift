@@ -164,9 +164,6 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let yFold = detectYAxisFold(speeds: allSpeeds)
         let xFold = detectXAxisFold(sizes: allSizes)
 
-        let maxDomainSize = (allSizes.last ?? 100.0) + 0.15
-        let minDomainSize = max(1.0, (allSizes.first ?? 2.8) - 0.15)
-
         func mapX(_ savingsVal: Double) -> CGFloat {
             let sizeMB = 100.0 * (1.0 - savingsVal / 100.0)
             if xFold.isFolded {
