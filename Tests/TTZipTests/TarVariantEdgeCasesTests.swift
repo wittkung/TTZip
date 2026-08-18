@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 import CryptoKit
@@ -20,7 +27,7 @@ final class TarVariantEdgeCasesTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    /// 1. 256+ 字符 Pax 超长路径测试
+    /// 1. 256+ Pax
     func testLongPath256CharsTar() async throws {
         let deepFolderNames = (0..<15).map { "long_path_subfolder_directory_name_segment_\($0)" }
         let relativeDeepPath = deepFolderNames.joined(separator: "/")
@@ -52,7 +59,7 @@ final class TarVariantEdgeCasesTests: XCTestCase {
         }
     }
     
-    /// 2. 0 字节空文件场景压测
+    /// 2. 0
     func testZeroByteEmptyFileTar() async throws {
         let emptyFile = (tempDirPath as NSString).appendingPathComponent("empty_payload.bin")
         FileManager.default.createFile(atPath: emptyFile, contents: Data())
@@ -75,7 +82,7 @@ final class TarVariantEdgeCasesTests: XCTestCase {
         }
     }
     
-    /// 3. 硬链接与软链接结构校验
+    /// Validates expected behavior and invariants.
     func testHardAndSoftLinksTar() async throws {
         let srcFile = (tempDirPath as NSString).appendingPathComponent("original.txt")
         let content = "Hard and Soft Link Test Payload Data"
@@ -102,7 +109,7 @@ final class TarVariantEdgeCasesTests: XCTestCase {
         XCTAssertEqual(extContent, content)
     }
     
-    /// 4. 损坏/截断 Tar 尾部 Recovery 测试
+    /// 4. / Tar Recovery
     func testCorruptedTarTrailingBlock() async throws {
         let validFile = (tempDirPath as NSString).appendingPathComponent("valid.txt")
         try "Valid Content Data".write(toFile: validFile, atomically: true, encoding: .utf8)
@@ -113,7 +120,7 @@ final class TarVariantEdgeCasesTests: XCTestCase {
         let normArc = (tempDirPath as NSString).appendingPathComponent("norm.tar")
         try await writer.createArchive(outputPath: normArc, format: .tar, level: .store, inputPaths: [validFile])
         
-        // 截断尾部 512 字节 zero-block 模拟损坏文件
+        // 512 zero-block
         let origData = try Data(contentsOf: URL(fileURLWithPath: normArc))
         let truncatedData = origData.prefix(max(512, origData.count - 512))
         let corruptArc = (tempDirPath as NSString).appendingPathComponent("corrupted.tar")
@@ -121,7 +128,7 @@ final class TarVariantEdgeCasesTests: XCTestCase {
         
         let outDest = (tempDirPath as NSString).appendingPathComponent("out_corrupt")
         
-        // 解压引擎不应崩溃，能提取可用块
+        // ，
         try? await extractor.extract(archivePath: corruptArc, destinationDir: outDest)
         let recoveredFile = (outDest as NSString).appendingPathComponent("valid.txt")
         if FileManager.default.fileExists(atPath: recoveredFile) {
@@ -130,7 +137,7 @@ final class TarVariantEdgeCasesTests: XCTestCase {
         }
     }
     
-    /// 5. CRC32 与 Byte-for-Byte 逐字节指纹测试
+    /// 5. CRC32 Byte-for-Byte
     func testCrc32ByteForByteVerification() async throws {
         let sampleData = Data((0..<1024*512).map { UInt8($0 % 256) })
         let sampleFile = (tempDirPath as NSString).appendingPathComponent("sample_512k.bin")

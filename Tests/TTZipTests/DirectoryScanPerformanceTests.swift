@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
-/// HyperCompressBench 跨平台目录树扫描与 VFS 元数据性能测试 (50,000 节点 <= 250ms)
+/// HyperCompressBench VFS (50,000 <= 250ms)
 final class DirectoryScanPerformanceTests: XCTestCase {
     
-    // MARK: - 1. 1,000 节点目录树快速遍历门禁 (<= 10.0 ms)
+    // MARK: - 1. 1,000 <= 10.0 ms
     
     func test1kNodesDirectoryScanPerformance() throws {
         let profile = MicroCorpusProfile(
@@ -34,7 +41,7 @@ final class DirectoryScanPerformanceTests: XCTestCase {
         #endif
     }
     
-    // MARK: - 2. 10,000 节点目录树遍历门禁 (<= 60.0 ms)
+    // MARK: - 2. 10,000 <= 60.0 ms
     
     func test10kNodesDirectoryScanPerformance() throws {
         guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] == "1" ||
@@ -69,7 +76,7 @@ final class DirectoryScanPerformanceTests: XCTestCase {
         #endif
     }
     
-    // MARK: - 3. 50,000 节点极限压力目录扫描门禁 (<= 250.0 ms, >= 200,000 items/s)
+    // MARK: - 3. 50,000 <= 250.0 ms, >= 200,000 items/s
     
     func test50kNodesDirectoryScanStressPerformance() throws {
         guard ProcessInfo.processInfo.environment["TTZIP_RUN_STRESS_BENCHMARKS"] == "1" else {

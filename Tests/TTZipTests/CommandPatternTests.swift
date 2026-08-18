@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
 @testable import TTZipCLI
 @testable import TTZipApp
 
-/// 辅助 Mock 失败命令，专门用于测试 MacroArchiveCommand 中途失败自动逆序 Rollback 机制
+/// Mock ， MacroArchiveCommand Rollback
 final class MockFailingCommand: ArchiveCommandProtocol, @unchecked Sendable {
     let commandId: String = UUID().uuidString
     let description: String = "Mock 故意失败命令"
@@ -44,7 +51,7 @@ final class MockFailingCommand: ArchiveCommandProtocol, @unchecked Sendable {
     }
 }
 
-/// 辅助 Mock Undo 抛错命令，用于测试 Rollback 聚合异常与状态恢复
+/// Mock Undo ， Rollback
 final class MockUndoFailingCommand: ArchiveCommandProtocol, @unchecked Sendable {
     let commandId: String = UUID().uuidString
     let description: String = "Mock Undo 故意抛错命令"
@@ -82,7 +89,7 @@ final class CommandPatternTests: XCTestCase {
         super.tearDown()
     }
     
-    // MARK: - 1. CompressCommand 单元测试与 Undo 恢复验证
+    // MARK: - 1. CompressCommand Undo
     
     func testCompressCommandExecutionAndUndo() async throws {
         let input1 = tempDir.appendingPathComponent("file1.txt").path
@@ -100,13 +107,13 @@ final class CommandPatternTests: XCTestCase {
         
         XCTAssertTrue(command.isUndoable)
         
-        // 1. 执行压缩
+        // 1.
         let result = try await command.execute()
         XCTAssertTrue(result.success)
         XCTAssertTrue(FileManager.default.fileExists(atPath: outZip))
         XCTAssertTrue(result.artifactsCreated.contains(outZip))
         
-        // 2. 执行撤销 Undo
+        // 2. Undo
         try await command.undo()
         XCTAssertFalse(FileManager.default.fileExists(atPath: outZip))
     }
@@ -124,19 +131,19 @@ final class CommandPatternTests: XCTestCase {
             format: .zip
         )
         
-        // 1. 执行压缩（覆盖既有文件）
+        // 1. （ ）
         let result = try await command.execute()
         XCTAssertTrue(result.success)
         XCTAssertFalse(result.backupPaths.isEmpty)
         
-        // 2. 撤销 Undo -> 恢复原始文件
+        // 2. Undo ->
         try await command.undo()
         XCTAssertTrue(FileManager.default.fileExists(atPath: outZip))
         let restoredText = try String(contentsOfFile: outZip, encoding: .utf8)
         XCTAssertEqual(restoredText, "Original Existing Content")
     }
     
-    // MARK: - 2. ExtractCommand 精准清理与安全 Undo 测试
+    // MARK: - 2. ExtractCommand Undo
     
     func testExtractCommandExecutionAndSafeUndo() async throws {
         let input1 = tempDir.appendingPathComponent("source.txt").path
@@ -145,10 +152,10 @@ final class CommandPatternTests: XCTestCase {
         
         try "Data Content".write(toFile: input1, atomically: true, encoding: .utf8)
         
-        // 先生成测试压缩包
+        // Verify expected invariant
         _ = try await TTZipEngineFacade.shared.quickCompress(inputs: [input1], outputPath: outZip)
         
-        // 模拟解压目标文件夹中原先就存在的用户文件
+        // Verify expected invariant
         try FileManager.default.createDirectory(atPath: extractDir, withIntermediateDirectories: true)
         let preExistingFile = (extractDir as NSString).appendingPathComponent("user_important_doc.txt")
         try "User Pre-existing File".write(toFile: preExistingFile, atomically: true, encoding: .utf8)
@@ -158,18 +165,18 @@ final class CommandPatternTests: XCTestCase {
             destinationDir: extractDir
         )
         
-        // 1. 执行解压
+        // 1.
         let result = try await command.execute()
         XCTAssertTrue(result.success)
         
-        // 2. 撤销 Undo -> 确保解压出来的文件被清除，而 preExistingFile 完好无损！
+        // 2. Undo -> ， preExistingFile ！
         try await command.undo()
         XCTAssertTrue(FileManager.default.fileExists(atPath: preExistingFile))
         let userDocContent = try String(contentsOfFile: preExistingFile, encoding: .utf8)
         XCTAssertEqual(userDocContent, "User Pre-existing File")
     }
     
-    // MARK: - 3. RepairCommand 单元测试
+    // MARK: - 3. RepairCommand
     
     func testRepairCommandExecutionAndUndo() async throws {
         let sourceFile = tempDir.appendingPathComponent("source.txt").path
@@ -189,7 +196,7 @@ final class CommandPatternTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: repairedFile))
     }
     
-    // MARK: - 4. MacroArchiveCommand 中途失败自动逆序 Rollback 回滚测试
+    // MARK: - 4. MacroArchiveCommand Rollback
     
     func testMacroArchiveCommandSuccessAndUndo() async throws {
         let input = tempDir.appendingPathComponent("input.txt").path
@@ -209,7 +216,7 @@ final class CommandPatternTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: zip1))
         XCTAssertTrue(FileManager.default.fileExists(atPath: zip2))
         
-        // 逆序 Undo
+        // Undo
         try await macro.undo()
         XCTAssertFalse(FileManager.default.fileExists(atPath: zip1))
         XCTAssertFalse(FileManager.default.fileExists(atPath: zip2))
@@ -231,14 +238,14 @@ final class CommandPatternTests: XCTestCase {
             XCTFail("宏命令应该在 step2 抛出异常并触发自动 Rollback")
         } catch let CommandError.macroExecutionFailed(failedIdx, _, _) {
             XCTAssertEqual(failedIdx, 1)
-            // 验证自动 Rollback 成果：step1 产生的 zip1 应该被自动物理清理摧毁！
+            // Rollback ：step1 zip1 ！
             XCTAssertFalse(FileManager.default.fileExists(atPath: zip1))
         } catch {
             XCTFail("意外捕获到了其它未知的异常: \(error)")
         }
     }
     
-    // MARK: - 5. CommandHistoryManager 双栈、LRU 与线程安全测试
+    // MARK: - 5. CommandHistoryManager 、LRU
     
     func testCommandHistoryManagerExecuteUndoRedo() async throws {
         let manager = CommandHistoryManager(maxHistoryCapacity: 10)
@@ -285,7 +292,7 @@ final class CommandPatternTests: XCTestCase {
             _ = try await manager.execute(command: cmd)
         }
         
-        // 此时栈中只能容纳最新的 3 条历史记录
+        // 3
         XCTAssertEqual(manager.undoStackCount, 3)
     }
     
@@ -310,11 +317,11 @@ final class CommandPatternTests: XCTestCase {
             }
         }
         
-        // 并发任务正常结束，未发生死锁或崩溃
+        // ，
         XCTAssertTrue(manager.undoStackCount + manager.redoStackCount <= 100)
     }
     
-    // MARK: - 6. Facade 门面与 Batch Transactional 集成测试
+    // MARK: - 6. Facade Batch Transactional
     
     func testTTZipEngineFacadeCommandIntegration() async throws {
         let facade = TTZipEngineFacade.shared
@@ -345,14 +352,14 @@ final class CommandPatternTests: XCTestCase {
         let task1 = BatchCompressTask(inputs: [input1], outputPath: out1)
         let task2 = BatchCompressTask(inputs: [input2], outputPath: out2)
         
-        // 成功情况
+        // Verify expected invariant
         let res = try await batchFacade.batchCompressTransactional(tasks: [task1, task2])
         XCTAssertTrue(res.success)
         XCTAssertTrue(FileManager.default.fileExists(atPath: out1))
         XCTAssertTrue(FileManager.default.fileExists(atPath: out2))
     }
     
-    // MARK: - 7. CommandHistoryManager 历史栈与并发通知测试
+    // MARK: - 7. CommandHistoryManager
     
     func testCommandHistoryStateAndNotifications() async throws {
         let history = CommandHistoryManager(maxHistoryCapacity: 5)
@@ -378,7 +385,7 @@ final class CommandPatternTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: outZip))
     }
     
-    // MARK: - 8. 二次深度二次巡猎（Secondary Deep Audit）专研补强测试
+    // MARK: - 8. Secondary Deep Audit
     
     func testExtractCommandPreExistingDirAndOverwrittenFilesRestoredOnUndo() async throws {
         let extractDir = tempDir.appendingPathComponent("pre_existing_extract").path
@@ -399,11 +406,11 @@ final class CommandPatternTests: XCTestCase {
         let execRes = try await command.execute()
         XCTAssertTrue(execRes.success)
         
-        // 解压后 doc.txt 被覆盖
+        // doc.txt
         let postExtractText = try String(contentsOfFile: existingFile, encoding: .utf8)
         XCTAssertEqual(postExtractText, "Overwritten Doc Content")
         
-        // 撤销 ExtractCommand -> doc.txt 必须还原为 "Original Doc Content"；untouched.txt 完好
+        // ExtractCommand -> doc.txt "Original Doc Content"；untouched.txt
         try await command.undo()
         let restoredText = try String(contentsOfFile: existingFile, encoding: .utf8)
         XCTAssertEqual(restoredText, "Original Doc Content")
@@ -422,7 +429,7 @@ final class CommandPatternTests: XCTestCase {
         _ = try await command.execute()
         XCTAssertTrue(FileManager.default.fileExists(atPath: newDestDir))
         
-        // 撤销 Undo -> 解压前原本不存在的目标根目录必须被优雅清理移除
+        // Undo ->
         try await command.undo()
         XCTAssertFalse(FileManager.default.fileExists(atPath: newDestDir))
     }
@@ -438,7 +445,7 @@ final class CommandPatternTests: XCTestCase {
         let outZip = (outputDir as NSString).appendingPathComponent("myarchive.zip")
         let splitSlice1 = (outputDir as NSString).appendingPathComponent("myarchive.z01")
         
-        // 模拟压缩前就存在同名分卷切片与主包
+        // Verify expected invariant
         try "Old Zip Main".write(toFile: outZip, atomically: true, encoding: .utf8)
         try "Old Slice 1".write(toFile: splitSlice1, atomically: true, encoding: .utf8)
         
@@ -447,14 +454,14 @@ final class CommandPatternTests: XCTestCase {
         XCTAssertTrue(execRes.success)
         XCTAssertTrue(execRes.artifactsCreated.contains(outZip))
         
-        // 模拟生成了新的分卷包切片
+        // Verify expected invariant
         let newSlice2 = (outputDir as NSString).appendingPathComponent("myarchive.z02")
         try "New Slice 2".write(toFile: newSlice2, atomically: true, encoding: .utf8)
         
-        // 执行撤销 Undo
+        // Undo
         try await command.undo()
         
-        // 验证：旧的主包与分卷切片 100% 被原样还原，新切片 newSlice2 被清除
+        // ： 100% ， newSlice2
         let restoredZip = try String(contentsOfFile: outZip, encoding: .utf8)
         let restoredSlice1 = try String(contentsOfFile: splitSlice1, encoding: .utf8)
         XCTAssertEqual(restoredZip, "Old Zip Main")
@@ -480,7 +487,7 @@ final class CommandPatternTests: XCTestCase {
             XCTFail("宏命令在 step3 必须抛错")
         } catch let CommandError.macroExecutionFailed(failedIdx, _, rollbackErrors) {
             XCTAssertEqual(failedIdx, 2)
-            // step2 undo 抛错，但 step1Success 仍被逆序 Rollback 彻底清除
+            // step2 undo ， step1Success Rollback
             XCTAssertFalse(FileManager.default.fileExists(atPath: outZip1))
             XCTAssertFalse(rollbackErrors.isEmpty)
         } catch {
@@ -506,15 +513,15 @@ final class CommandPatternTests: XCTestCase {
             }
         }
         
-        // 此时前 2 条命令（lru_bak_1, lru_bak_2）已经因为容量超限 (maxHistoryCapacity=2) 被 LRU 淘汰
-        // 验证被 LRU 淘汰的命令持有的 .bak 文件已经在磁盘上被自动清理摧毁！
+        // 2 （lru_bak_1, lru_bak_2） (maxHistoryCapacity=2) LRU
+        // LRU .bak ！
         XCTAssertFalse(fm.fileExists(atPath: backupFiles[0]))
         XCTAssertFalse(fm.fileExists(atPath: backupFiles[1]))
         
-        // 清空历史记录 clearHistory()
+        // clearHistory()
         history.clearHistory()
         
-        // 验证剩余命令的 .bak 磁盘文件也被 100% 自动物理物理清理
+        // .bak 100%
         XCTAssertFalse(fm.fileExists(atPath: backupFiles[2]))
         XCTAssertFalse(fm.fileExists(atPath: backupFiles[3]))
     }
@@ -532,18 +539,18 @@ final class CommandPatternTests: XCTestCase {
         _ = try await history.undo()
         XCTAssertTrue(history.canRedo)
         
-        // 执行一个 Mock non-undoable 命令
+        // Mock non-undoable
         let nonUndoableCmd = MockFailingCommand(shouldFailOnExecute: false)
         _ = try await history.execute(command: nonUndoableCmd)
         
-        // 验证 redoStack 已经被 100% 清空（防止历史分支混淆）
+        // redoStack 100% （ ）
         XCTAssertFalse(history.canRedo)
         XCTAssertEqual(history.redoStackCount, 0)
     }
     
-    // MARK: - 9. 第三轮终极极限界扫荡 (Round 3 Tertiary Audit Tests)
+    // MARK: - 9. Round 3 Tertiary Audit Tests
     
-    /// 1. 磁盘物理备份文件 .bak_<UUID> 零残留极限界扫荡（100+ 模拟命令并发/撤销/重做/LRU 淘汰全覆盖）
+    /// 1. .bak_<UUID> （100+ / / /LRU ）
     func testExhaustiveBakFileZeroRemnantSweep() async throws {
         let history = CommandHistoryManager(maxHistoryCapacity: 15)
         let fm = FileManager.default
@@ -553,15 +560,15 @@ final class CommandPatternTests: XCTestCase {
         let sampleSource = sweepDir.appendingPathComponent("sample_source.txt").path
         try "Original Source Payload for Bak Sweep".write(toFile: sampleSource, atomically: true, encoding: .utf8)
         
-        // 预先生成一个合法的 Zip 归档包，供解压与修复命令高效调用
+        // Zip ，
         let validZipPath = sweepDir.appendingPathComponent("valid_sample.zip").path
         _ = try await TTZipEngineFacade.shared.quickCompress(inputs: [sampleSource], outputPath: validZipPath)
         
-        // 循环执行 100+ 次覆盖式压缩/解压/修复/宏命令操作
+        // 100+ / / /
         for i in 1...105 {
             let targetPath = sweepDir.appendingPathComponent("target_\(i % 10).zip").path
             
-            // 模拟既有文件覆盖
+            // Verify expected invariant
             if !fm.fileExists(atPath: targetPath) {
                 try? fm.copyItem(atPath: validZipPath, toPath: targetPath)
             }
@@ -583,7 +590,7 @@ final class CommandPatternTests: XCTestCase {
             
             _ = try? await history.execute(command: cmd)
             
-            // 随机触发 Undo / Redo 动作
+            // Undo / Redo
             if i % 3 == 0 {
                 _ = try? await history.undo()
             } else if i % 5 == 0 {
@@ -591,10 +598,10 @@ final class CommandPatternTests: XCTestCase {
             }
         }
         
-        // 扫荡清空历史栈并摧毁所有挂载的备份
+        // Verify expected invariant
         history.clearHistory()
         
-        // 极限界扫描 temporary 目录与 sweepDir 根路径，确认 100% 0 个 .bak_<UUID> 残留
+        // temporary sweepDir ， 100% 0 .bak_<UUID>
         var leftoverBakCount = 0
         if let enumerator = fm.enumerator(atPath: tempDir.path) {
             while let item = enumerator.nextObject() as? String {
@@ -607,7 +614,7 @@ final class CommandPatternTests: XCTestCase {
         XCTAssertEqual(leftoverBakCount, 0, "扫荡发现磁盘临时目录中残留了 \(leftoverBakCount) 个 .bak_<UUID> 痕迹！")
     }
     
-    /// 2. 多线程并发 100+ 线程交叉调用 execute / undo / redo / clearHistory 线程安全验证
+    /// 2. 100+ execute / undo / redo / clearHistory
     func testCommandHistoryManagerExtremeConcurrency100Threads() async throws {
         let history = CommandHistoryManager(maxHistoryCapacity: 50)
         let threadCount = 100
@@ -637,12 +644,12 @@ final class CommandPatternTests: XCTestCase {
             }
         }
         
-        // 并发交替调度 100 个线程完成，未崩溃，栈元素受 LRU 约束且数量合法
+        // 100 ， ， LRU
         XCTAssertTrue(history.undoStackCount <= 50)
         XCTAssertTrue(history.redoStackCount <= 50)
     }
     
-    /// 3. AppViewState UI 主线程异步调度与 macOS 菜单栏 Undo/Redo 联动与防重入测试
+    /// 3. AppViewState UI macOS Undo/Redo
     @MainActor
     func testAppViewStateAsyncMainActorUndoRedoDispatch() async throws {
         let history = CommandHistoryManager(maxHistoryCapacity: 10)
@@ -660,18 +667,18 @@ final class CommandPatternTests: XCTestCase {
         XCTAssertFalse(viewState.canRedo)
         XCTAssertFalse(viewState.isLoading)
         
-        // 模拟 macOS 菜单栏连续快速点按 Cmd+Z 发送通知
+        // macOS Cmd+Z
         NotificationCenter.default.post(name: NSNotification.Name("TTZipPerformUndoNotification"), object: nil)
         NotificationCenter.default.post(name: NSNotification.Name("TTZipPerformUndoNotification"), object: nil)
         
-        // 给 MainActor 派发队列完成轮询的时间
+        // MainActor
         try? await Task.sleep(nanoseconds: 50_000_000)
         
         XCTAssertFalse(viewState.isLoading)
         XCTAssertFalse(viewState.canUndo)
         XCTAssertTrue(viewState.canRedo)
         
-        // 模拟 macOS 菜单栏点按 Cmd+Shift+Z 重做通知
+        // macOS Cmd+Shift+Z
         NotificationCenter.default.post(name: NSNotification.Name("TTZipPerformRedoNotification"), object: nil)
         try? await Task.sleep(nanoseconds: 50_000_000)
         

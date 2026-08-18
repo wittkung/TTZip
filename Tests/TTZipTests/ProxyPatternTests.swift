@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -60,14 +67,14 @@ final class ProxyPatternTests: XCTestCase {
             }
         )
         
-        // A. 基础轻量属性无延迟解析开销
+        // A.
         XCTAssertEqual(proxy.path, "documents/report.pdf")
         XCTAssertEqual(proxy.name, "report.pdf")
         XCTAssertEqual(proxy.uncompressedSize, 2048)
         XCTAssertEqual(proxy.extensionName, "pdf")
         XCTAssertFalse(proxy.isDirectory)
         
-        // 验证初始状态均为未加载
+        // Verify expected invariant
         XCTAssertFalse(proxy.isPosixLoaded)
         XCTAssertFalse(proxy.isMediaMetadataLoaded)
         XCTAssertFalse(proxy.isThumbnailLoaded)
@@ -77,7 +84,7 @@ final class ProxyPatternTests: XCTestCase {
         XCTAssertEqual(thumbCounter.count, 0)
         XCTAssertEqual(hashCounter.count, 0)
         
-        // B. 首次访问触发 POSIX 延迟加载
+        // B. POSIX
         let attrs = proxy.posixAttributes
         XCTAssertTrue(proxy.isPosixLoaded)
         XCTAssertEqual(proxy.posixPermissions, 0o755)
@@ -85,24 +92,24 @@ final class ProxyPatternTests: XCTestCase {
         XCTAssertEqual(posixCounter.count, 1)
         XCTAssertEqual(proxy.posixLoadCount, 1)
         
-        // 再次访问 POSIX 属性命中内存 memoize，不重触发解析闭包
+        // POSIX memoize，
         _ = proxy.posixAttributes
         _ = proxy.posixPermissions
         XCTAssertEqual(posixCounter.count, 1)
         
-        // C. 访问媒体元数据
+        // C.
         let media = proxy.mediaMetadata
         XCTAssertTrue(proxy.isMediaMetadataLoaded)
         XCTAssertEqual(media["PageCount"], "42")
         XCTAssertEqual(mediaCounter.count, 1)
         
-        // D. 访问缩略图数据
+        // D.
         let thumb = proxy.thumbnailData
         XCTAssertTrue(proxy.isThumbnailLoaded)
         XCTAssertNotNil(thumb)
         XCTAssertEqual(thumbCounter.count, 1)
         
-        // E. 访问 SHA-256 哈希
+        // E. SHA-256
         let hashVal = proxy.sha256Hash
         XCTAssertTrue(proxy.isHashLoaded)
         XCTAssertEqual(hashVal, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
@@ -120,7 +127,7 @@ final class ProxyPatternTests: XCTestCase {
         XCTAssertFalse(diskProxy.isMediaMetadataLoaded)
         XCTAssertFalse(diskProxy.isThumbnailLoaded)
         
-        // 触发磁盘 POSIX 与预览加载
+        // POSIX
         XCTAssertGreaterThan(diskProxy.posixAttributes.count, 0)
         XCTAssertTrue(diskProxy.isPosixLoaded)
         
@@ -141,11 +148,11 @@ final class ProxyPatternTests: XCTestCase {
         try "Hello Protection Proxy".write(to: file1, atomically: true, encoding: .utf8)
         let outZip = sandbox.fileURL(named: "protected_out.zip").path
         
-        // 启用单单元测试免费版模拟
+        // Verify expected invariant
         LicenseManager.simulateFreeTierInTests = true
         defer { LicenseManager.simulateFreeTierInTests = false }
         
-        // A. 尝试使用 Ultra 压缩级别拦截
+        // A. Ultra
         do {
             _ = try await proxy.quickCompress(
                 inputs: [file1.path],
@@ -162,7 +169,7 @@ final class ProxyPatternTests: XCTestCase {
             }
         }
         
-        // B. 尝试加密压缩拦截
+        // B.
         do {
             _ = try await proxy.quickCompress(
                 inputs: [file1.path],
@@ -189,7 +196,7 @@ final class ProxyPatternTests: XCTestCase {
         let escapePath = "../../../etc/passwd"
         let destDir = sandbox.fileURL(named: "out").path
         
-        // A. 压缩输入恶意 Escape 路径
+        // A. Escape
         do {
             _ = try await proxy.quickCompress(
                 inputs: [escapePath],
@@ -204,7 +211,7 @@ final class ProxyPatternTests: XCTestCase {
             }
         }
         
-        // B. 解压目标恶意 Escape 路径
+        // B. Escape
         do {
             _ = try await proxy.quickExtract(
                 archivePath: sandbox.fileURL(named: "test.zip").path,
@@ -219,7 +226,7 @@ final class ProxyPatternTests: XCTestCase {
             }
         }
         
-        // C. 单文件提取越权逃逸路径
+        // C.
         do {
             try await proxy.extractSingleEntry(
                 archivePath: sandbox.fileURL(named: "test.zip").path,
@@ -247,7 +254,7 @@ final class ProxyPatternTests: XCTestCase {
         let archivePath = sandbox.fileURL(named: "legit.zip").path
         let destDir = sandbox.fileURL(named: "legit_extracted").path
         
-        // 校验合法的压缩与解压请求顺利放行
+        // Verify expected invariant
         let compressRes = try await proxy.quickCompress(
             inputs: [file1.path],
             outputPath: archivePath,
@@ -280,31 +287,31 @@ final class ProxyPatternTests: XCTestCase {
             format: .zip
         )
         
-        // 1. 首次查询：Cache Miss
+        // 1. ：Cache Miss
         let firstRes = try await cacheProxy.inspectArchive(archivePath: archivePath)
         XCTAssertEqual(firstRes.entries.count, 1)
         XCTAssertEqual(cacheProxy.missCount, 1)
         XCTAssertEqual(cacheProxy.hitCount, 0)
         XCTAssertEqual(cacheProxy.cachedItemCount, 1)
         
-        // 2. 二次查询：Cache Hit 秒级返回
+        // 2. ：Cache Hit
         let secondRes = try await cacheProxy.inspectArchive(archivePath: archivePath)
         XCTAssertEqual(secondRes.entries.count, 1)
         XCTAssertEqual(cacheProxy.missCount, 1)
         XCTAssertEqual(cacheProxy.hitCount, 1)
         XCTAssertEqual(cacheProxy.hitRatio, 0.5)
         
-        // 3. 第三次查询：HitRatio 上升至 66.6%
+        // 3. ：HitRatio 66.6%
         let thirdRes = try await cacheProxy.inspectArchive(archivePath: archivePath)
         XCTAssertEqual(thirdRes.entries.count, 1)
         XCTAssertEqual(cacheProxy.hitCount, 2)
         XCTAssertEqual(cacheProxy.missCount, 1)
         
-        // 4. 手动使指定路径缓存失效
+        // 4.
         cacheProxy.invalidate(archivePath: archivePath)
         XCTAssertEqual(cacheProxy.cachedItemCount, 0)
         
-        // 5. 再次查询重新触发 Miss 并加载最新数据
+        // 5. Miss
         _ = try await cacheProxy.inspectArchive(archivePath: archivePath)
         XCTAssertEqual(cacheProxy.missCount, 2)
         XCTAssertEqual(cacheProxy.cachedItemCount, 1)
@@ -320,7 +327,7 @@ final class ProxyPatternTests: XCTestCase {
         try "Smart Proxy Concurrency and Audit Log Test".write(to: file1, atomically: true, encoding: .utf8)
         let archivePath = sandbox.fileURL(named: "smart_archive.zip").path
         
-        // 验证同步与异步通配包装 API (execute)
+        // API (execute)
         let res = try await smartProxy.execute(operationName: "customAsyncJob") { () -> Int in
             try await Task.sleep(nanoseconds: 10_000_000) // 10ms
             return 42
@@ -333,7 +340,7 @@ final class ProxyPatternTests: XCTestCase {
         XCTAssertTrue(logRecords.first?.success ?? false)
         XCTAssertGreaterThan(logRecords.first?.durationMs ?? 0, 5.0)
         
-        // 通过 SmartLoggingProxy 代理 facade 方法
+        // SmartLoggingProxy facade
         _ = try await smartProxy.quickCompress(
             inputs: [file1.path],
             outputPath: archivePath,
@@ -345,7 +352,7 @@ final class ProxyPatternTests: XCTestCase {
         XCTAssertEqual(smartProxy.activeOperationCount, 0)
     }
     
-    // MARK: - 5. Secondary Deep Audit Exhaustive Tests (二次深度寻猎测试套件)
+    // MARK: - 5. Secondary Deep Audit Exhaustive Tests
     
     func testSecurityProtectionProxyExhaustiveEscapeVariantsAndProDeadCorners() async throws {
         let proxy = SecurityProtectionProxy.shared
@@ -367,7 +374,7 @@ final class ProxyPatternTests: XCTestCase {
         for variant in escapeVariants {
             XCTAssertTrue(SecurityProtectionProxy.isPathTraversalOrEscape(variant), "路径变体 '\(variant)' 应被识别为逃逸攻击！")
             
-            // 验证在 inspectArchive 方法中被拦截
+            // inspectArchive
             do {
                 _ = try await proxy.inspectArchive(archivePath: variant)
                 XCTFail("应当拦截逃逸变体: \(variant)")
@@ -379,7 +386,7 @@ final class ProxyPatternTests: XCTestCase {
                 }
             }
             
-            // 验证在 verifyIntegrity 方法中被拦截
+            // verifyIntegrity
             do {
                 _ = try await proxy.verifyIntegrity(archivePath: variant)
                 XCTFail("应当拦截逃逸变体: \(variant)")
@@ -392,7 +399,7 @@ final class ProxyPatternTests: XCTestCase {
             }
         }
         
-        // 验证 AdvancedOptions 隐藏死角 Pro 功能拦截
+        // AdvancedOptions Pro
         LicenseManager.simulateFreeTierInTests = true
         defer { LicenseManager.simulateFreeTierInTests = false }
         
@@ -437,12 +444,12 @@ final class ProxyPatternTests: XCTestCase {
             format: .zip
         )
         
-        // 1. 首次 Inspect: Miss
+        // 1. Inspect: Miss
         _ = try await cacheProxy.inspectArchive(archivePath: archivePath)
         XCTAssertEqual(cacheProxy.missCount, 1)
         XCTAssertEqual(cacheProxy.cachedItemCount, 1)
         
-        // 2. 修改磁盘文件, 更新 mtime 与文件大小
+        // 2. , mtime
         let futureDate = Date().addingTimeInterval(5.0)
         try? FileManager.default.setAttributes([.modificationDate: futureDate], ofItemAtPath: archivePath)
         try "Modified Version 2 Content is larger".write(to: file1, atomically: true, encoding: .utf8)
@@ -452,12 +459,12 @@ final class ProxyPatternTests: XCTestCase {
             format: .zip
         )
         
-        // 3. mtime 改变后再次 Inspect: 应自动检测特征变更，触发 Miss 并清理旧失效缓存
+        // 3. mtime Inspect: ， Miss
         _ = try await cacheProxy.inspectArchive(archivePath: archivePath)
         XCTAssertEqual(cacheProxy.missCount, 2)
         XCTAssertEqual(cacheProxy.cachedItemCount, 1) // 保持 1 项，旧项被自动剔除
         
-        // 4. 测试 LRU 容量上限 (Cap = 3)
+        // 4. LRU (Cap = 3)
         var dummyZips: [String] = []
         for idx in 1...5 {
             let f = sandbox.fileURL(named: "dummy_\(idx).txt").path
@@ -471,7 +478,7 @@ final class ProxyPatternTests: XCTestCase {
             _ = try await cacheProxy.inspectArchive(archivePath: zPath)
         }
         
-        // 验证缓存总条目被精准限制在 maxCacheEntries = 3
+        // maxCacheEntries = 3
         XCTAssertEqual(cacheProxy.cachedItemCount, 3)
     }
     
@@ -491,7 +498,7 @@ final class ProxyPatternTests: XCTestCase {
             }
         )
         
-        // 派发 150 个并发 Task 抢占访问同一个 LazyProxy 的延迟属性
+        // 150 Task LazyProxy
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<150 {
                 group.addTask {
@@ -502,12 +509,12 @@ final class ProxyPatternTests: XCTestCase {
             }
         }
         
-        // 验证线程同步 memoization 闭包执行次数严格等于 2 (posix 1 次 + hash 1 次)
+        // memoization 2 (posix 1 + hash 1 )
         XCTAssertEqual(counter.count, 2)
         XCTAssertEqual(lazyProxy.posixLoadCount, 1)
         XCTAssertEqual(lazyProxy.hashLoadCount, 1)
         
-        // 测试 SmartLoggingProxy 在 150+ 高并发 Task 派发下的无锁绞死与计数正确性
+        // SmartLoggingProxy 150+ Task
         let smartProxy = SmartLoggingProxy.shared
         smartProxy.clearLogs()
         
@@ -527,10 +534,10 @@ final class ProxyPatternTests: XCTestCase {
         XCTAssertGreaterThan(smartProxy.logs.count, 0)
     }
     
-    // MARK: - 6. Round 3 Tertiary Audit Exhaustive Tests (第三轮终极极限界扫荡测试)
+    // MARK: - 6. Round 3 Tertiary Audit Exhaustive Tests
     
     func testRound3SecurityProtectionProxy4096BytePathPerformanceAndValidDoubleDots() {
-        // A. 4096 字节超长路径性能与防 ReDoS / 无栈溢出校验
+        // A. 4096 ReDoS /
         let longSegment = String(repeating: "a", count: 4000)
         let longPath = "folder/" + longSegment + "/file.txt"
         XCTAssertEqual(longPath.count, 4016)
@@ -542,14 +549,14 @@ final class ProxyPatternTests: XCTestCase {
         XCTAssertFalse(isEscape, "合法 4000 字节子路径不应被误判为逃逸攻击！")
         XCTAssertLessThan(elapsedMs, 5.0, "4096 字节路径判定必须在 5ms 内完成，实际耗时: \(elapsedMs)ms")
         
-        // B. 合法包含双点的文件名 (如 my..file.txt) 无误杀
+        // B. ( my..file.txt)
         let validDoubleDotFile = "documents/my..file.txt"
         XCTAssertFalse(SecurityProtectionProxy.isPathTraversalOrEscape(validDoubleDotFile), "合法文件名 'my..file.txt' 不应被拦截！")
         
         let validDoubleDotExt = "archive..v1.zip"
         XCTAssertFalse(SecurityProtectionProxy.isPathTraversalOrEscape(validDoubleDotExt), "合法文件名 'archive..v1.zip' 不应被拦截！")
         
-        // C. Windows 盘符与 UNC 无正则高效率匹配
+        // C. Windows UNC
         XCTAssertTrue(SecurityProtectionProxy.isPathTraversalOrEscape("C:\\Windows\\System32"))
         XCTAssertTrue(SecurityProtectionProxy.isPathTraversalOrEscape("d:/data/secret"))
         XCTAssertTrue(SecurityProtectionProxy.isPathTraversalOrEscape("//network/share"))
@@ -577,17 +584,17 @@ final class ProxyPatternTests: XCTestCase {
             }
         )
         
-        // 释放外部 tracker 引用
+        // tracker
         tracker = nil
         _ = proxy
         XCTAssertNotNil(weakTracker, "闭包尚未执行，tracker 应由闭包强引用持用")
         weakTracker = nil
         
-        // 触发延迟属性加载
+        // Verify expected invariant
         _ = proxy?.posixAttributes
         _ = proxy?.sha256Hash
         
-        // 验证执行后 Provider 闭包被设置为 nil，捕获的对象生命周期彻底解绑释放
+        // Provider nil，
         XCTAssertNil(weakTracker, "延迟加载完成后 Provider 闭包必须被置空，防止强引用内存泄露！")
         _ = proxy?.path
     }
@@ -602,7 +609,7 @@ final class ProxyPatternTests: XCTestCase {
         
         _ = try await TTZipEngineFacade.shared.quickCompress(inputs: [file1.path], outputPath: archivePath, format: .zip)
         
-        // 并发派发：Task 1 不断 write/compress 覆写同一归档，Task 2 不断 inspect 触发 Cache Read
+        // ：Task 1 write/compress ，Task 2 inspect Cache Read
         await withTaskGroup(of: Void.self) { group in
             group.addTask {
                 for i in 0..<10 {
@@ -620,11 +627,11 @@ final class ProxyPatternTests: XCTestCase {
             }
         }
         
-        // 写操作完全结束后，再次 Inspect
+        // ， Inspect
         let finalInspection = try await cacheProxy.inspectArchive(archivePath: archivePath)
         XCTAssertEqual(finalInspection.entries.count, 1)
         
-        // 验证缓存数据与磁盘文件真实元数据绝对一致
+        // Verify expected invariant
         let fileAttrs = try FileManager.default.attributesOfItem(atPath: archivePath)
         let diskModDate = fileAttrs[.modificationDate] as? Date
         let diskSize = (fileAttrs[.size] as? Int64) ?? 0

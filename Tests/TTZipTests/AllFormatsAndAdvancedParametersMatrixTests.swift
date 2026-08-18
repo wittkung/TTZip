@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
 
-/// 全格式 100% 进程内编解码与全矩阵高级参数组合深度测试套件
-/// 覆盖 16 种归档格式、各级压缩比、密码加密、固实块、分卷切片、长距离匹配 (LDM)、ZeroCopy 等全量高级选项
+/// 100%
+/// 16 、 、 、 、 、 (LDM)、ZeroCopy
 final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
 
     var tempDirPath: String!
@@ -15,7 +22,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         tempDirPath = tempDir.path
 
-        // 创建多层级测试文件集
+        // Verify expected invariant
         let subDir = (tempDirPath as NSString).appendingPathComponent("sub_folder")
         try FileManager.default.createDirectory(atPath: subDir, withIntermediateDirectories: true)
 
@@ -38,9 +45,9 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         try super.tearDownWithError()
     }
 
-    // MARK: - 1. ZIP 高级参数全矩阵组合测试
+    // MARK: - 1. ZIP
 
-    /// 组合 1: ZIP + AES-256 + UTF-8 + POSIX 属性 + Level 6 标准压缩
+    /// 1: ZIP + AES-256 + UTF-8 + POSIX + Level 6
     func testZip_AES256_UTF8_POSIX_Level6() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("zip_aes256.zip")
         let password = "SecretZipPassword#2026"
@@ -77,7 +84,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: restoredFile1))
     }
 
-    /// 组合 2: ZIP + Store (Level 0) + APFS 零拷贝 Extent 克隆
+    /// 2: ZIP + Store (Level 0) + APFS Extent
     func testZip_Store_ZeroCopy() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("zip_zerocopy.zip")
         let advOpts = ArchiveAdvancedOptions(
@@ -108,7 +115,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 组合 3: ZIP + 分卷切片 (50KB/卷) + AES-256 加密
+    /// 3: ZIP + (50KB/ ) + AES-256
     func testZip_SplitVolume_Encrypted() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("split_zip.zip")
         let password = "SplitZipPassword2026"
@@ -138,9 +145,9 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    // MARK: - 2. 7Z 高级参数全矩阵组合测试
+    // MARK: - 2. 7Z
 
-    /// 组合 4: 7Z + LZMA2 + 64MB 字典 + 固实压缩 + 标头加密 (mhe=on)
+    /// 4: 7Z + LZMA2 + 64MB + + (mhe=on)
     func testSevenZip_LZMA2_Solid_HeaderEncryption() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("7z_header_enc.7z")
         let password = "HeaderEncPassword2026"
@@ -175,7 +182,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 组合 5: 7Z + 分卷切片 (50KB/卷) + 密码
+    /// 5: 7Z + (50KB/ ) +
     func testSevenZip_SplitVolume_Password() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("split_7z.7z")
         let password = "7zSplitPassword2026"
@@ -205,9 +212,9 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    // MARK: - 3. ZSTD 高级参数全矩阵组合测试
+    // MARK: - 3. ZSTD
 
-    /// 组合 6: ZSTD + Long Distance Matching (LDM) + WindowLog 27 + Level 19 极限压缩
+    /// 6: ZSTD + Long Distance Matching (LDM) + WindowLog 27 + Level 19
     func testZstd_LDM_UltraLevel19() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("test_ldm.tar.zst")
         let advOpts = ArchiveAdvancedOptions(
@@ -241,7 +248,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 组合 7: ZSTD 极速负级别 (Level -3) 超高吞吐压缩
+    /// 7: ZSTD (Level -3)
     func testZstd_FastNegativeLevel() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("test_fast.tar.zst")
         let writer = ArchiveWriter()
@@ -259,9 +266,9 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertFalse(entries.isEmpty)
     }
 
-    // MARK: - 4. 所有 16 种格式端到端创建、探测与解压矩阵
+    // MARK: - 4. 16 、
 
-    /// 格式矩阵: Apple Archive (AAR)
+    /// : Apple Archive (AAR)
     func testFormat_AAR() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("archive.aar")
         let writer = ArchiveWriter()
@@ -278,7 +285,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: DMG 磁盘映像
+    /// : DMG
     func testFormat_DMG() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("image.dmg")
         let writer = ArchiveWriter()
@@ -295,7 +302,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: ISO 光盘映像
+    /// : ISO
     func testFormat_ISO() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("image.iso")
         let writer = ArchiveWriter()
@@ -312,7 +319,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: WIM 映像归档
+    /// : WIM
     func testFormat_WIM() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("archive.wim")
         let writer = ArchiveWriter()
@@ -329,7 +336,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: TAR (标准 POSIX 归档)
+    /// : TAR ( POSIX )
     func testFormat_TAR() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("archive.tar")
         let writer = ArchiveWriter()
@@ -346,7 +353,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: GZIP (tar.gz)
+    /// : GZIP (tar.gz)
     func testFormat_GZIP() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.gz")
         let writer = ArchiveWriter()
@@ -363,7 +370,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: BZIP2 (tar.bz2)
+    /// : BZIP2 (tar.bz2)
     func testFormat_BZIP2() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.bz2")
         let writer = ArchiveWriter()
@@ -380,7 +387,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: XZ (tar.xz)
+    /// : XZ (tar.xz)
     func testFormat_XZ() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.xz")
         let writer = ArchiveWriter()
@@ -397,7 +404,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: LZIP (tar.lz)
+    /// : LZIP (tar.lz)
     func testFormat_LZIP() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.lz")
         let writer = ArchiveWriter()
@@ -414,7 +421,7 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: LZ4 (tar.lz4)
+    /// : LZ4 (tar.lz4)
     func testFormat_LZ4() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.lz4")
         let writer = ArchiveWriter()
@@ -431,12 +438,12 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: BROTLI
+    /// : BROTLI
     func testFormat_BROTLI() async throws {
-        throw XCTSkip("BROTLI 格式解压支持完整集成，原生打包创建待外挂 libbrotli 写过滤器，跳过创建")
+        throw XCTSkip("BROTLI format decompression is fully supported, native creation requires external filter, libbrotli 写过滤器，skipping creation")
     }
 
-    /// 格式矩阵: LRZIP
+    /// : LRZIP
     func testFormat_LRZIP() async throws {
         let out = (tempDirPath as NSString).appendingPathComponent("archive.tar.lrz")
         let writer = ArchiveWriter()
@@ -453,8 +460,8 @@ final class AllFormatsAndAdvancedParametersMatrixTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: (extractDir as NSString).appendingPathComponent("doc1.txt")))
     }
 
-    /// 格式矩阵: SNAPPY
+    /// : SNAPPY
     func testFormat_SNAPPY() async throws {
-        throw XCTSkip("SNAPPY 格式解压支持完整集成，原生打包创建待外挂 libsnappy 写过滤器，跳过创建")
+        throw XCTSkip("SNAPPY format decompression is fully supported, native creation requires external filter, libsnappy 写过滤器，skipping creation")
     }
 }

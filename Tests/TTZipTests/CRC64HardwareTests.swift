@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import CTTZipBridge
 @testable import TTZipCore
@@ -7,42 +14,42 @@ private func lzma_crc64(_ buf: UnsafePointer<UInt8>?, _ size: Int, _ crc: UInt64
 
 final class CRC64HardwareTests: XCTestCase {
 
-    // MARK: - 1. 黄金测试向量与系统预言机对比测试 (Golden Test Vector & Oracle Validation)
+    // MARK: - 1. Golden Test Vector & Oracle Validation
 
     func testGoldenVectorAndDifferential() {
         let ascii9 = "123456789".data(using: .utf8)!
         let expectedXZCRC: UInt64 = 0x995DC9BBDF1939FA
 
-        // 1. 系统黄金预言机 lzma_crc64
+        // 1. lzma_crc64
         let computedLZMA = ascii9.withUnsafeBytes { raw in
             lzma_crc64(raw.baseAddress?.assumingMemoryBound(to: UInt8.self), raw.count, 0)
         }
         XCTAssertEqual(computedLZMA, expectedXZCRC, "lzma_crc64 oracle value mismatch!")
 
-        // 2. Swift Data 封装
+        // 2. Swift Data
         let computedSwift = CRC64Checksum.calculate(for: ascii9)
         XCTAssertEqual(computedSwift, expectedXZCRC, "CRC64 (Swift Data) for '123456789' mismatch!")
 
-        // 3. C 原生自动分发接口
+        // 3. C
         let computedC = ascii9.withUnsafeBytes { raw in
             ttzip_crc64(raw.baseAddress?.assumingMemoryBound(to: UInt8.self), raw.count, 0)
         }
         XCTAssertEqual(computedC, expectedXZCRC, "CRC64 (C ttzip_crc64) for '123456789' mismatch!")
 
-        // 4. PMULL 硬件加速接口
+        // 4. PMULL
         let computedPMULL = ascii9.withUnsafeBytes { raw in
             ttzip_crc64_pmull(raw.baseAddress?.assumingMemoryBound(to: UInt8.self), raw.count, 0)
         }
         XCTAssertEqual(computedPMULL, expectedXZCRC, "CRC64 (ttzip_crc64_pmull) for '123456789' mismatch!")
 
-        // 5. 标量查表接口
+        // 5.
         let computedScalar = ascii9.withUnsafeBytes { raw in
             ttzip_crc64_scalar(raw.baseAddress?.assumingMemoryBound(to: UInt8.self), raw.count, 0)
         }
         XCTAssertEqual(computedScalar, expectedXZCRC, "CRC64 (ttzip_crc64_scalar) for '123456789' mismatch!")
     }
 
-    // MARK: - 2. 零长度与边界条件确界 (Boundary & Invariant Safety)
+    // MARK: - 2. Boundary & Invariant Safety
 
     func testZeroLengthAndNull() {
         let emptyData = Data()
@@ -54,7 +61,7 @@ final class CRC64HardwareTests: XCTestCase {
         XCTAssertEqual(ttzip_crc64_scalar(nil, 0, seed), seed)
     }
 
-    // MARK: - 3. 0~256 字节穷举差分比对 (Exhaustive Differential Testing)
+    // MARK: - 3. 0~256 Exhaustive Differential Testing
 
     func testExhaustiveDifferential0To256() {
         var pattern = [UInt8](repeating: 0, count: 512)
@@ -81,7 +88,7 @@ final class CRC64HardwareTests: XCTestCase {
         }
     }
 
-    // MARK: - 4. 任意非对齐内存切片差分 (Unaligned & Multi-Slice Safety)
+    // MARK: - 4. Unaligned & Multi-Slice Safety
 
     func testUnalignedAndOffsetSlices() {
         let bufferSize = 2048
@@ -114,7 +121,7 @@ final class CRC64HardwareTests: XCTestCase {
         }
     }
 
-    // MARK: - 5. 10MB 吞吐性能门禁测试 (Throughput Performance Floor Gate)
+    // MARK: - 5. 10MB Throughput Performance Floor Gate
 
     func testThroughputPerformanceFloor() {
         let bufferSize = 10 * 1024 * 1024 // 10MB
@@ -123,7 +130,7 @@ final class CRC64HardwareTests: XCTestCase {
             testData[i] = UInt8(i & 0xFF)
         }
 
-        // 预热 (Warm-up)
+        // (Warm-up)
         testData.withUnsafeBufferPointer { bufPtr in
             _ = ttzip_crc64(bufPtr.baseAddress, bufPtr.count, 0)
         }
@@ -155,20 +162,20 @@ final class CRC64HardwareTests: XCTestCase {
         #endif
     }
 
-    // MARK: - 6. 全矩阵差分对比基准测试 (Comparative Speedup Benchmark)
+    // MARK: - 6. Comparative Speedup Benchmark
 
     func testComparativeSpeedupBenchmark() {
         let scenarios: [(name: String, size: Int, iterations: Int)] = [
-            ("64 KB 短切片", 64 * 1024, 2000),
-            ("1 MB 中等缓冲", 1 * 1024 * 1024, 500),
-            ("10 MB 标准块", 10 * 1024 * 1024, 100),
-            ("50 MB 大文件", 50 * 1024 * 1024, 20)
+            ("64 KB 短切片", 64 * 1024, TestBenchmarkTier.benchmarkIterations(default: 50, benchmark: 2000)),
+            ("1 MB 中等缓冲", 1 * 1024 * 1024, TestBenchmarkTier.benchmarkIterations(default: 10, benchmark: 500)),
+            ("10 MB 标准块", 10 * 1024 * 1024, TestBenchmarkTier.benchmarkIterations(default: 2, benchmark: 100)),
+            ("50 MB 大文件", 50 * 1024 * 1024, TestBenchmarkTier.benchmarkIterations(default: 1, benchmark: 20))
         ]
 
         print("\n=========================================================================================================")
-        print("                 TTZip ARM64 PMULL CRC64 硬件加速 vs 标量基准实测性能比对表")
+        print("                 TTZip ARM64 PMULL CRC64 硬件加速 vs Scalar基准实测性能比对表")
         print("=========================================================================================================")
-        print(String(format: "%-16@ | %-12@ | %-18@ | %-18@ | %-18@ | %-12@", "测试场景", "单次载荷", "基线 (lzma_crc64)", "标量 (Slice-by-8)", "PMULL 硬件加速", "加速比 (Speedup)"))
+        print(String(format: "%-16@ | %-12@ | %-18@ | %-18@ | %-18@ | %-12@", "Test Scenario", "Single Payload", "Baseline (lzma_crc64)", "Scalar (Slice-by-8)", "PMULL 硬件加速", "Speedup (Speedup)"))
         print("---------------------------------------------------------------------------------------------------------")
 
         for s in scenarios {
@@ -180,7 +187,7 @@ final class CRC64HardwareTests: XCTestCase {
             data.withUnsafeBufferPointer { bufPtr in
                 guard let base = bufPtr.baseAddress else { return }
 
-                // 1. 基线 lzma_crc64
+                // 1. lzma_crc64
                 _ = lzma_crc64(base, s.size, 0)
                 let t0 = CFAbsoluteTimeGetCurrent()
                 for _ in 0..<s.iterations {
@@ -189,7 +196,7 @@ final class CRC64HardwareTests: XCTestCase {
                 let elapsedLZMA = CFAbsoluteTimeGetCurrent() - t0
                 let mbLZMA = (Double(s.size * s.iterations) / (1024.0 * 1024.0)) / elapsedLZMA
 
-                // 2. 标量 Slice-by-8
+                // 2. Slice-by-8
                 _ = ttzip_crc64_scalar(base, s.size, 0)
                 let t1 = CFAbsoluteTimeGetCurrent()
                 for _ in 0..<s.iterations {
@@ -198,7 +205,7 @@ final class CRC64HardwareTests: XCTestCase {
                 let elapsedScalar = CFAbsoluteTimeGetCurrent() - t1
                 let mbScalar = (Double(s.size * s.iterations) / (1024.0 * 1024.0)) / elapsedScalar
 
-                // 3. PMULL 硬件加速
+                // 3. PMULL
                 _ = ttzip_crc64_pmull(base, s.size, 0)
                 let t2 = CFAbsoluteTimeGetCurrent()
                 for _ in 0..<s.iterations {

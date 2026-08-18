@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
-/// 专用于 ZIP 格式霸榜断言与竞品 1v1 PK 的测试用例 (调用 CompetitorBenchmarkRunner.runCompetitorMatrix)
+/// ZIP 1v1 PK ( CompetitorBenchmarkRunner.runCompetitorMatrix)
 final class ZipBenchPkTests: XCTestCase {
     
-    /// 专门测试 ZIP 格式并在 stopOnLagOrError=true 下核验霸榜与 100% 完整性
+    /// ZIP stopOnLagOrError=true 100%
     func testZipBenchPkLeaderboardAndDominance() async throws {
         guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
             throw XCTSkip("巨型 500MB 竞品 PK 跑分测试需设置 TTZIP_RUN_BENCHMARKS=1 触发，常规 swift test 自动跳过以杜绝卡主")

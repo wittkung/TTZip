@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import CryptoKit
 @testable import TTZipCore
@@ -15,7 +22,7 @@ final class NativeParallelEncryptedSplitEngineTests: XCTestCase {
             try? FileManager.default.removeItem(atPath: outputDir)
         }
         
-        // 生成 500MB 测试载荷
+        // 500MB
         let chunkSize = 50 * 1024 * 1024
         let dummyChunk = Data(repeating: 0xAB, count: chunkSize)
         FileManager.default.createFile(atPath: payloadPath, contents: nil)

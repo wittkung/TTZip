@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -19,7 +26,7 @@ final class ExhaustiveEdgeCasesTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    /// 边缘情况 1: 50 层极深嵌套目录结构打包与提取
+    /// 1: 50
     func test50LevelDeepDirectoryStructure() async throws {
         let baseDir = (tempDirPath as NSString).appendingPathComponent("root_dir")
         var currentPath = baseDir
@@ -43,7 +50,7 @@ final class ExhaustiveEdgeCasesTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: zipPath))
     }
     
-    /// 边缘情况 2: 包含 Shell 特殊转义字符的文件名 ($, ", ', ;, &, 空格)
+    /// 2: Shell ($, ", ', ;, &, )
     func testSpecialShellCharacterFilenames() async throws {
         let specialFileName = "Special file $dollars 'quotes' \"double\" &ampersand ;semicolon.txt"
         let filePath = (tempDirPath as NSString).appendingPathComponent(specialFileName)
@@ -59,7 +66,7 @@ final class ExhaustiveEdgeCasesTests: XCTestCase {
         XCTAssertFalse(entries.isEmpty)
     }
     
-    /// 边缘情况 3: 全 0x00 和全 0xFF 的极端二进制流
+    /// 3: 0x00 0xFF
     func testAllZeroAndAllFFBytes() async throws {
         let zeroFile = (tempDirPath as NSString).appendingPathComponent("all_zero.bin")
         let ffFile = (tempDirPath as NSString).appendingPathComponent("all_ff.bin")
@@ -77,7 +84,7 @@ final class ExhaustiveEdgeCasesTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: zstPath))
     }
     
-    /// 边缘情况 4: 只读文件权限 (chmod 0444)
+    /// 4: (chmod 0444)
     func testReadOnlyPermissionFiles() async throws {
         let readOnlyFile = (tempDirPath as NSString).appendingPathComponent("readonly.txt")
         try "ReadOnly Content".write(toFile: readOnlyFile, atomically: true, encoding: .utf8)
@@ -90,7 +97,7 @@ final class ExhaustiveEdgeCasesTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: zipPath))
     }
     
-    /// 边缘情况 5: 损坏的归档文件头修复
+    /// Validates expected behavior and invariants.
     func testDamagedArchiveHeaderRecovery() async throws {
         let damagedFile = (tempDirPath as NSString).appendingPathComponent("corrupted.zip")
         let corruptData = Data("NOT_A_VALID_ZIP_HEADER_DATA_STREAM_CORRUPTED_2026".utf8)

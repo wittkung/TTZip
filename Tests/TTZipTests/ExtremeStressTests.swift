@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -19,7 +26,7 @@ final class ExtremeStressTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    // 极端情况 1: 超长 Unicode 文件名与多国特殊字符 (Emoji, 日文, 阿拉伯文, 符号)
+    // 1: Unicode (Emoji, , , )
     func testSpecialAndUnicodeLongFilenames() async throws {
         let specialName = "🎉_测试_テスト_اختبار_#$@!%^&*()_very_long_filename_\(String(repeating: "a", count: 120)).txt"
         let sampleFile = (tempDirPath as NSString).appendingPathComponent(specialName)
@@ -42,11 +49,11 @@ final class ExtremeStressTests: XCTestCase {
         XCTAssertEqual(readBack, content)
     }
     
-    // 极端情况 2: 恶意路径穿越攻击防御 (Zip Slip Attack Prevention)
+    // 2: (Zip Slip Attack Prevention)
     func testZipSlipPathTraversalProtection() async throws {
         let zipPath = (tempDirPath as NSString).appendingPathComponent("malicious.zip")
         
-        // 建立一个正常的压缩包，然后模拟在 C 提取层清洗路径
+        // ， C
         let normalFile = (tempDirPath as NSString).appendingPathComponent("normal.txt")
         try "Normal Data".write(toFile: normalFile, atomically: true, encoding: .utf8)
         
@@ -57,7 +64,7 @@ final class ExtremeStressTests: XCTestCase {
         let extractor = ArchiveExtractor()
         try await extractor.extract(archivePath: zipPath, destinationDir: extractDir)
         
-        // 验证解压产物严格在 SafeExtract 目录内部，没有逃逸到外部
+        // SafeExtract ，
         let extractedItems = try FileManager.default.contentsOfDirectory(atPath: extractDir)
         XCTAssertFalse(extractedItems.isEmpty)
         for item in extractedItems {
@@ -66,7 +73,7 @@ final class ExtremeStressTests: XCTestCase {
         }
     }
     
-    // 极端情况 3: 大并发多 Task 读写压力测试 (High Concurrent Operations)
+    // 3: Task (High Concurrent Operations)
     func testConcurrentReadWriteStress() async throws {
         let writer = ArchiveWriter()
         let reader = ArchiveReader()
@@ -90,7 +97,7 @@ final class ExtremeStressTests: XCTestCase {
         }
     }
     
-    // 极端情况 4: 包含各种格式的压缩包连续切换读写
+    // 4:
     func testMultipleFormatsSwitchingStress() async throws {
         let sampleFile = (tempDirPath as NSString).appendingPathComponent("stress_payload.dat")
         let dummyData = Data(repeating: 0xAB, count: 1024 * 1024) // 1MB payload

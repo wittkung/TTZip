@@ -1,11 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import CTTZipBridge
 @testable import TTZipCore
 
-/// HyperCompressBench 小文件微型碎片批处理 Fast-Path 性能门禁测试 (500+ 文件 >= 50 MB/s Debug / >= 70 MB/s Release)
+/// HyperCompressBench Fast-Path (500+ >= 50 MB/s Debug / >= 70 MB/s Release)
 final class HyperCompressBatchGateTests: XCTestCase {
     
-    // MARK: - 1. ZIP 小文件批处理 Fast-Path 门禁
+    // MARK: - 1. ZIP Fast-Path
     
     func testHyperCompressBatchZipFastPathGate() async throws {
         let generator = HyperCompressCorpusGenerator(profile: .standardCiGate)
@@ -39,7 +46,7 @@ final class HyperCompressBatchGateTests: XCTestCase {
         #endif
     }
     
-    // MARK: - 2. TAR.ZST 小文件批处理 Fast-Path 门禁
+    // MARK: - 2. TAR.ZST Fast-Path
     
     func testHyperCompressBatchTarZstFastPathGate() async throws {
         let generator = HyperCompressCorpusGenerator(profile: .standardCiGate)
@@ -73,7 +80,7 @@ final class HyperCompressBatchGateTests: XCTestCase {
         #endif
     }
     
-    // MARK: - 3. 7Z 小文件批处理 Fast-Path 门禁
+    // MARK: - 3. 7Z Fast-Path
     
     func testHyperCompressBatch7zFastPathGate() async throws {
         let generator = HyperCompressCorpusGenerator(profile: .standardCiGate)

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 @testable import TTZipApp
@@ -23,9 +30,9 @@ final class ArchivePrototypeTests: XCTestCase {
         
         let clone = original.clone()
         
-        // 必须分配全新的 UUID
+        // UUID
         XCTAssertNotEqual(original.id, clone.id)
-        // 所有业务属性必须精确全量继承
+        // Verify expected invariant
         XCTAssertEqual(clone.name, original.name)
         XCTAssertEqual(clone.format, original.format)
         XCTAssertEqual(clone.level, original.level)
@@ -58,7 +65,7 @@ final class ArchivePrototypeTests: XCTestCase {
         XCTAssertEqual(clone.skipMacJunk, true)
         XCTAssertEqual(clone.skipGitDirectory, false)
         
-        // 验证克隆后的独立可变性，原对象不受任何副作用影响
+        // ，
         var mutableClone = clone
         mutableClone.name = "已修改名字"
         mutableClone.level = .ultra
@@ -91,11 +98,11 @@ final class ArchivePrototypeTests: XCTestCase {
             options.customIgnorePatterns.append("node_modules")
         }
         
-        // 原对象必须保持干净清洁的原生值
+        // Verify expected invariant
         XCTAssertEqual(original.skipGitDirectory, false)
         XCTAssertTrue(original.customIgnorePatterns.isEmpty)
         
-        // 变异副本必须更新对应字段
+        // Verify expected invariant
         XCTAssertEqual(mutated.skipGitDirectory, true)
         XCTAssertEqual(mutated.skipMacJunk, true)
         XCTAssertEqual(mutated.customIgnorePatterns, ["node_modules"])
@@ -118,7 +125,7 @@ final class ArchivePrototypeTests: XCTestCase {
         XCTAssertEqual(clone.zipOptions.zipEncryptionMethod, "ZipCrypto")
         XCTAssertEqual(clone.zstdOptions.zstdLevel, 19)
         
-        // 修改克隆对象的内部属性
+        // Verify expected invariant
         var modifiedClone = clone
         modifiedClone.cpuThreads = 2
         modifiedClone.sevenZipOptions.algorithm = "LZMA2"
@@ -165,13 +172,13 @@ final class ArchivePrototypeTests: XCTestCase {
         
         let clonedTree = rootTree.cloneTree()
         
-        // 树结构全面相等
+        // Verify expected invariant
         XCTAssertEqual(clonedTree, rootTree)
         XCTAssertEqual(clonedTree.children?.count, 2)
         XCTAssertEqual(clonedTree.children?[1].children?.count, 1)
         XCTAssertEqual(clonedTree.children?[1].children?[0].name, "f2.txt")
         
-        // 验证深拷贝隔离性：在克隆树上修改子节点，不破坏原始树
+        // ： ，
         var modifiedTree = clonedTree
         modifiedTree.children?[0] = ArchiveTreeNode(id: "root/new.txt", name: "new.txt", path: "root/new.txt", uncompressedSize: 999, isDirectory: false)
         

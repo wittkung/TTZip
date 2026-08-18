@@ -1,14 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
 
-/// 【Pattern 4.2 读写锁 / 线程安全缓存模式】15+ 专项测试集
+/// 【Pattern 4.2 / 】15+
 @MainActor
 public final class ReadWriteLockPatternTests: XCTestCase {
     
-    // MARK: - 1. POSIXReadWriteLock 基础并发与独占测试
+    // MARK: - 1. POSIXReadWriteLock
     
-    /// 测试 100 线程并发 Read 非阻塞吞吐
+    /// 100 Read
     public func testPOSIXReadWriteLockConcurrentReads() {
         let lock = POSIXReadWriteLock()
         let exp = expectation(description: "100 Concurrent Readers")
@@ -34,7 +41,7 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertGreaterThan(maxSimultaneousReaders.value, 1, "多个并发 Task 应能同时持有读锁，最大并发读计数应 > 1")
     }
     
-    /// 测试 Write 独占隔离：Write 期间阻塞所有 Read 与其他 Write
+    /// Write ：Write Read Write
     public func testPOSIXReadWriteLockWriteExclusivity() {
         let lock = POSIXReadWriteLock()
         let exp = expectation(description: "Write Exclusivity Test")
@@ -45,7 +52,7 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         let isWriting = AtomicBool(value: false)
         let conflictDetected = AtomicBool(value: false)
         
-        // 派发 5 个写任务与 5 个读任务
+        // 5 5
         for _ in 0..<5 {
             queue.async {
                 lock.withWriteLock {
@@ -75,7 +82,7 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertEqual(sharedState.value, 5, "最终共享状态应精确递增 5 次")
     }
     
-    /// 测试 读写锁 异常抛出与传播 (rethrows)
+    /// (rethrows)
     public func testPOSIXReadWriteLockRethrows() {
         enum TestError: Error {
             case readFailure
@@ -96,9 +103,9 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         }
     }
     
-    // MARK: - 2. ReadWriteLockCache LRU / TTL / Cost 淘汰测试
+    // MARK: - 2. ReadWriteLockCache LRU / TTL / Cost
     
-    /// 测试 LRU 容量限制淘汰：超越 maxEntries 时自动淘汰最久未访问条目
+    /// LRU ： maxEntries
     public func testCacheLRUEviction() {
         let cache = ReadWriteLockCache<String, Int>(policy: .lru(maxEntries: 3))
         
@@ -118,21 +125,21 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertEqual(cache.value(forKey: "D"), 40)
     }
     
-    /// 测试 TTL 超时失效淘汰
+    /// TTL
     public func testCacheTTLEviction() {
         let cache = ReadWriteLockCache<String, String>(policy: .ttl(seconds: 0.1))
         
         cache.setValue("Hello", forKey: "greeting")
         XCTAssertEqual(cache.value(forKey: "greeting"), "Hello")
         
-        // 睡眠 150ms 触发 TTL 超期
+        // 150ms TTL
         Thread.sleep(forTimeInterval: 0.15)
         
         XCTAssertNil(cache.value(forKey: "greeting"), "到达 TTL 超时时间后访问应自动失效返回 nil 并移除")
         XCTAssertEqual(cache.count, 0, "超期节点移除后 count 应归 0")
     }
     
-    /// 测试 Cost 内存开销上限淘汰
+    /// Cost
     public func testCacheCostEviction() {
         let cache = ReadWriteLockCache<String, String>(policy: .cost(maxTotalCost: 100))
         
@@ -140,7 +147,7 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         cache.setValue("Medium", forKey: "k2", cost: 40)
         XCTAssertEqual(cache.totalCost, 70)
         
-        // 写入开销为 50 的 Large 数据，总 Cost 变 120 > 100，触发淘汰最久未访问 key1 (30)
+        // 50 Large ， Cost 120 > 100， key1 (30)
         cache.setValue("Large", forKey: "k3", cost: 50)
         
         XCTAssertLessThanOrEqual(cache.totalCost, 100, "总 Cost 应控制在 maxTotalCost (100) 以内")
@@ -149,21 +156,21 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertEqual(cache.value(forKey: "k3"), "Large")
     }
     
-    /// 测试 更新已有 Key 的 Value 与 Cost
+    /// Key Value Cost
     public func testCacheUpdateExistingKeyCost() {
         let cache = ReadWriteLockCache<String, String>(policy: .cost(maxTotalCost: 100))
         
         cache.setValue("V1", forKey: "k1", cost: 40)
         XCTAssertEqual(cache.totalCost, 40)
         
-        // 更新 k1 的 Cost 为 80
+        // k1 Cost 80
         cache.setValue("V2", forKey: "k1", cost: 80)
         XCTAssertEqual(cache.count, 1)
         XCTAssertEqual(cache.totalCost, 80)
         XCTAssertEqual(cache.value(forKey: "k1"), "V2")
     }
     
-    /// 测试 手动移除特定 Key 缓存
+    /// Key
     public func testCacheRemoveValue() {
         let cache = ReadWriteLockCache<Int, String>(maxEntries: 10)
         
@@ -179,7 +186,7 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertEqual(cache.totalCost, 20)
     }
     
-    /// 测试 清空全部缓存 removeAll
+    /// removeAll
     public func testCacheRemoveAll() {
         let cache = ReadWriteLockCache<String, String>(maxEntries: 10)
         for i in 0..<5 {
@@ -194,9 +201,9 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertNil(cache.value(forKey: "K0"))
     }
     
-    // MARK: - 3. 100+ 高并发线程压测 (Zero Deadlock & Zero Data Race)
+    // MARK: - 3. 100+ Zero Deadlock & Zero Data Race
     
-    /// 测试 100+ 并发 Task 高频随机读写与移除压测
+    /// 100+ Task
     public func testCacheHighConcurrencyReadWriteStress() {
         let cache = ReadWriteLockCache<Int, Int>(policies: [
             .lru(maxEntries: 50),
@@ -231,9 +238,9 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertLessThanOrEqual(cache.totalCost, 500, "并发压测后，总 Cost 必须在 500 以内")
     }
     
-    // MARK: - 4. Core 代理与服务贯穿测试
+    // MARK: - 4. Core
     
-    /// 测试 ArchiveInspectionCacheProxy 接入 ReadWriteLockCache
+    /// ArchiveInspectionCacheProxy ReadWriteLockCache
     public func testArchiveInspectionCacheProxyIntegration() async throws {
         let proxy = ArchiveInspectionCacheProxy.shared
         proxy.clearCache()
@@ -247,12 +254,12 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertEqual(countBefore, 0)
         XCTAssertEqual(ratioBefore, 0.0)
         
-        // 清空缓存验证
+        // Verify expected invariant
         proxy.clearCache()
         XCTAssertEqual(proxy.cachedItemCount, 0)
     }
     
-    /// 测试 CharsetDetector 接入 ReadWriteLockCache
+    /// CharsetDetector ReadWriteLockCache
     public func testCharsetDetectorCacheIntegration() {
         CharsetDetector.clearCache()
         
@@ -269,7 +276,7 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertEqual(sanitized2, "Hello, TTZip ReadWriteLock!")
     }
     
-    /// 测试 PresetManager 接入 ReadWriteLockCache
+    /// PresetManager ReadWriteLockCache
     public func testPresetManagerCacheIntegration() {
         let manager = PresetManager.shared
         manager.resetToDefaults()
@@ -284,15 +291,15 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertEqual(fetched1?.id, first.id)
         XCTAssertEqual(fetched2?.id, first.id)
         
-        // 衍生测试
+        // Verify expected invariant
         let cloned = manager.duplicatePreset(id: first.id, newName: "Cloned Preset")
         XCTAssertNotNil(cloned)
         XCTAssertEqual(cloned?.name, "Cloned Preset")
     }
     
-    // MARK: - 5. 组合与边缘测试
+    // MARK: - 5.
     
-    /// 测试 复合淘汰策略 LRU + TTL + Cost
+    /// LRU + TTL + Cost
     public func testCacheMultipleEvictionPoliciesCombined() {
         let cache = ReadWriteLockCache<String, String>(policies: [
             .lru(maxEntries: 5),
@@ -305,14 +312,14 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertEqual(cache.count, 2)
         XCTAssertEqual(cache.totalCost, 40)
         
-        // 增加 K3 超出 totalCost (60 > 50) -> 淘汰最久未访问 K1
+        // K3 totalCost (60 > 50) -> K1
         cache.setValue("Val3", forKey: "K3", cost: 20)
         XCTAssertNil(cache.value(forKey: "K1"))
         XCTAssertEqual(cache.value(forKey: "K2"), "Val2")
         XCTAssertEqual(cache.value(forKey: "K3"), "Val3")
     }
     
-    /// 测试 compact 主动扫尾清理过期 TTL 条目
+    /// compact TTL
     public func testCacheCompactExpiredTTL() {
         let cache = ReadWriteLockCache<Int, String>(policy: .ttl(seconds: 0.1))
         
@@ -327,7 +334,7 @@ public final class ReadWriteLockPatternTests: XCTestCase {
         XCTAssertEqual(cache.count, 0, "compact 应主动扫尾清理掉所有已到期的 TTL 条目")
     }
     
-    /// 测试 边缘条件 (Cost为0, maxEntries为0, 不存在的 key)
+    /// (Cost 0, maxEntries 0, key)
     public func testCacheEdgeCases() {
         let cache = ReadWriteLockCache<String, String>(maxEntries: 0)
         cache.setValue("Zero", forKey: "K0", cost: 0)
@@ -338,7 +345,7 @@ public final class ReadWriteLockPatternTests: XCTestCase {
     }
 }
 
-// MARK: - 辅助并发计数原子类 (Atomic Helpers)
+// MARK: - Atomic Helpers
 
 private final class AtomicInt: @unchecked Sendable {
     private var _value: Int

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -20,7 +27,7 @@ final class ArchiveEngineFamilyTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    // MARK: - 工厂实例与产品族类型检测
+    // MARK: - Section Tests
     
     func testAppleSiliconAcceleratedEngineFactoryCreation() {
         let factory = AppleSiliconAcceleratedEngineFactory.shared
@@ -44,7 +51,7 @@ final class ArchiveEngineFamilyTests: XCTestCase {
         XCTAssertEqual(factory.tuner.optimalAlignedBufferSize, 64 * 1024)
     }
     
-    // MARK: - ArchiveEngineFamilyProvider 动态切换与模式控制
+    // MARK: - ArchiveEngineFamilyProvider
     
     func testEngineFamilyProviderModeSwitching() {
         let provider = ArchiveEngineFamilyProvider.shared
@@ -107,10 +114,10 @@ final class ArchiveEngineFamilyTests: XCTestCase {
         XCTAssertTrue(hasher.hardwareTuner is StandardPortableTuner)
     }
     
-    // MARK: - 端到端产品族交互测试 (End-to-End Pipeline & Family Swapping)
+    // MARK: - End-to-End Pipeline & Family Swapping
     
     func testEndToEndArchiveWorkflowWithPortableFamily() async throws {
-        // 设置全局产品族为 Standard Portable 族
+        // Standard Portable
         ArchiveEngineFamilyProvider.shared.mode = .standardPortable
         
         let srcFile = (tempDirPath as NSString).appendingPathComponent("test_portable.txt")
@@ -135,7 +142,7 @@ final class ArchiveEngineFamilyTests: XCTestCase {
         let extractedFile = (extractDir as NSString).appendingPathComponent("test_portable.txt")
         XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFile))
         
-        // 校验读取器与哈希计算器
+        // Verify expected invariant
         let reader = ArchiveEngineFactory.makeReader()
         let entries = try await reader.inspect(archivePath: archivePath)
         XCTAssertFalse(entries.isEmpty)
@@ -146,7 +153,7 @@ final class ArchiveEngineFamilyTests: XCTestCase {
     }
     
     func testEndToEndArchiveWorkflowWithAcceleratedFamily() async throws {
-        // 设置全局产品族为 Apple Silicon Accelerated 族
+        // Apple Silicon Accelerated
         ArchiveEngineFamilyProvider.shared.mode = .appleSiliconAccelerated
         
         let srcFile = (tempDirPath as NSString).appendingPathComponent("test_accelerated.txt")

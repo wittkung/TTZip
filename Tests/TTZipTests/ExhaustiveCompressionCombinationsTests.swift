@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -34,14 +41,16 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    // MARK: - 1. 调用 ExhaustiveBenchmarkRunner 物理压测全场景 (ZIP 格式 x 各级压缩 x 加密/未加密 x 零拷贝)
+    // MARK: - 1. ExhaustiveBenchmarkRunner ZIP x x / x
     func testExhaustiveZipBenchmarkRunnerScenarios() async throws {
-        let zipLevels: [ArchiveCompressionLevel] = [.store, .level1, .level6, .level9]
+        let zipLevels: [ArchiveCompressionLevel] = TestBenchmarkTier.isBenchmarkMode
+            ? [.store, .level1, .level6, .level9]
+            : [.store, .level6]
         
         TTLogger.info("\n================================================================================")
-        TTLogger.info("    📊 [TTZip Core Bench] 全场景 ZIP (不压缩/各等级 x 加密/未加密) 实时物理测算")
+        TTLogger.info("    📊 [TTZip Core Bench] Full ZIP scenarios (Store/Levels x Encrypted/Plain) empirical benchmark")
         TTLogger.info("================================================================================")
-        TTLogger.info(" 数据集                    | 格式   | 压缩等级   | 加密   | 压缩吞吐速率   | 解压吞吐速率   | 耗时(编/解码)     | 压缩体积比 | 物理完整性")
+        TTLogger.info(" Dataset                    | 格式   | Compression Level   | 加密   | Compression Throughput   | Decompression Throughput   | Elapsed Time (Enc/Dec)     | Compression Ratio | Physical Integrity")
         TTLogger.info("--------------------------------------------------------------------------------")
         
         let rows = try await ExhaustiveBenchmarkRunner.runExhaustiveMatrix(
@@ -57,16 +66,16 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
         )
         TTLogger.info("================================================================================\n")
         
-        XCTAssertGreaterThan(rows.count, 0, "物理压测结果不应为空")
+        XCTAssertGreaterThan(rows.count, 0, "Physical benchmark results must not be empty")
         for r in rows {
-            XCTAssertTrue(r.sha256Matched, "场景 [\(r.dimensionName) | L\(r.level.rawValue) | 加密:\(r.isEncrypted)] SHA256 无损校验必须 100% 匹配")
+            XCTAssertTrue(r.sha256Matched, "场景 [\(r.dimensionName) | L\(r.level.rawValue) | 加密:\(r.isEncrypted)] SHA256 lossless integrity verification must match 100%")
         }
     }
     
-    // MARK: - 2. 7z 格式全算法组合测试
+    // MARK: - 2. 7z
     func testSevenZipAllAlgorithmsAndOptions() async throws {
         let algorithms = ["LZMA2", "LZMA", "PPMd", "BZip2", "Deflate", "Copy"]
-        let dictSizes = [16, 32, 64]
+        let dictSizes = TestBenchmarkTier.isBenchmarkMode ? [16, 32, 64] : [16]
         
         for algo in algorithms {
             for dictMB in dictSizes {
@@ -95,7 +104,7 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
         }
     }
     
-    // MARK: - 3. ZIP 格式全加密与算法组合
+    // MARK: - 3. ZIP
     func testZipAllEncryptionsAndAlgorithms() async throws {
         let zipAlgos = ["Deflate", "Deflate64", "BZip2", "Store"]
         let encMethods = ["AES-256", "ZipCrypto"]

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -21,7 +28,7 @@ final class ZstdEngineTests: XCTestCase {
         let sampleContent = String(repeating: "Apple Silicon M5 Max Native Zstandard Compression Test Line 2026\n", count: 5000)
         try sampleContent.write(to: sampleFile, atomically: true, encoding: .utf8)
         
-        // 1. 测试流式压缩
+        // 1.
         let compressSuccess = try NativeZstdEngine.shared.compressFile(
             srcPath: sampleFile.path,
             dstPath: zstdFile.path,
@@ -31,7 +38,7 @@ final class ZstdEngineTests: XCTestCase {
         XCTAssertTrue(compressSuccess, "Zstd 物理压缩应当成功")
         XCTAssertTrue(FileManager.default.fileExists(atPath: zstdFile.path))
         
-        // 2. 测试 RFC 8878 帧描述符校验
+        // 2. RFC 8878
         let isValidFrame = NativeZstdEngine.shared.isValidZstdFrame(atPath: zstdFile.path)
         XCTAssertTrue(isValidFrame, "应当正确识别 RFC 8878 帧魔数")
         
@@ -39,7 +46,7 @@ final class ZstdEngineTests: XCTestCase {
         XCTAssertNotNil(descriptor)
         XCTAssertEqual(descriptor?.magicNumber, NativeZstdEngine.zstdMagicNumber)
         
-        // 3. 测试流式解压
+        // 3.
         let decompressSuccess = try NativeZstdEngine.shared.decompressFile(
             srcPath: zstdFile.path,
             dstPath: extractedFile.path

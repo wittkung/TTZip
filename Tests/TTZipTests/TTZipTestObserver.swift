@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
 
-/// 大厂级 XCTest 全局监听器：实现单测日志全自动抓取、无噪音静默与失败精准 Dump
+/// XCTest ： 、 Dump
 public final class TTZipTestObserver: NSObject, XCTestObservation, @unchecked Sendable {
     
     public static let shared = TTZipTestObserver()
@@ -11,7 +18,7 @@ public final class TTZipTestObserver: NSObject, XCTestObservation, @unchecked Se
     
     nonisolated(unsafe) private var currentTestHasFailed: Bool = false
     
-    /// 自动注册全局 XCTest 监听器
+    /// XCTest
     public static func registerObserverIfNeeded() {
         lock.lock()
         defer { lock.unlock() }
@@ -27,7 +34,7 @@ public final class TTZipTestObserver: NSObject, XCTestObservation, @unchecked Se
         currentTestHasFailed = false
         Self.lock.unlock()
         
-        // 每一个测试用例开始前，清空并开启日志抓取
+        // ，
         TTLogger.startTestCapture()
     }
     
@@ -43,10 +50,10 @@ public final class TTZipTestObserver: NSObject, XCTestObservation, @unchecked Se
         Self.lock.unlock()
         
         if hasFailed {
-            // 仅在单测断言失败时打出上下文日志
+            // Verify expected invariant
             TTLogger.dumpCapturedLogsOnFailure(testName: testCase.name)
         } else {
-            // 成功则静默清除
+            // Verify expected invariant
             TTLogger.clearTestCapture()
         }
     }

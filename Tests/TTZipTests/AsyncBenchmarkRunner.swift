@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 统一的异步性能基准度量统计指标
+/// Validates expected behavior and invariants.
 public struct BenchmarkMetrics: Sendable {
     public let name: String
     public let payloadBytes: Int64
@@ -17,10 +24,10 @@ public struct BenchmarkMetrics: Sendable {
     }
 }
 
-/// 专为 Swift Concurrency 编写的异步基准测试执行器
+/// Swift Concurrency
 public enum AsyncBenchmarkRunner {
     
-    /// 执行异步基准测试并计算统计学数据
+    /// Validates expected behavior and invariants.
     public static func measure(
         name: String,
         payloadBytes: Int64,
@@ -31,7 +38,7 @@ public enum AsyncBenchmarkRunner {
         block: @escaping (IsolatedTempSandbox) async throws -> Void
     ) async throws -> BenchmarkMetrics {
         
-        // 1. 预热运行 (Warm-up)
+        // 1. (Warm-up)
         for i in 0..<warmupIterations {
             let warmupSandbox = try IsolatedTempSandbox(prefix: "warmup_\(i)")
             try await setUp(warmupSandbox)
@@ -40,7 +47,7 @@ public enum AsyncBenchmarkRunner {
             warmupSandbox.cleanup()
         }
         
-        // 2. 正式采样运行
+        // 2.
         var durations: [Double] = []
         durations.reserveCapacity(iterations)
         var lastCompressedBytes: Int64 = 0
@@ -74,7 +81,7 @@ public enum AsyncBenchmarkRunner {
             sandbox.cleanup()
         }
         
-        // 3. 计算统计指标
+        // 3.
         durations.sort()
         let minSeconds = durations.first!
         let maxSeconds = durations.last!

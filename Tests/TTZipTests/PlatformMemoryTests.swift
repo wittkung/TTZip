@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
@@ -15,11 +22,11 @@ final class PlatformMemoryTests: XCTestCase {
             let addr = UInt(bitPattern: raw)
             XCTAssertEqual(addr % UInt(alignment), 0, "内存首地址必须满足 16KB 对齐")
             
-            // 写入测试
+            // Verify expected invariant
             raw.assumingMemoryBound(to: UInt8.self).initialize(repeating: 0x5A, count: size)
             XCTAssertEqual(raw.assumingMemoryBound(to: UInt8.self)[0], 0x5A)
             
-            // 安全物理擦除测试
+            // Verify expected invariant
             PlatformMemory.secureZero(pointer: raw, byteCount: size)
             XCTAssertEqual(raw.assumingMemoryBound(to: UInt8.self)[0], 0x00)
             XCTAssertEqual(raw.assumingMemoryBound(to: UInt8.self)[size - 1], 0x00)
@@ -40,7 +47,7 @@ final class PlatformMemoryTests: XCTestCase {
         let firstByte = mmapResult.pointer.assumingMemoryBound(to: UInt8.self).pointee
         XCTAssertEqual(firstByte, 0xEE)
         
-        // 执行解映射
+        // Verify expected invariant
         mmapResult.unmap()
     }
 }

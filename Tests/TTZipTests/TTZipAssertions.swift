@@ -1,11 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
 
-/// 对标 libarchive test_common.h 的原语级 POSIX、内存与编码高精诊断断言库
+/// libarchive test_common.h POSIX、
 public enum TTZipAssertions {
     
-    /// 断言两个二进制数据完全一致，并在失败时输出 16 字节对齐 HexDump 差分窗口与延迟上下文
+    /// ， 16 HexDump
     public static func assertDataEqual(
         _ actual: Data,
         _ expected: Data,
@@ -30,7 +37,7 @@ public enum TTZipAssertions {
         XCTFail(failureMsg, file: file, line: line)
     }
     
-    /// 断言两个字符串完全一致，并在失败时输出 Unicode 标量展开与 APFS NFD/NFC 差分分析
+    /// ， Unicode APFS NFD/NFC
     public static func assertStringEqual(
         _ actual: String,
         _ expected: String,
@@ -55,7 +62,7 @@ public enum TTZipAssertions {
         XCTFail(failureMsg, file: file, line: line)
     }
     
-    /// 断言文件内容与内存字节完全一致
+    /// Validates expected behavior and invariants.
     public static func assertFileContents(
         _ url: URL,
         expectedData: Data,
@@ -69,7 +76,7 @@ public enum TTZipAssertions {
         assertDataEqual(actualData, expectedData, message: "File: \(url.lastPathComponent)", file: file, line: line)
     }
     
-    /// 断言文件 POSIX 权限模式 (mode_t)
+    /// POSIX (mode_t)
     public static func assertFileMode(
         _ url: URL,
         expectedMode: mode_t,
@@ -85,7 +92,7 @@ public enum TTZipAssertions {
         XCTAssertEqual(actualMode, expectedMode & 0o777, "Assertion Failed: Expected mode \(String(expectedMode, radix: 8)) but got \(String(actualMode, radix: 8)) for \(url.path)", file: file, line: line)
     }
     
-    /// 断言路径为普通文件
+    /// Validates expected behavior and invariants.
     public static func assertIsReg(
         _ url: URL,
         file: StaticString = #filePath,
@@ -99,7 +106,7 @@ public enum TTZipAssertions {
         XCTAssertTrue((st.st_mode & S_IFMT) == S_IFREG, "Assertion Failed: \(url.path) is not a regular file", file: file, line: line)
     }
     
-    /// 断言路径为目录
+    /// Validates expected behavior and invariants.
     public static func assertIsDir(
         _ url: URL,
         file: StaticString = #filePath,
@@ -113,7 +120,7 @@ public enum TTZipAssertions {
         XCTAssertTrue((st.st_mode & S_IFMT) == S_IFDIR, "Assertion Failed: \(url.path) is not a directory", file: file, line: line)
     }
     
-    /// 断言两个路径为相同 inode 的硬链接 (Hardlink)
+    /// inode (Hardlink)
     public static func assertIsHardlink(
         _ urlA: URL,
         _ urlB: URL,
@@ -131,7 +138,7 @@ public enum TTZipAssertions {
         XCTAssertGreaterThanOrEqual(stA.st_nlink, 2, "Assertion Failed: Hardlink count for \(urlA.path) should be >= 2", file: file, line: line)
     }
     
-    /// 断言文件为空文件 (0 字节)
+    /// (0 )
     public static func assertEmptyFile(
         _ url: URL,
         file: StaticString = #filePath,

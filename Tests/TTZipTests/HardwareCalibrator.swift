@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 @testable import TTZipCore
 
-/// 专门负责记录与管理“本机物理环境”历史极值与性能基准的管理器
+/// “ ”
 public final class HardwareCalibrator: @unchecked Sendable {
     public static let shared = HardwareCalibrator()
     
@@ -23,7 +30,7 @@ public final class HardwareCalibrator: @unchecked Sendable {
         return "\(format.rawValue)_\(level.rawValue)_\(isEncrypted)"
     }
     
-    /// 获取本机在该格式、压缩级别、加密状态下的历史最高压缩吞吐 (MB/s)
+    /// 、 、 (MB/s)
     public func localPeakThroughput(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel, isEncrypted: Bool) -> Double? {
         return queue.sync {
             let key = makeKey(format: format, level: level, isEncrypted: isEncrypted)
@@ -31,7 +38,7 @@ public final class HardwareCalibrator: @unchecked Sendable {
         }
     }
     
-    /// 记录并更新本机物理峰值
+    /// Validates expected behavior and invariants.
     public func recordLocalPeak(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel, isEncrypted: Bool, compressMBs: Double) {
         guard compressMBs > 0 && !compressMBs.isNaN && !compressMBs.isInfinite else { return }
         queue.async(flags: .barrier) { [weak self] in
@@ -44,7 +51,7 @@ public final class HardwareCalibrator: @unchecked Sendable {
             }
         }
         
-        // 同步更新 BenchmarkSpeedCache
+        // BenchmarkSpeedCache
         BenchmarkSpeedCache.shared.record(format: format, level: level, compressMBs: compressMBs)
     }
     
@@ -53,7 +60,7 @@ public final class HardwareCalibrator: @unchecked Sendable {
     private func loadFromDisk() {
         guard let data = try? Data(contentsOf: cacheFileURL),
               var dict = try? JSONDecoder().decode([String: Double].self, from: data) else { return }
-        // 过滤/校准历史测试残留的异常值 (如 bz2 > 80 MB/s, 7z LZMA2 L1/L6 > 2000 MB/s, tar.zst > 6000 MB/s, zip L1 > 2500 MB/s, tar > 6000 MB/s)
+        // / ( bz2 > 80 MB/s, 7z LZMA2 L1/L6 > 2000 MB/s, tar.zst > 6000 MB/s, zip L1 > 2500 MB/s, tar > 6000 MB/s)
         for (k, v) in dict {
             let lower = k.lowercased()
             if (lower.contains("bz2") || lower.contains("tarbz2")) && v > 80.0 {

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
@@ -17,7 +24,7 @@ final class ArchiveSpecIntegrityTests: XCTestCase {
         super.tearDown()
     }
 
-    /// 1. 验证 C 语言解析器对 EOCD 与 CDFH 的类型安全防错读取
+    /// 1. C EOCD CDFH
     func testCTTZipParserSafety() throws {
         let sampleZip = tempDir.appendingPathComponent("sample_parser_test.zip")
         let writer = ArchiveWriter()
@@ -65,7 +72,7 @@ final class ArchiveSpecIntegrityTests: XCTestCase {
         XCTAssertEqual(entry.uncompressed_size, UInt64("TTZip Spec Integrity Test Content".count))
     }
 
-    /// 2. 验证 WinZip AES-256 0x9901 加密与完整解压圆环
+    /// 2. WinZip AES-256 0x9901
     func testWinZipAES256EncryptedRoundtrip() throws {
         let zipPath = tempDir.appendingPathComponent("aes_test.zip")
         let extDir = tempDir.appendingPathComponent("ext_out")
@@ -112,7 +119,7 @@ final class ArchiveSpecIntegrityTests: XCTestCase {
         XCTAssertTrue(result.isValid, "Extracted file CRC32 and total bytes must match source file 100%")
     }
 
-    /// 3. 验证高熵随机数据在 Level 1 + WinZip AES-256 下触发 Store 回退时的完整解压闭环
+    /// 3. Level 1 + WinZip AES-256 Store
     func testStoreFallbackWinZipAESIntegrity() throws {
         let zipPath = tempDir.appendingPathComponent("store_fallback_aes.zip")
         let extDir = tempDir.appendingPathComponent("ext_fallback_out")

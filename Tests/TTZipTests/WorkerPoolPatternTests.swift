@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -45,7 +52,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         try super.tearDownWithError()
     }
 
-    // MARK: - 1. 任务优先级枚举 Comparable 测试
+    // MARK: - 1. Comparable
 
     func testTaskPriorityComparable() {
         XCTAssertTrue(TaskPriorityLevel.critical > TaskPriorityLevel.userInitiated)
@@ -57,7 +64,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertEqual(sorted, [.background, .utility, .userInitiated, .critical])
     }
 
-    // MARK: - 2. 调度器 4 级优先级顺序出队测试
+    // MARK: - 2. 4
 
     func testTaskPriorityOrdering() {
         let dispatcher = ArchiveTaskDispatcher()
@@ -89,7 +96,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertTrue(dispatcher.isEmpty)
     }
 
-    // MARK: - 3. 调度器待处理数量与 Clear 清空测试
+    // MARK: - 3. Clear
 
     func testDispatcherPendingCountAndClear() {
         let dispatcher = ArchiveTaskDispatcher()
@@ -110,7 +117,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertEqual(dispatcher.count, 0)
     }
 
-    // MARK: - 4. 调度器指定任务取消测试
+    // MARK: - 4.
 
     func testDispatcherItemCancellation() {
         let dispatcher = ArchiveTaskDispatcher()
@@ -134,7 +141,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertNil(dispatcher.popHighestPriorityItem())
     }
 
-    // MARK: - 5. 调度器全量取消 CancelAll 测试
+    // MARK: - 5. CancelAll
 
     func testDispatcherCancelAll() {
         let dispatcher = ArchiveTaskDispatcher()
@@ -150,7 +157,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertTrue(dispatcher.isCancelled(itemID: "item_5"))
     }
 
-    // MARK: - 6. 线程并发上限压测 (maxWorkers = 3)
+    // MARK: - 6. maxWorkers = 3
 
     func testMaxWorkersConcurrencyLimit() async throws {
         let pool = ArchiveWorkerPool(maxWorkers: 3)
@@ -173,7 +180,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertLessThanOrEqual(maxObserved, 3, "实际最高并发数超过了 maxWorkers=3 的限制")
     }
 
-    // MARK: - 7. 动态线程池调优测试 (2 Workers -> 8 Workers -> 1 Worker)
+    // MARK: - 7. 2 Workers -> 8 Workers -> 1 Worker
 
     func testDynamicWorkerPoolScaling() {
         let pool = ArchiveWorkerPool(maxWorkers: 2)
@@ -188,7 +195,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         pool.shutdown()
     }
 
-    // MARK: - 8. 生命管控 Start / Pause / Resume 测试
+    // MARK: - 8. Start / Pause / Resume
 
     func testWorkerPoolLifecycleStartPauseResume() {
         let pool = ArchiveWorkerPool(maxWorkers: 2)
@@ -207,7 +214,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertEqual(pool.state, .shutdown)
     }
 
-    // MARK: - 9. 生命管控 Drain 平滑关闭测试
+    // MARK: - 9. Drain
 
     func testWorkerPoolLifecycleDrain() async throws {
         let pool = ArchiveWorkerPool(maxWorkers: 4)
@@ -226,7 +233,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertEqual(pool.state, .idle)
     }
 
-    // MARK: - 10. 生命管控 Shutdown 立即关闭测试
+    // MARK: - 10. Shutdown
 
     func testWorkerPoolLifecycleShutdown() {
         let pool = ArchiveWorkerPool(maxWorkers: 2)
@@ -243,7 +250,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertEqual(pool.pendingTaskCount, 0)
     }
 
-    // MARK: - 11. ExecuteAndAwait 异步等待结果测试
+    // MARK: - 11. ExecuteAndAwait
 
     func testExecuteAndAwaitResult() async throws {
         let pool = ArchiveWorkerPool(maxWorkers: 2)
@@ -257,7 +264,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         pool.shutdown()
     }
 
-    // MARK: - 12. 线程池特定任务取消测试
+    // MARK: - 12.
 
     func testCancelSpecificItemInPool() async throws {
         let pool = ArchiveWorkerPool(maxWorkers: 1)
@@ -280,7 +287,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         pool.shutdown()
     }
 
-    // MARK: - 13. 线程池 CancelAll 批量取消测试
+    // MARK: - 13. CancelAll
 
     func testCancelAllInPool() {
         let pool = ArchiveWorkerPool(maxWorkers: 1)
@@ -297,7 +304,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         pool.shutdown()
     }
 
-    // MARK: - 14. 100+ 高并发 Task 提交压测 (Zero Thread Explosion & Zero Deadlock)
+    // MARK: - 14. 100+ Task Zero Thread Explosion & Zero Deadlock
 
     func testHighConcurrencyStress100Tasks() async throws {
         let pool = ArchiveWorkerPool(maxWorkers: 8)
@@ -321,7 +328,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         await pool.drain()
     }
 
-    // MARK: - 15. BatchArchiveEngine 接入 ArchiveWorkerPool 调度测试
+    // MARK: - 15. BatchArchiveEngine ArchiveWorkerPool
 
     func testBatchArchiveEngineWithWorkerPool() async throws {
         let mockFacade = MockTTZipEngineFacade()
@@ -341,7 +348,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         }
     }
 
-    // MARK: - 16. PasswordRecoveryEngine 接入 WorkerPool 并发破解测试
+    // MARK: - 16. PasswordRecoveryEngine WorkerPool
 
     func testPasswordRecoveryEngineParallelWithWorkerPool() async throws {
         let dict = ["wrong1", "correct_pwd"]
@@ -369,7 +376,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertEqual(found, "correct_pwd")
     }
 
-    // MARK: - 17. FormatDiagnosticSuiteRunner 接入 WorkerPool 并发跑分测试
+    // MARK: - 17. FormatDiagnosticSuiteRunner WorkerPool
 
     func testFormatDiagnosticSuiteRunnerParallelWithWorkerPool() async throws {
         let pool = ArchiveWorkerPool(maxWorkers: 2)
@@ -384,7 +391,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertEqual(res, true)
     }
 
-    // MARK: - 18. WorkerPool 全局单例测试
+    // MARK: - 18. WorkerPool
 
     func testWorkerPoolSharedSingleton() {
         let shared = ArchiveWorkerPool.shared
@@ -392,7 +399,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(shared.maxWorkers, 1)
     }
 
-    // MARK: - 19. 动态缩容后再扩容 Worker 重新拉起并执行任务测试
+    // MARK: - 19. Worker
 
     func testDynamicScalingResuscitatesWorkers() async throws {
         let pool = ArchiveWorkerPool(maxWorkers: 4)
@@ -434,7 +441,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         XCTAssertEqual(pool.activeWorkerCount, 0)
     }
 
-    // MARK: - 20. executeAndAwait 与 concurrent cancel 竞态下无 Continuation 挂起测试
+    // MARK: - 20. executeAndAwait concurrent cancel Continuation
 
     func testConcurrentExecuteAndAwaitWithCancelRace() async throws {
         let pool = ArchiveWorkerPool(maxWorkers: 4)
@@ -468,7 +475,7 @@ final class WorkerPoolPatternTests: XCTestCase {
         await pool.drain()
     }
 
-    // MARK: - 21. Dispatcher popHighestPriorityItem 清理已出队作废 cancelledIDs 测试
+    // MARK: - 21. Dispatcher popHighestPriorityItem cancelledIDs
 
     func testCancelledIDsSetCleanupInDispatcher() {
         let dispatcher = ArchiveTaskDispatcher()

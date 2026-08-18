@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 使用 RAII 模式隔离管理测试临时目录，确保每次基准测试迭代具有完全独立且干净的物理环境
+/// RAII ，
 public final class IsolatedTempSandbox: @unchecked Sendable {
     public let url: URL
     private var isCleaned: Bool = false
@@ -15,19 +22,19 @@ public final class IsolatedTempSandbox: @unchecked Sendable {
         try FileManager.default.createDirectory(at: self.url, withIntermediateDirectories: true)
     }
     
-    /// 在沙盒内创建子目录
+    /// Validates expected behavior and invariants.
     public func createSubdirectory(_ name: String) throws -> URL {
         let subDir = url.appendingPathComponent(name)
         try FileManager.default.createDirectory(at: subDir, withIntermediateDirectories: true)
         return subDir
     }
     
-    /// 在沙盒内生成指定文件路径
+    /// Validates expected behavior and invariants.
     public func fileURL(named filename: String) -> URL {
         return url.appendingPathComponent(filename)
     }
     
-    /// 显式清理临时沙盒
+    /// Validates expected behavior and invariants.
     public func cleanup() {
         guard !isCleaned else { return }
         isCleaned = true

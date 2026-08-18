@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 @testable import TTZipApp
 
 final class FrontendPerfOptimizationTests: XCTestCase {
     
-    // MARK: - 1. ExplorerLRUCache 测试
+    // MARK: - 1. ExplorerLRUCache
     
     func testExplorerLRUCacheBasicOperations() {
         let cache = ExplorerLRUCache<String, String>(capacity: 3)
@@ -19,10 +26,10 @@ final class FrontendPerfOptimizationTests: XCTestCase {
         XCTAssertEqual(cache.get("b"), "Bravo")
         XCTAssertEqual(cache.get("c"), "Charlie")
         
-        // 访问 "a"，使其成为最近访问项。当前顺序淘汰优先级为: b -> c -> a
+        // "a"， 。 : b -> c -> a
         _ = cache.get("a")
         
-        // 插入 "d"，超出容量，应淘汰 "b"
+        // "d"， ， "b"
         cache.set("d", value: "Delta")
         XCTAssertEqual(cache.count, 3)
         XCTAssertNil(cache.get("b"))
@@ -30,12 +37,12 @@ final class FrontendPerfOptimizationTests: XCTestCase {
         XCTAssertEqual(cache.get("c"), "Charlie")
         XCTAssertEqual(cache.get("d"), "Delta")
         
-        // 测试 remove
+        // remove
         XCTAssertEqual(cache.remove("c"), "Charlie")
         XCTAssertEqual(cache.count, 2)
         XCTAssertNil(cache.get("c"))
         
-        // 测试 removeAll
+        // removeAll
         cache.removeAll()
         XCTAssertEqual(cache.count, 0)
         XCTAssertNil(cache.get("a"))
@@ -64,7 +71,7 @@ final class FrontendPerfOptimizationTests: XCTestCase {
         XCTAssertLessThanOrEqual(cache.count, 10)
     }
     
-    // MARK: - 2. ThrottledProgressPublisher 测试
+    // MARK: - 2. ThrottledProgressPublisher
     
     func testThrottledProgressPublisherGating() {
         let throttler = ThrottledProgressPublisher(maxFrequencyHz: 60.0) // 约 16.6ms 间隔
@@ -72,25 +79,25 @@ final class FrontendPerfOptimizationTests: XCTestCase {
         let t0: UInt64 = 1_000_000_000
         XCTAssertTrue(throttler.shouldEmit(now: t0), "首次调用必须放行")
         
-        // 5ms 后 (5_000_000 ns)，小于 16.6ms，应被节流
+        // 5ms (5_000_000 ns)， 16.6ms，
         let t1: UInt64 = t0 + 5_000_000
         XCTAssertFalse(throttler.shouldEmit(now: t1), "未达最小间隔应被节流")
         
-        // 20ms 后 (20_000_000 ns)，大于 16.6ms，应放行
+        // 20ms (20_000_000 ns)， 16.6ms，
         let t2: UInt64 = t0 + 20_000_000
         XCTAssertTrue(throttler.shouldEmit(now: t2), "达到最小间隔应放行")
         
-        // forceEmit 强制重置时钟
+        // forceEmit
         let t3: UInt64 = t2 + 1_000_000
         XCTAssertFalse(throttler.shouldEmit(now: t3))
         throttler.forceEmit(now: t3)
         
-        // 再次 reset
+        // reset
         throttler.reset()
         XCTAssertTrue(throttler.shouldEmit(now: t3), "reset 后首帧应放行")
     }
     
-    // MARK: - 3. ArchiveTreeStore 异步构建与 Memoization 测试
+    // MARK: - 3. ArchiveTreeStore Memoization
     
     @MainActor
     func testArchiveTreeStoreAsyncBuildAndMemoization() async {
@@ -107,7 +114,7 @@ final class FrontendPerfOptimizationTests: XCTestCase {
         
         store.updateEntries(entries)
         
-        // 等待异步后台树构建完成
+        // Verify expected invariant
         for _ in 0..<50 {
             if !store.rootNodes.isEmpty && !store.isBuildingTree {
                 break
@@ -118,18 +125,18 @@ final class FrontendPerfOptimizationTests: XCTestCase {
         XCTAssertFalse(store.rootNodes.isEmpty)
         XCTAssertEqual(store.rootNodes.count, 2) // FolderA, rootFile.txt
         
-        // 测试 Memoization: 传入相同的 entries 不应再次重置状态
+        // Memoization: entries
         let currentRoot = store.rootNodes
         store.updateEntries(entries)
         XCTAssertEqual(store.rootNodes, currentRoot)
         
-        // 测试清空
+        // Verify expected invariant
         store.clear()
         XCTAssertTrue(store.rootNodes.isEmpty)
         XCTAssertTrue(store.filteredEntries.isEmpty)
     }
     
-    // MARK: - 4. ArchiveTreeStore 搜索防抖与过滤测试
+    // MARK: - 4. ArchiveTreeStore
     
     @MainActor
     func testArchiveTreeStoreSearchFilter() async {
@@ -142,7 +149,7 @@ final class FrontendPerfOptimizationTests: XCTestCase {
         
         store.updateEntries(entries)
         
-        // 搜索 "swift"，debounceMs 设为 10ms 加速测试
+        // "swift"，debounceMs 10ms
         store.filter(query: "swift", debounceMs: 10)
         
         for _ in 0..<30 {
@@ -155,12 +162,12 @@ final class FrontendPerfOptimizationTests: XCTestCase {
         XCTAssertEqual(store.filteredEntries.count, 1)
         XCTAssertEqual(store.filteredEntries.first?.name, "Source.swift")
         
-        // 清空搜索
+        // Verify expected invariant
         store.filter(query: "", debounceMs: 0)
         XCTAssertEqual(store.filteredEntries.count, 3)
     }
     
-    // MARK: - 5. AppViewState 高频进度事件吞吐模拟测试
+    // MARK: - 5. AppViewState
     
     @MainActor
     func testAppViewStateHighFrequencyProgress() async {
@@ -180,7 +187,7 @@ final class FrontendPerfOptimizationTests: XCTestCase {
             appState.onProgressUpdated(progress)
         }
         
-        // 验证没有崩溃，并且主线程状态最终正确
+        // ，
         try? await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertGreaterThan(appState.progressValue, 0.0)
     }

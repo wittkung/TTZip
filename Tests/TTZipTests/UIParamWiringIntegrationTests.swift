@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -18,7 +25,7 @@ final class UIParamWiringIntegrationTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    /// P0-1: 验证密码加密参数打通与 Header 256-bit AES 加密保护
+    /// P0-1: Header 256-bit AES
     func testPasswordEncryptionParamWiring() async throws {
         let sampleFile = tempDirURL.appendingPathComponent("confidential.txt")
         let secretContent = "TopSecretPasswordProtectionVerification2026"
@@ -28,7 +35,7 @@ final class UIParamWiringIntegrationTests: XCTestCase {
         let password = "SuperComplexP0Password999!"
         let writer = ArchiveWriter()
         
-        // 执行带密码加密归档
+        // Verify expected invariant
         try await writer.createArchive(
             outputPath: outArchive,
             format: .sevenZip,
@@ -41,11 +48,11 @@ final class UIParamWiringIntegrationTests: XCTestCase {
         
         XCTAssertTrue(FileManager.default.fileExists(atPath: outArchive), "带有密码的压缩包未成功生成")
         
-        // 校验 1: 不传密码读取或列表时必须被判定为有密码或需要密码
+        // 1:
         let reader = ArchiveReader()
         _ = try? await reader.inspect(archivePath: outArchive)
         
-        // 校验 2: 用正解密码解压应成功，错误密码应报错
+        // 2: ，
         let extractor = ArchiveExtractor()
         let extractSuccessDir = tempDirURL.appendingPathComponent("extract_ok")
         try FileManager.default.createDirectory(at: extractSuccessDir, withIntermediateDirectories: true)
@@ -58,10 +65,10 @@ final class UIParamWiringIntegrationTests: XCTestCase {
         XCTAssertEqual(readBack, secretContent, "解压后的明文内容与原数据不一致")
     }
     
-    /// P0-2: 验证分卷切割参数打通与卷体生成逻辑
+    /// P0-2:
     func testSplitVolumeParamWiringAndVolumeGeneration() async throws {
         let payloadFile = tempDirURL.appendingPathComponent("large_data.bin")
-        // 使用伪随机数据防止被 LZMA 压缩至 1KB 以下
+        // LZMA 1KB
         var payloadData = Data(count: 3 * 1024 * 1024) // 3MB 高熵数据
         payloadData.withUnsafeMutableBytes { (buffer: UnsafeMutableRawBufferPointer) in
             guard let base = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
@@ -95,7 +102,7 @@ final class UIParamWiringIntegrationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: part2), "分卷 002 未能在指定切片参数下生成")
     }
     
-    /// P0-3: 验证实时进度回调 (Progress Handler) 与指标计算打通
+    /// P0-3: (Progress Handler)
     func testRealtimeProgressCallbackWiring() async throws {
         let sampleFile = tempDirURL.appendingPathComponent("progress_payload.bin")
         let dummyData = Data(repeating: 0x33, count: 2 * 1024 * 1024) // 2MB

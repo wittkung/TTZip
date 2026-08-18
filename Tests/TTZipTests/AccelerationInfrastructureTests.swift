@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 import CTTZipBridge
@@ -20,7 +27,7 @@ final class AccelerationInfrastructureTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    /// 1. 验证 Apple LZFSE 原生 C 硬件加速编解码
+    /// 1. Apple LZFSE C
     func testAppleLZFSERoundtrip() throws {
         XCTAssertTrue(ttzip_lzfse_is_available(), "Apple LZFSE library must be available on macOS")
         
@@ -33,12 +40,12 @@ final class AccelerationInfrastructureTests: XCTestCase {
         
         try sampleData.write(to: URL(fileURLWithPath: srcFile))
         
-        // 文件流压缩
+        // Verify expected invariant
         let compStatus = ttzip_lzfse_compress_file_stream(srcFile, compFile)
         XCTAssertEqual(compStatus, 0, "LZFSE file stream compression must return TTZIP_OK")
         XCTAssertTrue(FileManager.default.fileExists(atPath: compFile))
         
-        // 文件流解压
+        // Verify expected invariant
         let decompStatus = ttzip_lzfse_decompress_file_stream(compFile, decompFile)
         XCTAssertEqual(decompStatus, 0, "LZFSE file stream decompression must return TTZIP_OK")
         
@@ -46,7 +53,7 @@ final class AccelerationInfrastructureTests: XCTestCase {
         XCTAssertEqual(restoredText, sampleText, "LZFSE decompressed payload must match original exactly")
     }
     
-    /// 2. 验证 UnRAR 纯 C 直连引擎基础接口
+    /// 2. UnRAR C
     func testUnRAREngineAvailability() {
         let inspectRes = ttzip_unrar_inspect_entry_count("/non_existent_file.rar")
         XCTAssertEqual(inspectRes, -1, "Inspecting non-existent RAR file should return -1 gracefully")

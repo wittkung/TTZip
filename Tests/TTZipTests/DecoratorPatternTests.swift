@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -48,7 +55,7 @@ final class DecoratorPatternTests: XCTestCase {
         return path
     }
 
-    // MARK: - 1. 基础装饰器 Base Decorator Passthrough 测试
+    // MARK: - 1. Base Decorator Passthrough
 
     func testBaseArchiveOperationDecoratorPassthrough() async throws {
         let file1 = try createTestFile(filename: "decorator_base.txt", content: "Base Decorator Passthrough Test Content")
@@ -77,7 +84,7 @@ final class DecoratorPatternTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: extractDir))
     }
 
-    // MARK: - 2. EncryptionDecorator 密码加密与解密叠加测试
+    // MARK: - 2. EncryptionDecorator
 
     func testEncryptionDecoratorPassthroughAndEncryptionConfig() async throws {
         let file1 = try createTestFile(filename: "encrypted_file.txt", content: "Top Secret Decoded Content for Decorator")
@@ -104,7 +111,7 @@ final class DecoratorPatternTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: extractDir))
     }
 
-    // MARK: - 3. ProgressMonitoringDecorator 进度监控与 ETA 估算测试
+    // MARK: - 3. ProgressMonitoringDecorator ETA
 
     func testProgressMonitoringDecoratorProgressReporting() async throws {
         let file1 = try createTestFile(filename: "progress_file.txt", content: String(repeating: "Progress Decorator Payload ", count: 200))
@@ -135,7 +142,7 @@ final class DecoratorPatternTests: XCTestCase {
         XCTAssertEqual(recorder.last?.state, .completed)
     }
 
-    // MARK: - 4. SplitVolumeDecorator 分卷切片管理测试
+    // MARK: - 4. SplitVolumeDecorator
 
     func testSplitVolumeDecoratorMultiVolumeHandling() async throws {
         let file1 = try createTestFile(filename: "split_file.txt", content: "Split Volume Content")
@@ -162,7 +169,7 @@ final class DecoratorPatternTests: XCTestCase {
         XCTAssertGreaterThan(bytesExtracted, 0)
     }
 
-    // MARK: - 5. ChecksumVerificationDecorator 校验和算力校验测试
+    // MARK: - 5. ChecksumVerificationDecorator
 
     func testChecksumVerificationDecoratorHashComputation() async throws {
         let file1 = try createTestFile(filename: "checksum_file.txt", content: "Checksum Integrity Test Data Payload")
@@ -192,7 +199,7 @@ final class DecoratorPatternTests: XCTestCase {
         XCTAssertTrue(checksumDecorator.isVerified)
     }
 
-    // MARK: - 6. PerformanceMetricsDecorator 性能指标与吞吐测量测试
+    // MARK: - 6. PerformanceMetricsDecorator
 
     func testPerformanceMetricsDecoratorMeasurement() async throws {
         let file1 = try createTestFile(filename: "metrics_file.txt", content: String(repeating: "TTZip Performance Metrics Test ", count: 300))
@@ -233,7 +240,7 @@ final class DecoratorPatternTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(eMetrics.throughputMBs, 0)
     }
 
-    // MARK: - 7. 5 层装饰器链动态叠加组合测试 (Decorator Chain Composition)
+    // MARK: - 7. 5 Decorator Chain Composition
 
     func testDecoratorChainComposition() async throws {
         let file1 = try createTestFile(filename: "chain_file.txt", content: "Decorator Chain Multi-Layer Dynamic Overlay Test Content")
@@ -243,7 +250,7 @@ final class DecoratorPatternTests: XCTestCase {
         let progressCount = SafeAtomicInt64(0)
         let baseImplementor = ZipEngineBridgeImplementor()
 
-        // 5 层 Decorator Chain 自由叠加
+        // 5 Decorator Chain
         let decoratedEngine = baseImplementor
             .withEncryption(password: "ChainPwd")
             .withSplitVolume(splitVolumeSizeBytes: 10 * 1024 * 1024)
@@ -267,12 +274,12 @@ final class DecoratorPatternTests: XCTestCase {
         XCTAssertGreaterThan(bytesExtracted, 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: extractDir))
 
-        // 验证外层 Metrics 装饰器捕获到了吞吐指标
+        // Metrics
         XCTAssertNotNil(decoratedEngine.lastCompressMetrics)
         XCTAssertNotNil(decoratedEngine.lastExtractMetrics)
     }
 
-    // MARK: - 8. ArchiveEngineFactory 工厂方法集成测试
+    // MARK: - 8. ArchiveEngineFactory
 
     func testArchiveEngineFactoryMakeDecoratedImplementor() async throws {
         let file1 = try createTestFile(filename: "factory_dec_file.txt", content: "Factory Decorated Implementor Content")
@@ -303,7 +310,7 @@ final class DecoratorPatternTests: XCTestCase {
         XCTAssertGreaterThan(bytesExtracted, 0)
     }
 
-    // MARK: - 9. ArchivePipelineBuilder Builder 集成测试
+    // MARK: - 9. ArchivePipelineBuilder Builder
 
     func testArchivePipelineBuilderDecoratedImplementorIntegration() async throws {
         let file1 = try createTestFile(filename: "builder_dec_file.txt", content: "Builder Decorated Implementor Integration Content")

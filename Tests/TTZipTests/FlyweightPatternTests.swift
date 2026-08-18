@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -17,7 +24,7 @@ final class FlyweightPatternTests: XCTestCase {
         super.tearDown()
     }
     
-    // MARK: - 1. ArchiveEntryFlyweightFactory 享元池测试
+    // MARK: - 1. ArchiveEntryFlyweightFactory
     
     func testArchiveEntryFlyweightFactoryStringInterning() {
         let factory = ArchiveEntryFlyweightFactory.shared
@@ -25,7 +32,7 @@ final class FlyweightPatternTests: XCTestCase {
         let path1 = factory.internPath("node_modules/lodash/package.json")
         let path2 = factory.internPath("node_modules/lodash/package.json")
         
-        // 验证物理字符串指针引用完全一致 (Identity Match)
+        // (Identity Match)
         XCTAssertTrue((path1 as NSString) === (path2 as NSString), "享元池返回的字符串应具备完全相同的堆内存指针引用")
         
         let ext1 = factory.internExtension("json")
@@ -52,7 +59,7 @@ final class FlyweightPatternTests: XCTestCase {
         var entries: [ArchiveEntry] = []
         entries.reserveCapacity(totalCount)
         
-        // 模拟 node_modules 海量重复扩展名与相对目录前缀
+        // node_modules
         for i in 0..<totalCount {
             let path = "node_modules/react/lib/Component_\(i % 10).js"
             let entry = ArchiveEntry(path: path, uncompressedSize: 1024, isDirectory: false)
@@ -62,7 +69,7 @@ final class FlyweightPatternTests: XCTestCase {
         XCTAssertEqual(entries.count, totalCount)
         
         let counts = factory.poolCounts
-        // 10,000 个条目中，包含 10 个唯一路径、10 个唯一文件名、1 个编码，共 21 个唯一享元字符串（原为 30,000 个独立分配）
+        // 10,000 ， 10 、10 、1 ， 21 （ 30,000 ）
         XCTAssertLessThanOrEqual(counts.paths, 25)
         XCTAssertEqual(counts.extensions, 28) // 包含预热的 28 个常用扩展名
         
@@ -87,7 +94,7 @@ final class FlyweightPatternTests: XCTestCase {
         XCTAssertLessThanOrEqual(counts.paths, 20)
     }
     
-    // MARK: - 2. ByteCountFormatterFlyweight 享元池测试
+    // MARK: - 2. ByteCountFormatterFlyweight
     
     func testByteCountFormatterFlyweightQuantizationAndHitRatio() {
         let flyweight = ByteCountFormatterFlyweight.shared
@@ -105,7 +112,7 @@ final class FlyweightPatternTests: XCTestCase {
         let q2 = flyweight.quantizedString(fromByteCount: 10_520_000)
         XCTAssertEqual(q1, q2, "64KB 块量化格式化文本应收敛为同一个享元字符串")
         
-        // 验证 ByteCountFormatterCache 向后兼容代理
+        // ByteCountFormatterCache
         let legacyFormatted = ByteCountFormatterCache.string(fromByteCount: 1_048_576)
         XCTAssertEqual(legacyFormatted, size1)
     }
@@ -122,7 +129,7 @@ final class FlyweightPatternTests: XCTestCase {
         XCTAssertGreaterThan(flyweight.hitCount, 1000)
     }
     
-    // MARK: - 3. MemoryPageFlyweightPool 享元池测试
+    // MARK: - 3. MemoryPageFlyweightPool
     
     func testMemoryPageFlyweightPoolBorrowAndReturn() {
         let pool = MemoryPageFlyweightPool.shared
@@ -139,7 +146,7 @@ final class FlyweightPatternTests: XCTestCase {
         XCTAssertEqual(stats.returnCount, 1)
         XCTAssertGreaterThanOrEqual(stats.borrowCount, 1)
         
-        // 再次借用，应复用同一个物理 page 指针
+        // ， page
         let b64_reused = pool.borrowBuffer(size: .page64K)
         XCTAssertEqual(b64.pointer, b64_reused.pointer, "归还后的页 Buffer 享元应在下次借用时被优先零分配复用")
         pool.returnBuffer(b64_reused)
@@ -175,7 +182,7 @@ final class FlyweightPatternTests: XCTestCase {
         XCTAssertGreaterThan(stats.reuseRatio, 0.80, "高并发借还场景下页 Buffer 的复用率应超过 80%")
     }
     
-    // MARK: - 4. 架构整合验证 (ArchiveComponent, ArchiveTreeNode)
+    // MARK: - 4. ArchiveComponent, ArchiveTreeNode
     
     func testFullArchitectureFlyweightIntegration() {
         let leaf = ArchiveLeafFile(name: "index.js", path: "node_modules/express/index.js", sizeBytes: 2048)
@@ -201,7 +208,7 @@ final class FlyweightPatternTests: XCTestCase {
         XCTAssertEqual(entry.directoryPrefix, "node_modules/express/")
     }
     
-    // MARK: - 5. 二次深度排查与容量/内存压力释放测试 (Secondary Deep Audit Tests)
+    // MARK: - 5. / Secondary Deep Audit Tests
     
     func testArchiveEntryFlyweightFactoryCapacityLimitAndAutoPurge() {
         let factory = ArchiveEntryFlyweightFactory.shared
@@ -215,7 +222,7 @@ final class FlyweightPatternTests: XCTestCase {
             _ = factory.internPath("unique/path/file_\(i).txt")
         }
         
-        // 验证容量超限时自动触发清空与重置，防止无限扩张
+        // ，
         XCTAssertLessThanOrEqual(factory.poolCounts.paths, 50, "路径池容量超限时应自动实施上限截断")
         
         factory.clearPool()
@@ -227,7 +234,7 @@ final class FlyweightPatternTests: XCTestCase {
         let flyweight = ByteCountFormatterFlyweight.shared
         flyweight.clearPool()
         
-        // 高并发死锁/数据竞态压测
+        // /
         DispatchQueue.concurrentPerform(iterations: 1_000) { idx in
             let bytes = Int64(idx * 1337)
             _ = flyweight.string(fromByteCount: bytes)
@@ -248,7 +255,7 @@ final class FlyweightPatternTests: XCTestCase {
         pool.returnBuffer(buffer)
         
         let statsBefore = pool.poolStats
-        // 再次重复归还同一个 buffer 享元 (防御性代码校验)
+        // buffer ( )
         pool.returnBuffer(buffer)
         let statsAfter = pool.poolStats
         

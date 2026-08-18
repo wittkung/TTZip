@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import CTTZipBridge
 @testable import TTZipCore
 
-/// 验证 APFS 零拷贝技术架构在生产环境中的可逆性、CRC32 校验与降级能力
+/// APFS 、CRC32
 final class ZipStoreZeroCopyTests: XCTestCase {
 
     func testApfsZeroCopyArchitecture() throws {
@@ -16,7 +23,7 @@ final class ZipStoreZeroCopyTests: XCTestCase {
 
         let outArchive = tempDir.appendingPathComponent("test_store_zerocopy.zip")
 
-        // 1. 测试显式开启零拷贝模式
+        // 1.
         let success = try ZipStoreStreamWriter.shared.createStoreArchive(
             outputPath: outArchive.path,
             inputPaths: [sampleFile.path],
@@ -26,7 +33,7 @@ final class ZipStoreZeroCopyTests: XCTestCase {
         XCTAssertTrue(success, "APFS 零拷贝归档打包应执行成功")
         XCTAssertTrue(FileManager.default.fileExists(atPath: outArchive.path))
 
-        // 2. 验证生成的 ZIP 文件可以通过标准解压引擎完全还原
+        // 2. ZIP
         let extractDir = tempDir.appendingPathComponent("extracted")
         try FileManager.default.createDirectory(at: extractDir, withIntermediateDirectories: true)
 
@@ -51,7 +58,7 @@ final class ZipStoreZeroCopyTests: XCTestCase {
 
         let outArchive = tempDir.appendingPathComponent("test_store_physical.zip")
 
-        // 2. 测试默认物理写盘（不使用零拷贝）
+        // 2. （ ）
         let success = try ZipStoreStreamWriter.shared.createStoreArchive(
             outputPath: outArchive.path,
             inputPaths: [sampleFile.path],

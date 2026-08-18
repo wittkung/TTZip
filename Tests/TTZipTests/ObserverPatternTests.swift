@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 @testable import TTZipApp
@@ -67,7 +74,7 @@ final class MockCancellationObserver: TaskCancellationObserverProtocol, @uncheck
     }
 }
 
-/// 【3.2 观察者模式 (Observer Pattern)】单元测试套件 (`ObserverPatternTests`)
+/// 【3.2 (Observer Pattern)】 (`ObserverPatternTests`)
 final class ObserverPatternTests: XCTestCase {
     
     override func setUp() {
@@ -84,7 +91,7 @@ final class ObserverPatternTests: XCTestCase {
         super.tearDown()
     }
     
-    // MARK: - 1. 弱引用与自动销毁验证 (WeakObserver Retain Cycle & Memory Leak Defense)
+    // MARK: - 1. WeakObserver Retain Cycle & Memory Leak Defense
     
     func testWeakObserverAutoDeallocationInBroadcaster() {
         let broadcaster = ArchiveProgressBroadcaster.shared
@@ -98,7 +105,7 @@ final class ObserverPatternTests: XCTestCase {
             XCTAssertEqual(observer.receivedCount, 1)
         }
         
-        // 观察者实例已被出作用域销毁，再次广播触发自动清理
+        // ，
         broadcaster.broadcastProgress(ArchiveProgressInfo(bytesProcessed: 100, totalBytes: 100))
         XCTAssertEqual(broadcaster.observerCount, 0, "WeakObserver 包装器必须自动发现 nil 并从集合中剔除，消除泄露隐患")
     }
@@ -119,7 +126,7 @@ final class ObserverPatternTests: XCTestCase {
         XCTAssertEqual(center.observerCount, 0, "EventCenter 的弱引用包装器必须自动解构并释放归零")
     }
     
-    // MARK: - 2. 高并发广播与线程安全测试 (High Concurrency Thread Safety)
+    // MARK: - 2. High Concurrency Thread Safety
     
     func testHighConcurrencyBroadcasterThreadSafety() {
         let broadcaster = ArchiveProgressBroadcaster.shared
@@ -161,7 +168,7 @@ final class ObserverPatternTests: XCTestCase {
         XCTAssertEqual(result, .success, "EventCenter 在并发并发派发事件与注销时必须通过 NSLock 保护")
     }
     
-    // MARK: - 3. 订阅、事件过滤与取消感知验证
+    // MARK: - 3. 、
     
     func testEventFilteringInArchiveEventCenter() {
         let center = ArchiveEventCenter.shared
@@ -203,12 +210,12 @@ final class ObserverPatternTests: XCTestCase {
             XCTAssertEqual(center.registeredObserverTaskCount, 1)
         }
         
-        // 观察者已出作用域销毁，调用 prune 清理
+        // ， prune
         center.prune()
         XCTAssertEqual(center.observerCount(forTask: taskId), 0)
         XCTAssertEqual(center.registeredObserverTaskCount, 0, "自动剪枝机制必须清空失效 taskId 字典键")
         
-        // 测试 finishTask
+        // finishTask
         center.registerTask("Task_Finish_100")
         XCTAssertFalse(center.isTaskCancelled("Task_Finish_100"))
         center.finishTask("Task_Finish_100")
@@ -233,14 +240,14 @@ final class ObserverPatternTests: XCTestCase {
         XCTAssertEqual(mockObs.receivedCount, 1, "指定自定义队列分发的观察者应在目标队列收到通知")
     }
     
-    // MARK: - 4. 吞吐率 (MB/s) 与 ETA 0 字节防除零、NaN 与 Infinity 极界安全
+    // MARK: - 4. MB/s ETA 0 、NaN Infinity
     
     func testZeroDivisionThroughputAndETABoundary() {
         // 1. totalBytes == 0
         let zeroProgress = ArchiveProgressInfo(bytesProcessed: 0, totalBytes: 0, throughputMBs: 0.0)
         XCTAssertEqual(zeroProgress.fractionCompleted, 0.0, "totalBytes == 0 时 fractionCompleted 必须为 0.0，防止除零")
         
-        // 2. NaN 与 Infinity 防御
+        // 2. NaN Infinity
         let nanInfo = ArchiveProgressInfo(
             bytesProcessed: -50,
             totalBytes: -100,
@@ -252,7 +259,7 @@ final class ObserverPatternTests: XCTestCase {
         XCTAssertEqual(nanInfo.throughputMBs, 0.0, "NaN 吞吐率必须兜底归零")
         XCTAssertNil(nanInfo.estimatedTimeRemaining, "Infinity ETA 必须兜底为 nil")
         
-        // 3. BatchProgressInfo 极界
+        // 3. BatchProgressInfo
         let nanBatch = BatchProgressInfo(
             completedTasks: -1,
             totalTasks: 0,
@@ -275,7 +282,7 @@ final class ObserverPatternTests: XCTestCase {
         XCTAssertNil(invalidETA3, "吞吐率为 NaN 时 ETA 必须返回 nil")
     }
     
-    // MARK: - 5. 端到端解耦集成测试 (Engine Facade & Batch Integration)
+    // MARK: - 5. Engine Facade & Batch Integration
     
     func testEngineFacadeAndBatchFacadeBroadcastIntegration() async throws {
         let broadcaster = ArchiveProgressBroadcaster.shared
@@ -307,7 +314,7 @@ final class ObserverPatternTests: XCTestCase {
         XCTAssertTrue(mockEventObs.receivedEvents.contains { $0.eventType == .archiveCompleted }, "quickCompress 结束时必须发布 archiveCompleted 事件")
     }
     
-    // MARK: - 6. 【第三轮终极极限界扫荡 (Round 3 Tertiary Audit)】
+    // MARK: - 6. 【 Round 3 Tertiary Audit 】
     
     func testRound31000PlusObserversHighFrequencyGCDDispatchAndLifecycleZeroLeak() {
         let broadcaster = ArchiveProgressBroadcaster.shared
@@ -351,7 +358,7 @@ final class ObserverPatternTests: XCTestCase {
             XCTAssertEqual(eventCenter.observerCount, observerCountPerBatch)
             XCTAssertEqual(cancellationCenter.observerCount(forTask: taskId), observerCountPerBatch)
             
-            // 高频广播与事件派发
+            // Verify expected invariant
             let dispatchGroup = DispatchGroup()
             for i in 0..<50 {
                 dispatchGroup.enter()
@@ -363,19 +370,19 @@ final class ObserverPatternTests: XCTestCase {
             }
             _ = dispatchGroup.wait(timeout: .now() + 5.0)
             
-            // 确认数组尚存强引用
+            // Verify expected invariant
             XCTAssertEqual(progressObservers.count, observerCountPerBatch)
             XCTAssertEqual(eventObservers.count, observerCountPerBatch)
             XCTAssertEqual(cancelObservers.count, observerCountPerBatch)
         }
         
-        // 出作用域后，所有 observer 实例已被 ARC 释放。触发一次广播清理弱引用
+        // ， observer ARC 。
         broadcaster.broadcastProgress(ArchiveProgressInfo(bytesProcessed: 1000, totalBytes: 1000))
         eventCenter.postPresetChanged(oldPresetName: "A", newPresetName: "B")
         cancellationCenter.cancelTask(taskId)
         cancellationCenter.finishTask(taskId)
         
-        // 验证 100% 零强引用残存与零野指针残存
+        // 100%
         XCTAssertEqual(broadcaster.observerCount, 0, "出作用域后 1000+ 观察者必须达到 100% 零强引用残存")
         XCTAssertEqual(eventCenter.observerCount, 0, "出作用域后 1000+ 事件观察者必须达到 100% 零残存")
         XCTAssertEqual(cancellationCenter.registeredObserverTaskCount, 0, "finishTask 清理后 taskId 映射必须 100% 归零")
@@ -433,7 +440,7 @@ final class ObserverPatternTests: XCTestCase {
         eventCenter.addObserver(obs, forEvents: [.archiveCompleted])
         XCTAssertEqual(eventCenter.observerCount, 1)
         
-        // 重新注册并更新 filter 事件与 queue
+        // filter queue
         eventCenter.addObserver(obs, forEvents: [.presetChanged], dispatchQueue: customQueue)
         XCTAssertEqual(eventCenter.observerCount, 1, "重新注册观察者不得重复追加，必须更新现有订阅结构")
         

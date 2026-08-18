@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import CryptoKit
 @testable import TTZipCore
@@ -52,7 +59,7 @@ final class SilesiaCorpusIntegrityTests: XCTestCase {
             XCTAssertEqual(fileSize, item.size, "File '\(item.name)' size mismatch: expected \(item.size), got \(fileSize)")
             totalLoadedBytes += fileSize
             
-            // 零拷贝映射计算 SHA-256
+            // SHA-256
             let data = try SilesiaFixtureLoader.mappedData(named: item.name)
             let digest = SHA256.hash(data: data)
             let hexDigest = digest.map { String(format: "%02x", $0) }.joined()

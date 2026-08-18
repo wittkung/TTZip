@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -27,7 +34,7 @@ final class ArchiveIntegrityTests: XCTestCase {
         let checker = ArchiveIntegrityChecker()
         let crc = checker.computeCRC32(filePath: sampleFile)
         
-        // "123456789" 的标准 CRC32 校验和为 CBF43926
+        // "123456789" CRC32 CBF43926
         XCTAssertEqual(crc, "CBF43926")
     }
     

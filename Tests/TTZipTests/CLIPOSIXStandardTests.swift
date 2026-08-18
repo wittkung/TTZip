@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
 final class CLIPOSIXStandardTests: XCTestCase {
     
-    // MARK: - 1. POSIX 参数解析器规范测试
+    // MARK: - 1. POSIX
     
     func testPOSIXLongOptionsAndInlineValues() {
         let args = ["archive", "out.tar.zst", "src/", "--format=tar.zst", "--level=3", "--dry-run", "--json", "--threads=8", "--lang=zh-Hans"]
@@ -118,7 +125,7 @@ final class CLIPOSIXStandardTests: XCTestCase {
         XCTAssertTrue(res4.options.flattenPaths)
     }
     
-    // MARK: - 2. POSIX Sysexits 退出代码测试
+    // MARK: - 2. POSIX Sysexits
     
     func testSysexitsStandardCodes() {
         XCTAssertEqual(CLIExitCode.ok.rawValue, 0)
@@ -133,7 +140,7 @@ final class CLIPOSIXStandardTests: XCTestCase {
         XCTAssertEqual(CLIExitCode.sigint.rawValue, 130)
     }
     
-    // MARK: - 3. 流式管道与规范生成器测试
+    // MARK: - 3.
     
     func testStreamPipeIdentification() {
         XCTAssertTrue(StreamPipeAdapter.isStandardStream("-"))

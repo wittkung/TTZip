@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
 final class TestTierClassificationTests: XCTestCase {
     
-    // MARK: - 1. 测试分层定义与排序测试
+    // MARK: - 1.
     
     func testTestTierEnumAndOrdering() {
         XCTAssertEqual(TestTier.allCases.count, 6)
@@ -22,7 +29,7 @@ final class TestTierClassificationTests: XCTestCase {
         }
     }
     
-    // MARK: - 2. 测试报告模型与 JSON 序列化测试
+    // MARK: - 2. JSON
     
     func testTestSessionReportJSONSerialization() {
         let cases = [
@@ -42,7 +49,7 @@ final class TestTierClassificationTests: XCTestCase {
         XCTAssertTrue(json.contains("\"testB\""))
     }
     
-    // MARK: - 3. JUnit XML 报告构建与转义测试
+    // MARK: - 3. JUnit XML
     
     func testJUnitXMLReportBuilder() {
         let cases = [

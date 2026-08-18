@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -16,7 +23,7 @@ final class CharsetDetectorTests: XCTestCase {
     }
     
     func testGBKChineseCharsetDetection() {
-        // "你好测试文件.txt" 在 GBK 编码下的字节序列 (16 bytes)
+        // " .txt" GBK (16 bytes)
         let gbkString = "你好测试文件.txt"
         let gbkEncoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
         let data = gbkString.data(using: gbkEncoding)!

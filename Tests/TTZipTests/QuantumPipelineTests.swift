@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
 final class QuantumPipelineTests: XCTestCase {
     
     func testQuantumRLEFastCompressAndDecompress() throws {
-        // 100KB 全 0 重复字节数据
+        // 100KB 0
         let count = 100 * 1024
         let sample = Data(repeating: 0x41, count: count)
         
@@ -39,7 +46,7 @@ final class QuantumPipelineTests: XCTestCase {
     }
     
     func testQuantumEntropyFilter() throws {
-        // 纯低熵数据
+        // Verify expected invariant
         let lowEntropyText = String(repeating: "AAAAAAABBBBBBBCCCCCCC", count: 100).data(using: .utf8)!
         let lowEntropy = lowEntropyText.withUnsafeBytes { ptr in
             QuantumPipelineAccelerator.shared.estimateEntropy(buffer: ptr.baseAddress!, length: lowEntropyText.count)

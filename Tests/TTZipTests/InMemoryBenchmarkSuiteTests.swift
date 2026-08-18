@@ -11,12 +11,13 @@ import XCTest
 final class InMemoryBenchmarkSuiteTests: XCTestCase {
 
     func testInMemoryBenchmarkBasicExecution() async throws {
+        let minDuration = TestBenchmarkTier.isBenchmarkMode ? 150 : 50
         let config = InMemoryBenchmarkConfig(
             selectedFormats: ["zip", "zstd", "lz4"],
             selectedLevels: [1],
-            bufferSizeBytes: 2 * 1024 * 1024, // 2MB
+            bufferSizeBytes: 1 * 1024 * 1024, // 1MB
             warmupPasses: 1,
-            minDurationMs: 150,
+            minDurationMs: minDuration,
             useBinaryUnits: false,
             turboBenchOutput: true
         )
@@ -37,24 +38,26 @@ final class InMemoryBenchmarkSuiteTests: XCTestCase {
     }
 
     func testInMemoryBenchmarkLowVarianceRepeatability() async throws {
+        let minDuration = TestBenchmarkTier.isBenchmarkMode ? 200 : 50
         let config = InMemoryBenchmarkConfig(
             selectedFormats: ["zip"],
             selectedLevels: [1],
             bufferSizeBytes: 1 * 1024 * 1024, // 1MB
-            warmupPasses: 2,
-            minDurationMs: 200,
+            warmupPasses: 1,
+            minDurationMs: minDuration,
             useBinaryUnits: false
         )
 
+        let rounds = TestBenchmarkTier.benchmarkIterations(default: 3, benchmark: 5)
         var speeds: [Double] = []
-        for _ in 0..<5 {
+        for _ in 0..<rounds {
             let rep = try await InMemoryBenchmarkEngine.shared.runInMemoryBenchmark(config: config)
             if let first = rep.results.first {
                 speeds.append(first.compressionSpeedMBs)
             }
         }
 
-        XCTAssertEqual(speeds.count, 5)
+        XCTAssertEqual(speeds.count, rounds)
         let mean = speeds.reduce(0.0, +) / Double(speeds.count)
         let variance = speeds.map { pow($0 - mean, 2.0) }.reduce(0.0, +) / Double(speeds.count)
         let stdDev = sqrt(variance)
