@@ -20,11 +20,28 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
     
     private init() {}
     
+    /// Creates a ZIP archive using multi-core block parallelism for large files with a strong-typed profile.
+    public func createExtremeArchive(
+        outputPath: String,
+        inputPath: String,
+        profile: ZipCompressionProfile,
+        blockSize: Int = 0
+    ) throws -> Bool {
+        return try createExtremeArchive(
+            outputPath: outputPath,
+            inputPath: inputPath,
+            level: profile.level,
+            customProfile: profile,
+            blockSize: blockSize
+        )
+    }
+
     /// Creates a ZIP archive using multi-core block parallelism for large files.
     public func createExtremeArchive(
         outputPath: String,
         inputPath: String,
         level: ArchiveCompressionLevel = .fastest,
+        customProfile: ZipCompressionProfile? = nil,
         blockSize: Int = 0 // 0 = 基于香农熵与硬件缓存自适应推导
     ) throws -> Bool {
         let fileManager = FileManager.default
@@ -39,6 +56,8 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         let rawData = try Data(contentsOf: URL(fileURLWithPath: inputPath), options: .alwaysMapped)
         let uncompressedBytes = Int64(rawData.count)
         
+        let activeProfile = customProfile ?? level.zipProfile
+        
         // 0. 香农熵与试探可压缩性快速探测 (Microsecond SIMD Prober)
         var entropyVal: Double = 0.0
         var estimatedRatio: Double = 1.0
@@ -47,7 +66,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
             return Int32(ttzip_probe_entropy_and_compressibility(baseAddr, rawData.count, 4096, &entropyVal, &estimatedRatio))
         }
         
-        let isDirectStore = (routingMethod == 0)
+        let isDirectStore = (routingMethod == 0 || activeProfile.deflateLevel == 0 || level == .store)
         let compressionMethod: UInt16 = isDirectStore ? 0 : 8
         
         // 1. 计算全局 CRC-32 (使用 Apple NEON SIMD 硬件指令)
@@ -64,31 +83,9 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
             compressedPayload = rawData
             totalCompressedBytes = uncompressedBytes
         } else {
-            // 超级压缩档位 (Level 12 / Ultra Ratio): 启用 18 核并发图论最短路径穷举搜索 (97.0%+ 极限压缩比)
-            if level.rawValue == 12 {
-                let pigzPath = "/opt/homebrew/bin/pigz"
-                if FileManager.default.fileExists(atPath: pigzPath) {
-                    let p = Process()
-                    p.executableURL = URL(fileURLWithPath: pigzPath)
-                    p.arguments = ["-K", "-11", "-p", "18", "-q", "-c", inputPath]
-                    let pipe = Pipe()
-                    p.standardOutput = pipe
-                    do {
-                        try p.run()
-                        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                        p.waitUntilExit()
-                        if data.count > 0 {
-                            try data.write(to: URL(fileURLWithPath: outputPath))
-                            return true
-                        }
-                    } catch {}
-                }
-            }
-
-            let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : 262144
+            let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : max(4 * 1024 * 1024, (rawData.count + 15) / 16)
             let actualBlockSize = min(rawData.count, max(65536, baseBlockSize))
             let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
-            let libdeflateLevel = Int32(min(12, max(1, level.rawValue)))
             
             let maxChunkOut = actualBlockSize + 512
             let totalOutputSlab = UnsafeMutablePointer<UInt8>.allocate(capacity: totalBlocks * maxChunkOut)
@@ -110,30 +107,27 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                     let offset = blockIdx * actualBlockSize
                     let currentChunkSize = min(actualBlockSize, ptrBox.size - offset)
                     let chunkPtr = ptrBox.pointer.advanced(by: offset)
-                    let isFinal = (blockIdx == totalBlocks - 1)
-                    
-                    let dictPtr: UnsafePointer<UInt8>?
-                    let dictSize: Int
-                    if offset > 0 {
-                        let overlap = min(32768, offset)
-                        dictPtr = ptrBox.pointer.advanced(by: offset - overlap)
-                        dictSize = overlap
-                    } else {
-                        dictPtr = nil
-                        dictSize = 0
-                    }
-                    
                     let outBuf = slabBox.pointer.advanced(by: blockIdx * maxChunkOut)
                     
-                    let compSize = ttzip_raw_deflate_block_compress_with_dict(
+                    let historyPtr: UnsafePointer<UInt8>? = (blockIdx > 0 && offset >= 32768) ? ptrBox.pointer.advanced(by: offset - 32768) : ((blockIdx > 0) ? ptrBox.pointer : nil)
+                    let historySize: Int = (blockIdx > 0) ? min(32768, offset) : 0
+                    
+                    var options = TTZipZopfliOptions(
+                        compression_level: activeProfile.deflateLevel,
+                        num_iterations: activeProfile.zopfliIterations,
+                        block_splitting: activeProfile.blockSplitting ? 1 : 0,
+                        max_block_splits: activeProfile.maxBlockSplits,
+                        early_exit_threshold: activeProfile.earlyExitThreshold
+                    )
+                    
+                    let compSize = ttzip_zopfli_compress_block_with_history(
                         chunkPtr,
                         currentChunkSize,
-                        dictPtr,
-                        dictSize,
+                        historyPtr,
+                        historySize,
                         outBuf,
                         maxChunkOut,
-                        libdeflateLevel,
-                        isFinal
+                        &options
                     )
                     
                     if compSize > 0 && compSize < currentChunkSize {

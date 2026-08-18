@@ -219,7 +219,9 @@ public enum ArchiveCompressionFormat: String, Sendable, CaseIterable, Codable {
         switch self {
         case .tar, .dmg, .iso, .aar:
             return [.store]
-        case .sevenZip, .zip, .zst, .tarZst, .gz, .tarGz, .bz2, .tarBz2, .xz, .tarXz, .lzip, .lz4, .brotli, .lrzip, .snappy, .wim:
+        case .zip:
+            return [.store, .level1, .level2, .level3, .level4, .level5, .level6, .level7]
+        case .sevenZip, .zst, .tarZst, .gz, .tarGz, .bz2, .tarBz2, .xz, .tarXz, .lzip, .lz4, .brotli, .lrzip, .snappy, .wim:
             return [.store, .level1, .level6, .level9]
         }
     }
@@ -315,6 +317,16 @@ public enum ArchiveCompressionLevel: Int, Sendable, CaseIterable, Identifiable, 
     public init(levelInt: Int) {
         let clamped = max(-5, min(22, levelInt))
         self = ArchiveCompressionLevel(rawValue: clamped) ?? .level6
+    }
+    
+    /// 获取该压缩级别在 ZIP 格式下的强类型物理配置 Profile
+    public var zipProfile: ZipCompressionProfile {
+        return ZipCompressionProfile.profile(for: self)
+    }
+
+    /// 将通用压缩级别透明映射至底层 Deflate 引擎的原生物理等级
+    public var effectiveZipRawLevel: Int32 {
+        return zipProfile.deflateLevel
     }
     
     /// Measured relative throughput percentage (100% is peak).

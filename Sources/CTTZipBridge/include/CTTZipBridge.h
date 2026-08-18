@@ -54,6 +54,8 @@
 #include "CTTZipHeuristicTuner.h"
 #include "CTTZipPluginRegistry.h"
 #include "CTTZipBitGroom.h"
+#include "ttzip_blosclz.h"
+#include "ttzip_context_pool.h"
 
 #ifdef __cplusplus
 

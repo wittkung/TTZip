@@ -13,10 +13,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/stat.h>
+#include <stdbool.h>
+#include <sys/types.h>
 #include <sys/sysctl.h>
+#include <dispatch/dispatch.h>
 #include <sys/mman.h>
 #include <dirent.h>
 #include <archive.h>
@@ -34,10 +34,9 @@
 // MARK: - Castagnoli CRC32C Engine with ARM64 ACLE & Slice-by-8 Fallback
 
 static uint32_t s_crc32c_table[8][256];
-static bool s_crc32c_table_initialized = false;
+static dispatch_once_t s_crc32c_once;
 
-static void init_crc32c_slice8_table(void) {
-    if (s_crc32c_table_initialized) return;
+static void init_crc32c_slice8_table_impl(void) {
     const uint32_t poly = 0x82F63B78U; // Castagnoli reflected polynomial
     for (uint32_t i = 0; i < 256; i++) {
         uint32_t crc = i;
@@ -53,7 +52,12 @@ static void init_crc32c_slice8_table(void) {
             s_crc32c_table[j][i] = crc;
         }
     }
-    s_crc32c_table_initialized = true;
+}
+
+static void init_crc32c_slice8_table(void) {
+    dispatch_once(&s_crc32c_once, ^{
+        init_crc32c_slice8_table_impl();
+    });
 }
 
 static bool has_arm64_crc32_hardware(void) {

@@ -320,12 +320,26 @@ public struct CompressIntegratedConfigSectionView: View {
     private func levelTileView(fmt: ArchiveCompressionFormat, lvl: ArchiveCompressionLevel) -> some View {
         let ratioPct = Int(round(lvl.compressionRatioPercent(for: fmt)))
         let titleName: String
-        switch lvl {
-        case .store: titleName = "Store (\(ratioPct)%)"
-        case .level1: titleName = "Fast (\(ratioPct)%)"
-        case .level6: titleName = "Standard (\(ratioPct)%)"
-        case .level9: titleName = "Ultra (\(ratioPct)%)"
-        default: titleName = "Level \(lvl.rawValue) (\(ratioPct)%)"
+        if fmt == .zip {
+            switch lvl {
+            case .store: titleName = "Store (0%)"
+            case .level1: titleName = "1: 极速 (5.4 GB/s)"
+            case .level2: titleName = "2: 快速 (3.8 GB/s)"
+            case .level3: titleName = "3: 标准 (3.2 GB/s)"
+            case .level4: titleName = "4: 深度 (1.8 GB/s)"
+            case .level5: titleName = "5: 图论 (200 MB/s)"
+            case .level6: titleName = "6: 超级 (97.0%)"
+            case .level7: titleName = "7: 极限 (97.05%)"
+            default: titleName = "Level \(lvl.rawValue)"
+            }
+        } else {
+            switch lvl {
+            case .store: titleName = "Store (\(ratioPct)%)"
+            case .level1: titleName = "Fast (\(ratioPct)%)"
+            case .level6: titleName = "Standard (\(ratioPct)%)"
+            case .level9: titleName = "Ultra (\(ratioPct)%)"
+            default: titleName = "Level \(lvl.rawValue) (\(ratioPct)%)"
+            }
         }
         return levelTile(level: lvl, name: titleName)
     }

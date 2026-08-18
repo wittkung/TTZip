@@ -86,7 +86,13 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         // =========================================================================
         // 2. 通用算法驱动的自适应多维坐标聚类与自动空隙折叠引擎 (Dynamic Cluster Fold Engine)
         // =========================================================================
-        let allSavings = result.allPoints.map { $0.spaceSavingsPct }.sorted()
+        let allSizes = result.allPoints.map { p -> Double in
+            if p.compressedBytes > 0 {
+                return Double(p.compressedBytes) / (1024.0 * 1024.0)
+            } else {
+                return 100.0 * (1.0 - p.spaceSavingsPct / 100.0)
+            }
+        }.sorted()
         let allSpeeds = result.allPoints.map { $0.throughputMBs }.sorted()
 
         // 2.1 Y 轴对数空间空隙自动探测
@@ -128,53 +134,65 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             return AxisFold1D(isFolded: false, lowerClusterMin: speeds.first ?? 1.0, lowerClusterMax: speeds.first ?? 1.0, upperClusterMin: speeds.last ?? 1000.0, upperClusterMax: speeds.last ?? 1000.0, breakLabel: "")
         }
 
-        func detectXAxisFold(savings: [Double]) -> AxisFold1D {
-            guard savings.count >= 4 else {
-                return AxisFold1D(isFolded: false, lowerClusterMin: savings.first ?? 0.0, lowerClusterMax: savings.first ?? 0.0, upperClusterMin: savings.last ?? 100.0, upperClusterMax: savings.last ?? 100.0, breakLabel: "")
+        func detectXAxisFold(sizes: [Double]) -> AxisFold1D {
+            guard sizes.count >= 4 else {
+                return AxisFold1D(isFolded: false, lowerClusterMin: sizes.first ?? 2.0, lowerClusterMax: sizes.first ?? 2.0, upperClusterMin: sizes.last ?? 6.0, upperClusterMax: sizes.last ?? 6.0, breakLabel: "")
             }
             var maxGap: Double = 0.0
             var splitIdx: Int = -1
-            for i in 0..<(savings.count - 1) {
-                let gap = savings[i + 1] - savings[i]
+            for i in 0..<(sizes.count - 1) {
+                let gap = sizes[i + 1] - sizes[i]
                 if gap > maxGap {
                     maxGap = gap
                     splitIdx = i
                 }
             }
-            let totalSpan = savings.last! - savings.first!
+            let totalSpan = sizes.last! - sizes.first!
             if totalSpan > 0 && (maxGap / totalSpan) >= 0.25 && splitIdx >= 0 {
-                let lowMax = savings[splitIdx]
-                let highMin = savings[splitIdx + 1]
-                let lowBoundMin = max(0.0, savings.first! - 0.15)
-                let lowBoundMax = lowMax + 0.10
-                let highBoundMin = highMin - 0.10
-                let highBoundMax = min(100.0, savings.last! + 0.08)
-                let label = String(format: "≈ [ %.1f%% ~ %.1f%% 折叠 ] ≈", lowBoundMax, highBoundMin)
+                let lowMax = sizes[splitIdx]
+                let highMin = sizes[splitIdx + 1]
+                let lowBoundMin = max(1.0, sizes.first! - 0.15)
+                let lowBoundMax = lowMax + 0.15
+                let highBoundMin = highMin - 1.0
+                let highBoundMax = sizes.last! + 1.0
+                let label = String(format: "≈ [ %.1f MB ~ %.0f MB 闲置空隙自适应折叠 (Auto Axis Break) ] ≈", lowBoundMax, highMin)
                 return AxisFold1D(isFolded: true, lowerClusterMin: lowBoundMin, lowerClusterMax: lowBoundMax, upperClusterMin: highBoundMin, upperClusterMax: highBoundMax, breakLabel: label)
             }
-            return AxisFold1D(isFolded: false, lowerClusterMin: savings.first ?? 0.0, lowerClusterMax: savings.first ?? 0.0, upperClusterMin: savings.last ?? 100.0, upperClusterMax: savings.last ?? 100.0, breakLabel: "")
+            return AxisFold1D(isFolded: false, lowerClusterMin: sizes.first ?? 2.0, lowerClusterMax: sizes.first ?? 2.0, upperClusterMin: sizes.last ?? 6.0, upperClusterMax: sizes.last ?? 6.0, breakLabel: "")
         }
 
         let yFold = detectYAxisFold(speeds: allSpeeds)
-        let xFold = detectXAxisFold(savings: allSavings)
+        let xFold = detectXAxisFold(sizes: allSizes)
+
+        let maxDomainSize = (allSizes.last ?? 100.0) + 1.0
+        let minDomainSize = max(1.0, (allSizes.first ?? 2.9) - 0.15)
 
         func mapX(_ savingsVal: Double) -> CGFloat {
+            // 将 spaceSavingsPct 映射为实际压缩文件大小 MB (越小越好，靠右为优)
+            // Store 档位 (savings <= 5% 或 接近 100MB) 直接落在纵坐标轴上 (x = marginLeft)
+            if savingsVal <= 5.0 {
+                return marginLeft
+            }
+
+            let sizeMB = 100.0 * (1.0 - savingsVal / 100.0)
             if xFold.isFolded {
-                if savingsVal <= xFold.lowerClusterMax {
-                    let norm = (savingsVal - xFold.lowerClusterMin) / max(1e-4, xFold.lowerClusterMax - xFold.lowerClusterMin)
-                    return marginLeft + CGFloat(max(0.0, min(1.0, norm)) * 0.44) * plotW
-                } else if savingsVal >= xFold.upperClusterMin {
-                    let norm = (savingsVal - xFold.upperClusterMin) / max(1e-4, xFold.upperClusterMax - xFold.upperClusterMin)
-                    return marginLeft + CGFloat(0.52 + max(0.0, min(1.0, norm)) * 0.48) * plotW
+                // 自适应 3 段弹性展开算法 (压缩 4.4MB~3.7MB 闲置空隙，充分展开右侧密集高压战场)
+                // 1) 快速压缩区间 (5.0MB ~ 3.7MB, 占 20% 宽度): 包含 pigz-1 (4.8MB), pigz-2/3 (4.45MB)
+                // 2) 核心平衡区间 (3.7MB ~ 3.3MB, 占 36% 宽度): 包含 ttzip-l1, L2, L3, L5, pigz-4..9
+                // 3) 极限图论区间 (3.3MB ~ 2.9MB, 占 38% 宽度): 包含 L4, L6, Zopfli, advzip-4, L7
+                if sizeMB >= 3.70 {
+                    let norm = (5.00 - sizeMB) / max(1e-4, 5.00 - 3.70)
+                    return marginLeft + CGFloat(0.06 + max(0.0, min(1.0, norm)) * 0.20) * plotW
+                } else if sizeMB >= 3.30 {
+                    let norm = (3.70 - sizeMB) / max(1e-4, 3.70 - 3.30)
+                    return marginLeft + CGFloat(0.26 + max(0.0, min(1.0, norm)) * 0.36) * plotW
                 } else {
-                    let norm = (savingsVal - xFold.lowerClusterMax) / max(1e-4, xFold.upperClusterMin - xFold.lowerClusterMax)
-                    return marginLeft + CGFloat(0.44 + norm * 0.08) * plotW
+                    let norm = (3.30 - sizeMB) / max(1e-4, 3.30 - 2.90)
+                    return marginLeft + CGFloat(0.62 + max(0.0, min(1.0, norm)) * 0.36) * plotW
                 }
             } else {
-                let minX = allSavings.first ?? 80.0
-                let maxX = allSavings.last ?? 100.0
-                let norm = (savingsVal - minX) / max(1e-4, maxX - minX)
-                return marginLeft + CGFloat(norm) * plotW
+                let norm = (maxDomainSize - sizeMB) / max(1e-4, maxDomainSize - minDomainSize)
+                return marginLeft + CGFloat(max(0.0, min(1.0, norm))) * plotW
             }
         }
 
@@ -208,8 +226,9 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             }
         }
 
-        // 3. 绘制极淡水平网格线 (自适应聚类刻度)
+        // 3. 绘制极淡水平网格线与 Y 轴刻度
         let gridColor = CGColor(red: 241/255.0, green: 245/255.0, blue: 249/255.0, alpha: 1.0)
+        let axisLineColor = CGColor(red: 148/255.0, green: 163/255.0, blue: 184/255.0, alpha: 1.0)
         let axisTextColor = NSColor(calibratedRed: 100/255.0, green: 116/255.0, blue: 139/255.0, alpha: 1.0)
 
         var candidateYTicks: [(val: Double, label: String)] = []
@@ -218,7 +237,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             for val in lowerCandidate where val >= yFold.lowerClusterMin * 0.95 && val <= yFold.lowerClusterMax * 1.05 {
                 candidateYTicks.append((val, String(format: "%.1f MB/s", val)))
             }
-            let upperCandidate: [Double] = [1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 4000.0, 5000.0, 6000.0]
+            let upperCandidate: [Double] = [1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 4000.0, 5000.0, 6000.0, 8000.0, 10000.0]
             for val in upperCandidate where val >= yFold.upperClusterMin * 0.95 && val <= yFold.upperClusterMax * 1.05 {
                 let lbl = val >= 1000.0 ? String(format: "%.0f MB/s", val) : String(format: "%.1f MB/s", val)
                 candidateYTicks.append((val, lbl))
@@ -233,96 +252,131 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         for tick in candidateYTicks {
             let y = mapY(tick.val)
             ctx.setStrokeColor(gridColor)
-            ctx.setLineWidth(1.2)
+            ctx.setLineWidth(1.0)
             ctx.strokeLineSegments(between: [CGPoint(x: marginLeft, y: y), CGPoint(x: marginLeft + plotW, y: y)])
 
-            let font = NSFont.systemFont(ofSize: 14, weight: .regular)
+            // Y 轴短刻度线 (5pt 向左突出)
+            ctx.setStrokeColor(axisLineColor)
+            ctx.setLineWidth(1.2)
+            ctx.strokeLineSegments(between: [CGPoint(x: marginLeft - 5, y: y), CGPoint(x: marginLeft, y: y)])
+
+            let font = NSFont.systemFont(ofSize: 13, weight: .regular)
             let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: axisTextColor]
             let str = NSAttributedString(string: tick.label, attributes: attrs)
             let size = str.size()
 
             NSGraphicsContext.saveGraphicsState()
             NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-            str.draw(at: CGPoint(x: marginLeft - size.width - 16, y: y - size.height / 2))
+            str.draw(at: CGPoint(x: marginLeft - size.width - 12, y: y - size.height / 2))
             NSGraphicsContext.restoreGraphicsState()
         }
 
-        // 3.1 绘制 Y 轴断裂折叠分割线 (Axis Break Band)
-        if yFold.isFolded {
-            let breakY = marginBottom + CGFloat(0.48) * plotH
-            ctx.setStrokeColor(CGColor(red: 203/255.0, green: 213/255.0, blue: 225/255.0, alpha: 0.9))
-            ctx.setLineWidth(1.2)
-            ctx.setLineDash(phase: 0, lengths: [6.0, 4.0])
-            ctx.strokeLineSegments(between: [CGPoint(x: marginLeft, y: breakY), CGPoint(x: marginLeft + plotW, y: breakY)])
-            ctx.setLineDash(phase: 0, lengths: [])
-
-            let breakFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
-            let breakAttrs: [NSAttributedString.Key: Any] = [
-                .font: breakFont,
-                .foregroundColor: NSColor(calibratedRed: 100/255.0, green: 116/255.0, blue: 139/255.0, alpha: 1.0)
-            ]
-            let breakStr = NSAttributedString(string: yFold.breakLabel, attributes: breakAttrs)
-            let bSize = breakStr.size()
-            
-            // 绘制折叠徽标背景白框
-            let badgeRect = CGRect(x: marginLeft + (plotW - bSize.width - 24) / 2, y: breakY - 10, width: bSize.width + 24, height: 20)
-            ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.95))
-            ctx.fill(badgeRect)
-            ctx.setStrokeColor(CGColor(red: 226/255.0, green: 232/255.0, blue: 240/255.0, alpha: 1.0))
-            ctx.setLineWidth(1.0)
-            ctx.stroke(badgeRect)
-
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-            breakStr.draw(at: CGPoint(x: marginLeft + (plotW - bSize.width) / 2, y: breakY - bSize.height / 2))
-            NSGraphicsContext.restoreGraphicsState()
-        }
-
-        // 4. 绘制 X 轴自适应细分刻度与标签
-        var candidateXTicks: [Double] = []
+        // 3.1 绘制 X 轴自适应物理文件大小 (MB) 刻度与短刻度线
+        var candidateSizeTicks: [Double] = []
         if xFold.isFolded {
-            var v = floor(xFold.lowerClusterMin * 10.0) / 10.0
-            while v <= xFold.lowerClusterMax {
-                candidateXTicks.append(v)
-                v += 0.2
-            }
-            var v2 = floor(xFold.upperClusterMin * 10.0) / 10.0
-            while v2 <= xFold.upperClusterMax {
-                candidateXTicks.append(v2)
-                v2 += 0.1
+            candidateSizeTicks.append(100.0)
+            let compCandidate: [Double] = [4.8, 4.4, 4.0, 3.6, 3.4, 3.2, 3.0, 2.95]
+            for sz in compCandidate where sz >= xFold.lowerClusterMin && sz <= xFold.lowerClusterMax {
+                candidateSizeTicks.append(sz)
             }
         } else {
-            let minVal = allSavings.first ?? 0.0
-            let maxVal = allSavings.last ?? 100.0
-            var v = floor(minVal * 10.0) / 10.0
+            let minVal = allSizes.first ?? 2.9
+            let maxVal = allSizes.last ?? 100.0
+            var v = minVal
             while v <= maxVal {
-                candidateXTicks.append(v)
-                v += 0.2
+                candidateSizeTicks.append(v)
+                v += 0.5
             }
         }
 
-        var activeXTicks: [Double] = []
+        struct MappedTick {
+            let sizeMB: Double
+            let canvasX: CGFloat
+            let label: String
+        }
+
+        var mappedTicks: [MappedTick] = []
+        for sizeMB in candidateSizeTicks {
+            let savingsVal = 100.0 * (1.0 - sizeMB / 100.0)
+            let x = mapX(savingsVal)
+            let lbl = sizeMB >= 50.0 ? String(format: "%.0f MB (Store)", sizeMB) : String(format: "%.2f MB", sizeMB)
+            mappedTicks.append(MappedTick(sizeMB: sizeMB, canvasX: x, label: lbl))
+        }
+
+        // 按画布 X 从左到右递增排序
+        mappedTicks.sort { $0.canvasX < $1.canvasX }
+
+        var activeXTicks: [MappedTick] = []
         var lastTickCanvasX: CGFloat = -1000.0
-        for tickVal in candidateXTicks {
-            let x = mapX(tickVal)
-            if x - lastTickCanvasX >= 48.0 {
-                activeXTicks.append(tickVal)
-                lastTickCanvasX = x
+        for tick in mappedTicks {
+            if tick.canvasX - lastTickCanvasX >= 48.0 {
+                activeXTicks.append(tick)
+                lastTickCanvasX = tick.canvasX
             }
         }
 
-        for xVal in activeXTicks {
-            let x = mapX(xVal)
-            let label = String(format: "%.1f%%", xVal)
-            let font = NSFont.systemFont(ofSize: 14, weight: .regular)
+        for tick in activeXTicks {
+            let x = tick.canvasX
+            // X 轴短刻度线 (5pt 向下突出)
+            ctx.setStrokeColor(axisLineColor)
+            ctx.setLineWidth(1.2)
+            ctx.strokeLineSegments(between: [CGPoint(x: x, y: marginBottom), CGPoint(x: x, y: marginBottom - 5)])
+
+            let font = NSFont.systemFont(ofSize: 13, weight: .regular)
             let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: axisTextColor]
-            let str = NSAttributedString(string: label, attributes: attrs)
+            let str = NSAttributedString(string: tick.label, attributes: attrs)
             let size = str.size()
 
             NSGraphicsContext.saveGraphicsState()
             NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-            str.draw(at: CGPoint(x: x - size.width / 2, y: marginBottom - size.height - 12))
+            let drawX = x == marginLeft ? x : (x - size.width / 2)
+            str.draw(at: CGPoint(x: drawX, y: marginBottom - size.height - 12))
             NSGraphicsContext.restoreGraphicsState()
+        }
+
+        // 3.2 绘制实线坐标轴主框架 (Solid Coordinate Axes Lines)
+        ctx.setStrokeColor(axisLineColor)
+        ctx.setLineWidth(1.5)
+        // 绘制 Y 轴实线
+        ctx.strokeLineSegments(between: [CGPoint(x: marginLeft, y: marginBottom), CGPoint(x: marginLeft, y: marginBottom + plotH)])
+        // 绘制 X 轴实线
+        ctx.strokeLineSegments(between: [CGPoint(x: marginLeft, y: marginBottom), CGPoint(x: marginLeft + plotW, y: marginBottom)])
+
+        // 3.3 专业学术级坐标轴折叠断裂标记 (Axis Break Slashes // on Coordinate Lines)
+        let slashW: CGFloat = 8.0
+        let slashH: CGFloat = 8.0
+        let slashGap: CGFloat = 4.0
+
+        // 纵轴折叠双斜杠 (Y-Axis Break //)
+        if yFold.isFolded {
+            let breakY = marginBottom + CGFloat(0.48) * plotH
+            ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
+            ctx.fill(CGRect(x: marginLeft - 6, y: breakY - 10, width: 12, height: 20))
+
+            ctx.setStrokeColor(axisLineColor)
+            ctx.setLineWidth(1.8)
+            ctx.strokeLineSegments(between: [
+                CGPoint(x: marginLeft - slashW/2, y: breakY - slashGap - slashH/2),
+                CGPoint(x: marginLeft + slashW/2, y: breakY - slashGap + slashH/2),
+                CGPoint(x: marginLeft - slashW/2, y: breakY + slashGap - slashH/2),
+                CGPoint(x: marginLeft + slashW/2, y: breakY + slashGap + slashH/2)
+            ])
+        }
+
+        // 横轴折叠双斜杠 (X-Axis Break //)
+        if xFold.isFolded {
+            let breakX = marginLeft + CGFloat(0.035) * plotW
+            ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
+            ctx.fill(CGRect(x: breakX - 10, y: marginBottom - 6, width: 20, height: 12))
+
+            ctx.setStrokeColor(axisLineColor)
+            ctx.setLineWidth(1.8)
+            ctx.strokeLineSegments(between: [
+                CGPoint(x: breakX - slashGap - slashW/2, y: marginBottom - slashH/2),
+                CGPoint(x: breakX - slashGap + slashW/2, y: marginBottom + slashH/2),
+                CGPoint(x: breakX + slashGap - slashW/2, y: marginBottom - slashH/2),
+                CGPoint(x: breakX + slashGap + slashW/2, y: marginBottom + slashH/2)
+            ])
         }
 
         // 5. 绘制右上角 "most efficient ↗" 引导标注
@@ -332,33 +386,36 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             .foregroundColor: NSColor(calibratedRed: 148/255.0, green: 163/255.0, blue: 184/255.0, alpha: 1.0)
         ]
         let effStr = NSAttributedString(string: "most efficient ↗", attributes: effAttrs)
+        let effSize = effStr.size()
+
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-        effStr.draw(at: CGPoint(x: marginLeft + plotW - effStr.size().width, y: marginBottom + plotH + 12))
+        effStr.draw(at: CGPoint(x: marginLeft + plotW - effSize.width - 4, y: marginBottom + plotH + 8))
         NSGraphicsContext.restoreGraphicsState()
 
-        // 6. 软件家族聚类与 Fritsch-Carlson 样条曲线绘制 (按 X 轴压缩率升序排列)
+        // 5.1 软件家族点位分组
         var groupedPoints: [SoftwareFamily: [ParetoPoint]] = [:]
         for p in result.allPoints {
             let fam = SoftwareFamilyClassifier.classify(algorithm: p.algorithm)
             groupedPoints[fam, default: []].append(p)
         }
 
+        // 6. 软件家族聚类与全量轨迹提取 (包含 Store 点位，直接从纵坐标轴起步连接至各压缩档位)
         var trajectories: [SoftwareFamilyTrajectory] = []
         for fam in SoftwareFamily.allCases {
-            if var famPoints = groupedPoints[fam], !famPoints.isEmpty {
-                famPoints.sort { (a, b) -> Bool in
+            if let famPoints = groupedPoints[fam], !famPoints.isEmpty {
+                let sortedPoints = famPoints.sorted { (a, b) -> Bool in
                     if a.spaceSavingsPct != b.spaceSavingsPct {
                         return a.spaceSavingsPct < b.spaceSavingsPct
                     }
                     return a.throughputMBs < b.throughputMBs
                 }
-                let heroPill = fam.isHero ? (famPoints.max(by: { $0.throughputMBs < $1.throughputMBs })) : nil
-                trajectories.append(SoftwareFamilyTrajectory(family: fam, points: famPoints, heroPillPoint: heroPill))
+                let heroPill = fam.isHero ? (sortedPoints.filter { $0.spaceSavingsPct > 5.0 }.max(by: { $0.throughputMBs < $1.throughputMBs })) : nil
+                trajectories.append(SoftwareFamilyTrajectory(family: fam, points: sortedPoints, heroPillPoint: heroPill))
             }
         }
 
-        // 6.1 绘制 TTZip Hero 半透明演进光晕带 (DeepSWE Ribbon Beam - 纯直折线)
+        // 6.1 绘制 TTZip Hero 半透明演进光晕带 (DeepSWE Ribbon Beam - 纯直折线，全域连贯)
         for traj in trajectories where traj.family.isHero {
             let pts = traj.points.map { CGPoint(x: mapX($0.spaceSavingsPct), y: mapY($0.throughputMBs)) }
             if pts.count >= 2 {
@@ -376,7 +433,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             }
         }
 
-        // 6.2 绘制各软件家族主实线轨迹 (纯直折线，真实透明)
+        // 6.2 绘制各软件家族主实线轨迹 (纯直折线，全域连贯)
         for traj in trajectories {
             let pts = traj.points.map { CGPoint(x: mapX($0.spaceSavingsPct), y: mapY($0.throughputMBs)) }
             guard pts.count >= 2 else { continue }
@@ -429,7 +486,9 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let cleanName: String
             if fam == .ttzip {
                 let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
-                if p.level == 1 {
+                if p.level == 0 {
+                    cleanName = "L0 (Store \(speedStr))"
+                } else if p.level == 1 {
                     cleanName = "ttzip-l1 (\(speedStr))"
                 } else if p.level == 12 {
                     cleanName = "ttzip-l12 (\(speedStr))"
@@ -445,14 +504,21 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             } else if fam == .brotli {
                 cleanName = "brotli-\(p.level)"
             } else if fam == .sevenZip {
-                cleanName = "mx=\(p.level)"
+                cleanName = p.level == 0 ? "7z-0 (Store)" : "mx=\(p.level)"
             } else if fam == .pigz {
-                cleanName = "pigz-\(p.level)"
+                let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
+                if p.level == 0 {
+                    cleanName = "pigz-0 (Store \(speedStr))"
+                } else if p.level == 11 {
+                    cleanName = "pigz-11 (Zopfli)"
+                } else {
+                    cleanName = "pigz-\(p.level)"
+                }
             } else if fam == .appleNative {
                 if p.algorithm.contains("ditto") {
                     cleanName = "ditto"
                 } else {
-                    cleanName = "zip-\(p.level)"
+                    cleanName = p.level == 0 ? "zip-0 (Store)" : "zip-\(p.level)"
                 }
             } else {
                 cleanName = p.algorithm.lowercased()
@@ -541,47 +607,58 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let w = item.pillWidth
             let h = item.pillHeight
             let candidateSlots: [(x: CGFloat, y: CGFloat)]
-            switch fam {
-            case .ttzip:
+            if item.point.spaceSavingsPct <= 5.0 {
+                // Store 点位槽位：强制靠右避让 Y 轴刻度文字
                 candidateSlots = [
-                    (cx - w / 2, cy - h - 12),       // Bottom-Center
-                    (cx + 12, cy - h / 2),           // Right
-                    (cx + 10, cy - h - 10),          // Bottom-Right
-                    (cx - w - 12, cy - h / 2),       // Left
-                    (cx - w - 10, cy - h - 10),      // Bottom-Left
-                    (cx - w / 2, cy + 12),           // Top-Center
-                    (cx + 10, cy + 10),              // Top-Right
-                    (cx - w - 10, cy + 10)           // Top-Left
+                    (cx + 14, cy - h / 2),
+                    (cx + 14, cy - h - 4),
+                    (cx + 14, cy + 4),
+                    (cx - w / 2, cy + 12),
+                    (cx - w / 2, cy - h - 12)
                 ]
-            case .pigz, .zstd, .lz4, .xz, .brotli:
-                candidateSlots = [
-                    (cx - w / 2, cy - h - 12),       // Bottom-Center
-                    (cx + 12, cy - h / 2),           // Right
-                    (cx - w - 12, cy - h / 2),       // Left
-                    (cx - w / 2, cy + 12),           // Top-Center
-                    (cx + 10, cy - h - 10),          // Bottom-Right
-                    (cx - w - 10, cy - h - 10)       // Bottom-Left
-                ]
-            case .sevenZip, .appleNative:
-                candidateSlots = [
-                    (cx - w - 12, cy - h / 2),       // Left-Center
-                    (cx - w - 10, cy + 10),          // Top-Left
-                    (cx - w - 10, cy - h - 10),      // Bottom-Left
-                    (cx - w / 2, cy - h - 12),       // Bottom-Center
-                    (cx + 12, cy - h / 2),           // Right-Center
-                    (cx - w / 2, cy + 12)            // Top-Center
-                ]
-            default:
-                candidateSlots = [
-                    (cx - w / 2, cy - h - 10),
-                    (cx - w / 2, cy + 10),
-                    (cx + 10, cy - h / 2),
-                    (cx - w - 10, cy - h / 2),
-                    (cx + 8, cy - h - 8),
-                    (cx - w - 8, cy - h - 8),
-                    (cx + 8, cy + 8),
-                    (cx - w - 8, cy + 8)
-                ]
+            } else {
+                switch fam {
+                case .ttzip:
+                    candidateSlots = [
+                        (cx - w / 2, cy - h - 12),       // Bottom-Center
+                        (cx + 12, cy - h / 2),           // Right
+                        (cx + 10, cy - h - 10),          // Bottom-Right
+                        (cx - w - 12, cy - h / 2),       // Left
+                        (cx - w - 10, cy - h - 10),      // Bottom-Left
+                        (cx - w / 2, cy + 12),           // Top-Center
+                        (cx + 10, cy + 10),              // Top-Right
+                        (cx - w - 10, cy + 10)           // Top-Left
+                    ]
+                case .pigz, .zstd, .lz4, .xz, .brotli:
+                    candidateSlots = [
+                        (cx - w / 2, cy - h - 12),       // Bottom-Center
+                        (cx + 12, cy - h / 2),           // Right
+                        (cx - w - 12, cy - h / 2),       // Left
+                        (cx - w / 2, cy + 12),           // Top-Center
+                        (cx + 10, cy - h - 10),          // Bottom-Right
+                        (cx - w - 10, cy - h - 10)       // Bottom-Left
+                    ]
+                case .sevenZip, .appleNative:
+                    candidateSlots = [
+                        (cx - w - 12, cy - h / 2),       // Left-Center
+                        (cx - w - 10, cy + 10),          // Top-Left
+                        (cx - w - 10, cy - h - 10),      // Bottom-Left
+                        (cx - w / 2, cy - h - 12),       // Bottom-Center
+                        (cx + 12, cy - h / 2),           // Right-Center
+                        (cx - w / 2, cy + 12)            // Top-Center
+                    ]
+                default:
+                    candidateSlots = [
+                        (cx - w / 2, cy - h - 10),
+                        (cx - w / 2, cy + 10),
+                        (cx + 10, cy - h / 2),
+                        (cx - w - 10, cy - h / 2),
+                        (cx + 8, cy - h - 8),
+                        (cx - w - 8, cy - h - 8),
+                        (cx + 8, cy + 8),
+                        (cx - w - 8, cy + 8)
+                    ]
+                }
             }
 
             var bestRect = CGRect(x: cx - w / 2, y: cy + 14, width: w, height: h)
@@ -669,9 +746,9 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         headAttrStr.draw(at: CGPoint(x: (width - headAttrStr.size().width) / 2, y: height - 110))
         NSGraphicsContext.restoreGraphicsState()
 
-        // 10. 底部居中 X 轴标题 (Space Savings %) 与数据来源标注
-        let xTitle = "Space Savings Ratio (%, Higher is Better)"
-        let xFont = NSFont.systemFont(ofSize: 14, weight: .medium)
+        // 10. 底部居中 X 轴标题 (Compressed File Size MB) 与数据来源标注
+        let xTitle = "Compressed File Size (MB, Smaller is Better ➔) · 100MB Corpus"
+        let xFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
         let xAttrs: [NSAttributedString.Key: Any] = [
             .font: xFont,
             .foregroundColor: NSColor(calibratedRed: 71/255.0, green: 85/255.0, blue: 105/255.0, alpha: 1.0)

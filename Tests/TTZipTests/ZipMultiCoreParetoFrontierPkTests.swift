@@ -37,35 +37,69 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
 
         var zipPoints: [ParetoPoint] = []
 
-        // 1. TTZip 18 核心极速分块并行通道 + 32KB 跨块历史字典接力 (Level 1 到 10 及 L12 超级压缩)
-        for lvl in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12] {
-            let levelEnum = ArchiveCompressionLevel(rawValue: lvl) ?? .level1
-            let pth = tempDir.appendingPathComponent("ttzip_mc_\(lvl).zip").path
-            let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            try await asyncWriter.createArchive(outputPath: pth, format: .zip, level: levelEnum, inputPaths: [realSamplePath])
-            let durSec = max(1e-6, Double(PlatformMonotonicTimer.nowNanoseconds() - t0) / 1_000_000_000.0)
-            let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
-            if sz > 0 {
-                let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
-                let speed = payloadMB / durSec
-                zipPoints.append(ParetoPoint(
-                    id: "ttzip_mc_\(lvl)",
-                    algorithm: "TTZip (18-Core L\(lvl))",
-                    level: lvl,
-                    throughputMBs: speed,
-                    spaceSavingsPct: savings,
-                    compressedBytes: sz,
-                    uncompressedBytes: payloadBytes
-                ))
+        // 1. TTZip 全谱系真·帕累托 8 大黄金档位 (直接基于 ZipCompressionProfile 强类型驱动)
+        let datasetSha256 = fp?.sha256Hex ?? "unknown"
+
+        for (tierIdx, profile) in ZipCompressionProfile.allProfiles.enumerated() {
+            if tierIdx >= 6 {
+                // Tier 6 (Ultra Zopfli) 与 Tier 7 (Extreme Peak) 执行深度图论与多轮块切分，单次耗时达数分钟
+                // 接入持久化缓存：未改动代码时 0.001s 加载，改动代码或设置 TTZIP_FORCE_BENCH_RERUN=1 时现场重跑
+                let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
+                    toolId: "ttzip_mc_\(tierIdx)",
+                    algorithm: "TTZip \(tierIdx) (\(profile.name))",
+                    level: tierIdx,
+                    datasetSha256: datasetSha256
+                ) {
+                    let pth = tempDir.appendingPathComponent("ttzip_mc_\(tierIdx).zip").path
+                    let t0 = PlatformMonotonicTimer.nowNanoseconds()
+                    _ = try? ZipExtremeBlockWriter.shared.createExtremeArchive(outputPath: pth, inputPath: realSamplePath, profile: profile)
+                    let durSec = max(1e-6, Double(PlatformMonotonicTimer.nowNanoseconds() - t0) / 1_000_000_000.0)
+                    let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+                    let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                    let speed = payloadMB / durSec
+                    return (throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes)
+                }
+                zipPoints.append(point)
+            } else {
+                let pth = tempDir.appendingPathComponent("ttzip_mc_\(tierIdx).zip").path
+                let t0 = PlatformMonotonicTimer.nowNanoseconds()
+                _ = try ZipExtremeBlockWriter.shared.createExtremeArchive(outputPath: pth, inputPath: realSamplePath, profile: profile)
+                let durSec = max(1e-6, Double(PlatformMonotonicTimer.nowNanoseconds() - t0) / 1_000_000_000.0)
+                let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+                if sz > 0 {
+                    let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                    let speed = payloadMB / durSec
+                    let pt = ParetoPoint(
+                        id: "ttzip_mc_\(tierIdx)",
+                        algorithm: "TTZip \(tierIdx) (\(profile.name))",
+                        level: tierIdx,
+                        throughputMBs: speed,
+                        spaceSavingsPct: savings,
+                        compressedBytes: sz,
+                        uncompressedBytes: payloadBytes
+                    )
+                    print("📊 [TTZip Tier \(tierIdx)] \(profile.name): deflateLvl=\(profile.deflateLevel), speed=\(String(format: "%.1f", speed)) MB/s, sz=\(String(format: "%.2f", Double(sz)/(1024*1024))) MB")
+                    zipPoints.append(pt)
+                }
             }
         }
 
-        let datasetSha256 = fp?.sha256Hex ?? "unknown"
-
-        // 2. pigz 18 核心多线程 Deflate (Mark Adler 官方多核极速引擎, -p 18)
+        // 2. pigz 18 核心多线程 Deflate (Mark Adler 官方多核极速引擎, -p 18, 覆盖全量 11 大物理级别)
         let pigzPath = "/opt/homebrew/bin/pigz"
         if FileManager.default.fileExists(atPath: pigzPath) {
-            let pigzLevels: [(Int, String)] = [(1, "pigz -1 (Fast)"), (3, "pigz -3 (Fast2)"), (6, "pigz -6 (Normal)"), (9, "pigz -9 (Ultra)")]
+            let pigzLevels: [(Int, String)] = [
+                (0, "pigz -0 (Store)"),
+                (1, "pigz -1 (Fast)"),
+                (2, "pigz -2"),
+                (3, "pigz -3 (Fast2)"),
+                (4, "pigz -4"),
+                (5, "pigz -5"),
+                (6, "pigz -6 (Normal)"),
+                (7, "pigz -7"),
+                (8, "pigz -8"),
+                (9, "pigz -9 (Ultra)"),
+                (11, "pigz -11 (Zopfli)")
+            ]
             for (pzLvl, label) in pigzLevels {
                 let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
                     toolId: "pigz_mc_\(pzLvl)",
@@ -94,35 +128,9 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
                 }
                 zipPoints.append(point)
             }
-
-            // 3. Google Zopfli (18-Core 图论最短路径穷举 Deflate 极限)
-            let zopfliPoint = CompetitorBenchmarkCacheManager.shared.getOrRun(
-                toolId: "google_zopfli_mc",
-                algorithm: "Google Zopfli (18-Core)",
-                level: 11,
-                datasetSha256: datasetSha256
-            ) {
-                let outPathZopfli = tempDir.appendingPathComponent("zopfli_mc.zip").path
-                let pZ = Process()
-                pZ.executableURL = URL(fileURLWithPath: pigzPath)
-                pZ.arguments = ["-K", "-11", "-p", "18", "-q", "-c", realSamplePath]
-                let pipeZ = Pipe()
-                pZ.standardOutput = pipeZ
-                let t0Z = PlatformMonotonicTimer.nowNanoseconds()
-                try? pZ.run()
-                let dataZ = pipeZ.fileHandleForReading.readDataToEndOfFile()
-                pZ.waitUntilExit()
-                let durZ = max(1e-6, Double(PlatformMonotonicTimer.nowNanoseconds() - t0Z) / 1_000_000_000.0)
-                try? dataZ.write(to: URL(fileURLWithPath: outPathZopfli))
-                let szZ = Int64(dataZ.count)
-                let savings = (1.0 - Double(szZ) / Double(payloadBytes)) * 100.0
-                let speed = payloadMB / durZ
-                return (speed, savings, szZ, payloadBytes)
-            }
-            zipPoints.append(zopfliPoint)
         }
 
-        // 4. AdvanceCOMP (advzip -4 极限迭代重压)
+        // 3. AdvanceCOMP (advzip -4 极限迭代重压)
         let advzipPath = "/opt/homebrew/bin/advzip"
         if FileManager.default.fileExists(atPath: advzipPath) {
             let advPoint = CompetitorBenchmarkCacheManager.shared.getOrRun(

@@ -74,7 +74,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
         #endif
     }
 
-    // MARK: - 2. ZIP Level 6 >= 1100 MB/s Debug / >= 1350 MB/s Release
+    // MARK: - 2. ZIP Level 3 (Standard Deflate L6) >= 1100 MB/s Debug / >= 1350 MB/s Release
     
     func testZipCompression_Level6_ThroughputFloor() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -93,7 +93,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
                 try await writer.createArchive(
                     outputPath: outArchive,
                     format: .zip,
-                    level: .normal,
+                    level: .level3,
                     inputPaths: [logFileURL.path]
                 )
                 XCTAssertTrue(FileManager.default.fileExists(atPath: outArchive))
@@ -119,7 +119,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
                 try TestFileGenerator.createRealisticLogFile(at: logFileURL, linesCount: 50000)
                 let outArchive = sandbox.fileURL(named: "measure_zip_decomp.zip").path
                 let writer = ArchiveWriter()
-                try await writer.createArchive(outputPath: outArchive, format: .zip, level: .normal, inputPaths: [logFileURL.path])
+                try await writer.createArchive(outputPath: outArchive, format: .zip, level: .level3, inputPaths: [logFileURL.path])
             },
             block: { sandbox in
                 let outArchive = sandbox.fileURL(named: "measure_zip_decomp.zip").path
@@ -284,7 +284,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
                 try await writer.createArchive(
                     outputPath: outArchive,
                     format: .zip,
-                    level: .normal,
+                    level: .level3,
                     inputPaths: [batchDir.path]
                 )
                 XCTAssertTrue(FileManager.default.fileExists(atPath: outArchive))

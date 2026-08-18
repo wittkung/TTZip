@@ -109,9 +109,7 @@ parallel_gz_ctx* init_parallel_xz(const char* path, int level) {
 
 static void compress_chunk_async(parallel_gz_ctx *ctx, uint64_t seq, uint8_t *uncompressed_data, size_t uncompressed_len) {
     dispatch_async(ctx->compress_queue, ^{
-        int z_level = ctx->level;
-        if (z_level < 1) z_level = 1;
-        if (z_level > 9) z_level = 9;
+        int z_level = ctx->level < 1 ? 1 : (ctx->level > 12 ? 12 : ctx->level);
         
         uint8_t *out_buf = NULL;
         size_t final_size = 0;
@@ -137,7 +135,7 @@ static void compress_chunk_async(parallel_gz_ctx *ctx, uint64_t seq, uint8_t *un
                 return;
             }
             unsigned int dest_len = max_out;
-            int bz_level = z_level <= 3 ? z_level : 1;
+            int bz_level = z_level < 1 ? 1 : (z_level > 9 ? 9 : z_level);
             int bz_res = BZ2_bzBuffToBuffCompress((char*)out_buf, &dest_len, (char*)uncompressed_data, (unsigned int)uncompressed_len, bz_level, 0, 30);
             if (bz_res == BZ_OK) {
                 final_size = dest_len;
@@ -151,7 +149,7 @@ static void compress_chunk_async(parallel_gz_ctx *ctx, uint64_t seq, uint8_t *un
             }
             LZ4F_preferences_t prefs;
             memset(&prefs, 0, sizeof(prefs));
-            prefs.compressionLevel = z_level <= 3 ? z_level : 3;
+            prefs.compressionLevel = z_level < 0 ? 0 : (z_level > 12 ? 12 : z_level);
             prefs.frameInfo.blockMode = LZ4F_blockIndependent;
             prefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum;
             final_size = LZ4F_compressFrame(out_buf, max_out, uncompressed_data, uncompressed_len, &prefs);
@@ -162,7 +160,7 @@ static void compress_chunk_async(parallel_gz_ctx *ctx, uint64_t seq, uint8_t *un
                 free(uncompressed_data);
                 return;
             }
-            uint32_t preset = (uint32_t)(z_level <= 9 ? z_level : 1);
+            uint32_t preset = (uint32_t)(z_level < 0 ? 0 : (z_level > 9 ? 9 : z_level));
             size_t out_pos = 0;
             lzma_ret ret = lzma_easy_buffer_encode(preset, LZMA_CHECK_CRC32, NULL, uncompressed_data, uncompressed_len, out_buf, &out_pos, max_out);
             if (ret == LZMA_OK) {

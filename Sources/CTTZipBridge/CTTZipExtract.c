@@ -84,8 +84,9 @@ int ttzip_extract_zip_c_parallel(
     }
 
     const uint8_t* eocd = mapped + eocd_pos;
-    uint16_t total_entries = read_u16_le(eocd + 10);
+    uint64_t total_entries = read_u16_le(eocd + 10);
     uint32_t cd_size = read_u32_le(eocd + 12);
+    (void)cd_size;
     uint32_t cd_offset_32 = read_u32_le(eocd + 16);
 
     uint64_t cd_offset = cd_offset_32;
@@ -99,7 +100,7 @@ int ttzip_extract_zip_c_parallel(
                 if (read_u32_le(z64_eocd) == 0x06064b50) {
                     uint64_t total_entries_64 = read_u64_le(z64_eocd + 32);
                     uint64_t cd_offset_64 = read_u64_le(z64_eocd + 48);
-                    total_entries = (uint16_t)total_entries_64;
+                    total_entries = total_entries_64;
                     cd_offset = cd_offset_64;
                 }
             }

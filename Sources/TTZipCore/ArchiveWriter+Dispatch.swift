@@ -332,6 +332,7 @@ extension ArchiveWriter {
         }
         
         let windowLog = advancedOptions.zstdEnableLDM ? hardwareTuner.optimalZstdLongWindowLog : 0
+        let effectiveLvl = level.rawValue != 0 ? level.rawValue : advancedOptions.zstdLevel
         let status = CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
             ttzip_create_archive_tuned(
                 outputPath,
@@ -339,7 +340,7 @@ extension ArchiveWriter {
                 cInputPaths,
                 inputPaths.count,
                 options.skipMacJunk,
-                Int32(advancedOptions.zstdLevel),
+                Int32(effectiveLvl),
                 Int32(windowLog),
                 Int32(advancedOptions.cpuThreads),
                 password
