@@ -362,7 +362,7 @@ Add deterministic boundary and malformed stream regression test coverage to `sna
 
 #### Test Cases:
 1. **Empty Buffer**: 0-byte input stream.
-2. **Non-terminating Varint32**: 10 consecutive `0x80` bytes (exceeding maximum 32-bit varint length without termination).
+2. **Non-terminating Varint**: 10 consecutive `0x80` bytes (exceeding standard varint encoding length without a terminating 7-bit byte).
 3. **Oversized Varint with Immediate EOF**: Declares 1 GiB (`\x80\x80\x80\x80\x04`), but buffer terminates immediately without payload chunks.
 4. **Literal Run Overrun**: Tag specifies 60 literal bytes, but stream ends after 2 bytes.
 5. **Illegal LZ77 Copy Offset 0**: Tag encodes a copy offset of 0.
