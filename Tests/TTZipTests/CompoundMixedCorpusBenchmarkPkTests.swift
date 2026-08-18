@@ -125,6 +125,78 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
                 let savings = (1.0 - Double(outSize) / Double(totalBytes)) * 100.0
                 return (speed, ratio, savings, outSize)
             },
+            // pigz (Fast -1 multi-core)
+            BenchmarkCandidate(name: "pigz (ZIP Fast)", level: 1) {
+                let outZip = NSTemporaryDirectory() + "pigz_comp_1_\(UUID().uuidString).zip"
+                defer { try? FileManager.default.removeItem(atPath: outZip) }
+                let start = mach_absolute_time()
+                
+                let tarProc = Process()
+                tarProc.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
+                tarProc.arguments = ["-cf", "-", "-C", (workspaceDir as NSString).deletingLastPathComponent, (workspaceDir as NSString).lastPathComponent]
+                
+                let pigzProc = Process()
+                pigzProc.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/pigz")
+                pigzProc.arguments = ["-1", "-K", "-c"]
+                
+                let pipe = Pipe()
+                tarProc.standardOutput = pipe
+                pigzProc.standardInput = pipe
+                
+                let outPipe = Pipe()
+                pigzProc.standardOutput = outPipe
+                
+                try tarProc.run()
+                try pigzProc.run()
+                
+                let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+                tarProc.waitUntilExit()
+                pigzProc.waitUntilExit()
+                
+                let elapsed = Double(mach_absolute_time() - start) * 1e-9
+                try data.write(to: URL(fileURLWithPath: outZip))
+                let outSize = Int64(data.count)
+                let speed = totalMB / max(0.0001, elapsed)
+                let ratio = Double(totalBytes) / Double(max(1, outSize))
+                let savings = (1.0 - Double(outSize) / Double(totalBytes)) * 100.0
+                return (speed, ratio, savings, outSize)
+            },
+            // pigz (Normal -6 multi-core)
+            BenchmarkCandidate(name: "pigz (ZIP Normal)", level: 6) {
+                let outZip = NSTemporaryDirectory() + "pigz_comp_6_\(UUID().uuidString).zip"
+                defer { try? FileManager.default.removeItem(atPath: outZip) }
+                let start = mach_absolute_time()
+                
+                let tarProc = Process()
+                tarProc.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
+                tarProc.arguments = ["-cf", "-", "-C", (workspaceDir as NSString).deletingLastPathComponent, (workspaceDir as NSString).lastPathComponent]
+                
+                let pigzProc = Process()
+                pigzProc.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/pigz")
+                pigzProc.arguments = ["-6", "-K", "-c"]
+                
+                let pipe = Pipe()
+                tarProc.standardOutput = pipe
+                pigzProc.standardInput = pipe
+                
+                let outPipe = Pipe()
+                pigzProc.standardOutput = outPipe
+                
+                try tarProc.run()
+                try pigzProc.run()
+                
+                let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+                tarProc.waitUntilExit()
+                pigzProc.waitUntilExit()
+                
+                let elapsed = Double(mach_absolute_time() - start) * 1e-9
+                try data.write(to: URL(fileURLWithPath: outZip))
+                let outSize = Int64(data.count)
+                let speed = totalMB / max(0.0001, elapsed)
+                let ratio = Double(totalBytes) / Double(max(1, outSize))
+                let savings = (1.0 - Double(outSize) / Double(totalBytes)) * 100.0
+                return (speed, ratio, savings, outSize)
+            },
             // Apple Native (ditto - Archive Utility default)
             BenchmarkCandidate(name: "Apple Native (ditto)", level: 6) {
                 let outZip = NSTemporaryDirectory() + "apple_ditto_\(UUID().uuidString).zip"
@@ -227,7 +299,7 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
             to: artifactPath,
             width: 1920,
             height: 1080,
-            title: "Compound Real-World Workspace Benchmark (TTZip vs. 7-Zip vs. Apple Native)"
+            title: "Compound Real-World Workspace Benchmark (TTZip vs. 7-Zip vs. pigz vs. Apple Native)"
         )
         print("🏆 真实复合工程帕累托图已生成: \(artifactPath)")
         

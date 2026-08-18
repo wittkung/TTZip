@@ -31,6 +31,16 @@ size_t ttzip_libdeflate_compress(const void* src, size_t src_size, void* dst, si
 size_t ttzip_libdeflate_decompress(const void* src, size_t src_size, void* dst, size_t dst_capacity);
 size_t ttzip_raw_deflate_block_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity, int level, bool is_final);
 
+int ttzip_probe_entropy_and_compressibility(
+    const void* src,
+    size_t src_size,
+    size_t sample_limit,
+    double* entropy_out,
+    double* estimated_ratio_out
+);
+
+size_t ttzip_calculate_adaptive_block_size(double entropy, size_t file_size);
+
 typedef enum {
     TTZIP_CODEC_STORE = 0,
     TTZIP_CODEC_DEFLATE = 8,

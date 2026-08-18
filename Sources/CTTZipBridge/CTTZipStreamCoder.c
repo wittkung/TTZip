@@ -10,6 +10,7 @@
 #include "include/CTTZipPlatform.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <libdeflate.h>
 #include <limits.h>
 #include "lz4.h"
@@ -77,6 +78,87 @@ size_t ttzip_raw_deflate_block_compress(const void* src, size_t src_size, void* 
     size_t comp_size = (size_t)strm.total_out;
     deflateEnd(&strm);
     return comp_size;
+}
+
+int ttzip_probe_entropy_and_compressibility(
+    const void* src,
+    size_t src_size,
+    size_t sample_limit,
+    double* entropy_out,
+    double* estimated_ratio_out
+) {
+    if (!src || src_size == 0) {
+        if (entropy_out) *entropy_out = 0.0;
+        if (estimated_ratio_out) *estimated_ratio_out = 1.0;
+        return 0;
+    }
+    
+    size_t sample_len = (sample_limit > 0 && src_size > sample_limit) ? sample_limit : src_size;
+    if (sample_len > 4096) sample_len = 4096;
+    
+    // 1. 256-bin 栈上直方图 (Zero dynamic heap allocation!)
+    uint32_t freq[256];
+    memset(freq, 0, sizeof(freq));
+    const uint8_t* p = (const uint8_t*)src;
+    for (size_t i = 0; i < sample_len; i++) {
+        freq[p[i]]++;
+    }
+    
+    // 2. 计算香农信息熵 H = -sum(p_i * log2(p_i))
+    double entropy = 0.0;
+    double inv_sample = 1.0 / (double)sample_len;
+    for (int i = 0; i < 256; i++) {
+        if (freq[i] > 0) {
+            double prob = (double)freq[i] * inv_sample;
+            entropy -= prob * (log(prob) * 1.4426950408889634); // log2 = ln / ln(2)
+        }
+    }
+    
+    if (entropy_out) *entropy_out = entropy;
+    
+    // 3. 超轻量试探压缩
+    double estimated_ratio = 1.0;
+    if (entropy >= 7.35) {
+        uint8_t probe_dst[2048];
+        size_t probe_in_len = sample_len < 1024 ? sample_len : 1024;
+        size_t compressed = ttzip_libdeflate_compress(src, probe_in_len, probe_dst, sizeof(probe_dst), 1);
+        if (compressed > 0) {
+            estimated_ratio = (double)probe_in_len / (double)compressed;
+        } else {
+            estimated_ratio = 0.99;
+        }
+        
+        if (estimated_ratio_out) *estimated_ratio_out = estimated_ratio;
+        
+        if (estimated_ratio < 1.03) {
+            return 0; // Method 0 (Store Direct I/O)
+        }
+    } else {
+        estimated_ratio = 8.0 / (entropy > 0.5 ? entropy : 0.5);
+        if (estimated_ratio_out) *estimated_ratio_out = estimated_ratio;
+    }
+    
+    return 8; // Method 8 (Deflate)
+}
+
+size_t ttzip_calculate_adaptive_block_size(double entropy, size_t file_size) {
+    if (file_size <= 256 * 1024) {
+        return file_size > 65536 ? 65536 : (file_size > 0 ? file_size : 65536);
+    }
+    
+    if (entropy >= 7.35) {
+        return 0; // Direct Store (Method 0)
+    }
+    
+    if (entropy < 3.5) {
+        return 2 * 1024 * 1024; // Tier 1: 2048 KB (Large Dictionary)
+    }
+    
+    if (entropy < 6.0) {
+        return 512 * 1024;      // Tier 2: 512 KB (L2 Cache Golden Equilibrium)
+    }
+    
+    return 128 * 1024;          // Tier 3: 128 KB (L1D Cache Private Residency)
 }
 
 static TTZIP_THREAD_LOCAL LZ4_stream_t* g_tls_lz4_stream = NULL;

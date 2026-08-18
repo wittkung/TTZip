@@ -24,8 +24,8 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
     public func createExtremeArchive(
         outputPath: String,
         inputPath: String,
-        level: ArchiveCompressionLevel = .normal,
-        blockSize: Int = defaultBlockSize
+        level: ArchiveCompressionLevel = .fastest,
+        blockSize: Int = 0 // 0 = 基于香农熵与硬件缓存自适应推导
     ) throws -> Bool {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: inputPath) else { return false }
@@ -39,58 +39,81 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         let rawData = try Data(contentsOf: URL(fileURLWithPath: inputPath), options: .alwaysMapped)
         let uncompressedBytes = Int64(rawData.count)
         
+        // 0. 香农熵与试探可压缩性快速探测 (Microsecond SIMD Prober)
+        var entropyVal: Double = 0.0
+        var estimatedRatio: Double = 1.0
+        let routingMethod: Int32 = rawData.withUnsafeBytes { rawIn -> Int32 in
+            guard let baseAddr = rawIn.baseAddress else { return 8 }
+            return Int32(ttzip_probe_entropy_and_compressibility(baseAddr, rawData.count, 4096, &entropyVal, &estimatedRatio))
+        }
+        
+        let isDirectStore = (routingMethod == 0)
+        let compressionMethod: UInt16 = isDirectStore ? 0 : 8
+        
         // 1. 计算全局 CRC-32 (使用 Apple NEON SIMD 硬件指令)
         let totalCrc32: UInt32 = rawData.withUnsafeBytes { ptr -> UInt32 in
             guard let base = ptr.baseAddress else { return 0 }
             return ttzip_compute_buffer_crc32(base, rawData.count)
         }
         
-        // 2. 多核并发分块压缩 (18 核心饱和调度)
-        let actualBlockSize = max(65536, blockSize)
-        let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
-        let libdeflateLevel = Int32(min(12, max(1, level.rawValue)))
+        let compressedPayload: Data
+        let totalCompressedBytes: Int64
         
-        struct BlockResult: Sendable {
-            let data: Data
-            let uncompressedSize: Int
-        }
-        
-        let resultsBox = StateBoxResults([BlockResult?](repeating: nil, count: totalBlocks))
-        
-        rawData.withUnsafeBytes { rawIn in
-            guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-            let ptrBox = SendablePointerBox(pointer: baseAddr, size: rawData.count)
+        if isDirectStore {
+            // Direct Store (Method 0): 高熵数据零拷贝直通！
+            compressedPayload = rawData
+            totalCompressedBytes = uncompressedBytes
+        } else {
+            // 2. 基于熵与缓存拓扑的自适应分块多核并发压缩 (18 核心饱和调度)
+            let adaptiveSize = ttzip_calculate_adaptive_block_size(entropyVal, rawData.count)
+            let actualBlockSize = blockSize > 0 ? max(65536, blockSize) : (adaptiveSize > 0 ? adaptiveSize : 524288)
+            let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
+            let libdeflateLevel = Int32(min(12, max(1, level.rawValue)))
             
-            DispatchQueue.concurrentPerform(iterations: totalBlocks) { blockIdx in
-                let offset = blockIdx * actualBlockSize
-                let currentChunkSize = min(actualBlockSize, ptrBox.size - offset)
-                let chunkPtr = ptrBox.pointer.advanced(by: offset)
-                let isFinal = (blockIdx == totalBlocks - 1)
+            struct BlockResult: Sendable {
+                let data: Data
+                let uncompressedSize: Int
+            }
+            
+            let resultsBox = StateBoxResults([BlockResult?](repeating: nil, count: totalBlocks))
+            
+            rawData.withUnsafeBytes { rawIn in
+                guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+                let ptrBox = SendablePointerBox(pointer: baseAddr, size: rawData.count)
                 
-                let maxOut = currentChunkSize + 512
-                let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
-                defer { outBuf.deallocate() }
-                
-                let compSize = ttzip_raw_deflate_block_compress(chunkPtr, currentChunkSize, outBuf, maxOut, libdeflateLevel, isFinal)
-                
-                if compSize > 0 && compSize < currentChunkSize {
-                    let blockData = Data(bytes: outBuf, count: compSize)
-                    resultsBox.set(idx: blockIdx, res: BlockResult(data: blockData, uncompressedSize: currentChunkSize))
-                } else {
-                    // Fallback to uncompressed block if incompressible
-                    let blockData = Data(bytes: chunkPtr, count: currentChunkSize)
-                    resultsBox.set(idx: blockIdx, res: BlockResult(data: blockData, uncompressedSize: currentChunkSize))
+                DispatchQueue.concurrentPerform(iterations: totalBlocks) { blockIdx in
+                    let offset = blockIdx * actualBlockSize
+                    let currentChunkSize = min(actualBlockSize, ptrBox.size - offset)
+                    let chunkPtr = ptrBox.pointer.advanced(by: offset)
+                    let isFinal = (blockIdx == totalBlocks - 1)
+                    
+                    let maxOut = currentChunkSize + 512
+                    let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
+                    defer { outBuf.deallocate() }
+                    
+                    let compSize = ttzip_raw_deflate_block_compress(chunkPtr, currentChunkSize, outBuf, maxOut, libdeflateLevel, isFinal)
+                    
+                    if compSize > 0 && compSize < currentChunkSize {
+                        let blockData = Data(bytes: outBuf, count: compSize)
+                        resultsBox.set(idx: blockIdx, res: BlockResult(data: blockData, uncompressedSize: currentChunkSize))
+                    } else {
+                        // Fallback to uncompressed block if incompressible
+                        let blockData = Data(bytes: chunkPtr, count: currentChunkSize)
+                        resultsBox.set(idx: blockIdx, res: BlockResult(data: blockData, uncompressedSize: currentChunkSize))
+                    }
                 }
             }
-        }
-        
-        // 3. 顺序拼接压缩载荷
-        var compressedPayload = Data()
-        var totalCompressedBytes: Int64 = 0
-        for idx in 0..<totalBlocks {
-            guard let res = resultsBox.values[idx] else { return false }
-            compressedPayload.append(res.data)
-            totalCompressedBytes += Int64(res.data.count)
+            
+            // 3. 顺序拼接压缩载荷
+            var payload = Data()
+            var compBytes: Int64 = 0
+            for idx in 0..<totalBlocks {
+                guard let res = resultsBox.values[idx] else { return false }
+                payload.append(res.data)
+                compBytes += Int64(res.data.count)
+            }
+            compressedPayload = payload
+            totalCompressedBytes = compBytes
         }
         
         // 4. 构建标准 PKWARE ZIP 容器 (Local File Header + Central Directory + EOCD)
@@ -109,7 +132,8 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         lfh.append(contentsOf: [0x50, 0x4B, 0x03, 0x04]) // Signature: 0x04034B50
         lfh.append(contentsOf: [0x2D, 0x00])             // Version needed: 4.5 (ZIP64 capable)
         lfh.append(contentsOf: [0x00, 0x08])             // General purpose: UTF-8 bit 11 set (0x0800)
-        lfh.append(contentsOf: [0x08, 0x00])             // Compression method: 8 (Deflate)
+        var compMethodVal = compressionMethod
+        lfh.append(Data(bytes: &compMethodVal, count: 2)) // Compression method: 0 (Store) or 8 (Deflate)
         lfh.append(contentsOf: [0x00, 0x00, 0x21, 0x54]) // Modification time/date
         
         var crcVal = totalCrc32
@@ -152,7 +176,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         cd.append(contentsOf: [0x2D, 0x03])             // Version made by: UNIX (0x03) + v4.5 (0x2D)
         cd.append(contentsOf: [0x2D, 0x00])             // Version needed: 4.5
         cd.append(contentsOf: [0x00, 0x08])             // General purpose: UTF-8
-        cd.append(contentsOf: [0x08, 0x00])             // Compression method: 8 (Deflate)
+        cd.append(Data(bytes: &compMethodVal, count: 2)) // Compression method: 0 (Store) or 8 (Deflate)
         cd.append(contentsOf: [0x00, 0x00, 0x21, 0x54]) // Mod time/date
         cd.append(Data(bytes: &crcVal, count: 4))
         cd.append(Data(bytes: &compSize32, count: 4))
