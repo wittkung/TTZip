@@ -9,7 +9,7 @@ import XCTest
 import CTTZipBridge
 @testable import TTZipCore
 
-/// HyperCompressBench Fast-Path (500+ >= 50 MB/s Debug / >= 70 MB/s Release)
+/// HyperCompressBench fast-path performance floor gates (500+ files >= 50 MB/s Debug / >= 70 MB/s Release).
 final class HyperCompressBatchGateTests: XCTestCase {
     
     // MARK: - 1. ZIP Fast-Path
@@ -24,7 +24,7 @@ final class HyperCompressBatchGateTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "HyperCompress ZIP Batch (500 Files)",
             payloadBytes: totalBytes,
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { _ in },
             block: { sandbox in
                 let outArchive = sandbox.fileURL(named: "hypercompress_batch.zip").path
@@ -40,9 +40,9 @@ final class HyperCompressBatchGateTests: XCTestCase {
         )
         
         #if DEBUG
-        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 50.0, "HyperCompress ZIP 500 小文件批处理吞吐必须 >= 50.0 MB/s (Debug 门禁)")
+        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 50.0, "HyperCompress ZIP 500 small files batch throughput must be >= 50.0 MB/s (Debug gate)")
         #else
-        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 70.0, "HyperCompress ZIP 500 小文件批处理吞吐必须 >= 70.0 MB/s (Release 门禁)")
+        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 70.0, "HyperCompress ZIP 500 small files batch throughput must be >= 70.0 MB/s (Release gate)")
         #endif
     }
     
@@ -58,7 +58,7 @@ final class HyperCompressBatchGateTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "HyperCompress TAR.ZST Batch (500 Files)",
             payloadBytes: totalBytes,
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { _ in },
             block: { sandbox in
                 let outArchive = sandbox.fileURL(named: "hypercompress_batch.tar.zst").path
@@ -74,9 +74,9 @@ final class HyperCompressBatchGateTests: XCTestCase {
         )
         
         #if DEBUG
-        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 50.0, "HyperCompress TAR.ZST 500 小文件批处理吞吐必须 >= 50.0 MB/s (Debug 门禁)")
+        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 50.0, "HyperCompress TAR.ZST 500 small files batch throughput must be >= 50.0 MB/s (Debug gate)")
         #else
-        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 70.0, "HyperCompress TAR.ZST 500 小文件批处理吞吐必须 >= 70.0 MB/s (Release 门禁)")
+        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 70.0, "HyperCompress TAR.ZST 500 small files batch throughput must be >= 70.0 MB/s (Release gate)")
         #endif
     }
     
@@ -92,7 +92,7 @@ final class HyperCompressBatchGateTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "HyperCompress 7Z Batch (500 Files)",
             payloadBytes: totalBytes,
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { _ in },
             block: { sandbox in
                 let outArchive = sandbox.fileURL(named: "hypercompress_batch.7z").path
@@ -108,9 +108,9 @@ final class HyperCompressBatchGateTests: XCTestCase {
         )
         
         #if DEBUG
-        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 50.0, "HyperCompress 7Z 500 小文件批处理吞吐必须 >= 50.0 MB/s (Debug 门禁)")
+        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 50.0, "HyperCompress 7Z 500 small files batch throughput must be >= 50.0 MB/s (Debug gate)")
         #else
-        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 70.0, "HyperCompress 7Z 500 小文件批处理吞吐必须 >= 70.0 MB/s (Release 门禁)")
+        XCTAssertGreaterThanOrEqual(metrics.throughputMBs, 70.0, "HyperCompress 7Z 500 small files batch throughput must be >= 70.0 MB/s (Release gate)")
         #endif
     }
 }

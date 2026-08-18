@@ -47,23 +47,23 @@ final class StrategyPatternTests: XCTestCase {
         
         // 1.1 Store
         let storeSel = context.selectOptimalStrategy(inputPaths: ["test.txt"], targetFormat: .zip, level: .store)
-        XCTAssertTrue(storeSel is StoreStrategy, "Level = .store 时应选择 StoreStrategy")
+        XCTAssertTrue(storeSel is StoreStrategy, "Level = .store should select StoreStrategy")
         
         // 1.2 7z
         let sevenZipSel = context.selectOptimalStrategy(inputPaths: ["data.bin"], targetFormat: .sevenZip, level: .normal)
-        XCTAssertTrue(sevenZipSel is SevenZipStrategy, "TargetFormat = .sevenZip 时应选择 SevenZipStrategy")
+        XCTAssertTrue(sevenZipSel is SevenZipStrategy, "TargetFormat = .sevenZip should select SevenZipStrategy")
         
         // 1.3 Zstd
         let zstdSel = context.selectOptimalStrategy(inputPaths: ["log.txt"], targetFormat: .zst, level: .normal)
-        XCTAssertTrue(zstdSel is ZstdStrategy, "TargetFormat = .zst 时应选择 ZstdStrategy")
+        XCTAssertTrue(zstdSel is ZstdStrategy, "TargetFormat = .zst should select ZstdStrategy")
         
         // 1.4 POSIX Tar
         let tarSel = context.selectOptimalStrategy(inputPaths: ["archive.tar"], targetFormat: .tar, level: .store)
         XCTAssertTrue(tarSel is StoreStrategy || tarSel is POSIXTarStrategy)
         
-        // 1.5 ( .mp4, .png)
+        // 1.5 Pre-compressed media (.mp4, .png)
         let preCompressedSel = context.selectOptimalStrategy(inputPaths: ["video.mp4", "photo.png"], targetFormat: .zip, level: .normal)
-        XCTAssertTrue(preCompressedSel is StoreStrategy, "预压缩媒体文件应自动命中 StoreStrategy 免重复压缩")
+        XCTAssertTrue(preCompressedSel is StoreStrategy, "Pre-compressed media files should automatically select StoreStrategy")
     }
     
     func testCompressionPerformanceEstimation() throws {

@@ -38,12 +38,12 @@ final class InMemoryBenchmarkSuiteTests: XCTestCase {
     }
 
     func testInMemoryBenchmarkLowVarianceRepeatability() async throws {
-        let minDuration = TestBenchmarkTier.isBenchmarkMode ? 200 : 50
+        let minDuration = TestBenchmarkTier.isBenchmarkMode ? 200 : 100
         let config = InMemoryBenchmarkConfig(
             selectedFormats: ["zip"],
             selectedLevels: [1],
             bufferSizeBytes: 1 * 1024 * 1024, // 1MB
-            warmupPasses: 1,
+            warmupPasses: 2,
             minDurationMs: minDuration,
             useBinaryUnits: false
         )

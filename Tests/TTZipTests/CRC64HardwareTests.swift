@@ -166,16 +166,16 @@ final class CRC64HardwareTests: XCTestCase {
 
     func testComparativeSpeedupBenchmark() {
         let scenarios: [(name: String, size: Int, iterations: Int)] = [
-            ("64 KB 短切片", 64 * 1024, TestBenchmarkTier.benchmarkIterations(default: 50, benchmark: 2000)),
-            ("1 MB 中等缓冲", 1 * 1024 * 1024, TestBenchmarkTier.benchmarkIterations(default: 10, benchmark: 500)),
-            ("10 MB 标准块", 10 * 1024 * 1024, TestBenchmarkTier.benchmarkIterations(default: 2, benchmark: 100)),
-            ("50 MB 大文件", 50 * 1024 * 1024, TestBenchmarkTier.benchmarkIterations(default: 1, benchmark: 20))
+            ("64 KB Slice", 64 * 1024, TestBenchmarkTier.benchmarkIterations(default: 50, benchmark: 2000)),
+            ("1 MB Buffer", 1 * 1024 * 1024, TestBenchmarkTier.benchmarkIterations(default: 10, benchmark: 500)),
+            ("10 MB Block", 10 * 1024 * 1024, TestBenchmarkTier.benchmarkIterations(default: 2, benchmark: 100)),
+            ("50 MB Large", 50 * 1024 * 1024, TestBenchmarkTier.benchmarkIterations(default: 1, benchmark: 20))
         ]
 
         print("\n=========================================================================================================")
-        print("                 TTZip ARM64 PMULL CRC64 硬件加速 vs Scalar基准实测性能比对表")
+        print("                 TTZip ARM64 PMULL CRC64 Hardware Acceleration vs Scalar Benchmark")
         print("=========================================================================================================")
-        print(String(format: "%-16@ | %-12@ | %-18@ | %-18@ | %-18@ | %-12@", "Test Scenario", "Single Payload", "Baseline (lzma_crc64)", "Scalar (Slice-by-8)", "PMULL 硬件加速", "Speedup (Speedup)"))
+        print(String(format: "%-16@ | %-12@ | %-18@ | %-18@ | %-18@ | %-12@", "Test Scenario", "Single Payload", "Baseline (lzma_crc64)", "Scalar (Slice-by-8)", "PMULL Hardware", "Speedup (Speedup)"))
         print("---------------------------------------------------------------------------------------------------------")
 
         for s in scenarios {

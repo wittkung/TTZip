@@ -25,7 +25,7 @@ final class ArchiveEntropyEvaluatorTests: XCTestCase {
         try super.tearDownWithError()
     }
 
-    /// 1. ( / / )
+    /// 1. Tests low-entropy structured text data is not bypassed.
     func testLowEntropyDataNotBypassed() throws {
         let textPayload = String(repeating: "TTZip High-Performance Engine 2026 Structured Log Entry with Redundancy\n", count: 20000)
         let data = textPayload.data(using: .utf8)!
@@ -35,14 +35,14 @@ final class ArchiveEntropyEvaluatorTests: XCTestCase {
             count: data.count
         )
         
-        XCTAssertLessThan(entropy, 6.0, "文本与结构化数据 Shannon 熵应 < 6.0")
+        XCTAssertLessThan(entropy, 6.0, "Text and structured data Shannon entropy should be < 6.0")
         XCTAssertFalse(
             ArchiveEntropyEvaluator.shouldBypassCompression(data: data),
-            "低熵可压缩数据绝对不应跳过压缩"
+            "Low-entropy compressible data must not bypass compression"
         )
     }
 
-    /// 2. ( / )
+    /// 2. Tests high-entropy encrypted/random data is bypassed.
     func testHighEntropyDataBypassed() throws {
         var randomBytes = [UInt8](repeating: 0, count: 2 * 1024 * 1024)
         for i in 0..<randomBytes.count {
@@ -55,10 +55,10 @@ final class ArchiveEntropyEvaluatorTests: XCTestCase {
             count: data.count
         )
         
-        XCTAssertGreaterThan(entropy, 7.90, "真随机数与密文 Shannon 熵应 > 7.90")
+        XCTAssertGreaterThan(entropy, 7.90, "Random data and ciphertext Shannon entropy should be > 7.90")
         XCTAssertTrue(
             ArchiveEntropyEvaluator.shouldBypassCompression(data: data),
-            "高熵不可压缩数据应触发 Store 直通旁路"
+            "High-entropy incompressible data should trigger store bypass"
         )
     }
 
@@ -85,7 +85,7 @@ final class ArchiveEntropyEvaluatorTests: XCTestCase {
         )
     }
 
-    /// Validates expected behavior and invariants.
+    /// Validates expected behavior and user toggle invariants.
     func testSmartStoreBypassUserToggle() throws {
         var randomBytes = [UInt8](repeating: 0, count: 2 * 1024 * 1024)
         for i in 0..<randomBytes.count { randomBytes[i] = UInt8.random(in: 0...255) }
@@ -94,13 +94,13 @@ final class ArchiveEntropyEvaluatorTests: XCTestCase {
         ArchiveEntropyEvaluator.isSmartStoreBypassEnabled = false
         XCTAssertFalse(
             ArchiveEntropyEvaluator.shouldBypassCompression(data: data),
-            "当用户关闭智能直通时，即使极高熵数据也应强制压缩"
+            "When user disables smart bypass, high-entropy data must still be compressed"
         )
         
         ArchiveEntropyEvaluator.isSmartStoreBypassEnabled = true
         XCTAssertTrue(
             ArchiveEntropyEvaluator.shouldBypassCompression(data: data),
-            "当用户开启智能直通时，极高熵数据应自动直通"
+            "When user enables smart bypass, high-entropy data should automatically bypass"
         )
     }
 }

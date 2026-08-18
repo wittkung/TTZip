@@ -41,7 +41,7 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    // MARK: - 1. ExhaustiveBenchmarkRunner ZIP x x / x
+    // MARK: - 1. ExhaustiveBenchmarkRunner ZIP Matrix
     func testExhaustiveZipBenchmarkRunnerScenarios() async throws {
         let zipLevels: [ArchiveCompressionLevel] = TestBenchmarkTier.isBenchmarkMode
             ? [.store, .level1, .level6, .level9]
@@ -50,7 +50,7 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
         TTLogger.info("\n================================================================================")
         TTLogger.info("    📊 [TTZip Core Bench] Full ZIP scenarios (Store/Levels x Encrypted/Plain) empirical benchmark")
         TTLogger.info("================================================================================")
-        TTLogger.info(" Dataset                    | 格式   | Compression Level   | 加密   | Compression Throughput   | Decompression Throughput   | Elapsed Time (Enc/Dec)     | Compression Ratio | Physical Integrity")
+        TTLogger.info(" Dataset                    | Format | Compression Level   | Encrypted | Compression Throughput   | Decompression Throughput   | Elapsed Time (Enc/Dec)     | Compression Ratio | Physical Integrity")
         TTLogger.info("--------------------------------------------------------------------------------")
         
         let rows = try await ExhaustiveBenchmarkRunner.runExhaustiveMatrix(
@@ -76,30 +76,39 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
     func testSevenZipAllAlgorithmsAndOptions() async throws {
         let algorithms = ["LZMA2", "LZMA", "PPMd", "BZip2", "Deflate", "Copy"]
         let dictSizes = TestBenchmarkTier.isBenchmarkMode ? [16, 32, 64] : [16]
+        let baseFiles = sampleFiles
+        let baseTemp = tempDirPath!
         
-        for algo in algorithms {
-            for dictMB in dictSizes {
-                let archiveName = "test_7z_\(algo)_\(dictMB)MB.7z"
-                let outputPath = (tempDirPath as NSString).appendingPathComponent(archiveName)
-                
-                let writer = ArchiveWriter()
-                let advanced = ArchiveAdvancedOptions(
-                    algorithm: algo,
-                    dictionarySizeMB: dictMB,
-                    cpuThreads: 4,
-                    enableSolidArchive: (algo != "Copy"),
-                    encryptFileNames: false
-                )
-                
-                try await writer.createArchive(
-                    outputPath: outputPath,
-                    format: .sevenZip,
-                    level: (algo == "Copy") ? .store : .normal,
-                    inputPaths: sampleFiles,
-                    advancedOptions: advanced
-                )
-                
-                XCTAssertTrue(FileManager.default.fileExists(atPath: outputPath))
+        try await withThrowingTaskGroup(of: String.self) { group in
+            for algo in algorithms {
+                for dictMB in dictSizes {
+                    group.addTask {
+                        let archiveName = "test_7z_\(algo)_\(dictMB)MB.7z"
+                        let outputPath = (baseTemp as NSString).appendingPathComponent(archiveName)
+                        
+                        let writer = ArchiveWriter()
+                        let advanced = ArchiveAdvancedOptions(
+                            algorithm: algo,
+                            dictionarySizeMB: dictMB,
+                            cpuThreads: 2,
+                            enableSolidArchive: (algo != "Copy"),
+                            encryptFileNames: false
+                        )
+                        
+                        try await writer.createArchive(
+                            outputPath: outputPath,
+                            format: .sevenZip,
+                            level: (algo == "Copy") ? .store : .normal,
+                            inputPaths: baseFiles,
+                            advancedOptions: advanced
+                        )
+                        return outputPath
+                    }
+                }
+            }
+            
+            for try await path in group {
+                XCTAssertTrue(FileManager.default.fileExists(atPath: path))
             }
         }
     }
@@ -108,30 +117,39 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
     func testZipAllEncryptionsAndAlgorithms() async throws {
         let zipAlgos = ["Deflate", "Deflate64", "BZip2", "Store"]
         let encMethods = ["AES-256", "ZipCrypto"]
+        let baseFiles = sampleFiles
+        let baseTemp = tempDirPath!
         
-        for algo in zipAlgos {
-            for enc in encMethods {
-                let archiveName = "test_zip_\(algo)_\(enc).zip"
-                let outputPath = (tempDirPath as NSString).appendingPathComponent(archiveName)
-                
-                let writer = ArchiveWriter()
-                let advanced = ArchiveAdvancedOptions(
-                    algorithm: algo,
-                    cpuThreads: 0,
-                    zipEncryptionMethod: enc,
-                    zipEncodingUTF8: true
-                )
-                
-                try await writer.createArchive(
-                    outputPath: outputPath,
-                    format: .zip,
-                    level: (algo == "Store") ? .store : .normal,
-                    inputPaths: sampleFiles,
-                    password: "ZipPassWD!#$",
-                    advancedOptions: advanced
-                )
-                
-                XCTAssertTrue(FileManager.default.fileExists(atPath: outputPath))
+        try await withThrowingTaskGroup(of: String.self) { group in
+            for algo in zipAlgos {
+                for enc in encMethods {
+                    group.addTask {
+                        let archiveName = "test_zip_\(algo)_\(enc).zip"
+                        let outputPath = (baseTemp as NSString).appendingPathComponent(archiveName)
+                        
+                        let writer = ArchiveWriter()
+                        let advanced = ArchiveAdvancedOptions(
+                            algorithm: algo,
+                            cpuThreads: 0,
+                            zipEncryptionMethod: enc,
+                            zipEncodingUTF8: true
+                        )
+                        
+                        try await writer.createArchive(
+                            outputPath: outputPath,
+                            format: .zip,
+                            level: (algo == "Store") ? .store : .normal,
+                            inputPaths: baseFiles,
+                            password: "ZipPassWD!#$",
+                            advancedOptions: advanced
+                        )
+                        return outputPath
+                    }
+                }
+            }
+            
+            for try await path in group {
+                XCTAssertTrue(FileManager.default.fileExists(atPath: path))
             }
         }
     }

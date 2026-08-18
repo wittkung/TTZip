@@ -66,11 +66,29 @@ public final class FrontendBenchmarkRunner: Sendable {
             let clock = ContinuousClock()
             var matched = 0
             
-            let lowerQ = q.lowercased()
             let elapsed = clock.measure {
-                matched = entries.filter { entry in
-                    entry.name.lowercased().contains(lowerQ) || entry.path.lowercased().contains(lowerQ)
-                }.count
+                var count = 0
+                #if canImport(Darwin) || canImport(Glibc)
+                q.withCString { qPtr in
+                    for entry in entries {
+                        let matchName = entry.name.withCString { strcasestr($0, qPtr) != nil }
+                        if matchName {
+                            count += 1
+                        } else {
+                            let matchPath = entry.path.withCString { strcasestr($0, qPtr) != nil }
+                            if matchPath { count += 1 }
+                        }
+                    }
+                }
+                #else
+                let lowerQ = q.lowercased()
+                for entry in entries {
+                    if entry.name.localizedCaseInsensitiveContains(q) || entry.path.localizedCaseInsensitiveContains(q) {
+                        count += 1
+                    }
+                }
+                #endif
+                matched = count
             }
             
             let durationMs = Double(elapsed.components.seconds) * 1000.0 + (Double(elapsed.components.attoseconds) / 1e15)

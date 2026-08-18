@@ -90,27 +90,27 @@ final class ArchiveWriterTests: XCTestCase {
         let outputBase = (tempDirPath as NSString).appendingPathComponent("5.12.7z")
         let writer = ArchiveWriter()
         
-        // 7z (+ 2MB + )
+        // 7z store mode with 2MB split volume and password encryption
         try await writer.createArchive(
             outputPath: outputBase,
             format: .sevenZip,
             level: .store,
             inputPaths: [sourceDir],
-            splitVolumeSizeBytes: 2 * 1024 * 1024, // 2MB 分卷
+            splitVolumeSizeBytes: 2 * 1024 * 1024, // 2MB split volume
             password: "VerifyPassword123"
         )
         
-        // 1. ( 64 )
+        // 1. Verify split volume generation
         let vol1 = "\(outputBase).001"
         let vol2 = "\(outputBase).002"
-        XCTAssertTrue(FileManager.default.fileExists(atPath: vol1), "分卷 .001 必须真实生成")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: vol2), "分卷 .002 必须真实生成")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: vol1), "Split volume .001 must exist")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: vol2), "Split volume .002 must exist")
         
         let attr1 = try FileManager.default.attributesOfItem(atPath: vol1)
         let size1 = (attr1[.size] as? Int64) ?? 0
-        XCTAssertGreaterThan(size1, 1 * 1024 * 1024, "2MB 分卷体积必须大于 1MB，不能是假文件")
+        XCTAssertGreaterThan(size1, 1 * 1024 * 1024, "2MB split volume size must exceed 1MB")
         
-        // 2. ： 100%
+        // 2. Verify extraction and password decryption
         let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_out")
         try FileManager.default.createDirectory(atPath: extractDir, withIntermediateDirectories: true)
         
@@ -121,7 +121,7 @@ final class ArchiveWriterTests: XCTestCase {
             password: "VerifyPassword123"
         )
         
-        // 3. 100%
+        // 3. Verify extracted file content integrity
         var foundA: String? = nil
         var foundB: String? = nil
         if let enumerator = FileManager.default.enumerator(atPath: extractDir) {
@@ -131,20 +131,20 @@ final class ArchiveWriterTests: XCTestCase {
             }
         }
         
-        XCTAssertNotNil(foundA, "解压目标路径下必须查找到 video1.bin 文件")
-        XCTAssertNotNil(foundB, "解压目标路径下必须查找到 doc2.txt 文件")
+        XCTAssertNotNil(foundA, "Extracted destination must contain video1.bin")
+        XCTAssertNotNil(foundB, "Extracted destination must contain doc2.txt")
         
         let extractedFileA = foundA!
         let extractedFileB = foundB!
         
-        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFileA), "解压后视频文件必须完整存在")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFileB), "解压后文档文件必须完整存在")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFileA), "Extracted video file must exist")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFileB), "Extracted document file must exist")
         
         let extractedDataA = try Data(contentsOf: URL(fileURLWithPath: extractedFileA))
         let extractedDataB = try Data(contentsOf: URL(fileURLWithPath: extractedFileB))
         
-        XCTAssertEqual(extractedDataA.count, chunkA.count, "解压后的视频二进制数据体积必须 100% 无损对齐")
-        XCTAssertEqual(extractedDataB.count, chunkB.count, "解压后的文本数据体积必须 100% 无损对齐")
+        XCTAssertEqual(extractedDataA.count, chunkA.count, "Extracted binary payload size must match exactly")
+        XCTAssertEqual(extractedDataB.count, chunkB.count, "Extracted text payload size must match exactly")
     }
     
     func testAllFormatsCompressAndExtractVerification() async throws {
@@ -161,61 +161,68 @@ final class ArchiveWriterTests: XCTestCase {
             (.wim, "wim")
         ]
         
-        for (fmt, ext) in formats {
-            TTLogger.debug("🧪 Testing archive format: \(ext)...")
-            let sourceDir = (tempDirPath as NSString).appendingPathComponent("test_folder_\(ext)")
-            try FileManager.default.createDirectory(atPath: sourceDir, withIntermediateDirectories: true)
-            
-            let fileBinary = (sourceDir as NSString).appendingPathComponent("media.bin")
-            let fileText = (sourceDir as NSString).appendingPathComponent("notes.txt")
-            
-            let binaryData = Data((0..<1024*1024).map { UInt8($0 % 256) }) // 1MB
-            let textData = "TTZip Verification Test Payload for \(ext)".data(using: .utf8)!
-            
-            try binaryData.write(to: URL(fileURLWithPath: fileBinary))
-            try textData.write(to: URL(fileURLWithPath: fileText))
-            
-            let archiveOutput = (tempDirPath as NSString).appendingPathComponent("archive_\(ext).\(ext)")
-            let writer = ArchiveWriter()
-            try await writer.createArchive(
-                outputPath: archiveOutput,
-                format: fmt,
-                level: .normal,
-                inputPaths: [sourceDir]
-            )
-            
-            // 1.
-            XCTAssertTrue(FileManager.default.fileExists(atPath: archiveOutput), "格式 \(ext) 必须成功生成压缩包")
-            let attrs = try FileManager.default.attributesOfItem(atPath: archiveOutput)
-            let fileSize = (attrs[.size] as? Int64) ?? 0
-            XCTAssertGreaterThan(fileSize, 500, "格式 \(ext) 生成的包体积必须大于 500 字节，非假文件")
-            
-            // 2.
-            let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_\(ext)")
-            try FileManager.default.createDirectory(atPath: extractDir, withIntermediateDirectories: true)
-            
-            let extractor = ArchiveExtractor()
-            try await extractor.extract(archivePath: archiveOutput, destinationDir: extractDir)
-            
-            let subFolderName = "test_folder_\(ext)"
-            var restoredBinary = (extractDir as NSString).appendingPathComponent("\(subFolderName)/media.bin")
-            var restoredText = (extractDir as NSString).appendingPathComponent("\(subFolderName)/notes.txt")
-            if !FileManager.default.fileExists(atPath: restoredBinary) {
-                let directBinary = (extractDir as NSString).appendingPathComponent("media.bin")
-                if FileManager.default.fileExists(atPath: directBinary) {
-                    restoredBinary = directBinary
-                    restoredText = (extractDir as NSString).appendingPathComponent("notes.txt")
+        let baseTemp = tempDirPath!
+        
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for (fmt, ext) in formats {
+                group.addTask {
+                    let sourceDir = (baseTemp as NSString).appendingPathComponent("test_folder_\(ext)")
+                    try FileManager.default.createDirectory(atPath: sourceDir, withIntermediateDirectories: true)
+                    
+                    let fileBinary = (sourceDir as NSString).appendingPathComponent("media.bin")
+                    let fileText = (sourceDir as NSString).appendingPathComponent("notes.txt")
+                    
+                    let binaryData = Data((0..<1024*1024).map { UInt8($0 % 256) }) // 1MB
+                    let textData = "TTZip Verification Test Payload for \(ext)".data(using: .utf8)!
+                    
+                    try binaryData.write(to: URL(fileURLWithPath: fileBinary))
+                    try textData.write(to: URL(fileURLWithPath: fileText))
+                    
+                    let archiveOutput = (baseTemp as NSString).appendingPathComponent("archive_\(ext).\(ext)")
+                    let writer = ArchiveWriter()
+                    try await writer.createArchive(
+                        outputPath: archiveOutput,
+                        format: fmt,
+                        level: .normal,
+                        inputPaths: [sourceDir]
+                    )
+                    
+                    // 1. Verify archive creation
+                    XCTAssertTrue(FileManager.default.fileExists(atPath: archiveOutput), "Format \(ext) must generate archive")
+                    let attrs = try FileManager.default.attributesOfItem(atPath: archiveOutput)
+                    let fileSize = (attrs[.size] as? Int64) ?? 0
+                    XCTAssertGreaterThan(fileSize, 500, "Format \(ext) size must exceed 500 bytes")
+                    
+                    // 2. Verify extraction
+                    let extractDir = (baseTemp as NSString).appendingPathComponent("extracted_\(ext)")
+                    try FileManager.default.createDirectory(atPath: extractDir, withIntermediateDirectories: true)
+                    
+                    let extractor = ArchiveExtractor()
+                    try await extractor.extract(archivePath: archiveOutput, destinationDir: extractDir)
+                    
+                    let subFolderName = "test_folder_\(ext)"
+                    var restoredBinary = (extractDir as NSString).appendingPathComponent("\(subFolderName)/media.bin")
+                    var restoredText = (extractDir as NSString).appendingPathComponent("\(subFolderName)/notes.txt")
+                    if !FileManager.default.fileExists(atPath: restoredBinary) {
+                        let directBinary = (extractDir as NSString).appendingPathComponent("media.bin")
+                        if FileManager.default.fileExists(atPath: directBinary) {
+                            restoredBinary = directBinary
+                            restoredText = (extractDir as NSString).appendingPathComponent("notes.txt")
+                        }
+                    }
+                    
+                    XCTAssertTrue(FileManager.default.fileExists(atPath: restoredBinary), "Format \(ext) extracted media.bin must exist")
+                    XCTAssertTrue(FileManager.default.fileExists(atPath: restoredText), "Format \(ext) extracted notes.txt must exist")
+                    
+                    let restoredBinaryData = try Data(contentsOf: URL(fileURLWithPath: restoredBinary))
+                    let restoredTextData = try Data(contentsOf: URL(fileURLWithPath: restoredText))
+                    
+                    XCTAssertEqual(restoredBinaryData, binaryData, "Format \(ext) binary data must match exactly")
+                    XCTAssertEqual(restoredTextData, textData, "Format \(ext) text data must match exactly")
                 }
             }
             
-            XCTAssertTrue(FileManager.default.fileExists(atPath: restoredBinary), "格式 \(ext) 解压后 media.bin 必须存在")
-            XCTAssertTrue(FileManager.default.fileExists(atPath: restoredText), "格式 \(ext) 解压后 notes.txt 必须存在")
-            
-            let restoredBinaryData = try Data(contentsOf: URL(fileURLWithPath: restoredBinary))
-            let restoredTextData = try Data(contentsOf: URL(fileURLWithPath: restoredText))
-            
-            XCTAssertEqual(restoredBinaryData, binaryData, "格式 \(ext) 解压二进制数据必须 100% 对齐")
-            XCTAssertEqual(restoredTextData, textData, "格式 \(ext) 解压文本数据必须 100% 对齐")
+            try await group.waitForAll()
         }
     }
 }
