@@ -41,7 +41,7 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    // MARK: - 1. ExhaustiveBenchmarkRunner ZIP x x / x
+    // MARK: - 1. ExhaustiveBenchmarkRunner ZIP Matrix
     func testExhaustiveZipBenchmarkRunnerScenarios() async throws {
         let zipLevels: [ArchiveCompressionLevel] = TestBenchmarkTier.isBenchmarkMode
             ? [.store, .level1, .level6, .level9]
@@ -50,7 +50,7 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
         TTLogger.info("\n================================================================================")
         TTLogger.info("    📊 [TTZip Core Bench] Full ZIP scenarios (Store/Levels x Encrypted/Plain) empirical benchmark")
         TTLogger.info("================================================================================")
-        TTLogger.info(" Dataset                    | 格式   | Compression Level   | 加密   | Compression Throughput   | Decompression Throughput   | Elapsed Time (Enc/Dec)     | Compression Ratio | Physical Integrity")
+        TTLogger.info(" Dataset                    | Format | Compression Level   | Encrypted | Compression Throughput   | Decompression Throughput   | Elapsed Time (Enc/Dec)     | Compression Ratio | Physical Integrity")
         TTLogger.info("--------------------------------------------------------------------------------")
         
         let rows = try await ExhaustiveBenchmarkRunner.runExhaustiveMatrix(

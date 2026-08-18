@@ -90,27 +90,27 @@ final class ArchiveWriterTests: XCTestCase {
         let outputBase = (tempDirPath as NSString).appendingPathComponent("5.12.7z")
         let writer = ArchiveWriter()
         
-        // 7z (+ 2MB + )
+        // 7z store mode with 2MB split volume and password encryption
         try await writer.createArchive(
             outputPath: outputBase,
             format: .sevenZip,
             level: .store,
             inputPaths: [sourceDir],
-            splitVolumeSizeBytes: 2 * 1024 * 1024, // 2MB 分卷
+            splitVolumeSizeBytes: 2 * 1024 * 1024, // 2MB split volume
             password: "VerifyPassword123"
         )
         
-        // 1. ( 64 )
+        // 1. Verify split volume generation
         let vol1 = "\(outputBase).001"
         let vol2 = "\(outputBase).002"
-        XCTAssertTrue(FileManager.default.fileExists(atPath: vol1), "分卷 .001 必须真实生成")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: vol2), "分卷 .002 必须真实生成")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: vol1), "Split volume .001 must exist")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: vol2), "Split volume .002 must exist")
         
         let attr1 = try FileManager.default.attributesOfItem(atPath: vol1)
         let size1 = (attr1[.size] as? Int64) ?? 0
-        XCTAssertGreaterThan(size1, 1 * 1024 * 1024, "2MB 分卷体积必须大于 1MB，不能是假文件")
+        XCTAssertGreaterThan(size1, 1 * 1024 * 1024, "2MB split volume size must exceed 1MB")
         
-        // 2. ： 100%
+        // 2. Verify extraction and password decryption
         let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_out")
         try FileManager.default.createDirectory(atPath: extractDir, withIntermediateDirectories: true)
         
@@ -121,7 +121,7 @@ final class ArchiveWriterTests: XCTestCase {
             password: "VerifyPassword123"
         )
         
-        // 3. 100%
+        // 3. Verify extracted file content integrity
         var foundA: String? = nil
         var foundB: String? = nil
         if let enumerator = FileManager.default.enumerator(atPath: extractDir) {
@@ -131,20 +131,20 @@ final class ArchiveWriterTests: XCTestCase {
             }
         }
         
-        XCTAssertNotNil(foundA, "解压目标路径下必须查找到 video1.bin 文件")
-        XCTAssertNotNil(foundB, "解压目标路径下必须查找到 doc2.txt 文件")
+        XCTAssertNotNil(foundA, "Extracted destination must contain video1.bin")
+        XCTAssertNotNil(foundB, "Extracted destination must contain doc2.txt")
         
         let extractedFileA = foundA!
         let extractedFileB = foundB!
         
-        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFileA), "解压后视频文件必须完整存在")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFileB), "解压后文档文件必须完整存在")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFileA), "Extracted video file must exist")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFileB), "Extracted document file must exist")
         
         let extractedDataA = try Data(contentsOf: URL(fileURLWithPath: extractedFileA))
         let extractedDataB = try Data(contentsOf: URL(fileURLWithPath: extractedFileB))
         
-        XCTAssertEqual(extractedDataA.count, chunkA.count, "解压后的视频二进制数据体积必须 100% 无损对齐")
-        XCTAssertEqual(extractedDataB.count, chunkB.count, "解压后的文本数据体积必须 100% 无损对齐")
+        XCTAssertEqual(extractedDataA.count, chunkA.count, "Extracted binary payload size must match exactly")
+        XCTAssertEqual(extractedDataB.count, chunkB.count, "Extracted text payload size must match exactly")
     }
     
     func testAllFormatsCompressAndExtractVerification() async throws {

@@ -41,7 +41,7 @@ final class SwarOptimizationBenchmarkTests: XCTestCase {
         print("  - Throughput:           \(String(format: "%.2f", throughputMBS)) MB/s")
         print("=======================================================\n")
 
-        XCTAssertGreaterThan(throughputMBS, 2000.0, "ASCII 扫描吞吐必须大于 2,000 MB/s")
+        XCTAssertGreaterThan(throughputMBS, 2000.0, "ASCII scan throughput must exceed 2,000 MB/s")
     }
 
     func testEncodingDetectionSpeedup() throws {
@@ -72,7 +72,7 @@ final class SwarOptimizationBenchmarkTests: XCTestCase {
         print("  - Detection Rate: \(String(format: "%.2f", opsPerSec / 1_000_000.0)) M ops/s")
         print("=======================================================\n")
 
-        XCTAssertGreaterThan(opsPerSec, 5_000_000.0, "编码探测速率必须大于 5M ops/s")
+        XCTAssertGreaterThan(opsPerSec, 5_000_000.0, "Encoding detection rate must exceed 5M ops/s")
     }
 
     func testFormatSniffingThroughput() throws {
@@ -124,9 +124,9 @@ final class SwarOptimizationBenchmarkTests: XCTestCase {
         print("=======================================================\n")
 
         #if DEBUG
-        XCTAssertGreaterThan(opsPerSec, 10_000_000.0, "头部探测速率在 Debug 模式下必须大于 10M sniffs/s")
+        XCTAssertGreaterThan(opsPerSec, 10_000_000.0, "Header format sniffing rate in Debug mode must exceed 10M sniffs/s")
         #else
-        XCTAssertGreaterThan(opsPerSec, 20_000_000.0, "头部探测速率在 Release 模式下必须大于 20M sniffs/s")
+        XCTAssertGreaterThan(opsPerSec, 20_000_000.0, "Header format sniffing rate in Release mode must exceed 20M sniffs/s")
         #endif
     }
 }

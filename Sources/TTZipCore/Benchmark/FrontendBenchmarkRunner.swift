@@ -68,6 +68,7 @@ public final class FrontendBenchmarkRunner: Sendable {
             
             let elapsed = clock.measure {
                 var count = 0
+                #if canImport(Darwin) || canImport(Glibc)
                 q.withCString { qPtr in
                     for entry in entries {
                         let matchName = entry.name.withCString { strcasestr($0, qPtr) != nil }
@@ -79,6 +80,14 @@ public final class FrontendBenchmarkRunner: Sendable {
                         }
                     }
                 }
+                #else
+                let lowerQ = q.lowercased()
+                for entry in entries {
+                    if entry.name.localizedCaseInsensitiveContains(q) || entry.path.localizedCaseInsensitiveContains(q) {
+                        count += 1
+                    }
+                }
+                #endif
                 matched = count
             }
             
