@@ -53,7 +53,16 @@ size_t ttzip_libdeflate_decompress(const void* src, size_t src_size, void* dst, 
     return (res == LIBDEFLATE_SUCCESS) ? actual_out : 0;
 }
 
-size_t ttzip_raw_deflate_block_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity, int level, bool is_final) {
+size_t ttzip_raw_deflate_block_compress_with_dict(
+    const void* src,
+    size_t src_size,
+    const void* dict_ptr,
+    size_t dict_size,
+    void* dst,
+    size_t dst_capacity,
+    int level,
+    bool is_final
+) {
     if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
     
     z_stream strm;
@@ -62,6 +71,13 @@ size_t ttzip_raw_deflate_block_compress(const void* src, size_t src_size, void* 
     int z_lvl = level > 0 ? (level > 9 ? 9 : level) : 6;
     int ret = deflateInit2(&strm, z_lvl, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
     if (ret != Z_OK) return 0;
+    
+    // 跨块 32KB 历史字典预热 (RFC 1951 Deflate 滑动窗口注入)
+    if (dict_ptr && dict_size > 0) {
+        size_t effective_dict = dict_size > 32768 ? 32768 : dict_size;
+        const Bytef* dict_start = ((const Bytef*)dict_ptr) + (dict_size - effective_dict);
+        deflateSetDictionary(&strm, dict_start, (uInt)effective_dict);
+    }
     
     strm.next_in = (Bytef*)src;
     strm.avail_in = (uInt)src_size;
@@ -78,6 +94,10 @@ size_t ttzip_raw_deflate_block_compress(const void* src, size_t src_size, void* 
     size_t comp_size = (size_t)strm.total_out;
     deflateEnd(&strm);
     return comp_size;
+}
+
+size_t ttzip_raw_deflate_block_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity, int level, bool is_final) {
+    return ttzip_raw_deflate_block_compress_with_dict(src, src_size, NULL, 0, dst, dst_capacity, level, is_final);
 }
 
 int ttzip_probe_entropy_and_compressibility(

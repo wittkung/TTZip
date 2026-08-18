@@ -62,7 +62,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                 if FileManager.default.fileExists(atPath: singlePath, isDirectory: &isDir), !isDir.boolValue {
                     let attrs = (try? FileManager.default.attributesOfItem(atPath: singlePath)) ?? [:]
                     let fileSize = (attrs[.size] as? Int64) ?? 0
-                    if fileSize >= 2 * 1024 * 1024 && context.level.rawValue <= 10 { // L1~L10: 极速多核分块通道 (90+ GB/s ~ 15 GB/s)
+                    if fileSize >= 2 * 1024 * 1024 { // L1~L12: 全量 18 核极速分块并行通道 + 32KB 跨块字典接力
                         let extremeOk = (try? ZipExtremeBlockWriter.shared.createExtremeArchive(
                             outputPath: context.archivePath,
                             inputPath: singlePath,
