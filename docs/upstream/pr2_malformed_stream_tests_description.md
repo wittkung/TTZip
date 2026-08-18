@@ -7,13 +7,15 @@ Add deterministic boundary and malformed stream regression test coverage to `sna
 > Huge thanks to the Snappy team for the continuous emphasis on memory safety and fuzzing robustness!
 
 ### Test Coverage Details
-`Snappy.MalformedStreamBoundaryExhaustion` asserts that `GetUncompressedLength()`, `IsValidCompressedBuffer()`, and `Uncompress()` gracefully reject corrupted byte sequences without out-of-bounds reads, memory leaks, or hangs across 8 specific boundary cases:
+`Snappy.MalformedStreamBoundaryExhaustion` asserts that `GetUncompressedLength()`, `IsValidCompressedBuffer()`, and `Uncompress()` handle corrupted byte sequences safely across 8 specific boundary cases, reinforcing resilience against malformed stream parsing errors and unintended memory exhaustion:
 
-> **Expected Behavior**: All APIs return `false` gracefully without crashing, hanging, leaking memory, or triggering undefined behavior, guaranteeing complete immunity against malicious OOM or CPU DoS attacks.
+- **`snappy::GetUncompressedLength()`**: Returns `false` on malformed/non-terminating varints (Cases 1, 2) or successfully parses declared length when the varint header is syntactically valid (Cases 3, 4, 5, 6, 7, 8).
+- **`snappy::IsValidCompressedBuffer()` & `snappy::Uncompress()`**: Return `false` gracefully without out-of-bounds reads, memory leaks, hangs, or triggering undefined behavior across all cases.
 
+#### Test Cases:
 1. **Empty Buffer**: 0-byte input stream.
 2. **Non-terminating Varint32**: 10 consecutive `0x80` bytes (exceeding maximum 32-bit varint length without termination).
-3. **Oversized Varint with Immediate EOF**: Declares 1 GiB (`\x80\x80\x80\x80\x04`), but buffer terminates immediately.
+3. **Oversized Varint with Immediate EOF**: Declares 1 GiB (`\x80\x80\x80\x80\x04`), but buffer terminates immediately without payload chunks.
 4. **Literal Run Overrun**: Tag specifies 60 literal bytes, but stream ends after 2 bytes.
 5. **Illegal LZ77 Copy Offset 0**: Tag encodes a copy offset of 0.
 6. **Lookback Offset Exceeding History (Backward OOB Defense)**: Copy offset (100 bytes) exceeds previously emitted history (4 bytes).
