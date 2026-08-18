@@ -134,14 +134,22 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let axisTextColor = NSColor(calibratedRed: 100/255.0, green: 116/255.0, blue: 139/255.0, alpha: 1.0)
 
         let candidateYTicks: [(val: Double, label: String)] = [
+            (1.0, "1 MB/s"),
+            (5.0, "5 MB/s"),
             (10.0, "10 MB/s"),
+            (20.0, "20 MB/s"),
             (50.0, "50 MB/s"),
             (100.0, "100 MB/s"),
+            (200.0, "200 MB/s"),
             (500.0, "500 MB/s"),
             (1000.0, "1,000 MB/s"),
             (2000.0, "2,000 MB/s"),
             (5000.0, "5,000 MB/s"),
-            (10000.0, "10,000 MB/s")
+            (10000.0, "10 GB/s"),
+            (20000.0, "20 GB/s"),
+            (50000.0, "50 GB/s"),
+            (100000.0, "100 GB/s"),
+            (200000.0, "200 GB/s")
         ]
 
         for tick in candidateYTicks {

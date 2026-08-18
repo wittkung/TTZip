@@ -215,6 +215,63 @@ public final class CorpusOrchestrator: @unchecked Sendable {
         return nil
     }
     
+    // MARK: - 4. 复合多模态工作区构建 (Compound Mixed Corpus Workspace)
+    
+    /// 将 5 大 Tier 全部真实语料与 500 微文件源码树物理编排为一个 ~250MB 真实大型工程项目目录
+    public func mountCompoundMixedWorkspace(at destinationDirectory: String) throws -> (totalBytes: Int64, totalFiles: Int) {
+        let fm = FileManager.default
+        if fm.fileExists(atPath: destinationDirectory) {
+            try? fm.removeItem(atPath: destinationDirectory)
+        }
+        try fm.createDirectory(atPath: destinationDirectory, withIntermediateDirectories: true)
+        
+        var totalBytes: Int64 = 0
+        var totalFiles: Int = 0
+        
+        let subdirs = [
+            ("docs", BenchmarkTierCategory.tier1Text),
+            ("binaries", BenchmarkTierCategory.tier2Binary),
+            ("database", BenchmarkTierCategory.tier3Structured),
+            ("src", BenchmarkTierCategory.tier4SourceTree),
+            ("assets", BenchmarkTierCategory.tier5DenseMatrix)
+        ]
+        
+        for (folder, tier) in subdirs {
+            let folderPath = (destinationDirectory as NSString).appendingPathComponent(folder)
+            try fm.createDirectory(atPath: folderPath, withIntermediateDirectories: true)
+            
+            let tierItems = items(for: tier)
+            for item in tierItems {
+                let dstPath = (folderPath as NSString).appendingPathComponent((item.path as NSString).lastPathComponent)
+                if !fm.fileExists(atPath: dstPath) {
+                    try? fm.copyItem(atPath: item.path, toPath: dstPath)
+                    let sz = (try? fm.attributesOfItem(atPath: dstPath)[.size] as? Int64) ?? item.sizeBytes
+                    totalBytes += sz
+                    totalFiles += 1
+                }
+            }
+        }
+        
+        // 补充 500 个真实微小文件源码树 (嵌套 JSON/Logs/Config/Headers)
+        let microSrcPath = (destinationDirectory as NSString).appendingPathComponent("src/micro_modules")
+        try fm.createDirectory(atPath: microSrcPath, withIntermediateDirectories: true)
+        
+        for dirIdx in 0..<10 {
+            let subDir = (microSrcPath as NSString).appendingPathComponent("module_\(dirIdx)")
+            try fm.createDirectory(atPath: subDir, withIntermediateDirectories: true)
+            for fileIdx in 0..<50 {
+                let filePath = (subDir as NSString).appendingPathComponent("source_\(fileIdx).json")
+                let content = "{\"id\": \(fileIdx), \"module\": \"mod_\(dirIdx)\", \"status\": \"active\", \"payload\": \"\(UUID().uuidString)-\(UUID().uuidString)\"}\n"
+                let data = content.data(using: .utf8)!
+                try data.write(to: URL(fileURLWithPath: filePath))
+                totalBytes += Int64(data.count)
+                totalFiles += 1
+            }
+        }
+        
+        return (totalBytes, totalFiles)
+    }
+    
     private func resolveEnwik8Path() -> String? {
         if let env = ProcessInfo.processInfo.environment["TTZIP_ENWIK8_PATH"], FileManager.default.fileExists(atPath: env) {
             return env
