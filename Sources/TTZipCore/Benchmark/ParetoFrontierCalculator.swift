@@ -44,6 +44,12 @@ public final class ParetoFrontierCalculator: @unchecked Sendable {
         return computeParetoFrontier(points: &points)
     }
 
+    /// 从直接构造的 ParetoPoint 数组中提取帕累托前沿
+    public func calculateFrontierFromPoints(points: [ParetoPoint]) -> ParetoFrontierResult {
+        var copy = points
+        return computeParetoFrontier(points: &copy)
+    }
+
     /// 执行 2D 扫描线与 Patience Binary Search 确定多级帕累托层级与上凸包
     public func computeParetoFrontier(points: inout [ParetoPoint]) -> ParetoFrontierResult {
         guard !points.isEmpty else {

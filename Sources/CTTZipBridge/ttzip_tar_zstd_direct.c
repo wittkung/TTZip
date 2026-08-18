@@ -165,8 +165,8 @@ static int add_item_to_zstd_stream(
         int in_fd = open(full_path, O_RDONLY);
         if (in_fd >= 0) {
             size_t file_bytes = ttzip_clamp_size((uint64_t)st.st_size);
-            if (file_bytes <= 65536) {
-                uint8_t stack_buf[65536];
+            if (file_bytes <= 4096) {
+                uint8_t stack_buf[4096];
                 ssize_t rd = pread(in_fd, stack_buf, file_bytes, 0);
                 if (rd == (ssize_t)file_bytes) {
                     ZSTD_inBuffer in_file = { stack_buf, file_bytes, 0 };
@@ -202,7 +202,7 @@ static int add_item_to_zstd_stream(
                     }
                     munmap(mapped, file_bytes);
                 } else {
-                    uint8_t read_chunk[65536];
+                    uint8_t read_chunk[4096];
                     ssize_t rd = 0;
                     while ((rd = read(in_fd, read_chunk, sizeof(read_chunk))) > 0) {
                         ZSTD_inBuffer in_file = { read_chunk, (size_t)rd, 0 };

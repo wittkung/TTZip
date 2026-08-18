@@ -68,6 +68,9 @@ Vendor/libTTZipVendor.a
 # ------------------------------------------------------------------------------
 # 6. Benchmark Outputs, Test Payloads & Scratch Debris
 # ------------------------------------------------------------------------------
+docs/benchmarks/*.png
+docs/benchmarks/*.svg
+docs/benchmarks/*.json
 ditto_out.zip
 keka_7z.7z
 keka_zip.zip

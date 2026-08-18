@@ -43,6 +43,28 @@ public struct ParetoPoint: Codable, Sendable, Identifiable, Equatable {
         self.isParetoOptimal = isParetoOptimal
         self.isOnConvexEnvelope = isOnConvexEnvelope
     }
+
+    public init(
+        algorithm: String,
+        level: Int,
+        throughputMBs: Double,
+        spaceSavingsPct: Double,
+        compressionRatio: Double = 1.0,
+        id: String? = nil,
+        compressedBytes: Int64 = 0,
+        uncompressedBytes: Int64 = 0
+    ) {
+        self.id = id ?? "\(algorithm.lowercased().replacingOccurrences(of: " ", with: "_"))_l\(level)"
+        self.algorithm = algorithm
+        self.level = level
+        self.throughputMBs = throughputMBs
+        self.spaceSavingsPct = spaceSavingsPct
+        self.compressedBytes = compressedBytes
+        self.uncompressedBytes = uncompressedBytes
+        self.paretoRank = 1
+        self.isParetoOptimal = false
+        self.isOnConvexEnvelope = false
+    }
 }
 
 /// 帕累托前沿分析完整结果集
@@ -158,5 +180,162 @@ public struct ScenarioRecommendation: Codable, Sendable, Equatable {
         self.projectedThroughputMBs = projectedThroughputMBs
         self.projectedSpaceSavingsPct = projectedSpaceSavingsPct
         self.probeDurationMs = probeDurationMs
+    }
+}
+
+// MARK: - 软件家族聚类与学术级轨迹建模 (DeepSWE / Gemini 3.7 Flash Architecture)
+
+/// 软件家族品牌定义
+public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendable {
+    case ttzip         = "TTZip"
+    case sevenZip      = "7-Zip"
+    case appleNative   = "Apple Native"
+    case keka          = "Keka"
+    case theUnarchiver = "The Unarchiver"
+    case other         = "Other"
+
+    public var id: String { rawValue }
+
+    /// 品牌主视觉色 (HEX)
+    public var brandColorHex: String {
+        switch self {
+        case .ttzip:         return "#2563EB" // Royal Blue (Hero)
+        case .sevenZip:      return "#D97706" // Amber / Warm Bronze
+        case .appleNative:   return "#DC2626" // Crimson Red
+        case .keka:          return "#0D9488" // Teal / Jade
+        case .theUnarchiver: return "#9333EA" // Purple
+        case .other:         return "#64748B" // Slate
+        }
+    }
+
+    /// 是否作为 Hero 软件渲染演进光晕带与突出药丸徽章
+    public var isHero: Bool { self == .ttzip }
+
+    /// 主轨迹线条宽度
+    public var lineWidth: Double { isHero ? 2.8 : 2.2 }
+
+    /// 轨迹光晕带宽度 (仅 Hero 具备)
+    public var haloRibbonWidth: Double { isHero ? 24.0 : 0.0 }
+}
+
+/// 软件家族轨迹线模型
+public struct SoftwareFamilyTrajectory: Sendable, Identifiable {
+    public var id: String { family.rawValue }
+    public let family: SoftwareFamily
+    public let points: [ParetoPoint]
+    public let heroPillPoint: ParetoPoint?
+
+    public init(family: SoftwareFamily, points: [ParetoPoint], heroPillPoint: ParetoPoint? = nil) {
+        self.family = family
+        self.points = points
+        self.heroPillPoint = heroPillPoint
+    }
+}
+
+/// 软件家族自动分类器
+public struct SoftwareFamilyClassifier: Sendable {
+    public static func classify(algorithm: String) -> SoftwareFamily {
+        let lower = algorithm.lowercased()
+        if lower.contains("ttzip") || lower.contains("ttz") {
+            return .ttzip
+        } else if lower.contains("7-zip") || lower.contains("7zip") || lower.contains("7zz") || lower.contains("p7zip") {
+            return .sevenZip
+        } else if lower.contains("apple") || lower.contains("ditto") || lower.contains("bom") || lower.contains("archive utility") {
+            return .appleNative
+        } else if lower.contains("keka") {
+            return .keka
+        } else if lower.contains("unarchiver") {
+            return .theUnarchiver
+        } else {
+            return .other
+        }
+    }
+
+    public static func groupTrajectories(from points: [ParetoPoint]) -> [SoftwareFamilyTrajectory] {
+        var groups: [SoftwareFamily: [ParetoPoint]] = [:]
+        for p in points {
+            let fam = classify(algorithm: p.algorithm)
+            groups[fam, default: []].append(p)
+        }
+
+        var trajectories: [SoftwareFamilyTrajectory] = []
+        for fam in SoftwareFamily.allCases {
+            if var famPoints = groups[fam], !famPoints.isEmpty {
+                famPoints.sort { (a, b) -> Bool in
+                    if a.throughputMBs != b.throughputMBs {
+                        return a.throughputMBs < b.throughputMBs
+                    }
+                    return a.spaceSavingsPct < b.spaceSavingsPct
+                }
+                let heroPill = fam.isHero ? (famPoints.last(where: { $0.isParetoOptimal }) ?? famPoints.last) : nil
+                trajectories.append(SoftwareFamilyTrajectory(family: fam, points: famPoints, heroPillPoint: heroPill))
+            }
+        }
+        return trajectories
+    }
+}
+
+/// 2D 三次贝塞尔曲线控制段
+public struct CubicBezierSegment: Sendable {
+    public let startPoint: (x: Double, y: Double)
+    public let controlPoint1: (x: Double, y: Double)
+    public let controlPoint2: (x: Double, y: Double)
+    public let endPoint: (x: Double, y: Double)
+}
+
+/// Fritsch-Carlson (1980) 单调保形三次 Hermite 样条插值转换器 (用于 DeepSWE 无过冲平滑曲线)
+public struct FritschCarlsonSplineCalculator: Sendable {
+    public static func calculateBezierSegments(points: [(x: Double, y: Double)]) -> [CubicBezierSegment] {
+        let n = points.count
+        guard n >= 2 else { return [] }
+        if n == 2 {
+            let p0 = points[0]
+            let p1 = points[1]
+            let cp1 = (x: p0.x + (p1.x - p0.x) / 3.0, y: p0.y + (p1.y - p0.y) / 3.0)
+            let cp2 = (x: p1.x - (p1.x - p0.x) / 3.0, y: p1.y - (p1.y - p0.y) / 3.0)
+            return [CubicBezierSegment(startPoint: p0, controlPoint1: cp1, controlPoint2: cp2, endPoint: p1)]
+        }
+
+        var h = [Double](repeating: 0, count: n - 1)
+        var delta = [Double](repeating: 0, count: n - 1)
+
+        for i in 0..<(n - 1) {
+            h[i] = max(1e-6, points[i + 1].x - points[i].x)
+            delta[i] = (points[i + 1].y - points[i].y) / h[i]
+        }
+
+        var d = [Double](repeating: 0, count: n)
+        d[0] = delta[0]
+        d[n - 1] = delta[n - 2]
+
+        for i in 1..<(n - 1) {
+            d[i] = (delta[i - 1] + delta[i]) / 2.0
+        }
+
+        for i in 0..<(n - 1) {
+            if abs(delta[i]) < 1e-9 {
+                d[i] = 0.0
+                d[i + 1] = 0.0
+            } else {
+                let alpha = d[i] / delta[i]
+                let beta = d[i + 1] / delta[i]
+                let norm = alpha * alpha + beta * beta
+                if norm > 9.0 {
+                    let tau = 3.0 / sqrt(norm)
+                    d[i] = tau * alpha * delta[i]
+                    d[i + 1] = tau * beta * delta[i]
+                }
+            }
+        }
+
+        var segments: [CubicBezierSegment] = []
+        for i in 0..<(n - 1) {
+            let p0 = points[i]
+            let p1 = points[i + 1]
+            let cp1 = (x: p0.x + h[i] / 3.0, y: p0.y + (d[i] * h[i]) / 3.0)
+            let cp2 = (x: p1.x - h[i] / 3.0, y: p1.y - (d[i + 1] * h[i]) / 3.0)
+            segments.append(CubicBezierSegment(startPoint: p0, controlPoint1: cp1, controlPoint2: cp2, endPoint: p1))
+        }
+        return segments
     }
 }
