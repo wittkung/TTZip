@@ -1,11 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import CTTZipBridge
 @testable import TTZipCore
 
-/// 使用 AsyncBenchmarkRunner 与 IsolatedTempSandbox 规范评估 Clock / CPU / Memory 性能指标
+/// AsyncBenchmarkRunner IsolatedTempSandbox Clock / CPU / Memory
 final class XCTestPerformanceMeasureTests: XCTestCase {
     
-    // MARK: - 1. ZIP Level 1 压缩性能硬门禁 (>= 1400 MB/s Debug / >= 1700 MB/s Release)
+    // MARK: - 1. ZIP Level 1 >= 1400 MB/s Debug / >= 1700 MB/s Release
     
     func testZipCompression_Level1_ThroughputFloor() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -30,13 +37,13 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
             }
         )
         #if DEBUG
-        XCTAssertGreaterThan(metrics.throughputMBs, 1500.0, "ZIP Level 1 (10MB) 压缩吞吐速率必须高于 1500 MB/s (Debug 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 1500.0, "ZIP Level 1 (10MB) Compression Throughput必须高于 1500 MB/s (Debug 模式硬门禁)")
         #else
-        XCTAssertGreaterThan(metrics.throughputMBs, 2000.0, "ZIP Level 1 (10MB) 压缩吞吐速率必须高于 2000 MB/s (Release 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 2000.0, "ZIP Level 1 (10MB) Compression Throughput必须高于 2000 MB/s (Release 模式硬门禁)")
         #endif
     }
 
-    // MARK: - 1.1 单体大文件 (50MB) ZIP Level 1 压缩性能硬门禁 (>= 1700 MB/s Debug / >= 2100 MB/s Release)
+    // MARK: - 1.1 50MB ZIP Level 1 >= 1700 MB/s Debug / >= 2100 MB/s Release
     
     func testZipCompression_SingleLargeFile_Level1_ThroughputFloor() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -67,7 +74,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
         #endif
     }
 
-    // MARK: - 2. ZIP Level 6 压缩性能硬门禁 (>= 1100 MB/s Debug / >= 1350 MB/s Release)
+    // MARK: - 2. ZIP Level 6 >= 1100 MB/s Debug / >= 1350 MB/s Release
     
     func testZipCompression_Level6_ThroughputFloor() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -93,14 +100,14 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
             }
         )
         #if DEBUG
-        XCTAssertGreaterThan(metrics.throughputMBs, 1100.0, "ZIP Level 6 压缩吞吐速率必须高于 1100 MB/s (Debug 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 1100.0, "ZIP Level 6 Compression Throughput必须高于 1100 MB/s (Debug 模式硬门禁)")
         #else
-        XCTAssertGreaterThan(metrics.throughputMBs, 1350.0, "ZIP Level 6 压缩吞吐速率必须高于 1350 MB/s (Release 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 1350.0, "ZIP Level 6 Compression Throughput必须高于 1350 MB/s (Release 模式硬门禁)")
         #endif
 
     }
     
-    // MARK: - 3. ZIP 极速解压性能硬门禁 (>= 7500 MB/s Debug / >= 10000 MB/s Release)
+    // MARK: - 3. ZIP >= 7500 MB/s Debug / >= 10000 MB/s Release
     
     func testZipDecompression_ThroughputFloor() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -123,13 +130,13 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
             }
         )
         #if DEBUG
-        XCTAssertGreaterThan(metrics.throughputMBs, 7500.0, "ZIP 解压吞吐速率必须高于 7500 MB/s (Debug 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 7500.0, "ZIP Decompression Throughput必须高于 7500 MB/s (Debug 模式硬门禁)")
         #else
-        XCTAssertGreaterThan(metrics.throughputMBs, 10000.0, "ZIP 解压吞吐速率必须高于 10000 MB/s (Release 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 10000.0, "ZIP Decompression Throughput必须高于 10000 MB/s (Release 模式硬门禁)")
         #endif
     }
     
-    // MARK: - 4. 7Z Level 1 极速压缩门禁 (>= 3200 MB/s Debug / >= 3900 MB/s Release)
+    // MARK: - 4. 7Z Level 1 >= 3200 MB/s Debug / >= 3900 MB/s Release
 
     func testSevenZipCompression_Level1_ThroughputFloor() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -160,7 +167,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
         #endif
     }
 
-    // MARK: - 4.1 7Z 极速解压性能硬门禁 (>= 6600 MB/s Debug / >= 7200 MB/s Release)
+    // MARK: - 4.1 7Z >= 6600 MB/s Debug / >= 7200 MB/s Release
 
     func testSevenZipDecompression_ThroughputFloor() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -184,13 +191,13 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
             }
         )
         #if DEBUG
-        XCTAssertGreaterThan(metrics.throughputMBs, 6600.0, "7Z 解压吞吐速率必须高于 6600 MB/s (Debug 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 6600.0, "7Z Decompression Throughput必须高于 6600 MB/s (Debug 模式硬门禁)")
         #else
-        XCTAssertGreaterThan(metrics.throughputMBs, 7200.0, "7Z 解压吞吐速率必须高于 7200 MB/s (Release 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 7200.0, "7Z Decompression Throughput必须高于 7200 MB/s (Release 模式硬门禁)")
         #endif
     }
 
-    // MARK: - 4.2 7Z 多固实块 (LZMA2 Level 5) 性能度量 (>= 480 MB/s Debug / >= 620 MB/s Release)
+    // MARK: - 4.2 7Z LZMA2 Level 5 >= 480 MB/s Debug / >= 620 MB/s Release
     
     func testSevenZipCompression_XCTestMeasureMetrics() async throws {
         guard SevenZipBinaryResolver.resolveBinaryPath() != nil else {
@@ -219,13 +226,13 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
             }
         )
         #if DEBUG
-        XCTAssertGreaterThan(metrics.throughputMBs, 480.0, "7Z 压缩吞吐速率必须高于 480 MB/s (Debug 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 480.0, "7Z Compression Throughput必须高于 480 MB/s (Debug 模式硬门禁)")
         #else
-        XCTAssertGreaterThan(metrics.throughputMBs, 620.0, "7Z 压缩吞吐速率必须高于 620 MB/s (Release 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 620.0, "7Z Compression Throughput必须高于 620 MB/s (Release 模式硬门禁)")
         #endif
     }
     
-    // MARK: - 5. 巨型文件 Store 模式 Direct I/O 度量 (>= 6000 MB/s Debug / >= 7500 MB/s Release)
+    // MARK: - 5. Store Direct I/O >= 6000 MB/s Debug / >= 7500 MB/s Release
     
     func testZipStore_HugeFile_XCTestMeasureMetrics() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -258,7 +265,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
         #endif
     }
     
-    // MARK: - 6. 批量小文件零分配流式扫描与打包硬门禁 (>= 50 MB/s Debug / >= 70 MB/s Release)
+    // MARK: - 6. >= 50 MB/s Debug / >= 70 MB/s Release
     
     func testZipBatchSmallFiles_XCTestMeasureMetrics() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -290,7 +297,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
         #endif
     }
 
-    // MARK: - 7. TAR.ZST Direct In-Process 流式打包硬门禁 (>= 15000 MB/s Debug / >= 22000 MB/s Release)
+    // MARK: - 7. TAR.ZST Direct In-Process >= 15000 MB/s Debug / >= 22000 MB/s Release
 
     func testTarZstdDirect_50MB_ThroughputFloor() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -321,7 +328,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
         #endif
     }
 
-    // MARK: - 8. 7Z AES-256 KDF ARMv8 硬件派生耗时硬门禁 (<= 17 ms Debug / <= 15 ms Release)
+    // MARK: - 8. 7Z AES-256 KDF ARMv8 <= 17 ms Debug / <= 15 ms Release
 
     func testSevenZipKdf_HardwareAcceleration_DurationFloor() throws {
         var key = [UInt8](repeating: 0, count: 32)
@@ -340,7 +347,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
         #endif
     }
 
-    // MARK: - 9. LZ4 进程内流式压缩性能硬门禁 (>= 6000 MB/s Debug / >= 10000 MB/s Release)
+    // MARK: - 9. LZ4 >= 6000 MB/s Debug / >= 10000 MB/s Release
 
     func testLZ4_Compression_ThroughputFloor() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -365,13 +372,13 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
             }
         )
         #if DEBUG
-        XCTAssertGreaterThan(metrics.throughputMBs, 6000.0, "LZ4 压缩吞吐速率必须高于 6000 MB/s (Debug 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 6000.0, "LZ4 Compression Throughput必须高于 6000 MB/s (Debug 模式硬门禁)")
         #else
-        XCTAssertGreaterThan(metrics.throughputMBs, 10000.0, "LZ4 压缩吞吐速率必须高于 10000 MB/s (Release 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 10000.0, "LZ4 Compression Throughput必须高于 10000 MB/s (Release 模式硬门禁)")
         #endif
     }
 
-    // MARK: - 10. TAR.XZ 进程内多核流式打包性能硬门禁 (>= 1200 MB/s Debug / >= 1800 MB/s Release)
+    // MARK: - 10. TAR.XZ >= 1200 MB/s Debug / >= 1800 MB/s Release
 
     func testTarXz_Compression_ThroughputFloor() async throws {
         let metrics = try await AsyncBenchmarkRunner.measure(
@@ -396,9 +403,9 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
             }
         )
         #if DEBUG
-        XCTAssertGreaterThan(metrics.throughputMBs, 1200.0, "TAR.XZ 压缩吞吐速率必须高于 1200 MB/s (Debug 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 1200.0, "TAR.XZ Compression Throughput必须高于 1200 MB/s (Debug 模式硬门禁)")
         #else
-        XCTAssertGreaterThan(metrics.throughputMBs, 1800.0, "TAR.XZ 压缩吞吐速率必须高于 1800 MB/s (Release 模式硬门禁)")
+        XCTAssertGreaterThan(metrics.throughputMBs, 1800.0, "TAR.XZ Compression Throughput必须高于 1800 MB/s (Release 模式硬门禁)")
         #endif
     }
 }

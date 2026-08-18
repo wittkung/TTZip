@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 @testable import TTZipApp
 @testable import TTZipCLI
 
-// MARK: - Mock 测试协议与辅助类型
+// MARK: - Mock
 
 private protocol TestServiceProtocol: AnyObject, Sendable {
     func execute() -> String
@@ -112,7 +119,7 @@ private final class MockEngineFacade: TTZipEngineFacading, @unchecked Sendable {
     }
 }
 
-// MARK: - 专项单元测试 (DependencyInjectionPatternTests)
+// MARK: - DependencyInjectionPatternTests
 
 final class DependencyInjectionPatternTests: XCTestCase {
     
@@ -129,7 +136,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         super.tearDown()
     }
     
-    // 1. Singleton 生命周期解析测试
+    // 1. Singleton
     func testSingletonLifetimeResolution() {
         testContainer.register(TestServiceProtocol.self, lifetime: .singleton) { _ in
             TestSingletonService()
@@ -141,7 +148,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertTrue(s1 === s2, "Singleton 应该多次 resolve 返回同一实例")
     }
     
-    // 2. Transient 生命周期解析测试
+    // 2. Transient
     func testTransientLifetimeResolution() {
         testContainer.register(TestServiceProtocol.self, lifetime: .transient) { _ in
             TestTransientService()
@@ -153,7 +160,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertFalse(s1 === s2, "Transient 应该每次 resolve 创建全新实例")
     }
     
-    // 3. Scoped 作用域解析测试
+    // 3. Scoped
     func testScopedLifetimeResolution() {
         testContainer.register(TestServiceProtocol.self, lifetime: .scoped) { _ in
             TestScopedService()
@@ -169,7 +176,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertFalse(a1 === b1, "不同 Scope 间应该相互隔离")
     }
     
-    // 4. @Injected 属性包装器注入测试
+    // 4. @Injected
     func testInjectedPropertyWrapper() {
         testContainer.register(TestServiceProtocol.self, lifetime: .singleton) { _ in
             TestSingletonService()
@@ -187,7 +194,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertTrue(comp.service.execute().contains("SingletonService"))
     }
     
-    // 5. @InjectedOptional 属性包装器测试
+    // 5. @InjectedOptional
     func testInjectedOptionalPropertyWrapper() {
         struct Component {
             @InjectedOptional var service: TestServiceProtocol?
@@ -204,7 +211,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertNotNil(comp2.service, "已注册时应当正确注入实例")
     }
     
-    // 6. 单元测试 Mock 动态覆写测试
+    // 6. Mock
     func testMockOverrideInTestMode() {
         testContainer.register(TTZipEngineFacading.self, lifetime: .singleton) { _ in
             TTZipEngineFacade.shared
@@ -212,7 +219,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         let realEngine = testContainer.resolveRequired(TTZipEngineFacading.self)
         XCTAssertTrue(realEngine is TTZipEngineFacade)
         
-        // 动态覆写为 Mock 实例
+        // Mock
         testContainer.register(TTZipEngineFacading.self, lifetime: .singleton) { _ in
             MockEngineFacade()
         }
@@ -220,7 +227,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertTrue(mockEngine is MockEngineFacade)
     }
     
-    // 7. 服务注销 unregister 测试
+    // 7. unregister
     func testUnregisterService() {
         testContainer.register(TestServiceProtocol.self, lifetime: .singleton) { _ in TestSingletonService() }
         XCTAssertNotNil(testContainer.resolve(TestServiceProtocol.self))
@@ -229,7 +236,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertNil(testContainer.resolve(TestServiceProtocol.self), "注销后应当无法 resolve")
     }
     
-    // 8. 容器重置 reset 测试
+    // 8. reset
     func testResetContainer() {
         testContainer.register(TestServiceProtocol.self, lifetime: .singleton) { _ in TestSingletonService() }
         XCTAssertNotNil(testContainer.resolve(TestServiceProtocol.self))
@@ -238,14 +245,14 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertNil(testContainer.resolve(TestServiceProtocol.self), "重置后全量注册数据应当被清空")
     }
     
-    // 9. resolveRequired 强校验测试
+    // 9. resolveRequired
     func testResolveRequiredSuccess() {
         testContainer.register(TestServiceProtocol.self, lifetime: .singleton) { _ in TestSingletonService() }
         let s = testContainer.resolveRequired(TestServiceProtocol.self)
         XCTAssertNotNil(s)
     }
     
-    // 10. 100+ 高并发线程并行 resolve 压测 (Zero Deadlock & Zero Race)
+    // 10. 100+ resolve (Zero Deadlock & Zero Race)
     func testHighConcurrencyParallelResolvePressureTest() {
         testContainer.register(TestServiceProtocol.self, lifetime: .singleton) { _ in TestSingletonService() }
         
@@ -270,7 +277,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         wait(for: [expectation], timeout: 5.0)
     }
     
-    // 11. 高并发并行注册与解析交织测试 (Zero Deadlock & Race)
+    // 11. (Zero Deadlock & Race)
     func testHighConcurrencyParallelRegisterAndResolve() {
         let expectation = expectation(description: "ConcurrentRegisterAndResolve")
         let totalCount = 100
@@ -296,7 +303,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         wait(for: [expectation], timeout: 5.0)
     }
     
-    // 12. 全量注册 20+ 核心服务映射测试
+    // 12. 20+
     func testRegisterAllServicesBootstrapping() {
         TTZipServiceRegistrar.registerAllServices(container: testContainer)
         
@@ -323,14 +330,14 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertNotNil(testContainer.resolve(LicenseManager.self))
     }
     
-    // 13. TTZipEngineFacading 依赖注入测试
+    // 13. TTZipEngineFacading
     func testEngineFacadeInjection() {
         TTZipServiceRegistrar.registerAllServices(container: testContainer)
         let facade = testContainer.resolveRequired(TTZipEngineFacading.self)
         XCTAssertTrue(facade is TTZipEngineFacade)
     }
     
-    // 14. Repositories 依赖注入测试
+    // 14. Repositories
     func testRepositoriesInjection() {
         TTZipServiceRegistrar.registerAllServices(container: testContainer)
         let presetRepo = testContainer.resolveRequired((any ArchivePresetRepositoryProtocol).self)
@@ -339,7 +346,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertTrue(historyRepo is JSONFileArchiveHistoryRepository)
     }
     
-    // 15. Mediator & EventCenter 依赖注入测试
+    // 15. Mediator & EventCenter
     func testMediatorAndEventCenterInjection() {
         TTZipServiceRegistrar.registerAllServices(container: testContainer)
         let mediator = testContainer.resolveRequired(ArchiveMediatorProtocol.self)
@@ -348,7 +355,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertTrue(eventCenter is ArchiveEventCenter)
     }
     
-    // 16. Proxies & Strategy Context 依赖注入测试
+    // 16. Proxies & Strategy Context
     func testProxiesAndStrategyContextInjection() {
         TTZipServiceRegistrar.registerAllServices(container: testContainer)
         let cacheProxy = testContainer.resolveRequired(ArchiveInspectionCacheProxy.self)
@@ -360,7 +367,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertTrue(charsetCtx === CharsetDetectionStrategyContext.shared)
     }
     
-    // 17. Caretakers 依赖注入测试
+    // 17. Caretakers
     func testCaretakersInjection() {
         TTZipServiceRegistrar.registerAllServices(container: testContainer)
         let presetCaretaker = testContainer.resolveRequired(PresetEditorCaretaker.self)
@@ -372,7 +379,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertNotNil(checkpointCaretaker)
     }
     
-    // 18. CLICommandRouter 依赖注入集成测试
+    // 18. CLICommandRouter
     func testCLICommandRouterInjectionIntegration() {
         TTZipServiceRegistrar.registerAllServices(container: DependencyContainer.shared)
         
@@ -388,7 +395,7 @@ final class DependencyInjectionPatternTests: XCTestCase {
         XCTAssertNotNil(tester.taskDispatcher)
     }
     
-    // 19. ViewModel 依赖注入贯穿验证
+    // 19. ViewModel
     @MainActor
     func testViewModelsInjectionIntegration() {
         TTZipServiceRegistrar.registerAllServices(container: DependencyContainer.shared)

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -25,7 +32,7 @@ final class RepositoryPatternTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    // MARK: - 1. Preset Repository CRUD 测试
+    // MARK: - 1. Preset Repository CRUD
     
     func testPresetRepositoryCRUD() throws {
         let repo = UserDefaultsPresetRepository(userDefaults: testUserDefaults, storageKey: "TestPresets")
@@ -66,7 +73,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertNil(afterDelete)
     }
     
-    // MARK: - 2. Password Repository CRUD 测试
+    // MARK: - 2. Password Repository CRUD
     
     func testPasswordRepositoryCRUD() throws {
         let repo = KeychainPasswordRepository.shared
@@ -86,7 +93,7 @@ final class RepositoryPatternTests: XCTestCase {
         try repo.delete(id: entry.id)
     }
     
-    // MARK: - 3. History Repository CRUD 测试
+    // MARK: - 3. History Repository CRUD
     
     func testHistoryRepositoryCRUD() throws {
         let repo = JSONFileArchiveHistoryRepository(customFileURL: testHistoryURL)
@@ -116,7 +123,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertTrue(afterDelete.isEmpty)
     }
     
-    // MARK: - 4. DataMapper 双向转换保真度测试 (Preset)
+    // MARK: - 4. DataMapper Preset
     
     func testPresetDataMapperBidirectionalFidelity() throws {
         let mapper = PresetDataMapper()
@@ -145,7 +152,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertEqual(restored.skipGitDirectory, original.skipGitDirectory)
     }
     
-    // MARK: - 5. DataMapper 版本升级平滑迁移测试
+    // MARK: - 5. DataMapper
     
     func testPresetDataMapperVersionUpgradeFallback() throws {
         let mapper = PresetDataMapper()
@@ -163,7 +170,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertEqual(restored.format, .sevenZip)
     }
     
-    // MARK: - 6. DataMapper 双向转换保真度测试 (Keychain)
+    // MARK: - 6. DataMapper Keychain
     
     func testKeychainDataMapperBidirectionalFidelity() throws {
         let mapper = KeychainDataMapper()
@@ -188,7 +195,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertEqual(restored.useCount, 5)
     }
     
-    // MARK: - 7. DataMapper 双向转换保真度测试 (History)
+    // MARK: - 7. DataMapper History
     
     func testArchiveHistoryDataMapperBidirectionalFidelity() throws {
         let mapper = ArchiveHistoryDataMapper()
@@ -214,7 +221,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertEqual(restored.fileSizeByte, 1048576)
     }
     
-    // MARK: - 8. 存储损坏或异常路径 Safe Fallback 容错测试 (UserDefaults)
+    // MARK: - 8. Safe Fallback UserDefaults
     
     func testUserDefaultsPresetRepositoryCorruptedDataFallback() throws {
         let key = "CorruptedPresetsKey"
@@ -223,12 +230,12 @@ final class RepositoryPatternTests: XCTestCase {
         let repo = UserDefaultsPresetRepository(userDefaults: testUserDefaults, storageKey: key)
         let presets = try repo.fetchAll()
         
-        // Safe Fallback: 必须降级恢复为系统默认预设，绝不崩溃
+        // Safe Fallback: ，
         XCTAssertFalse(presets.isEmpty)
         XCTAssertEqual(presets.first?.name, "7Z 20GB")
     }
     
-    // MARK: - 9. 存储损坏 Safe Fallback 容错测试 (Disk JSON)
+    // MARK: - 9. Safe Fallback Disk JSON
     
     func testJSONFileArchiveHistoryRepositoryCorruptedDiskFallback() throws {
         let corruptedFile = tempDirURL.appendingPathComponent("corrupted_history.json")
@@ -237,11 +244,11 @@ final class RepositoryPatternTests: XCTestCase {
         let repo = JSONFileArchiveHistoryRepository(customFileURL: corruptedFile)
         let records = try repo.fetchAll()
         
-        // Safe Fallback: 必须容错降级为空历史数组
+        // Safe Fallback:
         XCTAssertTrue(records.isEmpty)
     }
     
-    // MARK: - 10. 预设仓储原型复制测试
+    // MARK: - 10.
     
     func testPresetRepositoryDuplicateFromPrototype() throws {
         let repo = UserDefaultsPresetRepository(userDefaults: testUserDefaults, storageKey: "PrototypeKey")
@@ -257,7 +264,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertEqual(all.count, 6) // 4 built-in defaults + 1 saved + 1 cloned = 6
     }
     
-    // MARK: - 11. 历史仓储按照状态与时间降序检索测试
+    // MARK: - 11.
     
     func testHistoryRepositoryFetchRecentAndFilter() throws {
         let repo = JSONFileArchiveHistoryRepository(customFileURL: testHistoryURL)
@@ -281,7 +288,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertEqual(failed.first?.commandName, "Task 2")
     }
     
-    // MARK: - 12. 密码库仓储分类搜索测试
+    // MARK: - 12.
     
     func testPasswordRepositoryCategorySearch() throws {
         let repo = KeychainPasswordRepository.shared
@@ -301,7 +308,7 @@ final class RepositoryPatternTests: XCTestCase {
         try repo.delete(id: entry2.id)
     }
     
-    // MARK: - 13. 密码库仓储锁与解锁状态变更测试
+    // MARK: - 13.
     
     func testPasswordRepositoryLockUnlockState() throws {
         let repo = KeychainPasswordRepository.shared
@@ -313,7 +320,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertFalse(unlockSuccess)
     }
     
-    // MARK: - 14. PresetManager 与 Repository 贯穿集成测试
+    // MARK: - 14. PresetManager Repository
     
     func testPresetManagerIntegrationWithRepository() throws {
         let repo = UserDefaultsPresetRepository(userDefaults: testUserDefaults, storageKey: "PresetManagerIntegrationKey")
@@ -330,7 +337,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertNil(manager.preset(for: custom.id))
     }
     
-    // MARK: - 15. CommandHistoryManager 与 History Repository 贯穿集成测试
+    // MARK: - 15. CommandHistoryManager History Repository
     
     private struct MockRepositoryCommand: ArchiveCommandProtocol {
         let commandId: String = UUID().uuidString
@@ -358,7 +365,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertTrue(history.contains(where: { $0.commandName.contains("Compress Mock Task") }))
     }
     
-    // MARK: - 16. 100+ 高并发线程 Preset 仓储并发读写安全性测试 (Zero Race & Zero Data Loss)
+    // MARK: - 16. 100+ Preset Zero Race & Zero Data Loss
     
     func testHighConcurrency100ThreadsPresetRepositoryReadWrite() throws {
         let repo = UserDefaultsPresetRepository(userDefaults: testUserDefaults, storageKey: "ConcurrencyPresets")
@@ -388,7 +395,7 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(finalPresets.count, threadCount)
     }
     
-    // MARK: - 17. 100+ 高并发线程 History 仓储并发读写安全性测试 (Zero Race & Zero Data Loss)
+    // MARK: - 17. 100+ History Zero Race & Zero Data Loss
     
     func testHighConcurrency100ThreadsHistoryRepositoryReadWrite() throws {
         let repo = JSONFileArchiveHistoryRepository(customFileURL: testHistoryURL)
@@ -417,12 +424,14 @@ final class RepositoryPatternTests: XCTestCase {
         XCTAssertEqual(records.count, threadCount)
     }
     
-    // MARK: - 18. 高并发线程 Password 仓储并发读写安全性测试 (Zero Race & Zero Data Loss)
+    // MARK: - 18. Password Zero Race & Zero Data Loss
     
     func testHighConcurrency100ThreadsPasswordRepositoryReadWrite() throws {
+        PasswordVaultManager.shared.lockVault()
+        defer { PasswordVaultManager.shared.lockVault() }
         let repo = KeychainPasswordRepository.shared
         let expectation = expectation(description: "Concurrent Password Repository operations")
-        let threadCount = 20
+        let threadCount = 100
         expectation.expectedFulfillmentCount = threadCount
         
         for i in 0..<threadCount {

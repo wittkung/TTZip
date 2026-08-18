@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
 final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
     
-    /// 1. 验证 5 层深层嵌套目录树的完整递归压缩与解压提取
+    /// 1. 5
     func testDeepNestedDirectoryTreeCompression() async throws {
         let writer = ArchiveWriter()
         let reader = ArchiveReader()
@@ -22,7 +29,7 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
             let archivePath = tempDir.appendingPathComponent("deep_\(format.rawValue).\(format.rawValue)").path
             try await writer.createArchive(outputPath: archivePath, format: format, level: .normal, inputPaths: [tempDir.appendingPathComponent("L1").path])
             
-            // 校验包内条目数 (至少包含 L1, L2, L3, L4, L5 以及两个文件)
+            // ( L1, L2, L3, L4, L5 )
             let entries = try await reader.inspect(archivePath: archivePath)
             XCTAssertGreaterThanOrEqual(entries.count, 6, "格式 \(format) 未能完整递归压入深层目录树")
             
@@ -30,7 +37,7 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
             XCTAssertNotNil(leafEntry, "格式 \(format) 缺失叶子节点文件")
             XCTAssertGreaterThan(leafEntry?.uncompressedSize ?? 0, 0)
             
-            // 解压验证文件内容完整性
+            // Verify expected invariant
             let destDir = tempDir.appendingPathComponent("dest_\(format.rawValue)")
             try await extractor.extract(archivePath: archivePath, destinationDir: destDir.path)
             
@@ -41,7 +48,7 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         }
     }
     
-    /// 2. 验证包含中文、空格及特殊字符的目录树压缩
+    /// 2. 、
     func testChineseAndSpecialCharacterPathsCompression() async throws {
         let writer = ArchiveWriter()
         let reader = ArchiveReader()
@@ -65,7 +72,7 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         XCTAssertEqual(foundVideo?.uncompressedSize, 64 * 1024)
     }
     
-    /// 3. 验证多文件与多文件夹混合输入的打包行为
+    /// Validates expected behavior and invariants.
     func testMultiFolderAndMultiFileMixedInputs() async throws {
         let writer = ArchiveWriter()
         let reader = ArchiveReader()
@@ -98,7 +105,7 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(entries.count, 5, "混合多文件与多文件夹未被完整写入包中")
     }
     
-    /// 4. 验证 macOS 垃圾文件 (.DS_Store / __MACOSX) 在递归目录树中的自动过滤行为
+    /// 4. macOS (.DS_Store / __MACOSX)
     func testMacJunkFilteringInDirectoryTree() async throws {
         let writer = ArchiveWriter()
         let reader = ArchiveReader()
@@ -129,7 +136,7 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         XCTAssertTrue(hasMainSwift, "正常源码文件误遭剔除")
     }
     
-    /// 5. 验证分卷压缩切割功能 (7z / Zip 分卷 .001, .002...)
+    /// 5. (7z / Zip .001, .002...)
     func testSplitVolumeArchiveCreation() async throws {
         let writer = ArchiveWriter()
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("SplitVol_\(UUID().uuidString)")
@@ -155,7 +162,7 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: part1), "分卷压缩包 .001 卷未成功生成")
     }
     
-    /// 6. 验证密码加密与 Header 加密功能 (-p -mhe=on)
+    /// 6. Header (-p -mhe=on)
     func testPasswordEncrypted7zCreation() async throws {
         let writer = ArchiveWriter()
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("Enc_\(UUID().uuidString)")

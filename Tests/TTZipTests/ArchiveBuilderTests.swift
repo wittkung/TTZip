@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -19,7 +26,7 @@ final class ArchiveBuilderTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    // MARK: - ArchiveOptionsBuilder 单元测试
+    // MARK: - ArchiveOptionsBuilder
     
     func testArchiveOptionsBuilderDefaultInitialization() {
         let builder = ArchiveOptionsBuilder()
@@ -104,10 +111,10 @@ final class ArchiveBuilderTests: XCTestCase {
         XCTAssertEqual(built.zstdOptions.zstdLevel, 12)
     }
     
-    // MARK: - ArchivePipelineBuilder 单元测试
+    // MARK: - ArchivePipelineBuilder
     
     func testArchivePipelineBuilderValidationErrors() async {
-        // 无 OutputPath 尝试 create
+        // OutputPath create
         do {
             _ = try await ArchivePipelineBuilder()
                 .withInputPaths(["/tmp/test.txt"])
@@ -117,7 +124,7 @@ final class ArchiveBuilderTests: XCTestCase {
             XCTAssertTrue(error is ArchiveError)
         }
         
-        // 无 InputPaths 尝试 create
+        // InputPaths create
         do {
             _ = try await ArchivePipelineBuilder()
                 .withOutputPath("/tmp/out.zip")
@@ -127,7 +134,7 @@ final class ArchiveBuilderTests: XCTestCase {
             XCTAssertTrue(error is ArchiveError)
         }
         
-        // 无 ArchivePath 尝试 extract
+        // ArchivePath extract
         do {
             _ = try await ArchivePipelineBuilder()
                 .withDestinationDir("/tmp/out")
@@ -137,7 +144,7 @@ final class ArchiveBuilderTests: XCTestCase {
             XCTAssertTrue(error is ArchiveError)
         }
         
-        // 无 DestinationDir 尝试 extract
+        // DestinationDir extract
         do {
             _ = try await ArchivePipelineBuilder()
                 .withArchivePath("/tmp/arc.zip")

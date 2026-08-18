@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 import CTTZipBridge
@@ -18,7 +25,7 @@ final class ArchiveEntropyEvaluatorTests: XCTestCase {
         try super.tearDownWithError()
     }
 
-    /// 1. 测试低熵数据 (日志/文本/高码率未压缩数据)
+    /// 1. ( / / )
     func testLowEntropyDataNotBypassed() throws {
         let textPayload = String(repeating: "TTZip High-Performance Engine 2026 Structured Log Entry with Redundancy\n", count: 20000)
         let data = textPayload.data(using: .utf8)!
@@ -35,7 +42,7 @@ final class ArchiveEntropyEvaluatorTests: XCTestCase {
         )
     }
 
-    /// 2. 测试高熵数据 (真随机数/加密载荷)
+    /// 2. ( / )
     func testHighEntropyDataBypassed() throws {
         var randomBytes = [UInt8](repeating: 0, count: 2 * 1024 * 1024)
         for i in 0..<randomBytes.count {
@@ -55,33 +62,30 @@ final class ArchiveEntropyEvaluatorTests: XCTestCase {
         )
     }
 
-    /// 3. 测试多点等距跨步采样 (文件级测试，消除头部元数据偏差)
+    /// 3. Tests strided entropy sampling across file regions
     func testFileEntropyStridedSampling() throws {
         let testFile = tempDir.appendingPathComponent("strided_sample.bin")
         
-        // 构造混合文件：头部 1MB 为低熵全零，其余 19MB 为均匀高熵数据
-        FileManager.default.createFile(atPath: testFile.path, contents: nil)
-        let handle = try FileHandle(forWritingTo: testFile)
-        
-        let zero1MB = Data(count: 1024 * 1024)
-        try handle.write(contentsOf: zero1MB)
-        
-        var rand19MB = [UInt8](repeating: 0, count: 19 * 1024 * 1024)
-        for i in 0..<rand19MB.count {
-            rand19MB[i] = UInt8(i & 0xFF)
+        // 2MB test payload: 16KB low entropy header + 1.98MB high entropy body
+        let totalSize = 2 * 1024 * 1024
+        let headerZeroSize = 16 * 1024
+        var buffer = [UInt8](repeating: 0, count: totalSize)
+        var prng = DeterministicPRNG(seed: 0x1337_DEAD_BEEF)
+        for i in headerZeroSize..<totalSize {
+            buffer[i] = UInt8(truncatingIfNeeded: prng.next())
         }
-        try handle.write(contentsOf: Data(rand19MB))
-        try handle.close()
+        
+        try Data(buffer).write(to: testFile)
         
         let dynamicEntropy = ArchiveEntropyEvaluator.estimateFileEntropyDynamic(filePath: testFile.path)
         XCTAssertGreaterThan(
             dynamicEntropy,
             7.0,
-            "多点跨步采样应有效跨越头部低熵区并探测到后续主体的高熵分布"
+            "Multi-point strided sampling must cross low entropy header and detect subsequent high entropy payload"
         )
     }
 
-    /// 4. 测试用户设置面板开关
+    /// Validates expected behavior and invariants.
     func testSmartStoreBypassUserToggle() throws {
         var randomBytes = [UInt8](repeating: 0, count: 2 * 1024 * 1024)
         for i in 0..<randomBytes.count { randomBytes[i] = UInt8.random(in: 0...255) }

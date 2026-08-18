@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
@@ -51,7 +58,7 @@ final class MockMediatorComponent: ArchiveMediatorComponentProtocol, @unchecked 
     }
 }
 
-// MARK: - 【3.8 中介者模式 (Mediator Pattern)】15+ 专项单元测试套件
+// MARK: - 【3.8 Mediator Pattern 】15+
 
 final class MediatorPatternTests: XCTestCase {
     
@@ -67,7 +74,7 @@ final class MediatorPatternTests: XCTestCase {
         super.tearDown()
     }
     
-    // MARK: - 1. 组件注册/注销生命周期测试
+    // MARK: - 1. /
     func testComponentRegistrationAndUnregistrationLifecycle() {
         let mediator = ArchiveAppMediator.shared
         let comp1 = MockMediatorComponent(componentId: "Comp1")
@@ -95,7 +102,7 @@ final class MediatorPatternTests: XCTestCase {
         XCTAssertNil(comp2.mediator)
     }
     
-    // MARK: - 2. GUI 事件多播分发测试
+    // MARK: - 2. GUI
     func testGUIMulticastEventDispatch() {
         let mediator = ArchiveAppMediator.shared
         let comp1 = MockMediatorComponent(componentId: "Comp1")
@@ -109,7 +116,7 @@ final class MediatorPatternTests: XCTestCase {
         let testEvent = AppMediatorEvent.requestPasswordPrompt(archivePath: "/tmp/secret.zip")
         mediator.send(event: testEvent, from: comp1)
         
-        // comp1 为发送方，不应当接收到自己触发的多播
+        // comp1 ，
         XCTAssertEqual(comp1.appEventCount, 0)
         XCTAssertEqual(comp2.appEventCount, 1)
         XCTAssertEqual(comp3.appEventCount, 1)
@@ -117,7 +124,7 @@ final class MediatorPatternTests: XCTestCase {
         XCTAssertEqual(comp3.receivedAppEvents.first, testEvent)
     }
     
-    // MARK: - 3. 定向事件派发测试
+    // MARK: - 3.
     func testTargetedEventDispatch() {
         let mediator = ArchiveAppMediator.shared
         let compA = MockMediatorComponent(componentId: "CompA")
@@ -134,13 +141,13 @@ final class MediatorPatternTests: XCTestCase {
         XCTAssertEqual(compB.receivedAppEvents.first, targetEvent)
     }
     
-    // MARK: - 4. Core 引擎多服务解耦流程协同闭环测试
+    // MARK: - 4. Core
     func testCoreEngineExtractionToPasswordVaultRetryFlow() {
         let mediator = CoreEngineMediator.shared
         let engineComp = MockMediatorComponent(componentId: "EngineComp")
         mediator.register(component: engineComp)
         
-        // 注入 Mock 查找与重试处理句柄
+        // Mock
         mediator.passwordLookupHandler = { path in
             return path.contains("encrypted") ? "Pa$$w0rd" : nil
         }
@@ -156,7 +163,7 @@ final class MediatorPatternTests: XCTestCase {
             return true
         }
         
-        // 触发步骤 1: 解压失败需要密码
+        // 1:
         mediator.send(event: .extractionFailedNeedPassword(archivePath: "/tmp/encrypted_test.7z"))
         
         wait(for: [exp], timeout: 3.0)
@@ -191,7 +198,7 @@ final class MediatorPatternTests: XCTestCase {
         XCTAssertTrue(logs.contains(where: { $0.contains("Step 7: Temporary cleanup completed") }))
     }
     
-    // MARK: - 6. 100+ 高并发线程下事件中介派发的线程安全性测试 (Zero Deadlock)
+    // MARK: - 6. 100+ Zero Deadlock
     func testHighConcurrency100PlusThreadsDispatchSafetyNoDeadlock() {
         let mediator = ArchiveAppMediator.shared
         let componentCount = 50
@@ -219,7 +226,7 @@ final class MediatorPatternTests: XCTestCase {
         XCTAssertEqual(mediator.registeredComponentCount, componentCount)
     }
     
-    // MARK: - 7. 组件弱引用循环引用防范测试 (Weak Component Lifetime Safety)
+    // MARK: - 7. Weak Component Lifetime Safety
     func testWeakComponentLifetimeRetainCycleSafety() {
         let mediator = ArchiveAppMediator.shared
         
@@ -230,19 +237,19 @@ final class MediatorPatternTests: XCTestCase {
         XCTAssertEqual(mediator.registeredComponentCount, 1)
         XCTAssertNotNil(weakCompRef)
         
-        // 释放强引用
+        // Verify expected invariant
         strongComp = nil
         weakCompRef = nil
         
-        // 验证 ARC 释放无保留循环
+        // ARC
         XCTAssertNil(weakCompRef)
         
-        // 发送事件触发内部自动清理
+        // Verify expected invariant
         mediator.send(event: .openTab(tabIndex: 1))
         XCTAssertEqual(mediator.registeredComponentCount, 0)
     }
     
-    // MARK: - 8. AppViewState 中介者集成测试
+    // MARK: - 8. AppViewState
     @MainActor
     func testAppViewStateMediatorIntegration() {
         let appState = AppViewState()
@@ -260,7 +267,7 @@ final class MediatorPatternTests: XCTestCase {
         XCTAssertEqual(appState.activeTab, WorkspaceTab.presets)
     }
     
-    // MARK: - 9. PresetWorkspaceViewModel 中介者集成测试
+    // MARK: - 9. PresetWorkspaceViewModel
     @MainActor
     func testPresetWorkspaceViewModelMediatorIntegration() {
         let viewModel = PresetWorkspaceViewModel()
@@ -275,28 +282,28 @@ final class MediatorPatternTests: XCTestCase {
         }
     }
     
-    // MARK: - 10. CompressModalMediatorComponent 机制测试
+    // MARK: - 10. CompressModalMediatorComponent
     func testCompressModalMediatorComponentRegistration() {
         let comp = CompressModalMediatorComponent()
         XCTAssertEqual(comp.componentId, "CompressModalView")
         XCTAssertTrue(ArchiveAppMediator.shared.isRegistered(componentId: "CompressModalView"))
     }
     
-    // MARK: - 11. ExtractModalMediatorComponent 机制测试
+    // MARK: - 11. ExtractModalMediatorComponent
     func testExtractModalMediatorComponentRegistration() {
         let comp = ExtractModalMediatorComponent()
         XCTAssertEqual(comp.componentId, "ExtractModalView")
         XCTAssertTrue(ArchiveAppMediator.shared.isRegistered(componentId: "ExtractModalView"))
     }
     
-    // MARK: - 12. PasswordPromptMediatorComponent 机制测试
+    // MARK: - 12. PasswordPromptMediatorComponent
     func testPasswordPromptMediatorComponentRegistration() {
         let comp = PasswordPromptMediatorComponent()
         XCTAssertEqual(comp.componentId, "PasswordPromptSheetView")
         XCTAssertTrue(ArchiveAppMediator.shared.isRegistered(componentId: "PasswordPromptSheetView"))
     }
     
-    // MARK: - 13. AppMediatorEvent 载荷判等与属性测试
+    // MARK: - 13. AppMediatorEvent
     func testAppMediatorEventPayloadEqualityAndProperties() {
         let ev1 = AppMediatorEvent.requestPasswordPrompt(archivePath: "/tmp/a.zip")
         let ev2 = AppMediatorEvent.requestPasswordPrompt(archivePath: "/tmp/a.zip")
@@ -308,7 +315,7 @@ final class MediatorPatternTests: XCTestCase {
         XCTAssertEqual(AppMediatorEvent.openTab(tabIndex: 0).eventName, "openTab")
     }
     
-    // MARK: - 14. CoreEngineMediatorEvent 载荷判等与属性测试
+    // MARK: - 14. CoreEngineMediatorEvent
     func testCoreEngineMediatorEventPayloadEqualityAndProperties() {
         let e1 = CoreEngineMediatorEvent.extractionFailedNeedPassword(archivePath: "1.zip")
         let e2 = CoreEngineMediatorEvent.extractionFailedNeedPassword(archivePath: "1.zip")
@@ -320,7 +327,7 @@ final class MediatorPatternTests: XCTestCase {
         XCTAssertEqual(e3.eventName, "cleanupTempFiles")
     }
     
-    // MARK: - 15. 高并发极界下频繁注册/注销稳定性测试 (Zero Lock Deadlock)
+    // MARK: - 15. / Zero Lock Deadlock
     func testRapidRegisterUnregisterUnderHighConcurrency() {
         let mediator = ArchiveAppMediator.shared
         let exp = expectation(description: "Rapid Register Unregister")
@@ -338,7 +345,7 @@ final class MediatorPatternTests: XCTestCase {
         XCTAssertEqual(mediator.registeredComponentCount, 0)
     }
     
-    // MARK: - 16. AnonymousMediatorComponent 闭包响应测试
+    // MARK: - 16. AnonymousMediatorComponent
     func testAnonymousMediatorComponentHandling() {
         let mediator = ArchiveAppMediator.shared
         var receivedAppEvent: AppMediatorEvent? = nil

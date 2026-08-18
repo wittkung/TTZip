@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 
-/// 零依赖高性能物理测试文件生成器 (支持分块流式写入、mkfile 系统的秒级生成与 AES 加密生成)
+/// ( 、mkfile AES )
 public enum TestFileGenerator {
     
-    /// 1. 生成大量指定大小的小文件 (零内存溢出分块写入)
+    /// 1. ( )
     @discardableResult
     public static func createBatchSmallFiles(in directory: URL, count: Int, sizePerFileInKB: Int) throws -> [URL] {
         let fileManager = FileManager.default
@@ -19,7 +26,7 @@ public enum TestFileGenerator {
         return generatedURLs
     }
     
-    /// 2. 高效生成巨型文件 (使用 Foundation OutputStream 流式写入，避免 OOM)
+    /// 2. ( Foundation OutputStream ， OOM)
     public static func createHugeFile(at targetURL: URL, sizeInMB: Int) throws {
         let parentDir = targetURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
@@ -37,7 +44,7 @@ public enum TestFileGenerator {
         }
     }
 
-    /// 3. 生成真实日志测试文件
+    /// Validates expected behavior and invariants.
     public static func createRealisticLogFile(at targetURL: URL, linesCount: Int) throws {
         let parentDir = targetURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
@@ -51,7 +58,7 @@ public enum TestFileGenerator {
         try logData.write(to: targetURL)
     }
     
-    /// 4. 生成已加密的巨型文件 (使用 Apple CryptoKit AES-GCM)
+    /// 4. ( Apple CryptoKit AES-GCM)
     public static func createHugeEncryptedFile(at targetURL: URL, sizeInMB: Int) throws {
         let parentDir = targetURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
@@ -63,7 +70,7 @@ public enum TestFileGenerator {
         try combinedData.write(to: targetURL)
     }
     
-    /// 5. 利用 macOS 内置 `/usr/sbin/mkfile` 命令行瞬间创建 GB 级大文件
+    /// 5. macOS `/usr/sbin/mkfile` GB
     public static func createInstantHugeFile(atPath path: String, sizeInMB: Int) {
         let parentDir = (path as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
@@ -77,7 +84,7 @@ public enum TestFileGenerator {
     }
 }
 
-/// 统一的高标准测试输出与性能报告格式化组件
+/// Validates expected behavior and invariants.
 public enum TTZipTestLogger {
     public static func logHeader(_ title: String) {
         print("\n================================================================================")

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import CryptoKit
 @testable import TTZipCore
@@ -21,7 +28,7 @@ final class Phase123FeatureCoverageTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    // 1. 验证 128GB Apple Silicon 物理内存调优与长匹配视窗
+    // 1. 128GB Apple Silicon
     func testAppleSilicon128GBHardwareTuning() {
         let tuner = AppleSiliconTuner.shared
         XCTAssertGreaterThan(tuner.topology.totalCores, 0)
@@ -35,7 +42,7 @@ final class Phase123FeatureCoverageTests: XCTestCase {
         }
     }
     
-    // 2. 验证原生 C-Bridge Zstd 与 LZ4 高速加解密流
+    // 2. C-Bridge Zstd LZ4
     func testNativeCBridgeZstdAndLZ4Roundtrip() throws {
         let sampleText = String(repeating: "TTZip Pro Native C-Bridge Zstd & LZ4 High Speed Stream Payload 2026\n", count: 100)
         let sampleData = Data(sampleText.utf8)
@@ -51,7 +58,7 @@ final class Phase123FeatureCoverageTests: XCTestCase {
         XCTAssertEqual(zstdDecompressed, sampleData, "Zstd C-Bridge 解压数据应与源数据 100% 一致")
     }
     
-    // 3. 验证标准 Zip64 及 7z 加密分卷创建与解密提取
+    // 3. Zip64 7z
     func testStandardEncryptedSplitVolumeCreationAndExtraction() async throws {
         guard SevenZipBinaryResolver.resolveBinaryPath() != nil else {
             throw XCTSkip("7zz binary not available in local environment")
@@ -65,7 +72,7 @@ final class Phase123FeatureCoverageTests: XCTestCase {
         let splitOutDir = (tempDirPath as NSString).appendingPathComponent("split_out")
         try FileManager.default.createDirectory(atPath: splitOutDir, withIntermediateDirectories: true)
         
-        // 创建 7z 1MB 分卷
+        // 7z 1MB
         let splitFiles7z = try await splitEngine.createStandardEncryptedSplitVolume(
             format: .sevenZip,
             sourcePaths: [sampleFile],
@@ -76,7 +83,7 @@ final class Phase123FeatureCoverageTests: XCTestCase {
         )
         XCTAssertGreaterThan(splitFiles7z.count, 1, "7z 应成功拆分为多个分卷文件")
         
-        // 解压 7z 分卷验证
+        // 7z
         let extractDest7z = (tempDirPath as NSString).appendingPathComponent("extracted_7z_split")
         let extractor = ArchiveExtractor()
         try await extractor.extract(archivePath: splitFiles7z.first!, destinationDir: extractDest7z, password: password)
@@ -89,7 +96,7 @@ final class Phase123FeatureCoverageTests: XCTestCase {
         }
     }
     
-    // 4. 验证真实 7zz 命令行多线程密码恢复与破解引擎
+    // 4. 7zz
     func testRealPasswordRecoveryEngine() async throws {
         let sampleFile = (tempDirPath as NSString).appendingPathComponent("recover_sample.txt")
         try "Secret Archive Payload Content 2026".write(toFile: sampleFile, atomically: true, encoding: .utf8)
@@ -115,7 +122,7 @@ final class Phase123FeatureCoverageTests: XCTestCase {
         XCTAssertGreaterThan(result.attemptsPerSecond, 0)
     }
     
-    // 5. 验证二进制文件 (.dylib) 固实打包无损性
+    // 5. (.dylib)
     func testLosslessSolidArchiveEngineWithBinaryData() async throws {
         let dylibPath = (tempDirPath as NSString).appendingPathComponent("test_binary.dylib")
         var dummyDylib = Data([0xCF, 0xFA, 0xED, 0xFE]) // Mach-O 64-bit Header
@@ -139,7 +146,7 @@ final class Phase123FeatureCoverageTests: XCTestCase {
         XCTAssertEqual(extractedData, dummyDylib, "固实打包解压后的 Mach-O 二进制文件应 100% 保持字节精确比对无损")
     }
     
-    // 6. 验证 PasswordVault 自动匹配无感预览与解压
+    // 6. PasswordVault
     func testPasswordVaultAutoUnlockIntegration() async throws {
         let vaultManager = PasswordVaultManager.shared
         vaultManager.setMasterPassword("TestMasterPassword2026")
@@ -159,13 +166,13 @@ final class Phase123FeatureCoverageTests: XCTestCase {
             password: testPassword
         )
         
-        // 当不显式传入 password 参数时，ArchiveReader 自动尝试 PasswordVault 口令池无感解锁
+        // password ，ArchiveReader PasswordVault
         let reader = ArchiveReader()
         let entries = try await reader.inspect(archivePath: encryptedArchivePath, password: nil)
         XCTAssertFalse(entries.isEmpty, "PasswordVault 自动解锁应成功无感解析元数据")
         XCTAssertTrue(entries.contains(where: { $0.path.contains("vault_sample.txt") }))
         
-        // 当不显式传入 password 参数时，ArchiveExtractor 自动尝试 PasswordVault 口令池无感提取
+        // password ，ArchiveExtractor PasswordVault
         let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_vault_auto")
         let extractor = ArchiveExtractor()
         try await extractor.extract(archivePath: encryptedArchivePath, destinationDir: extractDir, password: nil)
@@ -174,7 +181,7 @@ final class Phase123FeatureCoverageTests: XCTestCase {
         XCTAssertTrue(allVaultFiles.contains(where: { $0.hasSuffix("vault_sample.txt") }), "PasswordVault 自动解锁应成功无感解压提取文件")
     }
     
-    // 7. 验证 16MB 页面对齐硬件级 HashCalculator & ArchiveIntegrityChecker 速率与正确性
+    // 7. 16MB HashCalculator & ArchiveIntegrityChecker
     func testPageAlignedHighThroughputHashCalculator() async throws {
         let sampleFile = (tempDirPath as NSString).appendingPathComponent("hash_sample.bin")
         let payload = Data(repeating: 0x55, count: 10 * 1024 * 1024) // 10MB

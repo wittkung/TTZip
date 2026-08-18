@@ -24,7 +24,7 @@ final class GUILocalizationTests: XCTestCase {
         XCTAssertFalse(extractEn.isEmpty)
         XCTAssertEqual(extractEn, "Extract")
         
-        // 2. Switch to 简体中文
+        // 2. Switch to
         state.setLanguage(.zhHans)
         XCTAssertEqual(state.currentLanguage, .zhHans)
         XCTAssertEqual(TTZipLocalizationManager.shared.currentLanguage, .zhHans)

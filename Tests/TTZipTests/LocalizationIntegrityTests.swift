@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -5,7 +12,7 @@ final class LocalizationIntegrityTests: XCTestCase {
     
     let allLangs: [AppLanguage] = [.en, .zhHans, .zhHant, .ja, .de, .fr, .es]
     
-    // MARK: - 1. 7 种语言字典 Key 100% 完备性断言
+    // MARK: - 1. 7 Key 100%
     
     func testAllKeysPresentInAllSevenLanguages() {
         let allKeys = L10n.allRawKeys
@@ -20,7 +27,7 @@ final class LocalizationIntegrityTests: XCTestCase {
         }
     }
     
-    // MARK: - 2. 占位符格式化符号类型与数量一致性断言
+    // MARK: - 2.
     
     func testFormatSpecifierParityAndTypeSafetyAcrossLanguages() {
         let allKeys = L10n.allRawKeys
@@ -47,10 +54,10 @@ final class LocalizationIntegrityTests: XCTestCase {
         }
     }
     
-    // MARK: - 3. 级联回退与动态格式化引擎测试
+    // MARK: - 3.
     
     func testCascadingFallbackAndDynamicFormatting() {
-        // 容量格式化 (SI vs IEC)
+        // (SI vs IEC)
         let si1MB = ByteSizeFormatter.format(bytes: 1_500_000, style: .metricSI, language: .en)
         XCTAssertEqual(si1MB, "1.5 MB")
         
@@ -60,7 +67,7 @@ final class LocalizationIntegrityTests: XCTestCase {
         let de1MB = ByteSizeFormatter.format(bytes: 1_500_000, style: .metricSI, language: .de)
         XCTAssertEqual(de1MB, "1,5 MB")
         
-        // 吞吐速率格式化
+        // Verify expected invariant
         let speedEn = ThroughputFormatter.format(mbPerSec: 1250.5, language: .en)
         XCTAssertEqual(speedEn, "1250.5 MB/s")
         
@@ -68,7 +75,7 @@ final class LocalizationIntegrityTests: XCTestCase {
         XCTAssertEqual(speedFr, "1250,5 MB/s")
     }
     
-    // MARK: - 4. 孤立无效键扫描 (No Orphan Keys)
+    // MARK: - 4. No Orphan Keys
     
     func testNoOrphanKeysInLanguagePacks() {
         let validKeys = Set(L10n.allRawKeys)

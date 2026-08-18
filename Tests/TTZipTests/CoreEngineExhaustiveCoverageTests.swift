@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -20,7 +27,7 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         try super.tearDownWithError()
     }
 
-    // 1. 测试 ArchiveEngineFactory 策略工厂模式与 Repository 协议绑定
+    // 1. ArchiveEngineFactory Repository
     func testArchiveEngineFactoryAndRepositories() {
         let writer: ArchiveWriting = ArchiveEngineFactory.makeWriter(for: .sevenZip)
         XCTAssertNotNil(writer)
@@ -31,7 +38,7 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         let reader: ArchiveReading = ArchiveEngineFactory.makeReader(for: .tar)
         XCTAssertNotNil(reader)
 
-        // 验证格式策略工厂方法分发
+        // Verify expected invariant
         let zipStrategy = ArchiveEngineFactory.makeStrategy(for: .zip)
         XCTAssertEqual(zipStrategy.format, .zip)
         XCTAssertTrue(zipStrategy.canHandle(path: "sample.zip"))
@@ -48,7 +55,7 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         XCTAssertEqual(zstdStrategy.format, .zst)
         XCTAssertTrue(zstdStrategy.canHandle(path: "data.zst"))
 
-        // 验证文件路径自动识别策略工厂方法
+        // Verify expected invariant
         let autoZipStrategy = ArchiveEngineFactory.makeStrategy(for: "document.zip")
         XCTAssertNotNil(autoZipStrategy)
         XCTAssertTrue(autoZipStrategy?.canHandle(path: "document.zip") ?? false)
@@ -57,7 +64,7 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         XCTAssertNotNil(auto7zStrategy)
         XCTAssertTrue(auto7zStrategy?.canHandle(path: "backup.7z") ?? false)
 
-        // 验证引擎与组件抽象工厂方法
+        // Verify expected invariant
         let integrityChecker: ArchiveIntegrityChecking = ArchiveEngineFactory.makeIntegrityChecker()
         XCTAssertNotNil(integrityChecker)
 
@@ -86,7 +93,7 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         XCTAssertFalse((try? presetRepo.fetchAll())?.isEmpty ?? true)
     }
 
-    // 2. 测试 FileWatcherEngine 文件双击编辑与监视刷回引擎
+    // 2. FileWatcherEngine
     func testFileWatcherEngine() throws {
         let watchFile = (tempDirPath as NSString).appendingPathComponent("watch_me.txt")
         try "Original Watch Content".write(toFile: watchFile, atomically: true, encoding: .utf8)
@@ -111,7 +118,7 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         watcher.stopWatching(filePath: watchFile)
     }
 
-    // 3. 测试 FinderSyncHelper 访达右键扩展动态菜单
+    // 3. FinderSyncHelper
     func testFinderSyncHelperMenuItems() {
         let helper = FinderSyncHelper.shared
 
@@ -128,7 +135,7 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         XCTAssertTrue(normalItems.contains(where: { $0.actionIdentifier == "compress_modal_advanced" }))
     }
 
-    // 4. 测试 LicenseManager 商业授权激活规则与功能门控
+    // 4. LicenseManager
     func testLicenseManagerActivationAndGatekeeping() {
         LicenseManager.simulateFreeTierInTests = true
         defer { LicenseManager.simulateFreeTierInTests = false }
@@ -158,7 +165,7 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         XCTAssertFalse(license.isPro)
     }
 
-    // 5. 测试 SecurityScanner 路径穿越与危险可执行文件拦截
+    // 5. SecurityScanner
     func testSecurityScanner() {
         let safeEntry = ArchiveEntry(path: "documents/readme.txt", uncompressedSize: 100, isDirectory: false)
         let traversalEntry = ArchiveEntry(path: "../../../etc/passwd", uncompressedSize: 500, isDirectory: false)
@@ -173,7 +180,7 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         XCTAssertTrue(result.suspiciousFileNames.contains("payload.exe"))
     }
 
-    // 6. 测试 ArchiveRepairEngine 扫描与修复逻辑
+    // 6. ArchiveRepairEngine
     func testArchiveRepairEngineFlow() async throws {
         let dummyFile = (tempDirPath as NSString).appendingPathComponent("repair_test.txt")
         try "Repair test string data".write(toFile: dummyFile, atomically: true, encoding: .utf8)
@@ -190,7 +197,7 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: repairedOutputPath))
     }
 
-    // 7. 测试 PresetManager 自定义预设管理与恢复
+    // 7. PresetManager
     func testPresetManagerCRUD() {
         let manager = PresetManager.shared
         let initialCount = manager.presets.count

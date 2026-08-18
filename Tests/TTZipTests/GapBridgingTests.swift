@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -78,7 +85,7 @@ final class GapBridgingTests: XCTestCase {
         vault.addEntry(label: "UnitTest Vault Key", password: "SecretPassword#2026", category: "测试")
         XCTAssertEqual(vault.getEntries().count, initialCount + 1)
         
-        // 验证重启持久化：重新实例化模拟应用重启
+        // ：
         let reopenedVault = PasswordVaultManager(
             vaultURL: tempDir.appendingPathComponent("vault.enc"),
             configURL: tempDir.appendingPathComponent("config.json"),
@@ -91,12 +98,12 @@ final class GapBridgingTests: XCTestCase {
         XCTAssertTrue(unlockSuccess)
         XCTAssertEqual(reopenedVault.getEntries().count, initialCount + 1, "重启并解锁后密码库条目未能从磁盘完美恢复")
         
-        // 测试重置密码库主口令并备份
+        // Verify expected invariant
         vault.resetMasterPassword(newMasterPassword: "NewMasterKey#2026")
         XCTAssertTrue(vault.hasBackupVault)
         XCTAssertEqual(vault.getEntries().count, 0) // 重置后主动清空当前库
         
-        // 测试通过输入原本的旧主口令找回历史密码
+        // Verify expected invariant
         let recoverySuccess = vault.recoverBackupVault(withOriginalMasterPassword: originalMaster)
         XCTAssertTrue(recoverySuccess)
         XCTAssertGreaterThanOrEqual(vault.getEntries().count, 1)

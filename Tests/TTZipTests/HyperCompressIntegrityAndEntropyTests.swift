@@ -1,12 +1,19 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import CryptoKit
 import CTTZipBridge
 @testable import TTZipCore
 
-/// HyperCompressBench 混合熵分流、Match-Finder Early-Exit 与解压哈希真实预言机闭环验证
+/// HyperCompressBench 、Match-Finder Early-Exit
 final class HyperCompressIntegrityAndEntropyTests: XCTestCase {
     
-    // MARK: - 1. 100% 逐文件解压哈希一致性验证 (Oracle-First 闭环)
+    // MARK: - 1. 100% Oracle-First
     
     func testRoundTripByteLevelIntegrity() async throws {
         let profile = MicroCorpusProfile(
@@ -34,7 +41,7 @@ final class HyperCompressIntegrityAndEntropyTests: XCTestCase {
             try? FileManager.default.removeItem(at: extractDir)
         }
         
-        // 1. 批量压缩
+        // 1.
         let writer = ArchiveWriter()
         try await writer.createArchive(
             outputPath: tempZip.path,
@@ -44,11 +51,11 @@ final class HyperCompressIntegrityAndEntropyTests: XCTestCase {
         )
         XCTAssertTrue(FileManager.default.fileExists(atPath: tempZip.path))
         
-        // 2. 解压
+        // 2.
         let extractor = ArchiveExtractor()
         try await extractor.extract(archivePath: tempZip.path, destinationDir: extractDir.path)
         
-        // 3. 逐文件比对原始哈希 (SHA-256 & CRC32)
+        // 3. (SHA-256 & CRC32)
         var verifiedCount = 0
         for item in generated.items {
             let extractedFileURL = extractDir
@@ -67,7 +74,7 @@ final class HyperCompressIntegrityAndEntropyTests: XCTestCase {
                     "文件大小必须与原始数据严格一致: \(item.relativePath)"
                 )
                 
-                // CRC32 校验
+                // CRC32
                 var extractedCRC: UInt32 = 0
                 extractedData.withUnsafeBytes { rawBuf in
                     if let ptr = rawBuf.baseAddress {
@@ -76,7 +83,7 @@ final class HyperCompressIntegrityAndEntropyTests: XCTestCase {
                 }
                 XCTAssertEqual(extractedCRC, item.crc32, "CRC32 校验和必须一致: \(item.relativePath)")
                 
-                // SHA-256 校验
+                // SHA-256
                 let digest = SHA256.hash(data: extractedData)
                 let sha256Hex = digest.map { String(format: "%02x", $0) }.joined()
                 XCTAssertEqual(sha256Hex, item.sha256Hex, "SHA-256 密码学哈希必须一致: \(item.relativePath)")
@@ -88,7 +95,7 @@ final class HyperCompressIntegrityAndEntropyTests: XCTestCase {
         XCTAssertEqual(verifiedCount, generated.items.count, "必须 100% 验证全部微文件")
     }
     
-    // MARK: - 2. 混合熵不可压缩碎片膨胀率与 Early-Exit 验证
+    // MARK: - 2. Early-Exit
     
     func testMixedEntropyEarlyExitEfficiency() async throws {
         let profile = MicroCorpusProfile(
@@ -122,7 +129,7 @@ final class HyperCompressIntegrityAndEntropyTests: XCTestCase {
         let attr = try FileManager.default.attributesOfItem(atPath: tempZip.path)
         let zipBytes = attr[.size] as? Int64 ?? 0
         
-        // 高熵不可压缩数据压缩后体积膨胀不得超过 3.0% (加上 ZIP 容器 Header 和 Deflate 块头)
+        // 3.0% ( ZIP Header Deflate )
         let maxAllowedBytes = Int64(Double(rawBytes) * 1.03) + 8192
         XCTAssertLessThanOrEqual(
             zipBytes,

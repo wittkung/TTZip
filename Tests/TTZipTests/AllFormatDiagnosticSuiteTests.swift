@@ -1,19 +1,26 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
 
-/// 全格式整合单项诊断测试主套件
+/// Validates expected behavior and invariants.
 ///
-/// 既可以一次性无缝测试全格式，也可在命令行通过 `--filter` 快速单项调试任意指定格式：
-/// - 单项测试 ZIP: `swift test --filter testZipDiagnostic`
-/// - 单项测试 7z:  `swift test --filter testSevenZipDiagnostic`
-/// - 单项测试 ZSTD: `swift test --filter testZstdDiagnostic`
-/// - 单项测试 GZIP: `swift test --filter testGzipDiagnostic`
-/// - 单项测试 TAR:  `swift test --filter testTarDiagnostic`
-/// - ... 依此类推
+/// ， `--filter` ：
+/// - ZIP: `swift test --filter testZipDiagnostic`
+/// - 7z: `swift test --filter testSevenZipDiagnostic`
+/// - ZSTD: `swift test --filter testZstdDiagnostic`
+/// - GZIP: `swift test --filter testGzipDiagnostic`
+/// - TAR: `swift test --filter testTarDiagnostic`
+/// - ...
 final class AllFormatDiagnosticSuiteTests: XCTestCase {
 
-    /// 统一的高阶诊断断言抽取器 (零冗余代码)
+    /// ( )
     private static let supportedCreationFormats: Set<ArchiveCompressionFormat> = [
         .zip, .sevenZip, .tar, .tarGz, .gz, .tarZst, .zst, .tarBz2, .bz2, .tarXz, .xz,
         .lzip, .lz4, .brotli, .lrzip, .aar, .wim, .dmg, .iso
@@ -27,7 +34,7 @@ final class AllFormatDiagnosticSuiteTests: XCTestCase {
         line: UInt = #line
     ) throws {
         guard Self.supportedCreationFormats.contains(format) else {
-            throw XCTSkip("\(format.rawValue.uppercased()) 归档格式暂未集成原生 C 打包创建支持，跳过打包诊断测试")
+            throw XCTSkip("\(format.rawValue.uppercased()) format native C packing creation is not yet supported, skipping test")
         }
         let config = FormatDiagnosticConfig(
             format: format,
@@ -35,7 +42,7 @@ final class AllFormatDiagnosticSuiteTests: XCTestCase {
             testPasswordEncryption: testEncryption
         )
         let pass = try FormatDiagnosticSuiteRunner.shared.runDiagnosticSuite(config: config)
-        XCTAssertTrue(pass, "❌ [诊断测试断言失败] \(format.rawValue.uppercased()) (\(format.fileExtension)) 格式单项诊断测试未达到 100% 通过率", file: file, line: line)
+        XCTAssertTrue(pass, "❌ [Diagnostic assertion failure] \(format.rawValue.uppercased()) (\(format.fileExtension)) 格式单项诊断测试未达到 100% 通过率", file: file, line: line)
     }
 
     func testZipDiagnostic() throws { try assertDiagnosticPass(for: .zip, testEncryption: true) }

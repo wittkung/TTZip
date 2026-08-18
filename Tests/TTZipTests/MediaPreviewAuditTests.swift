@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import AppKit
 import AVFoundation
@@ -26,7 +33,7 @@ final class MediaPreviewAuditTests: XCTestCase {
     // MARK: - Test 1: Image Downsampling Reduces 50MP Mock Image
     
     func testImageDownsamplingReduces50MPMockImagePixelDimensions() throws {
-        // 1. 生成 50MP (8000 x 6250 = 50,000,000 pixels) 模拟图像
+        // 1. 50MP (8000 x 6250 = 50,000,000 pixels)
         let width = 8000
         let height = 6250
         let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -53,7 +60,7 @@ final class MediaPreviewAuditTests: XCTestCase {
             return
         }
         
-        // 2. 导出为 JPEG 数据以模拟真实磁盘/网络图片文件
+        // 2. JPEG /
         let jpegData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(jpegData as CFMutableData, "public.jpeg" as CFString, 1, nil) else {
             XCTFail("无法创建 CGImageDestination")
@@ -65,7 +72,7 @@ final class MediaPreviewAuditTests: XCTestCase {
         let fileURL = tempDirURL.appendingPathComponent("sample_50mp.jpg")
         try (jpegData as Data).write(to: fileURL)
         
-        // 3. 执行 ImageIO 下采样 (指定 maxPixelSize: 2048)
+        // 3. ImageIO ( maxPixelSize: 2048)
         let cache = ImageIOThumbnailCache.shared
         guard let downsampledDataImage = cache.downsample(data: jpegData as Data, maxPixelSize: 2048) else {
             XCTFail("从 Data 执行 ImageIO 下采样失败")
@@ -77,7 +84,7 @@ final class MediaPreviewAuditTests: XCTestCase {
             return
         }
         
-        // 4. 验证下采样后的像素尺寸 <= 2048px，并保持长宽比
+        // 4. <= 2048px，
         guard let cgData = downsampledDataImage.cgImage(forProposedRect: nil, context: nil, hints: nil),
               let cgFile = downsampledFileURLImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             XCTFail("无法提取下采样后的底层 CGImage")
@@ -100,7 +107,7 @@ final class MediaPreviewAuditTests: XCTestCase {
         cache.purgeCache()
         cache.resetStatistics()
         
-        // 1. 创建小型测试图像
+        // 1.
         let testImageURL = tempDirURL.appendingPathComponent("test_cache.png")
         let dummyContext = CGContext(
             data: nil,
@@ -119,19 +126,19 @@ final class MediaPreviewAuditTests: XCTestCase {
         let pngData = rep.representation(using: .png, properties: [:])!
         try pngData.write(to: testImageURL)
         
-        // 2. 首次查询：预期 Cache Miss
+        // 2. ： Cache Miss
         let first = cache.thumbnail(for: testImageURL, maxPixelSize: 512)
         XCTAssertNotNil(first)
         XCTAssertEqual(cache.missCount, 1)
         XCTAssertEqual(cache.hitCount, 0)
         
-        // 3. 二次查询：预期 Cache Hit
+        // 3. ： Cache Hit
         let second = cache.thumbnail(for: testImageURL, maxPixelSize: 512)
         XCTAssertNotNil(second)
         XCTAssertEqual(cache.missCount, 1)
         XCTAssertEqual(cache.hitCount, 1)
         
-        // 4. 并发安全性测试 (50 个线程并行访问)
+        // 4. (50 )
         let group = DispatchGroup()
         let iterations = 50
         
@@ -155,30 +162,30 @@ final class MediaPreviewAuditTests: XCTestCase {
     func testAudioVideoStoreTeardownLifecycle() throws {
         let store = SharedVideoPlayerStore()
         
-        // 创建模拟媒体文件
+        // Verify expected invariant
         let testMediaURL = tempDirURL.appendingPathComponent("mock_video.mp4")
         try Data("mock media stream content".utf8).write(to: testMediaURL)
         
-        // 1. 初始化播放器
+        // 1.
         store.setup(url: testMediaURL)
         XCTAssertNotNil(store.player)
         XCTAssertEqual(store.currentURL, testMediaURL)
         
-        // 2. 模拟播放器状态流转
+        // 2.
         store.togglePlayPause()
         XCTAssertTrue(store.isPlaying)
         
-        // 3. 执行严格 5 步清理协议
+        // 3. 5
         store.cleanUp()
         
-        // 4. 断言资源已彻底释放
+        // 4.
         XCTAssertNil(store.player, "Player 实例未置为 nil")
         XCTAssertNil(store.currentURL, "currentURL 未清空")
         XCTAssertFalse(store.isPlaying, "isPlaying 状态未重置")
         XCTAssertEqual(store.currentTime, 0, "currentTime 未清零")
         XCTAssertEqual(store.duration, 0, "duration 未清零")
         
-        // 5. 验证底层 AVPlayer replaceCurrentItem(with: nil) 行为
+        // 5. AVPlayer replaceCurrentItem(with: nil)
         let directPlayer = AVPlayer(url: testMediaURL)
         XCTAssertNotNil(directPlayer.currentItem)
         directPlayer.replaceCurrentItem(with: nil)
@@ -189,7 +196,7 @@ final class MediaPreviewAuditTests: XCTestCase {
     
     @MainActor
     func testDragProviderWrapsVirtualItemMetadata() throws {
-        // 1. 测试虚拟归档条目（已在 PreviewLRUCacheManager 缓存）
+        // 1. （ PreviewLRUCacheManager ）
         let mockArchivePath = "/Users/test/Documents/archive.zip"
         let mockSubpath = "assets/hero_banner.png"
         let virtualPath = "file://\(mockArchivePath)?subpath=\(mockSubpath)"
@@ -198,7 +205,7 @@ final class MediaPreviewAuditTests: XCTestCase {
         let hash = abs(mockArchivePath.hashValue).description + "_" + abs(filename.hashValue).description
         let targetCachedURL = PreviewLRUCacheManager.shared.targetURL(forKey: hash, filename: filename)
         
-        // 写入虚拟缓存实体
+        // Verify expected invariant
         let dummyData = Data("mock extracted png image".utf8)
         try dummyData.write(to: targetCachedURL)
         PreviewLRUCacheManager.shared.register(key: hash, fileURL: targetCachedURL)
@@ -217,7 +224,7 @@ final class MediaPreviewAuditTests: XCTestCase {
         XCTAssertEqual(cachedProvider.suggestedName, filename, "已缓存虚拟项拖拽 suggestedName 不匹配")
         XCTAssertTrue(cachedProvider.canLoadObject(ofClass: URL.self), "Drag provider 应支持加载 URL 对象")
         
-        // 2. 测试虚拟归档条目（未提前解压到缓存）
+        // 2. （ ）
         let uncachedVirtualPath = "file://\(mockArchivePath)?subpath=docs/manual.pdf"
         let uncachedItem = DiskItemInfo(
             virtualName: "manual.pdf",
@@ -232,7 +239,7 @@ final class MediaPreviewAuditTests: XCTestCase {
         let uncachedProvider = MillerColumnItemRowView.makeDragItemProvider(for: uncachedItem)
         XCTAssertEqual(uncachedProvider.suggestedName, "manual.pdf", "未缓存虚拟项拖拽 suggestedName 不匹配")
         
-        // 3. 测试普通物理磁盘文件
+        // 3.
         let physicalFile = tempDirURL.appendingPathComponent("regular_document.txt")
         try "hello ttzip".write(to: physicalFile, atomically: true, encoding: .utf8)
         

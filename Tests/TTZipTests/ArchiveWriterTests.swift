@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -68,7 +75,7 @@ final class ArchiveWriterTests: XCTestCase {
     }
     
     func testStoreModeDirectoryArchiveAndExtractVerification() async throws {
-        // 创建名为 "5.12" 的多文件目录
+        // "5.12"
         let sourceDir = (tempDirPath as NSString).appendingPathComponent("5.12")
         try FileManager.default.createDirectory(atPath: sourceDir, withIntermediateDirectories: true)
         
@@ -83,7 +90,7 @@ final class ArchiveWriterTests: XCTestCase {
         let outputBase = (tempDirPath as NSString).appendingPathComponent("5.12.7z")
         let writer = ArchiveWriter()
         
-        // 执行 7z 仅存储模式 (+ 2MB 分卷 + 密码加密)
+        // 7z (+ 2MB + )
         try await writer.createArchive(
             outputPath: outputBase,
             format: .sevenZip,
@@ -93,7 +100,7 @@ final class ArchiveWriterTests: XCTestCase {
             password: "VerifyPassword123"
         )
         
-        // 1. 验证生成的分卷文件存在且体积有效 (不能是 64 字节假文件)
+        // 1. ( 64 )
         let vol1 = "\(outputBase).001"
         let vol2 = "\(outputBase).002"
         XCTAssertTrue(FileManager.default.fileExists(atPath: vol1), "分卷 .001 必须真实生成")
@@ -103,7 +110,7 @@ final class ArchiveWriterTests: XCTestCase {
         let size1 = (attr1[.size] as? Int64) ?? 0
         XCTAssertGreaterThan(size1, 1 * 1024 * 1024, "2MB 分卷体积必须大于 1MB，不能是假文件")
         
-        // 2. 解压验证：解压还原并进行 100% 校验
+        // 2. ： 100%
         let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_out")
         try FileManager.default.createDirectory(atPath: extractDir, withIntermediateDirectories: true)
         
@@ -114,7 +121,7 @@ final class ArchiveWriterTests: XCTestCase {
             password: "VerifyPassword123"
         )
         
-        // 3. 校验解压出的内容与源文件 100% 完全一致
+        // 3. 100%
         var foundA: String? = nil
         var foundB: String? = nil
         if let enumerator = FileManager.default.enumerator(atPath: extractDir) {
@@ -177,13 +184,13 @@ final class ArchiveWriterTests: XCTestCase {
                 inputPaths: [sourceDir]
             )
             
-            // 1. 验证生成的文件存在且非空
+            // 1.
             XCTAssertTrue(FileManager.default.fileExists(atPath: archiveOutput), "格式 \(ext) 必须成功生成压缩包")
             let attrs = try FileManager.default.attributesOfItem(atPath: archiveOutput)
             let fileSize = (attrs[.size] as? Int64) ?? 0
             XCTAssertGreaterThan(fileSize, 500, "格式 \(ext) 生成的包体积必须大于 500 字节，非假文件")
             
-            // 2. 解压验证
+            // 2.
             let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_\(ext)")
             try FileManager.default.createDirectory(atPath: extractDir, withIntermediateDirectories: true)
             

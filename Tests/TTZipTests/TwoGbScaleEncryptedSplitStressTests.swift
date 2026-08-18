@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -8,7 +15,7 @@ final class TwoGbScaleEncryptedSplitStressTests: XCTestCase {
     let password = "TTZipProEncryptedPassword#2026"
     let splitVolumeSizeBytes: Int64 = 100 * 1024 * 1024 // 100 MB per volume part
     
-    /// 超大文件在带密码加密 + 分卷切割模式下的极限性能基准测试 (仅在 TTZIP_BENCH_TIER=STRESS 开启)
+    /// + ( TTZIP_BENCH_TIER=STRESS )
     func testTwoGigabyteEncryptedSplitVolumeCompressionAndDecompression() async throws {
         guard ProcessInfo.processInfo.environment["TTZIP_BENCH_TIER"] == "STRESS" else {
             throw XCTSkip("巨型加密分卷性能测试需设置环境变量 TTZIP_BENCH_TIER=STRESS 触发，常规 swift test 自动跳过。")

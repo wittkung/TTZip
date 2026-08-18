@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
 final class GbScaleStressTests: XCTestCase {
     
-    /// 1.0 GB 超大文件流式压缩、解压与内存稳定性测试 (仅在 TTZIP_BENCH_TIER=STRESS 开启)
+    /// 1.0 GB 、 ( TTZIP_BENCH_TIER=STRESS )
     func testOneGigabyteStreamingCompressionAndDecompression() async throws {
         guard ProcessInfo.processInfo.environment["TTZIP_BENCH_TIER"] == "STRESS" else {
             throw XCTSkip("巨型 GB 级性能测试需设置环境变量 TTZIP_BENCH_TIER=STRESS 触发，常规 swift test 自动跳过。")
@@ -79,8 +86,8 @@ final class GbScaleStressTests: XCTestCase {
         TTLogger.info(String(format: "1GB 解压速度 : %.2f MB/s (耗时: %.3f 秒)", decompressSpeedMBps, decompressDuration))
         TTLogger.info("==================================================\n")
         
-        XCTAssertGreaterThan(compressSpeedMBps, 50.0, "1GB 压缩吞吐速率应大于 50 MB/s")
-        XCTAssertGreaterThan(decompressSpeedMBps, 100.0, "1GB 解压吞吐速率应大于 100 MB/s")
+        XCTAssertGreaterThan(compressSpeedMBps, 50.0, "1GB Compression Throughput应大于 50 MB/s")
+        XCTAssertGreaterThan(decompressSpeedMBps, 100.0, "1GB Decompression Throughput应大于 100 MB/s")
         XCTAssertTrue(fileManager.fileExists(atPath: outArchive))
     }
 }

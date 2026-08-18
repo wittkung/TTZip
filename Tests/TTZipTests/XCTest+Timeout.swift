@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
@@ -13,7 +20,7 @@ public enum TimeoutError: Error, CustomStringConvertible, Sendable {
 }
 
 extension XCTestCase {
-    /// 执行异步测试任务，若超过 timeoutSeconds 秒未完成则判定测试超时失败并强行抛错终止 (防卡主熔断器)
+    /// ， timeoutSeconds ( )
     public func withTimeout(
         seconds: TimeInterval = 30.0,
         description: String = "Async Test Operation",

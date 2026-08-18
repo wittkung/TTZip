@@ -311,8 +311,15 @@ public enum DifferentialManifestVerifier: Sendable {
             }
             
             // Dimension 4: POSIX permissions
-            if ttzipEntry.posixMode != oracleEntry.posixMode {
-                divergenceErrors.append("Entry '\(key)' POSIX permission mismatch: TTZip=0o\(String(ttzipEntry.posixMode, radix: 8)), Oracle=0o\(String(oracleEntry.posixMode, radix: 8))")
+            if format == .tar {
+                if ttzipEntry.posixMode != oracleEntry.posixMode {
+                    divergenceErrors.append("Entry '\(key)' POSIX permission mismatch: TTZip=0o\(String(ttzipEntry.posixMode, radix: 8)), Oracle=0o\(String(oracleEntry.posixMode, radix: 8))")
+                }
+            } else {
+                // For ZIP and 7Z containers, check executable bit parity across cross-platform oracles
+                if (ttzipEntry.posixMode & 0o111) != (oracleEntry.posixMode & 0o111) {
+                    divergenceErrors.append("Entry '\(key)' executable permission bit mismatch: TTZip=0o\(String(ttzipEntry.posixMode, radix: 8)), Oracle=0o\(String(oracleEntry.posixMode, radix: 8))")
+                }
             }
         }
         

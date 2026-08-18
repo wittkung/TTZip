@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
 final class InterpreterPatternTests: XCTestCase {
     
-    // MARK: - 1. Lexer 词法分析测试
+    // MARK: - 1. Lexer
     
     func testLexerTokenizationBasic() throws {
         let query = "ext:pdf AND size:>50MB AND NOT name:*secret*"
@@ -37,7 +44,7 @@ final class InterpreterPatternTests: XCTestCase {
         XCTAssertTrue(tokens.contains(.stringLiteral("confidential plan.pdf")))
     }
     
-    // MARK: - 2. 终结符表达式求值测试
+    // MARK: - 2.
     
     func testExtensionExpressionSingleAndMultiple() {
         let singleExtExpr = ExtensionExpression(extensions: ["pdf"])
@@ -102,7 +109,7 @@ final class InterpreterPatternTests: XCTestCase {
         XCTAssertTrue(dateOlderThan30Days.evaluate(entry: oldEntry))
     }
     
-    // MARK: - 3. 非终结符逻辑求值测试
+    // MARK: - 3.
     
     func testAndExpressionShortCircuit() {
         let left = MatchNoneExpression()
@@ -132,7 +139,7 @@ final class InterpreterPatternTests: XCTestCase {
         XCTAssertFalse(notExpr.evaluate(entry: entry))
     }
     
-    // MARK: - 4. 复杂 AST 树构建与完整语法求解
+    // MARK: - 4. AST
     
     func testComplexNestedBooleanLogicQuery() throws {
         let query = "(ext:pdf OR ext:docx) AND size:>10MB AND NOT name:*draft*"
@@ -170,7 +177,7 @@ final class InterpreterPatternTests: XCTestCase {
         XCTAssertFalse(ast.evaluate(entry: smallZip))
     }
     
-    // MARK: - 5. 语法错误捕获与 Safe Fallback
+    // MARK: - 5. Safe Fallback
     
     func testParserSyntaxErrorThrowing() {
         let invalidQuery = "ext:pdf AND ("
@@ -184,11 +191,11 @@ final class InterpreterPatternTests: XCTestCase {
         let fallbackAST = ArchiveFilterDSLInterpreter.parseOrFallback(malformedQuery)
         
         let matchingEntry = ArchiveEntry(path: "some_file.txt", uncompressedSize: 10, isDirectory: false)
-        // 应该自动转换为 FilenameGlobExpression，不会发生任何 Runtime Exception 或 Crash
+        // FilenameGlobExpression， Runtime Exception Crash
         XCTAssertNoThrow(_ = fallbackAST.evaluate(entry: matchingEntry))
     }
     
-    // MARK: - 6. ArchiveFilterOptions 集成测试
+    // MARK: - 6. ArchiveFilterOptions
     
     func testArchiveFilterOptionsMatchesWithDSL() {
         let options = ArchiveFilterOptions(skipMacJunk: true, skipGitDirectory: true)
@@ -204,7 +211,7 @@ final class InterpreterPatternTests: XCTestCase {
         XCTAssertFalse(options.matches(entry: gitEntry, dslQuery: dslQuery))
     }
     
-    // MARK: - 7. 100+ 高并发线程 AST 求值线程安全测试
+    // MARK: - 7. 100+ AST
     
     @MainActor
     func testHighConcurrency100ThreadsASTEvaluationSafety() throws {
@@ -237,7 +244,7 @@ final class InterpreterPatternTests: XCTestCase {
         waitForExpectations(timeout: 10.0)
     }
     
-    // MARK: - 8. 10,000 高容量条目性能基准测试
+    // MARK: - 8. 10,000
     
     func testPerformanceASTEvaluationHighVolume() throws {
         let query = "(ext:zip OR ext:7z OR ext:tar) AND size:>50MB AND modified:<30d"

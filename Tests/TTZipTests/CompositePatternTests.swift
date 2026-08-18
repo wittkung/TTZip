@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
 final class CompositePatternTests: XCTestCase {
     
-    // MARK: - 1. ArchiveLeafFile 叶子节点测试
+    // MARK: - 1. ArchiveLeafFile
     
     func testArchiveLeafFileBasicProperties() {
         let file = ArchiveLeafFile(name: "test.txt", path: "documents/test.txt", sizeBytes: 1024)
@@ -15,7 +22,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertTrue(file.getChildren().isEmpty)
     }
     
-    // MARK: - 2. ArchiveCompositeDirectory 容器节点测试与动态尺寸计算
+    // MARK: - 2. ArchiveCompositeDirectory
     
     func testArchiveCompositeDirectoryDynamicSize() {
         let root = ArchiveCompositeDirectory(name: "Root", path: "Root")
@@ -35,7 +42,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertEqual(subDir.sizeBytes, 3500)
         XCTAssertEqual(root.sizeBytes, 4000) // 500 + 2000 + 1500
         
-        // 动态移除节点
+        // Verify expected invariant
         subDir.remove(componentNamed: "pic1.jpg")
         XCTAssertEqual(subDir.sizeBytes, 1500)
         XCTAssertEqual(root.sizeBytes, 2000)
@@ -54,7 +61,7 @@ final class CompositePatternTests: XCTestCase {
         let children = dir.getChildren()
         XCTAssertEqual(children.count, 3)
         
-        // 验证目录优先排在前面，其次名称按字母升序
+        // ，
         XCTAssertTrue(children[0].isDirectory)
         XCTAssertEqual(children[0].name, "Sub")
         XCTAssertEqual(children[1].name, "a.txt")
@@ -65,7 +72,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertTrue(dir.getChildren().isEmpty)
     }
     
-    // MARK: - 3. ArchiveComponentTreeBuilder 从 ArchiveEntry 算法树构建测试
+    // MARK: - 3. ArchiveComponentTreeBuilder ArchiveEntry
     
     func testTreeBuilderFromArchiveEntries() {
         let entries = [
@@ -87,7 +94,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertEqual(leaves.count, 4)
     }
     
-    // MARK: - 4. 磁盘路径 Composite Tree 构建与度量测试
+    // MARK: - 4. Composite Tree
     
     func testTreeBuilderFromDiskPath() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -112,7 +119,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertGreaterThan(component.sizeBytes, 0)
     }
     
-    // MARK: - 5. Visitor Pattern 访问者模式测试
+    // MARK: - 5. Visitor Pattern
     
     private final class CustomCountingVisitor: ArchiveComponentVisitorProtocol {
         typealias Result = (fileNames: [String], dirNames: [String])
@@ -153,7 +160,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertEqual(result.dirNames.sorted(), ["Root", "Sub"])
     }
     
-    // MARK: - 6. ArchiveTreeNode 互操作与 Composite 重构集成测试
+    // MARK: - 6. ArchiveTreeNode Composite
     
     func testArchiveTreeNodeCompositeInterop() {
         let entries = [
@@ -178,7 +185,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertEqual(restoredNode.uncompressedSize, folderNode.uncompressedSize)
     }
     
-    // MARK: - 7. FolderStatsCalculator Composite 集成测试
+    // MARK: - 7. FolderStatsCalculator Composite
     
     func testFolderStatsCalculatorWithCompositeComponent() {
         let root = ArchiveCompositeDirectory(name: "Root", path: "Root")
@@ -198,7 +205,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertEqual(stats.dist.count, 3)
     }
     
-    // MARK: - 8. SecurityScanner Composite 集成测试
+    // MARK: - 8. SecurityScanner Composite
     
     func testSecurityScannerWithCompositeComponent() {
         let root = ArchiveCompositeDirectory(name: "Archive", path: "Archive")
@@ -214,7 +221,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertEqual(result.suspiciousFileNames, ["Archive/hack.sh"])
     }
     
-    // MARK: - 9. 磁盘 Composite Size 动态度量测试
+    // MARK: - 9. Composite Size
     
     func testDiskCompositeSizeMeasurement() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -231,7 +238,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertEqual(component.sizeBytes, 5)
     }
 
-    // MARK: - 10. renderTree 树形 ASCII 格式化与 Sequence 扩展测试
+    // MARK: - 10. renderTree ASCII Sequence
 
     func testRenderTreeFormattingAndSequenceExtensions() {
         let root = ArchiveCompositeDirectory(name: "Project", path: "Project")
@@ -256,7 +263,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertEqual(components.flattenLeaves().count, 2)
     }
 
-    // MARK: - 11. ArchiveReader.inspectTree 组合树解析与 ZipDirectoryScanner 测试
+    // MARK: - 11. ArchiveReader.inspectTree ZipDirectoryScanner
 
     func testArchiveReaderInspectTreeAndScannerIntegration() async throws {
         let entries = [
@@ -271,10 +278,10 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(scannedItems.count, 2)
     }
 
-    // MARK: - 12. ArchiveTreeNode 目录节点 sizeBytes 递归聚合修复验证
+    // MARK: - 12. ArchiveTreeNode sizeBytes
 
     func testArchiveTreeNodeDirectorySizeBytesRecursiveAggregation() {
-        // 目录节点 uncompressedSize == 0，但包含子节点，sizeBytes 应透明递归计算
+        // uncompressedSize == 0， ，sizeBytes
         let child1 = ArchiveTreeNode(
             id: "dir/a.txt", name: "a.txt", path: "dir/a.txt",
             uncompressedSize: 100, isDirectory: false
@@ -289,15 +296,15 @@ final class CompositePatternTests: XCTestCase {
             children: [child1, child2]
         )
         
-        // 核心断言：目录 sizeBytes == 子节点之和
+        // ： sizeBytes ==
         XCTAssertEqual(dirNode.sizeBytes, 350)
         
-        // 叶子节点 sizeBytes 仍直接返回 uncompressedSize
+        // sizeBytes uncompressedSize
         XCTAssertEqual(child1.sizeBytes, 100)
     }
 
     func testArchiveTreeNodeNestedDirectorySizeTransitivity() {
-        // 嵌套多层目录，sizeBytes 应逐层递归
+        // ，sizeBytes
         let leaf = ArchiveTreeNode(
             id: "root/sub/file.dat", name: "file.dat", path: "root/sub/file.dat",
             uncompressedSize: 500, isDirectory: false
@@ -317,7 +324,7 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertEqual(rootDir.sizeBytes, 500)
     }
     
-    // MARK: - 13. ArchiveCompositeDirectory O(1) findChild 查找验证
+    // MARK: - 13. ArchiveCompositeDirectory O 1 findChild
 
     func testCompositeDirectoryFindChildO1Lookup() {
         let dir = ArchiveCompositeDirectory(name: "Root", path: "Root")
@@ -329,7 +336,7 @@ final class CompositePatternTests: XCTestCase {
         dir.add(component: subB)
         dir.add(component: file)
         
-        // O(1) 精确查找
+        // O(1)
         let foundAlpha = dir.findChild(named: "Alpha")
         XCTAssertNotNil(foundAlpha)
         XCTAssertEqual(foundAlpha?.name, "Alpha")
@@ -339,11 +346,11 @@ final class CompositePatternTests: XCTestCase {
         XCTAssertNotNil(foundFile)
         XCTAssertEqual(foundFile?.sizeBytes, 42)
         
-        // 不存在的名称返回 nil
+        // nil
         XCTAssertNil(dir.findChild(named: "NonExistent"))
     }
     
-    // MARK: - 14. ArchiveTreeNode 与 ArchiveTreeBuilder sizeBytes 端到端一致性
+    // MARK: - 14. ArchiveTreeNode ArchiveTreeBuilder sizeBytes
 
     func testArchiveTreeBuilderNodeSizeBytesEndToEnd() {
         let entries = [
@@ -357,10 +364,10 @@ final class CompositePatternTests: XCTestCase {
         
         let projectNode = treeNodes[0]
         XCTAssertTrue(projectNode.isDirectory)
-        // ArchiveTreeNode.sizeBytes 应递归计算 == 200 + 150 + 50
+        // ArchiveTreeNode.sizeBytes == 200 + 150 + 50
         XCTAssertEqual(projectNode.sizeBytes, 400)
         
-        // 对比 toComponent() 路径的 sizeBytes，两者必须一致
+        // toComponent() sizeBytes，
         let component = projectNode.toComponent()
         XCTAssertEqual(component.sizeBytes, projectNode.sizeBytes)
     }

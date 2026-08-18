@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 零拷贝静态 Silesia 语料库测试加载器 (基于 SPM Bundle.module 与直接路径回退)
+/// Silesia ( SPM Bundle.module )
 public enum SilesiaFixtureLoader {
     
-    /// 获取 Fixtures/Silesia 目录的根 URL
+    /// Fixtures/Silesia URL
     public static func corpusDirectoryURL() throws -> URL {
         #if SWIFT_PACKAGE
         if let bundleURL = Bundle.module.url(forResource: "Silesia", withExtension: nil, subdirectory: "Fixtures") {
@@ -34,7 +41,7 @@ public enum SilesiaFixtureLoader {
         )
     }
     
-    /// 获取指定 Silesia 语料文件的绝对 URL
+    /// Silesia URL
     public static func fileURL(named filename: String) throws -> URL {
         let dir = try corpusDirectoryURL()
         let file = dir.appendingPathComponent(filename)
@@ -48,23 +55,23 @@ public enum SilesiaFixtureLoader {
         return file
     }
     
-    /// 获取指定 Silesia 语料文件的绝对物理路径 (供 C 引擎 open/mmap 直读)
+    /// Silesia ( C open/mmap )
     public static func filePath(named filename: String) throws -> String {
         return try fileURL(named: filename).path
     }
     
-    /// 以零拷贝内核分页映射模式读取指定语料文件 (零堆分配)
+    /// ( )
     public static func mappedData(named filename: String) throws -> Data {
         let url = try fileURL(named: filename)
         return try Data(contentsOf: url, options: .alwaysMapped)
     }
     
-    /// 获取 silesia_manifest.json 的 URL
+    /// silesia_manifest.json URL
     public static func manifestURL() throws -> URL {
         return try fileURL(named: "silesia_manifest.json")
     }
     
-    /// 获取全部 12 个标准 Silesia 文件名列表
+    /// 12 Silesia
     public static let standardFileNames: [String] = [
         "dickens",
         "mozilla",

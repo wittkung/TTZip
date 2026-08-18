@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 import CTTZipBridge
@@ -35,7 +42,7 @@ final class ChunkedDeflateStreamingTests: XCTestCase {
         XCTAssertGreaterThan(result.totalCompressed, 0)
         XCTAssertGreaterThan(result.finalCrc32, 0)
         
-        // 校验生成的文件存在且大小与 totalCompressed 一致
+        // totalCompressed
         let attr = try FileManager.default.attributesOfItem(atPath: outPath)
         let diskSize = try XCTUnwrap(attr[.size] as? UInt64)
         XCTAssertEqual(diskSize, result.totalCompressed)
@@ -48,7 +55,7 @@ final class ChunkedDeflateStreamingTests: XCTestCase {
         
         let writer = try XCTUnwrap(ChunkedDeflateStreamWriter(outFd: fd, level: 1))
         
-        // 构造 3.5MB 的可预测重复数据
+        // 3.5MB
         let pattern = "TTZipFastStreamingPayload2026_AppleSilicon_M_Series#".data(using: .utf8)!
         var totalBytesWritten: Int = 0
         let targetBytes: Int = 3 * 1024 * 1024 + 512 * 1024 // 3.5MB

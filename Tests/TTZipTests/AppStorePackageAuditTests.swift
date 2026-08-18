@@ -27,20 +27,20 @@ final class AppStorePackageAuditTests: XCTestCase {
         
         let data = try Data(contentsOf: privacyFile)
         guard let plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else {
-            XCTFail("PrivacyInfo.xcprivacy 必须是有效的 Apple Property List")
+            XCTFail("PrivacyInfo.xcprivacy must be a valid Apple Property List")
             return
         }
         
-        // 1. 验证零用户追踪
+        // 1.
         let tracking = plist["NSPrivacyTracking"] as? Bool
         XCTAssertEqual(tracking, false, "TTZip 绝无用户行为追踪 (NSPrivacyTracking 必须为 false)")
         
-        // 2. 验证零用户数据收集
+        // 2.
         let collected = plist["NSPrivacyCollectedDataTypes"] as? [Any]
         XCTAssertNotNil(collected)
         XCTAssertTrue(collected?.isEmpty == true, "TTZip 绝无用户数据上传或收集 (NSPrivacyCollectedDataTypes 必须为空)")
         
-        // 3. 验证声明的敏感 API 理由
+        // 3. API
         let accessedAPIs = plist["NSPrivacyAccessedAPITypes"] as? [[String: Any]]
         XCTAssertNotNil(accessedAPIs)
         XCTAssertTrue(accessedAPIs?.contains { ($0["NSPrivacyAccessedAPIType"] as? String) == "NSPrivacyAccessedAPICategoryFileTimestamp" } == true, "必须合法声明归档时间戳访问理由")

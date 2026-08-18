@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
 @testable import TTZipCLI
 @testable import TTZipApp
 
-/// 【3.5 状态模式 (State Pattern)】核心体系与全库贯穿集成单元测试套件
+/// 【3.5 (State Pattern)】
 final class StatePatternTests: XCTestCase {
     
-    // MARK: - 1. 7 大具体状态属性与转移矩阵校验
+    // MARK: - 1. 7
     
     func test7ConcreteStatesPropertiesAndTransitions() throws {
         let idle = IdleState()
@@ -54,7 +61,7 @@ final class StatePatternTests: XCTestCase {
         XCTAssertFalse(failed.canCancel)
     }
     
-    // MARK: - 2. 合法状态转移主干流程校验
+    // MARK: - 2.
     
     func testValidStateTransitionsFlow() throws {
         let context = ArchiveTaskStateMachine(taskName: "TestFlowTask", totalBytes: 100_000)
@@ -81,7 +88,7 @@ final class StatePatternTests: XCTestCase {
         try context.start()
         XCTAssertTrue(context.currentState is RunningState)
         
-        // 更新进度并暂停
+        // Verify expected invariant
         context.updateProgress(processedBytes: 50_000)
         XCTAssertEqual(context.processedBytes, 50_000)
         
@@ -89,11 +96,11 @@ final class StatePatternTests: XCTestCase {
         XCTAssertTrue(context.currentState is PausedState)
         XCTAssertEqual(context.checkpointOffset, 50_000)
         
-        // 恢复运行
+        // Verify expected invariant
         try context.resume()
         XCTAssertTrue(context.currentState is RunningState)
         
-        // 完成
+        // Verify expected invariant
         try context.complete()
         XCTAssertTrue(context.currentState is CompletedState)
         XCTAssertEqual(context.processedBytes, 100_000)
@@ -102,12 +109,12 @@ final class StatePatternTests: XCTestCase {
         XCTAssertEqual(safeHistory.history, ["Preparing", "Running", "Paused", "Running", "Completed"])
     }
     
-    // MARK: - 3. 非法状态转变拦截测试 (Illegal Transition Interception)
+    // MARK: - 3. Illegal Transition Interception
     
     func testIllegalStateTransitionsInterception() throws {
         let context = ArchiveTaskStateMachine(taskName: "IllegalTestTask")
         
-        // 1. Idle 状态下禁止 Pause, Resume, Complete
+        // 1. Idle Pause, Resume, Complete
         XCTAssertThrowsError(try context.pause()) { err in
             XCTAssertEqual(err as? ArchiveError, ArchiveError.invalidState)
         }
@@ -115,24 +122,24 @@ final class StatePatternTests: XCTestCase {
         XCTAssertThrowsError(try context.resume())
         XCTAssertThrowsError(try context.complete())
         
-        // 进入 Running 状态
+        // Running
         try context.start()
         
-        // 2. Running 状态下禁止 Resume
+        // 2. Running Resume
         XCTAssertThrowsError(try context.resume())
         
-        // 暂停任务
+        // Verify expected invariant
         try context.pause()
         
-        // 3. Paused 状态下禁止 Pause, Complete
+        // 3. Paused Pause, Complete
         XCTAssertThrowsError(try context.pause())
         XCTAssertThrowsError(try context.complete())
         
-        // 恢复并完成
+        // Verify expected invariant
         try context.resume()
         try context.complete()
         
-        // 4. Completed 终态下禁止任何操作
+        // 4. Completed
         XCTAssertThrowsError(try context.pause()) { err in
             XCTAssertEqual(err as? ArchiveError, ArchiveError.invalidState)
         }
@@ -144,7 +151,7 @@ final class StatePatternTests: XCTestCase {
         }
         XCTAssertThrowsError(try context.complete())
         
-        // 5. Failed 终态下拦截测试
+        // 5. Failed
         let failedCtx = ArchiveTaskStateMachine(taskName: "FailedTask")
         try failedCtx.fail(error: CommandError.executionFailed(reason: "Fail Reason"))
         XCTAssertTrue(failedCtx.currentState is FailedState)
@@ -157,7 +164,7 @@ final class StatePatternTests: XCTestCase {
         }
     }
     
-    // MARK: - 4. 断点 Save & Restore 断点续传机制
+    // MARK: - 4. Save & Restore
     
     func testPauseResumeCheckpointOffsetAndRestoration() throws {
         let context = ArchiveTaskStateMachine(taskName: "CheckpointTask", totalBytes: 200_000)
@@ -169,7 +176,7 @@ final class StatePatternTests: XCTestCase {
         XCTAssertEqual(context.checkpointOffset, 88_400)
         XCTAssertTrue(context.currentState is PausedState)
         
-        // 恢复运行，核对 checkpointOffset 是否正确导向更新
+        // ， checkpointOffset
         try context.resume()
         XCTAssertTrue(context.currentState is RunningState)
         XCTAssertEqual(context.processedBytes, 88_400)
@@ -179,7 +186,7 @@ final class StatePatternTests: XCTestCase {
         XCTAssertEqual(context.processedBytes, 200_000)
     }
     
-    // MARK: - 5. Cancelling 善后与临时文件清理机制
+    // MARK: - 5. Cancelling
     
     func testCancellingStateCleanupMechanism() throws {
         let tempDir = NSTemporaryDirectory()
@@ -205,7 +212,7 @@ final class StatePatternTests: XCTestCase {
         XCTAssertTrue(context.tempFiles.isEmpty)
     }
     
-    // MARK: - 6. 100+ 高并发状态机转换安全与 NSLock 线程安全测试
+    // MARK: - 6. 100+ NSLock
     
     func test100PlusConcurrentTaskStateMachinesSafety() async throws {
         let taskCount = 120
@@ -229,7 +236,7 @@ final class StatePatternTests: XCTestCase {
                         sm.updateProgress(processedBytes: 1000)
                         try sm.complete()
                     } catch {
-                        // 并发竞态异常捕捉
+                        // Verify expected invariant
                     }
                 }
             }
@@ -240,7 +247,7 @@ final class StatePatternTests: XCTestCase {
         }
     }
     
-    // MARK: - 7. TTZipEngineFacade 贯穿集成测试
+    // MARK: - 7. TTZipEngineFacade
     
     func testTTZipEngineFacadeIntegration() throws {
         let facade = TTZipEngineFacade.shared
@@ -261,7 +268,7 @@ final class StatePatternTests: XCTestCase {
         XCTAssertTrue(sm.currentState is FailedState)
     }
     
-    // MARK: - 8. ArchiveBatchFacade 贯穿集成测试
+    // MARK: - 8. ArchiveBatchFacade
     
     func testArchiveBatchFacadeIntegration() async throws {
         let batchFacade = ArchiveBatchFacade.shared
@@ -287,13 +294,13 @@ final class StatePatternTests: XCTestCase {
         XCTAssertTrue(sm2.currentState is FailedState)
     }
     
-    // MARK: - 9. PasswordRecoveryEngine 状态机贯穿与 Pause/Resume Checkpoint
+    // MARK: - 9. PasswordRecoveryEngine Pause/Resume Checkpoint
     
     func testPasswordRecoveryEngineWithStateMachine() async throws {
         let engine = PasswordRecoveryEngine()
         let dict = ["wrong1", "wrong2", "wrong3", "correct123", "wrong4"]
         
-        // 创建测试包
+        // Verify expected invariant
         let tempDir = NSTemporaryDirectory()
         let testArchive = (tempDir as NSString).appendingPathComponent("state_test_store.7z")
         if !FileManager.default.fileExists(atPath: testArchive) {
@@ -302,7 +309,7 @@ final class StatePatternTests: XCTestCase {
         
         let sm = ArchiveTaskStateMachine(taskName: "CrackTask", totalBytes: Int64(dict.count))
         
-        // 执行在 stateMachine 上
+        // stateMachine
         let task = Task {
             return try await engine.recoverPassword(archivePath: testArchive, dictionary: dict, stateMachine: sm)
         }
@@ -312,7 +319,7 @@ final class StatePatternTests: XCTestCase {
         XCTAssertTrue(sm.currentState is CompletedState || sm.currentState is FailedState)
     }
     
-    // MARK: - 10. AppViewState GUI 绑定与交互测试
+    // MARK: - 10. AppViewState GUI
     
     @MainActor
     func testAppViewStateStateMachineBinding() throws {
@@ -345,29 +352,29 @@ final class StatePatternTests: XCTestCase {
         XCTAssertEqual(appState.taskStateName, "Failed")
     }
     
-    // MARK: - 11. 二次扫荡深度审计测试：Paused 状态下 Cancel/Fail 耗时无缝累加测试
+    // MARK: - 11. ：Paused Cancel/Fail
     
     func testMetricsPauseDurationAccumulationWhenCancelledFromPausedState() throws {
         let sm = ArchiveTaskStateMachine(taskName: "PausedCancelMetricsTask", totalBytes: 10_000)
         try sm.start()
         sm.updateProgress(processedBytes: 5_000)
         
-        // 暂停任务
+        // Verify expected invariant
         try sm.pause()
         XCTAssertTrue(sm.currentState is PausedState)
         
-        // 模拟在暂停状态下停留片刻
+        // Verify expected invariant
         Thread.sleep(forTimeInterval: 0.1)
         
-        // 从 Paused 状态直接 Cancel
+        // Paused Cancel
         try sm.cancel()
         XCTAssertTrue(sm.currentState is FailedState)
         
-        // 验证 pauseDuration 被正确累加，且大于 0
+        // pauseDuration ， 0
         XCTAssertGreaterThan(sm.metrics.pauseDuration, 0.05)
     }
     
-    // MARK: - 12. 二次扫荡深度审计测试：终态不可变保护与并发过度转入保护
+    // MARK: - 12. ：
     
     func testTerminalStateImmutabilityUnderConcurrency() throws {
         let sm = ArchiveTaskStateMachine(taskName: "TerminalStateTask", totalBytes: 100)
@@ -375,7 +382,7 @@ final class StatePatternTests: XCTestCase {
         try sm.complete()
         XCTAssertTrue(sm.currentState is CompletedState)
         
-        // 尝试强行将已完成的任务再次 transitionTo RunningState
+        // transitionTo RunningState
         sm.transitionTo(RunningState())
         XCTAssertTrue(sm.currentState is CompletedState, "终态 CompletedState 不可被转出")
         
@@ -390,7 +397,7 @@ final class StatePatternTests: XCTestCase {
         XCTAssertTrue(failedSm.currentState is FailedState, "终态 FailedState 不可被转出")
     }
     
-    // MARK: - 13. 二次扫荡深度审计测试：Task Failure 场景下的 TempFiles 安全清理
+    // MARK: - 13. ：Task Failure TempFiles
     
     func testTempFilesCleanedUpOnTaskFailure() throws {
         let tempDir = NSTemporaryDirectory()
@@ -402,14 +409,14 @@ final class StatePatternTests: XCTestCase {
         sm.addTempFile(file1)
         try sm.start()
         
-        // 模拟异常失败
+        // Verify expected invariant
         try sm.fail(error: CommandError.executionFailed(reason: "IO Error"))
         XCTAssertTrue(sm.currentState is FailedState)
         XCTAssertFalse(FileManager.default.fileExists(atPath: file1), "Task 失败时临时文件必须被自动物理删除")
         XCTAssertTrue(sm.tempFiles.isEmpty)
     }
     
-    // MARK: - 14. 二次扫荡深度审计测试：PasswordRecoveryEngine 终态拦截测试
+    // MARK: - 14. ：PasswordRecoveryEngine
     
     func testPasswordRecoveryEngineTerminalStateInterception() async throws {
         let engine = PasswordRecoveryEngine()
@@ -427,7 +434,7 @@ final class StatePatternTests: XCTestCase {
         }
     }
     
-    // MARK: - 15. 第三轮极限审查测试：100+ 高并发状态转换下的 onStateChanged 时序与锁安全
+    // MARK: - 15. ：100+ onStateChanged
     
     func testRound3HighConcurrency100PlusThreadsStateTransitionsAndFIFOOrdering() throws {
         let sm = ArchiveTaskStateMachine(taskName: "HighConcurrency100Task", totalBytes: 1_000_000)
@@ -471,7 +478,7 @@ final class StatePatternTests: XCTestCase {
         let waitResult = group.wait(timeout: .now() + 5.0)
         XCTAssertEqual(waitResult, .success, "120 个并发线程必须在 5 秒内完成且无死锁")
         
-        // 验证最终必定收敛在终态之一 (CompletedState 或 FailedState)
+        // (CompletedState FailedState)
         let finalState = sm.currentState
         XCTAssertTrue(finalState is CompletedState || finalState is FailedState, "并发竞争后状态机必须收敛处于终态之一")
         
@@ -483,7 +490,7 @@ final class StatePatternTests: XCTestCase {
         }
     }
     
-    // MARK: - 16. 第三轮极限审查测试：TaskMetrics 吞吐率计算防除零与 processedBytes 超越保护
+    // MARK: - 16. ：TaskMetrics processedBytes
     
     func testRound3TaskMetricsThroughputBoundaryAndProgressFractionProtection() throws {
         let metrics = TaskMetrics(
@@ -499,7 +506,7 @@ final class StatePatternTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(metrics.totalBytes, 0)
         XCTAssertEqual(metrics.progressFraction, 0.0)
         
-        // 测试 processedBytes 超越 totalBytes 场景 (如解压解包容量展开)
+        // processedBytes totalBytes ( )
         let sm = ArchiveTaskStateMachine(taskName: "OverflowMetricsTask", totalBytes: 1_000)
         try sm.start()
         sm.updateProgress(processedBytes: 2_500, totalBytes: 1_000)
@@ -509,13 +516,13 @@ final class StatePatternTests: XCTestCase {
         XCTAssertFalse(sm.metrics.throughputMBs.isInfinite, "吞吐率不得为 Infinity")
         XCTAssertGreaterThanOrEqual(sm.metrics.throughputMBs, 0.0, "吞吐率不得为负数")
         
-        // 测试 durationSeconds == 0 时的吞吐率保护
+        // durationSeconds == 0
         let zeroDurationSm = ArchiveTaskStateMachine(taskName: "ZeroDurationTask", totalBytes: 500)
         zeroDurationSm.updateProgress(processedBytes: 300)
         XCTAssertEqual(zeroDurationSm.metrics.throughputMBs, 0.0, "duration == 0 时吞吐率必须安全收敛为 0.0")
     }
     
-    // MARK: - 17. 第三轮极限审查测试：AppViewState 在极速状态转换下的界面同步
+    // MARK: - 17. ：AppViewState
     
     @MainActor
     func testRound3AppViewStateRapidStateTransitionsSync() throws {
@@ -528,7 +535,7 @@ final class StatePatternTests: XCTestCase {
         XCTAssertFalse(appState.canResumeTask)
         XCTAssertFalse(appState.canCancelTask)
         
-        // 触发极速转换 Idle -> Preparing -> Running -> Paused -> Running -> Completed
+        // Idle -> Preparing -> Running -> Paused -> Running -> Completed
         try sm.start()
         try sm.pause()
         try sm.resume()

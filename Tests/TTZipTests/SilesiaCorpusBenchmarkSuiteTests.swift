@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
-/// Silesia 语料库多格式全矩阵基准测试与 3.0% 零性能倒退门禁套件
+/// Silesia 3.0%
 final class SilesiaCorpusBenchmarkSuiteTests: XCTestCase {
     
     struct SilesiaMetricRow: Sendable {
@@ -16,7 +23,7 @@ final class SilesiaCorpusBenchmarkSuiteTests: XCTestCase {
         let verified: Bool
     }
     
-    /// 针对 12 个 Silesia 文件执行全主干格式基准测试与零性能倒退门禁
+    /// 12 Silesia
     func testSilesiaAllFormatsZeroRegressionGate() async throws {
         guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
             throw XCTSkip("Silesia 211MB 真实语料全矩阵基准测试需设置 TTZIP_RUN_BENCHMARKS=1 触发，常规 swift test 自动跳过")
@@ -52,7 +59,7 @@ final class SilesiaCorpusBenchmarkSuiteTests: XCTestCase {
                     let originalSizeBytes = fileAttrs[.size] as? Int ?? 0
                     let rawMB = Double(originalSizeBytes) / (1024.0 * 1024.0)
                     
-                    // 1. 预热轮次 (1 Pass, unmeasured): 消除 DVFS 降频与内核换页冷启动干扰
+                    // 1. (1 Pass, unmeasured): DVFS
                     let warmupSandbox = try IsolatedTempSandbox(prefix: "silesia_warmup_\(format.rawValue)")
                     let warmupArchive = warmupSandbox.fileURL(named: "warmup.\(format.rawValue)").path
                     let warmupExtract = warmupSandbox.fileURL(named: "warmup_ext").path
@@ -64,7 +71,7 @@ final class SilesiaCorpusBenchmarkSuiteTests: XCTestCase {
                     _ = try? await extractor.extract(archivePath: warmupArchive, destinationDir: warmupExtract)
                     warmupSandbox.cleanup()
                     
-                    // 2. 测量轮次 (3 Passes): 独立 RAII 沙盒与纳秒时钟
+                    // 2. (3 Passes): RAII
                     var compSpeeds: [Double] = []
                     var decompSpeeds: [Double] = []
                     var compressedSizeBytes: Int = 0
@@ -79,7 +86,7 @@ final class SilesiaCorpusBenchmarkSuiteTests: XCTestCase {
                         
                         let clock = ContinuousClock()
                         
-                        // 压缩计时
+                        // Verify expected invariant
                         let compElapsed = try await clock.measure {
                             try await writer.createArchive(outputPath: outArchive, format: format, level: .level1, inputPaths: [inputPath])
                         }
@@ -92,7 +99,7 @@ final class SilesiaCorpusBenchmarkSuiteTests: XCTestCase {
                             compressedSizeBytes = outAttr[.size] as? Int ?? 0
                         }
                         
-                        // 解压计时
+                        // Verify expected invariant
                         let decompElapsed = try await clock.measure {
                             try await extractor.extract(archivePath: outArchive, destinationDir: extractDest)
                         }
@@ -100,7 +107,7 @@ final class SilesiaCorpusBenchmarkSuiteTests: XCTestCase {
                         let decompMBps = rawMB / decompSec
                         decompSpeeds.append(decompMBps)
                         
-                        // 校验解压字节完整性
+                        // Verify expected invariant
                         let extractedFile = (extractDest as NSString).appendingPathComponent(fileName)
                         if FileManager.default.fileExists(atPath: extractedFile) {
                             let restoredData = try Data(contentsOf: URL(fileURLWithPath: extractedFile), options: .alwaysMapped)
@@ -109,7 +116,7 @@ final class SilesiaCorpusBenchmarkSuiteTests: XCTestCase {
                         }
                     }
                     
-                    // 3. 统计指标计算 (中位数与变异系数)
+                    // 3. ( )
                     compSpeeds.sort()
                     decompSpeeds.sort()
                     let medianCompSpeed = compSpeeds[compSpeeds.count / 2]

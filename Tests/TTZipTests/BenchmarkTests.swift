@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -71,7 +78,7 @@ final class BenchmarkTests: XCTestCase {
         let rawSizeBytes = Double(originalData.count)
         let rawMB = rawSizeBytes / (1024 * 1024)
         
-        // 1. 压缩测试
+        // 1.
         let writer = ArchiveWriter()
         let clock = ContinuousClock()
         
@@ -81,11 +88,11 @@ final class BenchmarkTests: XCTestCase {
         let compressDuration = max(0.0001, Double(compressElapsed.components.seconds) + (Double(compressElapsed.components.attoseconds) / 1e18))
         let compressSpeedMBps = rawMB / compressDuration
         
-        // 2. 体积与压缩率计算
+        // 2.
         let attr = try FileManager.default.attributesOfItem(atPath: outArchive)
         let compressedSizeBytes = Double(attr[.size] as? Int64 ?? 0)
         
-        // 3. 解压测试与无损完整性校验
+        // 3.
         let extractor = ArchiveExtractor()
         let decompressElapsed = try await clock.measure {
             try await extractor.extract(archivePath: outArchive, destinationDir: extractDest)
@@ -93,7 +100,7 @@ final class BenchmarkTests: XCTestCase {
         let decompressDuration = max(0.0001, Double(decompressElapsed.components.seconds) + (Double(decompressElapsed.components.attoseconds) / 1e18))
         let decompressSpeedMBps = rawMB / decompressDuration
         
-        // 字节级完全恢复确认
+        // Verify expected invariant
         let extractedFilePath = (extractDest as NSString).appendingPathComponent((inputPath as NSString).lastPathComponent)
         if FileManager.default.fileExists(atPath: extractedFilePath) {
             let restoredData = try Data(contentsOf: URL(fileURLWithPath: extractedFilePath))

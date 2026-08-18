@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -23,7 +30,7 @@ final class BridgePatternTests: XCTestCase {
         return path
     }
 
-    // MARK: - 1. 具体格式 Bridge Implementor 单元测试
+    // MARK: - 1. Bridge Implementor
 
     func testZipEngineBridgeImplementorCompressAndExtract() async throws {
         let file1 = try createTestFile(filename: "bridge_zip_test.txt", content: "Bridge Pattern Zip Compression Test Content")
@@ -125,14 +132,14 @@ final class BridgePatternTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: extractDir))
     }
 
-    // MARK: - 2. 桥接模式高层抽象与动态切换测试 (Bridge Abstraction & Dynamic Swapping)
+    // MARK: - 2. Bridge Abstraction & Dynamic Swapping
 
     func testArchiveOperationAbstractionDynamicImplementorSwapping() async throws {
         let file1 = try createTestFile(filename: "dynamic_swap_test.txt", content: "Dynamic Bridge Implementor Swapping Content")
         let zipOutput = (tempDir as NSString).appendingPathComponent("dynamic_zip.zip")
         let sevenZipOutput = (tempDir as NSString).appendingPathComponent("dynamic_7z.7z")
 
-        // 1. 初始化 Abstraction，持有一个 ZipImplementor
+        // 1. Abstraction， ZipImplementor
         let zipImplementor = ZipEngineBridgeImplementor()
         let abstraction = ArchiveOperationAbstraction(implementor: zipImplementor)
         XCTAssertEqual(abstraction.implementor.supportedFormat, .zip)
@@ -141,7 +148,7 @@ final class BridgePatternTests: XCTestCase {
         XCTAssertGreaterThan(zipBytes, 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: zipOutput))
 
-        // 2. 动态解耦切换为 SevenZipImplementor
+        // 2. SevenZipImplementor
         let sevenZipImplementor = SevenZipEngineBridgeImplementor()
         abstraction.setImplementor(sevenZipImplementor)
         XCTAssertEqual(abstraction.implementor.supportedFormat, .sevenZip)
@@ -175,7 +182,7 @@ final class BridgePatternTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(extThroughput, 0)
     }
 
-    // MARK: - 3. 工厂模式与策略模式 Bridge 集成测试
+    // MARK: - 3. Bridge
 
     func testArchiveEngineFactoryMakeBridgeComponents() {
         let zipImpl = ArchiveEngineFactory.makeImplementor(for: .zip)
@@ -212,7 +219,7 @@ final class BridgePatternTests: XCTestCase {
         XCTAssertEqual(zstdStrategy.bridgeImplementor.supportedFormat, .zst)
     }
 
-    // MARK: - 4. 抽象工厂与 Bridge 闭环与多线程 Data Race 保护测试
+    // MARK: - 4. Bridge Data Race
 
     func testArchiveOperationAbstractionConcurrentDataRaceProtection() async throws {
         let zipImpl = ZipEngineBridgeImplementor()
@@ -220,7 +227,7 @@ final class BridgePatternTests: XCTestCase {
         let zstdImpl = ZstdEngineBridgeImplementor()
         let abstraction = ArchiveOperationAbstraction(implementor: zipImpl)
 
-        // 高并发多线程重写入与多线程读取并发测试，验证 NSLock 锁保护防 Data Race
+        // ， NSLock Data Race
         await withTaskGroup(of: Void.self) { group in
             for i in 0..<100 {
                 group.addTask {

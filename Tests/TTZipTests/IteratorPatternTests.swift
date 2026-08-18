@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
 final class IteratorPatternTests: XCTestCase {
     
-    // MARK: - 1. ArrayArchiveIterator 过滤、排序与切片测试
+    // MARK: - 1. ArrayArchiveIterator 、
     
     func testArrayArchiveIteratorFilteringAndSorting() {
         let now = Date()
@@ -15,33 +22,33 @@ final class IteratorPatternTests: XCTestCase {
             ArchiveEntry(path: "system/log.txt", uncompressedSize: 800, isDirectory: false, modificationDate: now.addingTimeInterval(-900))
         ]
         
-        // A. 扩展名过滤
+        // A.
         let txtIterator = ArrayArchiveIterator(entries: entries, extensions: ["txt"])
         XCTAssertEqual(txtIterator.count, 2)
         let txtNames = Set(Array(txtIterator).map { $0.name })
         XCTAssertEqual(txtNames, ["notes.txt", "log.txt"])
         
-        // B. 文件大小范围过滤
+        // B.
         let sizeIterator = ArrayArchiveIterator(entries: entries, minSize: 500, maxSize: 50000)
         XCTAssertEqual(sizeIterator.count, 3) // pdf(5000), archive(50000), log(800)
         
-        // C. 正则表达式过滤
+        // C.
         let regexIterator = ArrayArchiveIterator(entries: entries, regexPattern: "^photos/.*")
         XCTAssertEqual(regexIterator.count, 2)
         
-        // D. 按文件大小降序排序
+        // D.
         let sortSizeDesc = ArrayArchiveIterator(entries: entries, sortBy: .size, sortOrder: .descending)
         let sortedSizes = Array(sortSizeDesc).map { $0.uncompressedSize }
         XCTAssertEqual(sortedSizes, [120000, 50000, 5000, 800, 200])
         
-        // E. 切片
+        // E.
         let slicedIterator = sortSizeDesc.slice(offset: 1, limit: 2)
         XCTAssertEqual(slicedIterator.count, 2)
         let slicedSizes = Array(slicedIterator).map { $0.uncompressedSize }
         XCTAssertEqual(slicedSizes, [50000, 5000])
     }
     
-    // MARK: - 2. DFS 前序 (Pre-order) 与后序 (Post-order) 遍历测试
+    // MARK: - 2. DFS Pre-order Post-order
     
     func testDFSTraversalPreOrderAndPostOrder() {
         let root = ArchiveCompositeDirectory(name: "Root", path: "Root")
@@ -55,7 +62,7 @@ final class IteratorPatternTests: XCTestCase {
         root.add(component: dirA)
         root.add(component: fileB)
         
-        // A. DFS Pre-order: 预期 Root -> DirA -> FileA1 -> FileA2 -> FileB
+        // A. DFS Pre-order: Root -> DirA -> FileA1 -> FileA2 -> FileB
         let preOrderIterator = DepthFirstTreeIterator(root: root, order: .preOrder)
         var preOrderPaths: [String] = []
         while let entry = preOrderIterator.next() {
@@ -63,7 +70,7 @@ final class IteratorPatternTests: XCTestCase {
         }
         XCTAssertEqual(preOrderPaths, ["Root", "Root/DirA", "Root/DirA/FileA1.txt", "Root/DirA/FileA2.txt", "Root/FileB.txt"])
         
-        // B. DFS Post-order: 预期 FileA1 -> FileA2 -> DirA -> FileB -> Root
+        // B. DFS Post-order: FileA1 -> FileA2 -> DirA -> FileB -> Root
         let postOrderIterator = DepthFirstTreeIterator(root: root, order: .postOrder)
         var postOrderPaths: [String] = []
         while let entry = postOrderIterator.next() {
@@ -72,7 +79,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertEqual(postOrderPaths, ["Root/DirA/FileA1.txt", "Root/DirA/FileA2.txt", "Root/DirA", "Root/FileB.txt", "Root"])
     }
     
-    // MARK: - 3. BFS 广度优先按层级遍历测试
+    // MARK: - 3. BFS
     
     func testBFSTraversalLevelOrder() {
         let root = ArchiveCompositeDirectory(name: "Root", path: "Root")
@@ -93,7 +100,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertEqual(bfsPaths, ["Root", "Root/DirA", "Root/FileB.txt", "Root/DirA/FileA1.txt"])
     }
     
-    // MARK: - 4. 显式栈结构防深层嵌套目录栈溢出测试 (1000+ 层深)
+    // MARK: - 4. 1000+
     
     func testExplicitStackDeepDirectoryOverflow() {
         let depth = 1000
@@ -108,7 +115,7 @@ final class IteratorPatternTests: XCTestCase {
         let leaf = ArchiveLeafFile(name: "deep_leaf.txt", path: "\(current.path)/deep_leaf.txt", sizeBytes: 100)
         current.add(component: leaf)
         
-        // A. DFS Pre-order (1000+ 层遍历)
+        // A. DFS Pre-order (1000+ )
         let preOrder = DepthFirstTreeIterator(root: root, order: .preOrder)
         var preCount = 0
         while preOrder.next() != nil {
@@ -116,7 +123,7 @@ final class IteratorPatternTests: XCTestCase {
         }
         XCTAssertEqual(preCount, depth + 2) // 1001 个 directory + 1 个 leaf
         
-        // B. DFS Post-order (1000+ 层遍历)
+        // B. DFS Post-order (1000+ )
         let postOrder = DepthFirstTreeIterator(root: root, order: .postOrder)
         var postCount = 0
         while postOrder.next() != nil {
@@ -133,7 +140,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertEqual(bfsCount, depth + 2)
     }
     
-    // MARK: - 5. Peek 预览与 Reset 重置状态幂等性测试
+    // MARK: - 5. Peek Reset
     
     func testPeekAndResetIdempotency() {
         let entries = [
@@ -144,7 +151,7 @@ final class IteratorPatternTests: XCTestCase {
         
         let iter = ArrayArchiveIterator(entries: entries)
         
-        // A. 连续 5 次 Peek() 幂等测试：指示位置不应当改变
+        // A. 5 Peek() ：
         let peek1 = iter.peek()
         let peek2 = iter.peek()
         let peek3 = iter.peek()
@@ -152,30 +159,30 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertEqual(peek2?.path, "a.txt")
         XCTAssertEqual(peek3?.path, "a.txt")
         
-        // B. 提取 next()
+        // B. next()
         let first = iter.next()
         XCTAssertEqual(first?.path, "a.txt")
         XCTAssertEqual(iter.peek()?.path, "b.txt")
         
-        // C. Skip 1 项
+        // C. Skip 1
         let skipped = iter.skip(count: 1)
         XCTAssertEqual(skipped, 1)
         XCTAssertEqual(iter.peek()?.path, "c.txt")
         
-        // D. Reset 重置测试
+        // D. Reset
         iter.reset()
         XCTAssertEqual(iter.peek()?.path, "a.txt")
         XCTAssertEqual(iter.next()?.path, "a.txt")
     }
     
-    // MARK: - 6. LazyDiskScanner 磁盘流式扫描与谓词拦截测试
+    // MARK: - 6. LazyDiskScanner
     
     func testLazyDiskScannerIterator() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
         
-        // 创建 10 个测试文件 (.txt 与 .log)
+        // 10 (.txt .log)
         for i in 1...5 {
             let txtFile = tempDir.appendingPathComponent("file_\(i).txt")
             try "Hello \(i)".write(to: txtFile, atomically: true, encoding: .utf8)
@@ -183,7 +190,7 @@ final class IteratorPatternTests: XCTestCase {
             try "Log \(i)".write(to: logFile, atomically: true, encoding: .utf8)
         }
         
-        // 谓词拦截：仅扫描 .txt 扩展名文件
+        // ： .txt
         let lazyScanner = LazyDiskScannerIterator(
             rootURL: tempDir,
             urlPredicate: { $0.pathExtension == "txt" }
@@ -196,13 +203,13 @@ final class IteratorPatternTests: XCTestCase {
         }
         XCTAssertEqual(txtCount, 5)
         
-        // 测试 Reset 幂等
+        // Reset
         lazyScanner.reset()
         XCTAssertFalse(lazyScanner.isAtEnd)
         XCTAssertTrue(lazyScanner.peek()?.path.hasSuffix(".txt") ?? false)
     }
     
-    // MARK: - 7. Swift Sequence 原生契合与链式高阶函数测试
+    // MARK: - 7. Swift Sequence
     
     func testSwiftSequenceChainingConformances() {
         let entries = [
@@ -213,14 +220,14 @@ final class IteratorPatternTests: XCTestCase {
         
         let rootComponent = ArchiveComponentTreeBuilder.buildTree(from: entries)
         
-        // A. ArchiveCompositeDirectory Sequence 链式 filter / map / reduce
+        // A. ArchiveCompositeDirectory Sequence filter / map / reduce
         let totalSize = rootComponent.filter { !$0.isDirectory }.reduce(0) { $0 + $1.uncompressedSize }
         XCTAssertEqual(totalSize, 52300)
         
         let swiftFiles = rootComponent.filter { $0.path.hasSuffix(".swift") }.map { $0.name }
         XCTAssertEqual(Set(swiftFiles), ["main.swift", "utils.swift"])
         
-        // B. ArchiveTreeNode Sequence 链式调用
+        // B. ArchiveTreeNode Sequence
         let treeNodes = ArchiveTreeBuilder.buildTree(from: entries)
         let rootNode = ArchiveTreeNode(
             id: "root",
@@ -233,7 +240,7 @@ final class IteratorPatternTests: XCTestCase {
         let treeLeafPaths = rootNode.filter { !$0.isDirectory }.map { $0.path }
         XCTAssertEqual(treeLeafPaths.count, 3)
         
-        // C. ArchiveInspectionResult Sequence 链式调用
+        // C. ArchiveInspectionResult Sequence
         let dummyReport = SecurityReport(
             isSafe: true,
             suspiciousFileNames: [],
@@ -252,7 +259,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertEqual(inspectionNames, ["main.swift", "utils.swift", "logo.png"])
     }
     
-    // MARK: - 8. 100+ 并发迭代并发安全与线程安全测试
+    // MARK: - 8. 100+
     
     func testConcurrentIterationThreadSafety() async {
         let entries = (0..<100).map { i in
@@ -290,7 +297,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertNotNil(bfsIter)
     }
     
-    // MARK: - 9. 第二轮极限界扫荡：树结构动态变异容错测试 (Mutation Safety)
+    // MARK: - 9. ： Mutation Safety
     
     func testTreeDynamicMutationSafetyDuringIteration() {
         let root = ArchiveCompositeDirectory(name: "Root", path: "Root")
@@ -302,13 +309,13 @@ final class IteratorPatternTests: XCTestCase {
         dirA.add(component: fileA2)
         root.add(component: dirA)
         
-        // A. DFS Pre-order 迭代中途动态插入与删除节点
+        // A. DFS Pre-order
         let dfsPre = DepthFirstTreeIterator(root: root, order: .preOrder)
         var preVisited: [String] = []
         while let entry = dfsPre.next() {
             preVisited.append(entry.path)
             if entry.path == "Root/DirA" {
-                // 在迭代中途动态删除 FileA1，并新增 FileA3
+                // FileA1， FileA3
                 dirA.remove(componentNamed: "FileA1.txt")
                 let fileA3 = ArchiveLeafFile(name: "FileA3.txt", path: "Root/DirA/FileA3.txt", sizeBytes: 30)
                 dirA.add(component: fileA3)
@@ -316,7 +323,7 @@ final class IteratorPatternTests: XCTestCase {
         }
         XCTAssertFalse(preVisited.isEmpty)
         
-        // B. DFS Post-order 迭代中途清空 Composite 节点
+        // B. DFS Post-order Composite
         let dfsPost = DepthFirstTreeIterator(root: root, order: .postOrder)
         var postVisited: [String] = []
         while let entry = dfsPost.next() {
@@ -327,7 +334,7 @@ final class IteratorPatternTests: XCTestCase {
         }
         XCTAssertFalse(postVisited.isEmpty)
         
-        // C. BFS 迭代中途动态追加新节点
+        // C. BFS
         let bfs = BreadthFirstTreeIterator(root: root)
         var bfsVisited: [String] = []
         while let entry = bfs.next() {
@@ -340,7 +347,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertFalse(bfsVisited.isEmpty)
     }
     
-    // MARK: - 10. 第二轮极限界扫荡：LazyDiskScanner 早退中断与显式/自动 Cleanup 测试
+    // MARK: - 10. ：LazyDiskScanner / Cleanup
     
     func testLazyDiskScannerEarlyTerminationCleanup() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -352,7 +359,7 @@ final class IteratorPatternTests: XCTestCase {
             try "bin \(i)".write(to: file, atomically: true, encoding: .utf8)
         }
         
-        // A. 模拟 for-in 循环中途通过 break 提前中断，并显式调用 close()
+        // A. for-in break ， close()
         let scanner = LazyDiskScannerIterator(rootURL: tempDir)
         var count = 0
         for entry in scanner {
@@ -366,7 +373,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertEqual(count, 5)
         XCTAssertTrue(scanner.isAtEnd)
         
-        // B. 自然迭代结束，验证 enumerator 自动置 nil 与句柄释放
+        // B. ， enumerator nil
         let fullScanner = LazyDiskScannerIterator(rootURL: tempDir)
         var total = 0
         while fullScanner.next() != nil {
@@ -376,7 +383,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertTrue(fullScanner.isAtEnd)
     }
     
-    // MARK: - 11. 第二轮极限界扫荡：100+ 线程 ArrayArchiveIterator 极限并发加固测试
+    // MARK: - 11. ：100+ ArrayArchiveIterator
     
     func testArrayArchiveIteratorExhaustive100PlusThreadsConcurrency() async {
         let entries = (0..<500).map { i in
@@ -413,7 +420,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertGreaterThan(iterator.count, 0)
     }
     
-    // MARK: - 12. 第二轮极限界扫荡：100+ 线程 LazyDiskScanner 极限并发加固测试
+    // MARK: - 12. ：100+ LazyDiskScanner
     
     func testLazyDiskScannerHighConcurrencyStressTest() async {
         guard let tempDir = try? FileManager.default.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true) else { return }
@@ -446,7 +453,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertTrue(scanner.isAtEnd)
     }
     
-    // MARK: - 13. 第三轮终极扫荡：LazyDiskScanner 150+ 线程狂躁交叉 close()/next()/peek()/reset() 与 ARC deinit 析构安全测试
+    // MARK: - 13. ：LazyDiskScanner 150+ close /next /peek /reset ARC deinit
     
     func testRound3LazyDiskScannerConcurrentTokenDeinitAndCloseSafety() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -458,7 +465,7 @@ final class IteratorPatternTests: XCTestCase {
             try "data \(i)".write(to: f, atomically: true, encoding: .utf8)
         }
         
-        // 150+ 线程疯狂交叉操作并随时重置/关闭/析构句柄
+        // 150+ / /
         await withTaskGroup(of: Void.self) { group in
             for threadId in 0..<150 {
                 group.addTask {
@@ -491,13 +498,13 @@ final class IteratorPatternTests: XCTestCase {
                     default:
                         break
                     }
-                    // scanner 在此处自然结束生命周期并触发 deinit
+                    // scanner deinit
                 }
             }
         }
     }
     
-    // MARK: - 14. 第三轮终极扫荡：10,000+ 条目大包下 Sequence 高阶函数 (filter/map/reduce) 链式开销与 O(1) Init 性能测试
+    // MARK: - 14. ：10,000+ Sequence filter/map/reduce O 1 Init
     
     func testRound3Large10kEntriesSequenceHighOrderFunctionsPerformanceAndMemory() {
         let entryCount = 10_000
@@ -514,7 +521,7 @@ final class IteratorPatternTests: XCTestCase {
             ))
         }
         
-        // A. ArchiveInspectionResult Sequence 链式 filter / map / reduce 性能
+        // A. ArchiveInspectionResult Sequence filter / map / reduce
         let rootComponent = ArchiveComponentTreeBuilder.buildTree(from: entries)
         let report = SecurityReport(isSafe: true, suspiciousFileNames: [], hasZipSlipRisk: false, detailMessage: "OK", riskLevel: .safe)
         let inspectionResult = ArchiveInspectionResult(archivePath: "large10k.zip", entries: entries, treeNode: rootComponent, securityReport: report)
@@ -528,7 +535,7 @@ final class IteratorPatternTests: XCTestCase {
         XCTAssertGreaterThan(totalSize, 0)
         XCTAssertLessThan(duration, 0.5, "10,000 条目 Sequence 链式 reduce 耗时超标: \(duration)s")
         
-        // B. 验证 Composite 节点创建 DFS / BFS 迭代器的 O(1) 延迟计算初始化开销
+        // B. Composite DFS / BFS O(1)
         let initStart = CFAbsoluteTimeGetCurrent()
         let dfsIter = rootComponent.makeDepthFirstIterator(order: .preOrder)
         let bfsIter = rootComponent.makeBreadthFirstIterator()
@@ -536,13 +543,13 @@ final class IteratorPatternTests: XCTestCase {
         
         XCTAssertLessThan(initDuration, 0.01, "DFS/BFS Iterator 初始化耗时应为 O(1): \(initDuration)s")
         
-        // 验证迭代遍历数
+        // Verify expected invariant
         let filteredFiles = dfsIter.filter { !$0.isDirectory }
         XCTAssertGreaterThan(filteredFiles.count, 8000)
         XCTAssertEqual(bfsIter.count, rootComponent.totalFileCount() + rootComponent.totalDirectoryCount() + 1)
     }
     
-    // MARK: - 15. 第三轮终极扫荡：MillerColumnDirectoryScanner & CLICommandRouter 流式打印与层级展示准确性测试
+    // MARK: - 15. ：MillerColumnDirectoryScanner & CLICommandRouter
     
     func testRound3MillerColumnScannerAndCLIRouterStreamingAccuracy() async throws {
         let entries = [
@@ -554,14 +561,14 @@ final class IteratorPatternTests: XCTestCase {
         
         let rootComponent = ArchiveComponentTreeBuilder.buildTree(from: entries)
         
-        // A. 验证 CLI renderTree ASCII 树节点展示准确性
+        // A. CLI renderTree ASCII
         let treeStr = rootComponent.renderTree()
         XCTAssertTrue(treeStr.contains("documents (<DIR>)"))
         XCTAssertTrue(treeStr.contains("work (<DIR>)"))
         XCTAssertTrue(treeStr.contains("report.pdf"))
         XCTAssertTrue(treeStr.contains("readme.txt"))
         
-        // B. 验证 Iterator 遍历的相对路径与格式化准确性
+        // B. Iterator
         let iterator = ArrayArchiveIterator(entries: entries)
         var printedLines: [String] = []
         while let entry = iterator.next() {

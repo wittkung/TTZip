@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import CryptoKit
 @testable import TTZipCore
 
-/// enwik8 / enwik9 极端高压缩比文本语料基准测试与内存确界门禁套件
+/// enwik8 / enwik9
 final class ExtremeRatioBenchmarkSuiteTests: XCTestCase {
     
     struct ExtremeRatioMetricRow: Sendable {
@@ -68,7 +75,7 @@ final class ExtremeRatioBenchmarkSuiteTests: XCTestCase {
                 
                 let clock = ContinuousClock()
                 
-                // 1. 压缩计时
+                // 1.
                 let compElapsed = try await clock.measure {
                     try await writer.createArchive(outputPath: outArchive, format: config.format, level: config.level, inputPaths: [corpusPath])
                 }
@@ -79,14 +86,14 @@ final class ExtremeRatioBenchmarkSuiteTests: XCTestCase {
                 let compressedBytes = outAttrs.size
                 let spaceReduction = (1.0 - (Double(compressedBytes) / Double(rawBytes))) * 100.0
                 
-                // 2. 解压计时与完整性校验
+                // 2.
                 let decompElapsed = try await clock.measure {
                     try await extractor.extract(archivePath: outArchive, destinationDir: extractDest)
                 }
                 let decompSec = max(0.0001, Double(decompElapsed.components.seconds) + (Double(decompElapsed.components.attoseconds) / 1e18))
                 let decompSpeed = rawMB / decompSec
                 
-                // 验证解压后数据哈希
+                // Verify expected invariant
                 let extractedFiles = try FileManager.default.contentsOfDirectory(atPath: extractDest)
                 var exactMatch = false
                 if let firstFile = extractedFiles.first {
@@ -96,7 +103,7 @@ final class ExtremeRatioBenchmarkSuiteTests: XCTestCase {
                     exactMatch = (extHash == originalHashHex)
                 }
                 
-                // 3. 内存遥测快照
+                // 3.
                 let memSnapshot = PlatformMemory.currentMemoryUsage()
                 let currentRSSMB = Double(memSnapshot.currentRSSBytes) / (1024.0 * 1024.0)
                 let baselineRSSMB = Double(passBaselineMemory.currentRSSBytes) / (1024.0 * 1024.0)

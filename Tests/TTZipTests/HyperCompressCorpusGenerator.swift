@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import CTTZipBridge
@@ -86,7 +93,7 @@ public struct SyntheticFileItem: Sendable {
         self.byteLength = data.count
         self.isHighEntropy = isHighEntropy
         
-        // 计算 CRC32
+        // CRC32
         var crc: UInt32 = 0
         data.withUnsafeBytes { rawBuffer in
             if let baseAddress = rawBuffer.baseAddress {
@@ -95,7 +102,7 @@ public struct SyntheticFileItem: Sendable {
         }
         self.crc32 = crc
         
-        // 计算 SHA-256
+        // SHA-256
         let digest = SHA256.hash(data: data)
         self.sha256Hex = digest.map { String(format: "%02x", $0) }.joined()
     }
@@ -173,7 +180,7 @@ public final class HyperCompressCorpusGenerator: @unchecked Sendable {
     private let profile: MicroCorpusProfile
     private var prng: SplitMix64PRNG
     
-    // 词汇表与模板
+    // Verify expected invariant
     private static let jsonKeys = [
         "id", "user_id", "trace_id", "span_id", "timestamp", "service_name",
         "endpoint", "http_status", "latency_ms", "region", "cluster", "payload",
@@ -197,7 +204,7 @@ public final class HyperCompressCorpusGenerator: @unchecked Sendable {
         self.prng = SplitMix64PRNG(seed: profile.seed)
     }
     
-    /// 生成全量内存测试语料 (>= 1500 MB/s)
+    /// (>= 1500 MB/s)
     public func generateInMemoryCorpus() -> [SyntheticFileItem] {
         var items = [SyntheticFileItem]()
         items.reserveCapacity(profile.fileCount)
@@ -208,7 +215,7 @@ public final class HyperCompressCorpusGenerator: @unchecked Sendable {
         
         var fileIdx = 0
         
-        // 1. JSON 碎片
+        // 1. JSON
         for _ in 0..<jsonCount {
             let path = makeHierarchicalPath(index: fileIdx, ext: "json")
             let targetSize = prng.nextInt(in: profile.minFileSizeBytes...min(profile.maxFileSizeBytes, 8192))
@@ -217,7 +224,7 @@ public final class HyperCompressCorpusGenerator: @unchecked Sendable {
             fileIdx += 1
         }
         
-        // 2. 日志片段
+        // 2.
         for _ in 0..<logCount {
             let path = makeHierarchicalPath(index: fileIdx, ext: "log")
             let targetSize = prng.nextInt(in: max(profile.minFileSizeBytes, 4096)...min(profile.maxFileSizeBytes, 32768))
@@ -226,7 +233,7 @@ public final class HyperCompressCorpusGenerator: @unchecked Sendable {
             fileIdx += 1
         }
         
-        // 3. 高熵伪随机块
+        // 3.
         for _ in 0..<binaryCount {
             let path = makeHierarchicalPath(index: fileIdx, ext: "bin")
             let targetSize = prng.nextInt(in: max(profile.minFileSizeBytes, 8192)...profile.maxFileSizeBytes)
@@ -238,7 +245,7 @@ public final class HyperCompressCorpusGenerator: @unchecked Sendable {
         return items
     }
     
-    /// 将生成语料写入临时沙盒目录 (用于真实 VFS / APFS / NTFS 目录扫描压测)
+    /// ( VFS / APFS / NTFS )
     public func writeToTemporaryDirectory() throws -> (rootURL: URL, items: [SyntheticFileItem], cleanup: () -> Void) {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("HyperCompressBench_\(UUID().uuidString)")

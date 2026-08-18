@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 import Foundation
 @testable import TTZipCore
@@ -30,7 +37,7 @@ final class PlatformHardwareTests: XCTestCase {
     }
     
     func testBoostThreadPriority() {
-        // 验证提权调用安全无异常
+        // Verify expected invariant
         PlatformHardware.boostCurrentThreadPriority()
     }
 }

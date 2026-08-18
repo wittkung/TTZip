@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -59,7 +66,7 @@ final class ArchiveReaderTests: XCTestCase {
     func testInspectZipArchiveSuccess() async throws {
         let reader = ArchiveReader()
         
-        // 使用 Process 建立一个原生的 zip 压缩包
+        // Process zip
         let sampleTxt = (tempDirPath as NSString).appendingPathComponent("sample.txt")
         try "Sample text content".write(toFile: sampleTxt, atomically: true, encoding: .utf8)
         

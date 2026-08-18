@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -18,7 +25,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         try super.tearDownWithError()
     }
 
-    // MARK: - 1. 基础 Push / Pop / Finish 生命周期测试
+    // MARK: - 1. Push / Pop / Finish
 
     func testBasicPushPopFinishLifecycle() async throws {
         let queue = BoundedProducerConsumerQueue<Int>(maxCapacity: 10)
@@ -47,7 +54,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertTrue(queue.isCompleted)
     }
 
-    // MARK: - 2. 背压与内存上限测试 (maxCapacity = 5, 推送 100 条数据)
+    // MARK: - 2. maxCapacity = 5, 100
 
     func testBackpressureAndMemoryLimitCap() async throws {
         let queue = BoundedProducerConsumerQueue<Int>(maxCapacity: 5)
@@ -65,10 +72,10 @@ final class ProducerConsumerPatternTests: XCTestCase {
             queue.finish()
         }
         
-        // 等待 100 个并发 Producer Tasks 推送并挂起
+        // 100 Producer Tasks
         try await Task.sleep(nanoseconds: 50_000_000)
         
-        // 验证有界队列 Count 受到 maxCapacity = 5 严格限制，无爆炸式内存占用
+        // Count maxCapacity = 5 ，
         XCTAssertLessThanOrEqual(queue.count, 5)
         XCTAssertEqual(queue.pendingProducerCount, totalItems - 5)
         
@@ -84,7 +91,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertTrue(queue.isCompleted)
     }
 
-    // MARK: - 3. 多生产者多消费者并发吞吐率测试
+    // MARK: - 3.
 
     func testMultiProducerMultiConsumerConcurrentThroughput() async throws {
         let queue = BoundedProducerConsumerQueue<Int>(maxCapacity: 16)
@@ -96,7 +103,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         let receivedItemsBox = LockProtectedArray<Int>()
         
         try await withThrowingTaskGroup(of: Void.self) { group in
-            // 启动 Consumers
+            // Consumers
             for _ in 0..<consumerCount {
                 group.addTask {
                     while let item = try await queue.pop() {
@@ -105,7 +112,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
                 }
             }
             
-            // 启动 Producers
+            // Producers
             for pIndex in 0..<producerCount {
                 group.addTask {
                     for i in 0..<itemsPerProducer {
@@ -115,7 +122,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
                 }
             }
             
-            // 等待生产者推完后调用 finish
+            // finish
             try await Task.sleep(nanoseconds: 100_000_000)
             queue.finish()
             
@@ -127,18 +134,18 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertEqual(Set(results).count, totalExpectedItems)
     }
 
-    // MARK: - 4. 异常抛出与取消信号 (cancel()) 快速传递测试
+    // MARK: - 4. cancel
 
     func testCancelSignalFastPropagation() async throws {
         let queue = BoundedProducerConsumerQueue<Int>(maxCapacity: 1)
         try await queue.push(1)
         
-        // Producer 队满挂起
+        // Producer
         let producerTask = Task {
             try await queue.push(2)
         }
         
-        // Empty Consumer 队空挂起
+        // Empty Consumer
         let emptyQueue = BoundedProducerConsumerQueue<Int>(maxCapacity: 1)
         let consumerTask = Task {
             _ = try await emptyQueue.pop()
@@ -146,7 +153,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         
         try await Task.sleep(nanoseconds: 30_000_000)
         
-        // 触发 Cancel 广播
+        // Cancel
         queue.cancel()
         emptyQueue.cancel()
         
@@ -165,7 +172,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         }
     }
 
-    // MARK: - 5. 100+ 高并发线程下有界队列存取无死锁压测 (Zero Deadlock)
+    // MARK: - 5. 100+ Zero Deadlock
 
     func testHighConcurrency100TasksZeroDeadlock() async throws {
         let queue = BoundedProducerConsumerQueue<Int>(maxCapacity: 8)
@@ -197,7 +204,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertTrue(queue.isCompleted)
     }
 
-    // MARK: - 6. ArchiveDataChunk 构造与 EOF 助手测试
+    // MARK: - 6. ArchiveDataChunk EOF
 
     func testArchiveDataChunkInitializationAndEOF() {
         let chunk = ArchiveDataChunk(chunkID: 10, offset: 1024, data: Data([0x01, 0x02]), isEOF: false, crc32: 12345)
@@ -214,7 +221,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertTrue(eofChunk.data.isEmpty)
     }
 
-    // MARK: - 7. DiskReadProducer 结合 MemoryPageFlyweightPool 测试
+    // MARK: - 7. DiskReadProducer MemoryPageFlyweightPool
 
     func testDiskReadProducerFlyweightPoolIntegration() async throws {
         let filePath = tempDirURL.appendingPathComponent("read_test.bin").path
@@ -247,12 +254,12 @@ final class ProducerConsumerPatternTests: XCTestCase {
         let nilChunk = try await producer.produce()
         XCTAssertNil(nilChunk)
 
-        // 验证 MemoryPageFlyweightPool 享元池有正常借还统计
+        // MemoryPageFlyweightPool
         let stats = MemoryPageFlyweightPool.shared.poolStats
         XCTAssertGreaterThan(stats.borrowCount, 0)
     }
 
-    // MARK: - 8. CompressorConsumerGroup 并行压缩测试
+    // MARK: - 8. CompressorConsumerGroup
 
     func testCompressorConsumerGroupParallelCompression() async throws {
         let inputQueue = BoundedProducerConsumerQueue<ArchiveDataChunk>(maxCapacity: 10)
@@ -288,7 +295,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertLessThan(compressedChunk.data.count, rawChunk.data.count) // 确认数据被压缩
     }
 
-    // MARK: - 9. DiskWriteConsumer 乱序 Chunk 保序落盘测试
+    // MARK: - 9. DiskWriteConsumer Chunk
 
     func testDiskWriteConsumerSequentialReordering() async throws {
         let outputPath = tempDirURL.appendingPathComponent("write_test.bin").path
@@ -298,7 +305,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         let chunk0 = ArchiveDataChunk(chunkID: 0, offset: 0, data: Data("Hello ".utf8))
         let chunk2 = ArchiveDataChunk(chunkID: 2, offset: 15, data: Data("!".utf8))
 
-        // 故意乱序推送 Chunk: 1 -> 0 -> 2
+        // Chunk: 1 -> 0 -> 2
         try await consumer.consume(chunk1)
         XCTAssertEqual(consumer.totalWrittenBytes, 0) // 此时缺少 Chunk 0，无法写盘
 
@@ -314,7 +321,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertEqual(String(data: writtenData, encoding: .utf8), "Hello World!")
     }
 
-    // MARK: - 10. ArchivePipelineProducerConsumerEngine 端到端管道测试
+    // MARK: - 10. ArchivePipelineProducerConsumerEngine
 
     func testEndToEndArchivePipelineEngine() async throws {
         let inputPath = tempDirURL.appendingPathComponent("pipeline_in.dat").path
@@ -340,7 +347,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: outputPath))
     }
 
-    // MARK: - 11. ZipParallelWriter 有界队列扩展集成测试
+    // MARK: - 11. ZipParallelWriter
 
     func testZipParallelWriterBoundedQueueIntegration() async throws {
         let file1 = tempDirURL.appendingPathComponent("f1.txt").path
@@ -361,7 +368,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: zipOut))
     }
 
-    // MARK: - 12. ArchiveOperationPipeline 生产者-消费者引擎集成测试
+    // MARK: - 12. ArchiveOperationPipeline -
 
     func testArchiveOperationPipelineIntegration() async throws {
         let inputPath = tempDirURL.appendingPathComponent("pipeline_op_in.txt").path
@@ -381,7 +388,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: outputPath))
     }
 
-    // MARK: - 13. Finish 状态下 Push 抛出异常测试
+    // MARK: - 13. Finish Push
 
     func testPushAfterFinishThrowsError() async throws {
         let queue = BoundedProducerConsumerQueue<Int>(maxCapacity: 5)
@@ -395,7 +402,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         }
     }
 
-    // MARK: - 14. Finish 状态下 Pop 队列为空返回 nil 测试
+    // MARK: - 14. Finish Pop nil
 
     func testPopFinishedEmptyQueueReturnsNil() async throws {
         let queue = BoundedProducerConsumerQueue<String>(maxCapacity: 5)
@@ -405,7 +412,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertNil(item)
     }
 
-    // MARK: - 15. Cancel 自定义 Error 传递测试
+    // MARK: - 15. Cancel Error
 
     func testCancelWithCustomError() async throws {
         let queue = BoundedProducerConsumerQueue<Double>(maxCapacity: 2)
@@ -421,7 +428,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         }
     }
 
-    // MARK: - 16. 容量为 1 的极限有界队列边界测试
+    // MARK: - 16. 1
 
     func testSingleElementQueueCapacityBoundary() async throws {
         let queue = BoundedProducerConsumerQueue<Int>(maxCapacity: 1)
@@ -445,12 +452,12 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertEqual(val2, 2)
     }
 
-    // MARK: - 17. 50 生产者 + 50 消费者挂起状态下 Cancel 恢复测试
+    // MARK: - 17. 50 + 50 Cancel
 
     func testConcurrentCancelResumesSuspendedProducersAndConsumers() async throws {
         let queue = BoundedProducerConsumerQueue<Int>(maxCapacity: 5)
         
-        // 满队
+        // Verify expected invariant
         for i in 0..<5 {
             try await queue.push(i)
         }
@@ -459,7 +466,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         let suspendedConsumersCountBox = LockProtectedInt(0)
         
         try await withThrowingTaskGroup(of: Void.self) { group in
-            // 50 个 挂起 Producer
+            // 50 Producer
             for i in 0..<50 {
                 group.addTask {
                     do {
@@ -470,11 +477,11 @@ final class ProducerConsumerPatternTests: XCTestCase {
                 }
             }
             
-            // 取消 queue
+            // queue
             try await Task.sleep(nanoseconds: 50_000_000)
             queue.cancel()
             
-            // 50 个 Cancel 后的 Consumer
+            // 50 Cancel Consumer
             for _ in 0..<50 {
                 group.addTask {
                     do {
@@ -492,26 +499,26 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertEqual(suspendedConsumersCountBox.value, 50)
     }
 
-    // MARK: - 18. DiskWriteConsumer 乱序缓冲区容量上限控制与背压唤醒测试
+    // MARK: - 18. DiskWriteConsumer
 
     func testDiskWriteConsumerMaxReorderBufferCapacity() async throws {
         let outputPath = tempDirURL.appendingPathComponent("max_reorder_test.bin").path
         let maxCap = 5
         let consumer = try DiskWriteConsumer(outputPath: outputPath, maxReorderBufferCapacity: maxCap)
 
-        // 故意先推送 1~5 乱序 Chunk (缺失 Chunk 0)
+        // 1~5 Chunk ( Chunk 0)
         for i in 1...maxCap {
             let chunk = ArchiveDataChunk(chunkID: Int64(i), offset: Int64(i * 10), data: Data("Data \(i)".utf8))
             try await consumer.consume(chunk)
         }
 
-        // 验证缓冲区已占用 5 个 Chunk
+        // 5 Chunk
         XCTAssertEqual(consumer.pendingChunksCount, maxCap)
 
         let isConsumerSuspendedBox = LockProtectedInt(0)
         let isConsumerFinishedBox = LockProtectedInt(0)
 
-        // 在新 Task 中推送 Chunk 6 (超额)，应该触发 Continuation 挂起背压
+        // Task Chunk 6 ( )， Continuation
         let overflowTask = Task {
             isConsumerSuspendedBox.increment()
             let chunk6 = ArchiveDataChunk(chunkID: 6, offset: 60, data: Data("Data 6".utf8))
@@ -523,7 +530,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertEqual(isConsumerSuspendedBox.value, 1)
         XCTAssertEqual(isConsumerFinishedBox.value, 0) // overflowTask 仍挂起在 Continuation 中
 
-        // 现在推送缺失的 Chunk 0 推进 nextExpectedChunkID 顺序排空缓冲区
+        // Chunk 0 nextExpectedChunkID
         let chunk0 = ArchiveDataChunk(chunkID: 0, offset: 0, data: Data("Data 0".utf8))
         try await consumer.consume(chunk0)
 
@@ -539,7 +546,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertEqual(writtenString, "Data 0Data 1Data 2Data 3Data 4Data 5Data 6")
     }
 
-    // MARK: - 19. TaskGroup 异常抛出与队列 Cancel 自动解锁唤醒测试
+    // MARK: - 19. TaskGroup Cancel
 
     func testArchivePipelineEngineErrorCancellationPropagation() async throws {
         let inputPath = tempDirURL.appendingPathComponent("pipeline_err_in.dat").path
@@ -548,8 +555,8 @@ final class ProducerConsumerPatternTests: XCTestCase {
         let sampleData = Data(repeating: 0x42, count: 64 * 1024)
         try sampleData.write(to: URL(fileURLWithPath: inputPath))
 
-        // 构造触发 Producer/Compressor 异常的管道
-        // 我们通过删除 inputPath 文件使 DiskReadProducer 在 produce 时抛出 FileHandle 异常
+        // Producer/Compressor
+        // inputPath DiskReadProducer produce FileHandle
         try FileManager.default.removeItem(atPath: inputPath)
 
         let engine = ArchivePipelineProducerConsumerEngine()
@@ -562,7 +569,7 @@ final class ProducerConsumerPatternTests: XCTestCase {
             )
             XCTFail("Should throw error due to missing input file")
         } catch {
-            // 捕获异常，确保无死锁或无法唤醒的挂起 Task
+            // ， Task
             XCTAssertNotNil(error)
         }
     }

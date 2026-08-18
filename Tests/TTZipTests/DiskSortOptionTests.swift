@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipApp
 @testable import TTZipCore
@@ -124,7 +131,7 @@ final class DiskSortOptionTests: XCTestCase {
         // Folders first
         XCTAssertEqual(sorted.first?.name, "Folder")
         let fileNames = sorted.dropFirst().map(\.name)
-        // Verified localizedStandardCompare order: "7Z 归档" -> "文本文件" (textA, textB) -> "PDF 文档" -> "ZIP 归档"
+        // Verified localizedStandardCompare order: "7Z " -> " " (textA, textB) -> "PDF " -> "ZIP "
         XCTAssertEqual(fileNames, ["archiveA.7z", "textA.txt", "textB.txt", "document.pdf", "archiveZ.zip"])
     }
     

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -152,7 +159,7 @@ final class TemplateMethodPatternTests: XCTestCase {
         XCTAssertEqual(result.getMetadata(forKey: "pkzip_header_verified"), "PKZipHeaderValid")
         XCTAssertEqual(result.getMetadata(forKey: "central_directory_reconstruction"), "CentralDirectoryReconstructed")
 
-        // 验证文件头 magic bytes为 PK\x03\x04 (0x50, 0x4B, 0x03, 0x04)
+        // magic bytes PK\x03\x04 (0x50, 0x4B, 0x03, 0x04)
         let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: outZip))
         defer { try? handle.close() }
         let headerData = handle.readData(ofLength: 4)

@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
-/// 调用 TTZip 核心 BenchmarkEngine 测算引擎，覆盖不同参数并包含竞品实测对比
+/// TTZip BenchmarkEngine ，
 final class EngineBenchmarkSuiteTests: XCTestCase {
     
     func testBenchmarkEngineWithCompetitors() async throws {
@@ -16,7 +23,7 @@ final class EngineBenchmarkSuiteTests: XCTestCase {
             
             let engine = BenchmarkEngine()
             
-            // 传入不同参数矩阵 (规模, 特征, 格式, 等级, 推荐名称)
+            // ( , , , , )
             let parameterSets: [(size: BenchmarkDataSize, profile: BenchmarkDatasetProfile, format: ArchiveCompressionFormat, level: ArchiveCompressionLevel, name: String)] = [
                 (.small, .codeText, .zip, .level1, "⚡ 100MB ZIP 极速模式 (Level 1 Fast)"),
                 (.small, .mixedOffice, .zip, .level6, "⚖️ 100MB ZIP 标准平衡 (Level 6 Normal)"),
