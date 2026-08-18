@@ -15,4 +15,18 @@
 
 #include "ttzip_platform.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* ============================================================================
+ * Hardware Thermal State Accessors
+ * ============================================================================ */
+TTZIP_API void ttzip_bridge_set_thermal_state(int32_t state);
+TTZIP_API int32_t ttzip_bridge_get_thermal_state(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* CTTZIP_PLATFORM_H */

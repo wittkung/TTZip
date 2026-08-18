@@ -23,6 +23,7 @@
 #include <uchardet/uchardet.h>
 #include "CTTZipCommon.h"
 #include "ttzip_platform.h"
+#include "CTTZipPlatform.h"
 #include "CTTZipIO.h"
 
 #include "CTTZipSIMD.h"

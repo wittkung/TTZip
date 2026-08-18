@@ -126,6 +126,94 @@ void ttzip_filter_shuffle_backward(const uint8_t* src, uint8_t* dst, size_t size
     }
 }
 
+void ttzip_filter_truncate_float32_neon(const float* src, float* dst, size_t count, uint8_t keep_bits) {
+    if (!src || !dst || count == 0) return;
+    if (keep_bits >= 23) {
+        if (src != dst) memcpy(dst, src, count * sizeof(float));
+        return;
+    }
+    if (keep_bits == 0) keep_bits = 1;
+
+    uint32_t q = 23 - keep_bits;
+    uint32_t mask_val = ~((1U << q) - 1U);
+    uint32_t bias_val = 1U << (q - 1);
+
+#if (defined(__ARM_NEON) || defined(__aarch64__))
+    uint32x4_t v_mask = vdupq_n_u32(mask_val);
+    uint32x4_t v_bias = vdupq_n_u32(bias_val);
+    size_t vec_count = count / 4;
+
+    const uint32_t* s_ptr = (const uint32_t*)src;
+    uint32_t* d_ptr = (uint32_t*)dst;
+
+    for (size_t i = 0; i < vec_count; i++) {
+        uint32x4_t v_in = vld1q_u32(s_ptr);
+        uint32x4_t v_rounded = vaddq_u32(v_in, v_bias);
+        uint32x4_t v_out = vandq_u32(v_rounded, v_mask);
+        vst1q_u32(d_ptr, v_out);
+        s_ptr += 4;
+        d_ptr += 4;
+    }
+
+    size_t rem = count % 4;
+    for (size_t i = 0; i < rem; i++) {
+        uint32_t val = *s_ptr++;
+        *d_ptr++ = (val + bias_val) & mask_val;
+    }
+#else
+    const uint32_t* s_ptr = (const uint32_t*)src;
+    uint32_t* d_ptr = (uint32_t*)dst;
+    for (size_t i = 0; i < count; i++) {
+        uint32_t val = s_ptr[i];
+        d_ptr[i] = (val + bias_val) & mask_val;
+    }
+#endif
+}
+
+void ttzip_filter_truncate_float64_neon(const double* src, double* dst, size_t count, uint8_t keep_bits) {
+    if (!src || !dst || count == 0) return;
+    if (keep_bits >= 52) {
+        if (src != dst) memcpy(dst, src, count * sizeof(double));
+        return;
+    }
+    if (keep_bits == 0) keep_bits = 1;
+
+    uint64_t q = 52 - keep_bits;
+    uint64_t mask_val = ~((1ULL << q) - 1ULL);
+    uint64_t bias_val = 1ULL << (q - 1);
+
+#if (defined(__ARM_NEON) || defined(__aarch64__))
+    uint64x2_t v_mask = vdupq_n_u64(mask_val);
+    uint64x2_t v_bias = vdupq_n_u64(bias_val);
+    size_t vec_count = count / 2;
+
+    const uint64_t* s_ptr = (const uint64_t*)src;
+    uint64_t* d_ptr = (uint64_t*)dst;
+
+    for (size_t i = 0; i < vec_count; i++) {
+        uint64x2_t v_in = vld1q_u64(s_ptr);
+        uint64x2_t v_rounded = vaddq_u64(v_in, v_bias);
+        uint64x2_t v_out = vandq_u64(v_rounded, v_mask);
+        vst1q_u64(d_ptr, v_out);
+        s_ptr += 2;
+        d_ptr += 2;
+    }
+
+    size_t rem = count % 2;
+    for (size_t i = 0; i < rem; i++) {
+        uint64_t val = *s_ptr++;
+        *d_ptr++ = (val + bias_val) & mask_val;
+    }
+#else
+    const uint64_t* s_ptr = (const uint64_t*)src;
+    uint64_t* d_ptr = (uint64_t*)dst;
+    for (size_t i = 0; i < count; i++) {
+        uint64_t val = s_ptr[i];
+        d_ptr[i] = (val + bias_val) & mask_val;
+    }
+#endif
+}
+
 void ttzip_filter_delta_forward(uint8_t* buf, size_t size) {
     if (!buf || size <= 1) return;
     for (size_t i = size - 1; i > 0; i--) {
@@ -170,6 +258,7 @@ int ttzip_filter_pipeline_apply_forward(
         ttzip_filter_type_t filter = pipeline->filters[k];
         uint8_t typesize = pipeline->type_sizes[k];
         if (typesize == 0) typesize = 1;
+        uint8_t t_bits = pipeline->truncate_bits[k];
 
         switch (filter) {
             case TTZIP_FILTER_SHUFFLE:
@@ -178,6 +267,12 @@ int ttzip_filter_pipeline_apply_forward(
             case TTZIP_FILTER_DELTA:
                 if (cur_in != cur_out) memcpy(cur_out, cur_in, size);
                 ttzip_filter_delta_forward(cur_out, size);
+                break;
+            case TTZIP_FILTER_TRUNCATE_FLOAT32:
+                ttzip_filter_truncate_float32_neon((const float*)cur_in, (float*)cur_out, size / sizeof(float), t_bits > 0 ? t_bits : 7);
+                break;
+            case TTZIP_FILTER_TRUNCATE_FLOAT64:
+                ttzip_filter_truncate_float64_neon((const double*)cur_in, (double*)cur_out, size / sizeof(double), t_bits > 0 ? t_bits : 14);
                 break;
             case TTZIP_FILTER_NONE:
             default:
@@ -235,6 +330,11 @@ int ttzip_filter_pipeline_apply_backward(
             case TTZIP_FILTER_DELTA:
                 if (cur_in != cur_out) memcpy(cur_out, cur_in, size);
                 ttzip_filter_delta_backward(cur_out, size);
+                break;
+            case TTZIP_FILTER_TRUNCATE_FLOAT32:
+            case TTZIP_FILTER_TRUNCATE_FLOAT64:
+                // Truncation is lossy; backward pass preserves current data
+                if (cur_in != cur_out) memcpy(cur_out, cur_in, size);
                 break;
             case TTZIP_FILTER_NONE:
             default:

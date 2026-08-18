@@ -19,5 +19,8 @@
 #include "CTTZipCacheTopology.h"
 #include "CTTZipFilterPipeline.h"
 #include "CTTZipSparseSlicing.h"
+#include "CTTZipPrefetchPipeline.h"
+#include "CTTZipVLMeta.h"
+#include "CTTZipTensorSlicing.h"
 
 #endif // CTTZipCoreArchitecture_h

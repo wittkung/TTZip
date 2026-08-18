@@ -41,6 +41,7 @@ public struct InMemoryBenchmarkConfig: Codable, Sendable {
     public var minDurationMs: Int
     public var useBinaryUnits: Bool
     public var turboBenchOutput: Bool
+    public var enableThermalGuard: Bool
     public var customInputPath: String?
 
     public init(
@@ -51,6 +52,7 @@ public struct InMemoryBenchmarkConfig: Codable, Sendable {
         minDurationMs: Int = 500,
         useBinaryUnits: Bool = false,
         turboBenchOutput: Bool = false,
+        enableThermalGuard: Bool = false,
         customInputPath: String? = nil
     ) {
         self.selectedFormats = selectedFormats
@@ -60,6 +62,7 @@ public struct InMemoryBenchmarkConfig: Codable, Sendable {
         self.minDurationMs = max(100, minDurationMs)
         self.useBinaryUnits = useBinaryUnits
         self.turboBenchOutput = turboBenchOutput
+        self.enableThermalGuard = enableThermalGuard
         self.customInputPath = customInputPath
     }
 }

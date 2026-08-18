@@ -20,10 +20,12 @@ extern "C" {
  * @brief Filter Type Identifiers for Zero-Alloc Pre-compression Transformation
  */
 typedef enum {
-    TTZIP_FILTER_NONE      = 0,
-    TTZIP_FILTER_SHUFFLE   = 1, // ARM NEON Byte Shuffle (4/8/16-byte transposition)
-    TTZIP_FILTER_DELTA     = 2, // 1st-order Delta Differential (ByteDiff)
-    TTZIP_FILTER_BITSHUFFLE = 3 // 8-bit vector bit transposition
+    TTZIP_FILTER_NONE             = 0,
+    TTZIP_FILTER_SHUFFLE          = 1, // ARM NEON Byte Shuffle (4/8/16-byte transposition)
+    TTZIP_FILTER_DELTA            = 2, // 1st-order Delta Differential (ByteDiff)
+    TTZIP_FILTER_BITSHUFFLE       = 3, // 8-bit vector bit transposition
+    TTZIP_FILTER_TRUNCATE_FLOAT32 = 4, // IEEE-754 Float32 Mantissa Precision Truncation + Half-Bit Rounding
+    TTZIP_FILTER_TRUNCATE_FLOAT64 = 5  // IEEE-754 Float64 Mantissa Precision Truncation + Half-Bit Rounding
 } ttzip_filter_type_t;
 
 /**
@@ -31,9 +33,20 @@ typedef enum {
  */
 typedef struct {
     ttzip_filter_type_t filters[4];
-    uint8_t type_sizes[4]; // Element type size (1, 2, 4, 8)
+    uint8_t type_sizes[4];    // Element type size (1, 2, 4, 8)
+    uint8_t truncate_bits[4]; // Mantissa bits to keep (e.g. 7..23 for float32, 14..52 for float64)
     size_t count;
 } ttzip_filter_pipeline_t;
+
+/**
+ * @brief Applies ARM NEON float32 mantissa truncation with unbiased half-bit rounding.
+ */
+void ttzip_filter_truncate_float32_neon(const float* src, float* dst, size_t count, uint8_t keep_bits);
+
+/**
+ * @brief Applies ARM NEON float64 mantissa truncation with unbiased half-bit rounding.
+ */
+void ttzip_filter_truncate_float64_neon(const double* src, double* dst, size_t count, uint8_t keep_bits);
 
 /**
  * @brief Applies NEON Byte Shuffle on a buffer (forward transformation).

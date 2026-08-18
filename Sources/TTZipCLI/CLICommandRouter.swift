@@ -738,7 +738,7 @@ public enum CLICommandRouter {
     }
     
     private static func handleBench(options: CLIOptions) async {
-        if options.inMemory || options.turboBenchCompat {
+        if options.inMemory || options.turboBenchCompat || options.recommend || options.pareto || options.plot || options.svgOutPath != nil || options.transferSheet || options.thermalGuard {
             await CLIBenchmarkRunner.runInMemoryBenchmark(options: options)
             return
         }

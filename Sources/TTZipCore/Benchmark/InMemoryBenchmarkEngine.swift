@@ -66,6 +66,15 @@ public final class InMemoryBenchmarkEngine: Sendable {
         for formatStr in formats {
             let normalizedFmt = formatStr.lowercased().trimmingCharacters(in: .whitespaces)
             for level in levels {
+                if config.enableThermalGuard {
+                    if ProcessInfo.processInfo.thermalState == .serious || ProcessInfo.processInfo.thermalState == .critical {
+                        progressCallback?("🔥 检测到硬件热饱和 (Thermal Pressure: \(ProcessInfo.processInfo.thermalState.rawValue))，进入自适应冷却休眠...")
+                        while ProcessInfo.processInfo.thermalState != .nominal {
+                            try await Task.sleep(nanoseconds: 500_000_000)
+                        }
+                        try await Task.sleep(nanoseconds: 1_500_000_000) // 稳频
+                    }
+                }
                 if let res = benchmarkAlgorithm(
                     format: normalizedFmt,
                     level: level,

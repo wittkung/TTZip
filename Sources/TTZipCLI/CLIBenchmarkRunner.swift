@@ -245,6 +245,40 @@ public enum CLIBenchmarkRunner {
     // MARK: - In-Memory & TurboBench / lzbench Benchmark Suite
 
     public static func runInMemoryBenchmark(options: CLIOptions) async {
+        // 1. 快速场景推荐分支 (--recommend)
+        if options.recommend {
+            print("🧠 Running Smart Codec Scenario Selector (< 10ms micro-probe)...")
+            let scenario = SmartCodecSelector.Scenario.from(string: options.scenario ?? "balanced")
+            
+            var sampleData: Data
+            if let inPath = options.inputPath, let loaded = try? Data(contentsOf: URL(fileURLWithPath: inPath)) {
+                sampleData = loaded
+            } else {
+                sampleData = Data(repeating: 0x41, count: 65536) + Data((0..<65536).map { UInt8($0 & 0xFF) })
+            }
+
+            let recommendation = sampleData.withUnsafeBytes { rawPtr -> ScenarioRecommendation in
+                guard let base = rawPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                    return SmartCodecSelector.shared.recommend(for: [0], length: 1, scenario: scenario)
+                }
+                return SmartCodecSelector.shared.recommend(for: base, length: sampleData.count, scenario: scenario)
+            }
+
+            print("\n╔═ 🎯 TTZip Smart Codec Scenario Recommendation ═════════════════════════════════════╗")
+            print(String(format: "║ Scenario:              %-60s║", recommendation.scenario))
+            print(String(format: "║ Shannon Entropy:       %-60s║", String(format: "%.3f bits/byte", recommendation.measuredEntropy)))
+            print(String(format: "║ Trial Compressibility: %-60s║", String(format: "%.1f%% (Trial Ratio: %.3f)", (1.0 - recommendation.trialCompressibilityRatio) * 100.0, recommendation.trialCompressibilityRatio)))
+            print(String(format: "║ Recommended Codec:     %-60s║", "\(recommendation.recommendedAlgorithm) Level \(recommendation.recommendedLevel)"))
+            print(String(format: "║ Projected Speed:       %-60s║", String(format: "%.1f MB/s (Est. Savings: %.1f%%)", recommendation.projectedThroughputMBs, recommendation.projectedSpaceSavingsPct)))
+            print(String(format: "║ Probe Analysis Time:   %-60s║", String(format: "%.3f ms", recommendation.probeDurationMs)))
+            print("╠════════════════════════════════════════════════════════════════════════════════════╣")
+            print("║ 💡 Rationale:                                                                      ║")
+            let wrappedRationale = "║  " + recommendation.rationale.padding(toLength: 82, withPad: " ", startingAt: 0) + "║"
+            print(wrappedRationale)
+            print("╚════════════════════════════════════════════════════════════════════════════════════╝\n")
+            return
+        }
+
         print("⚡ Initializing in-memory benchmark engine (TurboBench / lzbench calibrated clock)...")
 
         let formats: [String]
@@ -274,6 +308,7 @@ public enum CLIBenchmarkRunner {
             minDurationMs: options.minDurationMs,
             useBinaryUnits: options.binaryUnits,
             turboBenchOutput: options.turboBenchCompat,
+            enableThermalGuard: options.thermalGuard,
             customInputPath: options.inputPath
         )
 
@@ -290,6 +325,28 @@ public enum CLIBenchmarkRunner {
             }
 
             print("\n" + engine.generateTurboBenchTable(report: report))
+
+            // 2. 帕累托最优前沿分析与渲染
+            let paretoResult = ParetoFrontierCalculator.shared.calculateFrontier(from: report.results)
+
+            if options.pareto || options.plot || options.svgOutPath != nil {
+                if options.plot || options.pareto {
+                    let plotStr = TerminalParetoPlotter.shared.renderTerminalPlot(result: paretoResult)
+                    print("\n" + plotStr)
+                }
+
+                if let svgPath = options.svgOutPath {
+                    try SVGParetoPlotter.shared.exportSVG(result: paretoResult, to: svgPath)
+                    print("📈 Interactive SVG Pareto chart exported: \(svgPath)")
+                }
+            }
+
+            // 3. 物理传输介质端到端耗时投影表
+            if options.transferSheet {
+                let transferReports = TransferSpeedSheetCalculator.shared.calculateMatrixReports(results: report.results)
+                let sheetTable = TransferSpeedSheetCalculator.shared.formatTable(reports: transferReports)
+                print("\n" + sheetTable)
+            }
 
             if let jsonPath = options.jsonReportPath {
                 try engine.exportJSONReport(report: report, to: jsonPath)

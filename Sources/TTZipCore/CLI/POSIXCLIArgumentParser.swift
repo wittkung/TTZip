@@ -93,6 +93,26 @@ public enum POSIXCLIArgumentParser {
                     options.inMemory = true
                 case "turbobench", "compat-turbobench":
                     options.turboBenchCompat = true
+                case "pareto":
+                    options.pareto = true
+                case "plot":
+                    options.plot = true
+                case "svg-out", "svg":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
+                        options.svgOutPath = v
+                        if inlineValue == nil { i += 1 }
+                    }
+                case "thermal-guard", "thermal":
+                    options.thermalGuard = true
+                case "transfer-sheet", "transfer":
+                    options.transferSheet = true
+                case "recommend":
+                    options.recommend = true
+                case "scenario":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
+                        options.scenario = v
+                        if inlineValue == nil { i += 1 }
+                    }
                 case "keep", "keep-temp":
                     options.keepTempFiles = true
                 case "dump-on-failure":

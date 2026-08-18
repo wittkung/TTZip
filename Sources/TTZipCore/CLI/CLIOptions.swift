@@ -189,6 +189,29 @@ public struct CLIOptions: Sendable {
     /// Use binary units (`MiB/s`, `GiB/s`) instead of decimal units (`MB/s`, `GB/s`).
     public var binaryUnits: Bool = false
     
+    // MARK: - 4D Evolution & Pareto Analytics Options
+    
+    /// Calculate 2D Pareto frontier skyline and convex envelope (`--pareto`).
+    public var pareto: Bool = false
+    
+    /// Render 2D terminal Unicode Braille scatter plot (`--plot`).
+    public var plot: Bool = false
+    
+    /// Output path for standalone SVG vector graphic chart (`--svg-out`).
+    public var svgOutPath: String? = nil
+    
+    /// Enable CPU thermal state monitoring and DVFS cooldown pauses (`--thermal-guard`).
+    public var thermalGuard: Bool = false
+    
+    /// Generate physical media turnaround time matrix (`--transfer-sheet`).
+    public var transferSheet: Bool = false
+    
+    /// Execute Smart Codec Scenario Selector and entropy probe (`--recommend`).
+    public var recommend: Bool = false
+    
+    /// Target scenario for smart recommendation (`--scenario "airdrop"|"daily"|"cold"`).
+    public var scenario: String? = nil
+    
     // MARK: - Domain Property Conversion
     
     /// Strong enum representation of `overwritePolicy`.
