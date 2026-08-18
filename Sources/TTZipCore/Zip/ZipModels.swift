@@ -56,3 +56,12 @@ final class SendablePointerBox: @unchecked Sendable {
         self.size = size
     }
 }
+
+final class SendableMutablePointerBox: @unchecked Sendable {
+    let pointer: UnsafeMutablePointer<UInt8>
+    let size: Int
+    init(pointer: UnsafeMutablePointer<UInt8>, size: Int) {
+        self.pointer = pointer
+        self.size = size
+    }
+}

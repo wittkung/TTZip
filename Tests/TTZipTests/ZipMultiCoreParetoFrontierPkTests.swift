@@ -22,20 +22,31 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
         let payloadBytes = (sampleAttrs[.size] as? Int64) ?? 100_000_000
         let payloadMB = Double(payloadBytes) / 1024.0 / 1024.0
 
-        var zipPoints: [ParetoPoint] = []
+        // 0. 科学 Warm-up 热身轮次 (消除缺页中断、GCD 线程冷创建与 C 状态冷开销)
         let asyncWriter = ArchiveWriter()
+        let warmupPath = tempDir.appendingPathComponent("ttzip_warmup.zip").path
+        _ = try? await asyncWriter.createArchive(outputPath: warmupPath, format: .zip, level: .level1, inputPaths: [realSamplePath])
+        try? FileManager.default.removeItem(atPath: warmupPath)
+
+        // 校验样本密码学指纹
+        let corpusItem = CorpusItem(id: "enwik8", name: "enwik8", tier: .tier1Text, path: realSamplePath, sizeBytes: payloadBytes)
+        if let fp = CorpusFingerprintManager.shared.computeFingerprint(for: corpusItem) {
+            print("🔒 [Benchmark Fixture Verified] SHA-256: \(fp.sha256Hex)")
+        }
+
+        var zipPoints: [ParetoPoint] = []
 
         // 1. TTZip 18 核心极速分块并行通道 + 32KB 跨块历史字典接力 (Level 1 到 12)
         for lvl in 1...12 {
             let levelEnum = ArchiveCompressionLevel(rawValue: lvl) ?? .level1
             let pth = tempDir.appendingPathComponent("ttzip_mc_\(lvl).zip").path
-            let t0 = CACurrentMediaTime()
+            let t0 = PlatformMonotonicTimer.nowNanoseconds()
             try await asyncWriter.createArchive(outputPath: pth, format: .zip, level: levelEnum, inputPaths: [realSamplePath])
-            let dur = max(1e-6, CACurrentMediaTime() - t0)
+            let durSec = max(1e-6, Double(PlatformMonotonicTimer.nowNanoseconds() - t0) / 1_000_000_000.0)
             let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
             if sz > 0 {
                 let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
-                let speed = payloadMB / dur
+                let speed = payloadMB / durSec
                 zipPoints.append(ParetoPoint(
                     id: "ttzip_mc_\(lvl)",
                     algorithm: "TTZip (18-Core L\(lvl))",

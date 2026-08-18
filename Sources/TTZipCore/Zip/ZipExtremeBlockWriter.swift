@@ -85,17 +85,18 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                 }
             }
 
-            let adaptiveSize = ttzip_calculate_adaptive_block_size(entropyVal, rawData.count)
-            let levelChunkMultiplier: Int = level.rawValue >= 9 ? 4 : (level.rawValue >= 6 ? 2 : 1)
-            let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : (adaptiveSize > 0 ? adaptiveSize : 524288)
-            let actualBlockSize = min(rawData.count, max(65536, baseBlockSize * levelChunkMultiplier))
+            let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : 262144
+            let actualBlockSize = min(rawData.count, max(65536, baseBlockSize))
             let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
             let libdeflateLevel = Int32(min(12, max(1, level.rawValue)))
             
+            let maxChunkOut = actualBlockSize + 512
+            let totalOutputSlab = UnsafeMutablePointer<UInt8>.allocate(capacity: totalBlocks * maxChunkOut)
+            defer { totalOutputSlab.deallocate() }
+            
             struct RawBlockBuffer: @unchecked Sendable {
-                let ptr: UnsafeMutablePointer<UInt8>
+                let ptr: UnsafePointer<UInt8>
                 let size: Int
-                let isAllocated: Bool
             }
             
             let resultsBox = StateBoxResults([RawBlockBuffer?](repeating: nil, count: totalBlocks))
@@ -103,6 +104,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
             rawData.withUnsafeBytes { rawIn in
                 guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
                 let ptrBox = SendablePointerBox(pointer: baseAddr, size: rawData.count)
+                let slabBox = SendableMutablePointerBox(pointer: totalOutputSlab, size: totalBlocks * maxChunkOut)
                 
                 DispatchQueue.concurrentPerform(iterations: totalBlocks) { blockIdx in
                     let offset = blockIdx * actualBlockSize
@@ -121,8 +123,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                         dictSize = 0
                     }
                     
-                    let maxOut = currentChunkSize + 512
-                    let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
+                    let outBuf = slabBox.pointer.advanced(by: blockIdx * maxChunkOut)
                     
                     let compSize = ttzip_raw_deflate_block_compress_with_dict(
                         chunkPtr,
@@ -130,19 +131,16 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                         dictPtr,
                         dictSize,
                         outBuf,
-                        maxOut,
+                        maxChunkOut,
                         libdeflateLevel,
                         isFinal
                     )
                     
                     if compSize > 0 && compSize < currentChunkSize {
-                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: compSize, isAllocated: true))
+                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: compSize))
                     } else {
                         // Incompressible fallback
-                        outBuf.deallocate()
-                        let fallbackBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: currentChunkSize)
-                        memcpy(fallbackBuf, chunkPtr, currentChunkSize)
-                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: fallbackBuf, size: currentChunkSize, isAllocated: true))
+                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: chunkPtr, size: currentChunkSize))
                     }
                 }
             }
@@ -158,14 +156,12 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
             var payload = Data()
             payload.reserveCapacity(totalComp)
             for idx in 0..<totalBlocks {
-                guard let buf = resultsBox.values[idx] else { return false }
-                payload.append(buf.ptr, count: buf.size)
-                if buf.isAllocated {
-                    buf.ptr.deallocate()
+                if let buf = resultsBox.values[idx] {
+                    payload.append(buf.ptr, count: buf.size)
                 }
             }
             compressedPayload = payload
-            totalCompressedBytes = Int64(totalComp)
+            totalCompressedBytes = Int64(payload.count)
         }
         
         // 4. 构建标准 PKWARE ZIP 容器 (Local File Header + Central Directory + EOCD)

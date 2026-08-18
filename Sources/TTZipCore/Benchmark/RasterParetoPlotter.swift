@@ -240,19 +240,14 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             }
         }
 
-        // 6.1 绘制 TTZip Hero 半透明演进光晕带 (DeepSWE Ribbon Beam)
+        // 6.1 绘制 TTZip Hero 半透明演进光晕带 (DeepSWE Ribbon Beam - 纯直折线)
         for traj in trajectories where traj.family.isHero {
-            let pts = traj.points.map { (x: Double(mapX($0.spaceSavingsPct)), y: Double(mapY($0.throughputMBs))) }
+            let pts = traj.points.map { CGPoint(x: mapX($0.spaceSavingsPct), y: mapY($0.throughputMBs)) }
             if pts.count >= 2 {
-                let segments = FritschCarlsonSplineCalculator.calculateBezierSegments(points: pts)
                 let ribbonPath = CGMutablePath()
-                ribbonPath.move(to: CGPoint(x: pts[0].x, y: pts[0].y))
-                for seg in segments {
-                    ribbonPath.addCurve(
-                        to: CGPoint(x: seg.endPoint.x, y: seg.endPoint.y),
-                        control1: CGPoint(x: seg.controlPoint1.x, y: seg.controlPoint1.y),
-                        control2: CGPoint(x: seg.controlPoint2.x, y: seg.controlPoint2.y)
-                    )
+                ribbonPath.move(to: pts[0])
+                for i in 1..<pts.count {
+                    ribbonPath.addLine(to: pts[i])
                 }
                 ctx.setStrokeColor(CGColor(red: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 0.16))
                 ctx.setLineWidth(CGFloat(traj.family.haloRibbonWidth))
@@ -263,20 +258,15 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             }
         }
 
-        // 6.2 绘制各软件家族主实线轨迹
+        // 6.2 绘制各软件家族主实线轨迹 (纯直折线，真实透明)
         for traj in trajectories {
-            let pts = traj.points.map { (x: Double(mapX($0.spaceSavingsPct)), y: Double(mapY($0.throughputMBs))) }
+            let pts = traj.points.map { CGPoint(x: mapX($0.spaceSavingsPct), y: mapY($0.throughputMBs)) }
             guard pts.count >= 2 else { continue }
-            let segments = FritschCarlsonSplineCalculator.calculateBezierSegments(points: pts)
 
-            let splinePath = CGMutablePath()
-            splinePath.move(to: CGPoint(x: pts[0].x, y: pts[0].y))
-            for seg in segments {
-                splinePath.addCurve(
-                    to: CGPoint(x: seg.endPoint.x, y: seg.endPoint.y),
-                    control1: CGPoint(x: seg.controlPoint1.x, y: seg.controlPoint1.y),
-                    control2: CGPoint(x: seg.controlPoint2.x, y: seg.controlPoint2.y)
-                )
+            let polylinePath = CGMutablePath()
+            polylinePath.move(to: pts[0])
+            for i in 1..<pts.count {
+                polylinePath.addLine(to: pts[i])
             }
 
             let strokeColor = NSColor(hexString: traj.family.brandColorHex) ?? NSColor.darkGray
@@ -284,7 +274,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             ctx.setLineWidth(CGFloat(traj.family.lineWidth))
             ctx.setLineCap(.round)
             ctx.setLineJoin(.round)
-            ctx.addPath(splinePath)
+            ctx.addPath(polylinePath)
             ctx.strokePath()
         }
 
