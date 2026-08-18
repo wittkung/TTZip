@@ -161,6 +161,29 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
             }
         }
 
+        let zipPath = "/usr/bin/zip"
+        if FileManager.default.fileExists(atPath: zipPath) {
+            // Apple zip -1
+            let zip1Path = tempDir.appendingPathComponent("apple_real_zip1.zip").path
+            let zip1Dur = runProcess(zipPath, ["-1", "-q", "-r", zip1Path, realSamplePath])
+            let zip1Sz = (try? FileManager.default.attributesOfItem(atPath: zip1Path)[.size] as? Int64) ?? 0
+            if zip1Sz > 0 {
+                let zip1Savings = (1.0 - (Double(zip1Sz) / Double(payloadBytes))) * 100.0
+                let zip1Speed = payloadMB / zip1Dur
+                softwarePoints.append(ParetoPoint(id: "apple_zip_l1", algorithm: "Apple Native (zip -1 Fast)", level: 1, throughputMBs: zip1Speed, spaceSavingsPct: zip1Savings, compressedBytes: zip1Sz, uncompressedBytes: payloadBytes))
+            }
+
+            // Apple zip -6
+            let zip6Path = tempDir.appendingPathComponent("apple_real_zip6.zip").path
+            let zip6Dur = runProcess(zipPath, ["-6", "-q", "-r", zip6Path, realSamplePath])
+            let zip6Sz = (try? FileManager.default.attributesOfItem(atPath: zip6Path)[.size] as? Int64) ?? 0
+            if zip6Sz > 0 {
+                let zip6Savings = (1.0 - (Double(zip6Sz) / Double(payloadBytes))) * 100.0
+                let zip6Speed = payloadMB / zip6Dur
+                softwarePoints.append(ParetoPoint(id: "apple_zip_l6", algorithm: "Apple Native (zip -6 Normal)", level: 6, throughputMBs: zip6Speed, spaceSavingsPct: zip6Savings, compressedBytes: zip6Sz, uncompressedBytes: payloadBytes))
+            }
+        }
+
         // TTZip LZ4 (Tier 4: In-Memory / High-IOPS)
         let ttLz4Path = tempDir.appendingPathComponent("ttzip_real.lz4").path
         let t0_ttlz4 = CACurrentMediaTime()
@@ -171,42 +194,72 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         let ttLz4Speed = payloadMB / ttLz4Dur
         softwarePoints.append(ParetoPoint(id: "ttzip_lz4_l1", algorithm: "TTZip (LZ4 Fast)", level: 1, throughputMBs: ttLz4Speed, spaceSavingsPct: ttLz4Savings, compressedBytes: ttLz4Sz, uncompressedBytes: payloadBytes))
 
-        // 4. 计算软件级帕累托前沿
-        var points = softwarePoints
-        let paretoResult = ParetoFrontierCalculator.shared.computeParetoFrontier(points: &points)
-
-        // 5. 计算 4-Tier 格式矩阵综合效能评分 (Base-1000 GMean Index)
+        // 4. 计算 4-Tier 格式矩阵综合效能评分 (Base-1000 GMean Index)
         let compositeReports = FormatMatrixScorer.computeCompositeScore(points: softwarePoints)
 
-        // 6. 导出真实高清 PNG 图片 (保存到本地工件目录供用户直接查看，不上传 Git)
-        let artifactPngPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/software_pareto_pk.png"
-        let localPngPath = "docs/benchmarks/software_pareto_pk.png"
-        let localSvgPath = "docs/benchmarks/software_pareto_pk.svg"
+        // 5. 按格式独立生成专属帕累托 PK 图表 (One Chart Per Format) 与全景图
+        let artifactDir = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f"
+        let docsBenchDir = "docs/benchmarks"
 
-        let chartTitle = "TTZip vs. 7-Zip vs. Apple Native (4-Tier 格式矩阵软件 PK)"
+        for session in DedicatedFormatSession.allCases {
+            var sessionPoints: [ParetoPoint]
+            switch session {
+            case .zip:
+                sessionPoints = softwarePoints.filter {
+                    let low = $0.algorithm.lowercased()
+                    return (low.contains("zip") || low.contains("ditto")) && !low.contains("7z")
+                }
+            case .sevenZ:
+                sessionPoints = softwarePoints.filter {
+                    let low = $0.algorithm.lowercased()
+                    return low.contains("7z") || low.contains("lzma")
+                }
+            case .tarZst:
+                sessionPoints = softwarePoints.filter {
+                    let low = $0.algorithm.lowercased()
+                    return low.contains("zst") || low.contains("zstandard")
+                }
+            case .lz4:
+                sessionPoints = softwarePoints.filter {
+                    let low = $0.algorithm.lowercased()
+                    return low.contains("lz4")
+                }
+            case .full:
+                sessionPoints = softwarePoints
+            }
 
-        try RasterParetoPlotter.shared.exportPNG(
-            result: paretoResult,
-            to: artifactPngPath,
-            title: chartTitle
-        )
-        try? RasterParetoPlotter.shared.exportPNG(
-            result: paretoResult,
-            to: localPngPath,
-            title: chartTitle
-        )
-        try? SVGParetoPlotter.shared.exportSVG(
-            result: paretoResult,
-            to: localSvgPath,
-            title: chartTitle
-        )
+            guard !sessionPoints.isEmpty else { continue }
+            let paretoRes = ParetoFrontierCalculator.shared.computeParetoFrontier(points: &sessionPoints)
+
+            let artPng = "\(artifactDir)/\(session.pngFileName)"
+            let localPng = "\(docsBenchDir)/\(session.pngFileName)"
+            let localSvg = "\(docsBenchDir)/\(session.svgFileName)"
+
+            try RasterParetoPlotter.shared.exportPNG(
+                result: paretoRes,
+                to: artPng,
+                title: session.chartTitle
+            )
+            try? RasterParetoPlotter.shared.exportPNG(
+                result: paretoRes,
+                to: localPng,
+                title: session.chartTitle
+            )
+            try? SVGParetoPlotter.shared.exportSVG(
+                result: paretoRes,
+                to: localSvg,
+                title: session.chartTitle
+            )
+        }
 
         print("\n========================================================================")
-        print("🏆 真实语料 100MB enwik8 软件级 PK 4-Tier 帕累托图表已生成:")
-        print("   图片路径: \(artifactPngPath)")
+        print("🏆 真实语料 100MB enwik8 软件级 PK 专属格式图表已全部生成:")
+        for s in DedicatedFormatSession.allCases {
+            print("   • \(s.rawValue.uppercased()) 图表: \(artifactDir)/\(s.pngFileName)")
+        }
         print("------------------------------------------------------------------------")
-        for p in paretoResult.allPoints {
-            print(String(format: "• %-26@ | 压缩速度: %7.1f MB/s | 空间节省: %5.1f%% | 状态: %@", p.algorithm, p.throughputMBs, p.spaceSavingsPct, p.isParetoOptimal ? "👑 帕累托前沿最优" : "⚪ 被支配"))
+        for p in softwarePoints {
+            print(String(format: "• %-28@ | 压缩速度: %7.1f MB/s | 空间节省: %5.1f%%", p.algorithm, p.throughputMBs, p.spaceSavingsPct))
         }
         print("------------------------------------------------------------------------")
         print("📊 4-Tier 综合效能评分 (Base-1000 加权几何平均指数):")
