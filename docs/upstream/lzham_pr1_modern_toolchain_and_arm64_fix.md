@@ -3,6 +3,7 @@
 **Target Repository**: `richgel999/lzham_codec`  
 **Target Branch**: `master`  
 **Working Branch**: `fix/modern-toolchain-and-arm64-compat`  
+**Pull Request URL**: https://github.com/richgel999/lzham_codec/pull/35  
 **Commit Sequence (Modular & Bisect-Friendly)**:  
 1. `0b2d5f3` - `cmake: modernize root minimum version and clean subproject hierarchy`  
 2. `de08bae` - `clang: use __is_pod intrinsic and __builtin_debugtrap for modern compilers`  
