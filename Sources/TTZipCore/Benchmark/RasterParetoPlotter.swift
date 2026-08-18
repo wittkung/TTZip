@@ -83,115 +83,151 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let plotW = width - marginLeft - marginRight
         let plotH = height - marginTop - marginBottom
 
-        // 2. 自适应 X 轴（双区间非线性拉伸）与 Y 轴（双波段折叠 Dual-Band Folded Axis）
-        let allSavings = result.allPoints.map { $0.spaceSavingsPct }
-        let allSpeeds = result.allPoints.map { $0.throughputMBs }
+        // =========================================================================
+        // 2. 通用算法驱动的自适应多维坐标聚类与自动空隙折叠引擎 (Dynamic Cluster Fold Engine)
+        // =========================================================================
+        let allSavings = result.allPoints.map { $0.spaceSavingsPct }.sorted()
+        let allSpeeds = result.allPoints.map { $0.throughputMBs }.sorted()
 
-        let minX = allSavings.min() ?? 80.0
-        let maxX = allSavings.max() ?? 99.0
-        let minY = allSpeeds.min() ?? 10.0
-        let maxY = allSpeeds.max() ?? 10000.0
+        // 2.1 Y 轴对数空间空隙自动探测
+        struct AxisFold1D: Sendable {
+            let isFolded: Bool
+            let lowerClusterMin: Double
+            let lowerClusterMax: Double
+            let upperClusterMin: Double
+            let upperClusterMax: Double
+            let breakLabel: String
+        }
 
-        // 判定是否为典型多核双峰分布 (包含 <20 MB/s 与 >1000 MB/s，但 50~800 MB/s 为空)
-        let isDualBandY = allSpeeds.contains(where: { $0 < 30.0 }) &&
-                          allSpeeds.contains(where: { $0 > 1000.0 }) &&
-                          !allSpeeds.contains(where: { $0 >= 50.0 && $0 <= 800.0 })
+        func detectYAxisFold(speeds: [Double]) -> AxisFold1D {
+            guard speeds.count >= 4 else {
+                return AxisFold1D(isFolded: false, lowerClusterMin: speeds.first ?? 1.0, lowerClusterMax: speeds.first ?? 1.0, upperClusterMin: speeds.last ?? 1000.0, upperClusterMax: speeds.last ?? 1000.0, breakLabel: "")
+            }
+            let logVals = speeds.map { log10(max(1e-4, $0)) }
+            var maxGap: Double = 0.0
+            var splitIdx: Int = -1
+            for i in 0..<(logVals.count - 1) {
+                let gap = logVals[i + 1] - logVals[i]
+                if gap > maxGap {
+                    maxGap = gap
+                    splitIdx = i
+                }
+            }
+            let totalLogSpan = logVals.last! - logVals.first!
+            // 当最大无数据空隙超过总对数跨度的 30% 时，算法自适应激活折叠
+            if totalLogSpan > 0 && (maxGap / totalLogSpan) >= 0.30 && splitIdx >= 0 {
+                let lowMax = speeds[splitIdx]
+                let highMin = speeds[splitIdx + 1]
+                let lowBoundMin = max(0.1, speeds.first! * 0.70)
+                let lowBoundMax = lowMax * 1.35
+                let highBoundMin = highMin * 0.80
+                let highBoundMax = speeds.last! * 1.15
+                let label = String(format: "≈ [ %.1f MB/s ~ %.0f MB/s 闲置空隙自适应折叠 (Auto Axis Break) ] ≈", lowBoundMax, highBoundMin)
+                return AxisFold1D(isFolded: true, lowerClusterMin: lowBoundMin, lowerClusterMax: lowBoundMax, upperClusterMin: highBoundMin, upperClusterMax: highBoundMax, breakLabel: label)
+            }
+            return AxisFold1D(isFolded: false, lowerClusterMin: speeds.first ?? 1.0, lowerClusterMax: speeds.first ?? 1.0, upperClusterMin: speeds.last ?? 1000.0, upperClusterMax: speeds.last ?? 1000.0, breakLabel: "")
+        }
 
-        // 判定是否为典型 ZIP 双区间横坐标 (95.0%~95.7% 与 96.4%~97.05%，中间 95.7%~96.4% 为空)
-        let isPiecewiseX = minX >= 94.5 && maxX <= 97.5 &&
-                           allSavings.contains(where: { $0 < 95.8 }) &&
-                           allSavings.contains(where: { $0 > 96.4 })
+        func detectXAxisFold(savings: [Double]) -> AxisFold1D {
+            guard savings.count >= 4 else {
+                return AxisFold1D(isFolded: false, lowerClusterMin: savings.first ?? 0.0, lowerClusterMax: savings.first ?? 0.0, upperClusterMin: savings.last ?? 100.0, upperClusterMax: savings.last ?? 100.0, breakLabel: "")
+            }
+            var maxGap: Double = 0.0
+            var splitIdx: Int = -1
+            for i in 0..<(savings.count - 1) {
+                let gap = savings[i + 1] - savings[i]
+                if gap > maxGap {
+                    maxGap = gap
+                    splitIdx = i
+                }
+            }
+            let totalSpan = savings.last! - savings.first!
+            if totalSpan > 0 && (maxGap / totalSpan) >= 0.25 && splitIdx >= 0 {
+                let lowMax = savings[splitIdx]
+                let highMin = savings[splitIdx + 1]
+                let lowBoundMin = max(0.0, savings.first! - 0.15)
+                let lowBoundMax = lowMax + 0.10
+                let highBoundMin = highMin - 0.10
+                let highBoundMax = min(100.0, savings.last! + 0.08)
+                let label = String(format: "≈ [ %.1f%% ~ %.1f%% 折叠 ] ≈", lowBoundMax, highBoundMin)
+                return AxisFold1D(isFolded: true, lowerClusterMin: lowBoundMin, lowerClusterMax: lowBoundMax, upperClusterMin: highBoundMin, upperClusterMax: highBoundMax, breakLabel: label)
+            }
+            return AxisFold1D(isFolded: false, lowerClusterMin: savings.first ?? 0.0, lowerClusterMax: savings.first ?? 0.0, upperClusterMin: savings.last ?? 100.0, upperClusterMax: savings.last ?? 100.0, breakLabel: "")
+        }
+
+        let yFold = detectYAxisFold(speeds: allSpeeds)
+        let xFold = detectXAxisFold(savings: allSavings)
 
         func mapX(_ savingsVal: Double) -> CGFloat {
-            if isPiecewiseX {
-                let s = max(95.0, min(savingsVal, 97.05))
-                if s <= 95.7 {
-                    let norm = (s - 95.0) / 0.7
-                    return marginLeft + CGFloat(norm * 0.32) * plotW
-                } else if s <= 96.4 {
-                    let norm = (s - 95.7) / 0.7
-                    return marginLeft + CGFloat(0.32 + norm * 0.10) * plotW
+            if xFold.isFolded {
+                if savingsVal <= xFold.lowerClusterMax {
+                    let norm = (savingsVal - xFold.lowerClusterMin) / max(1e-4, xFold.lowerClusterMax - xFold.lowerClusterMin)
+                    return marginLeft + CGFloat(max(0.0, min(1.0, norm)) * 0.44) * plotW
+                } else if savingsVal >= xFold.upperClusterMin {
+                    let norm = (savingsVal - xFold.upperClusterMin) / max(1e-4, xFold.upperClusterMax - xFold.upperClusterMin)
+                    return marginLeft + CGFloat(0.52 + max(0.0, min(1.0, norm)) * 0.48) * plotW
                 } else {
-                    let norm = (s - 96.4) / 0.65
-                    return marginLeft + CGFloat(0.42 + norm * 0.58) * plotW
+                    let norm = (savingsVal - xFold.lowerClusterMax) / max(1e-4, xFold.upperClusterMin - xFold.lowerClusterMax)
+                    return marginLeft + CGFloat(0.44 + norm * 0.08) * plotW
                 }
             } else {
-                func logRatio(_ savings: Double) -> Double {
-                    let clamped = max(0.0, min(savings, 99.999))
-                    let ratio = 100.0 / max(0.001, 100.0 - clamped)
-                    return log10(ratio)
-                }
-                let minLogX = logRatio(minX)
-                let maxLogX = logRatio(maxX)
-                let spanLogX = max(0.01, maxLogX - minLogX)
-                let domainMinLogX = max(0.0, minLogX - spanLogX * 0.03)
-                let domainMaxLogX = maxLogX + spanLogX * 0.04
-
-                let valLogX = logRatio(savingsVal)
-                let norm = (valLogX - domainMinLogX) / max(1e-6, domainMaxLogX - domainMinLogX)
+                let minX = allSavings.first ?? 80.0
+                let maxX = allSavings.last ?? 100.0
+                let norm = (savingsVal - minX) / max(1e-4, maxX - minX)
                 return marginLeft + CGFloat(norm) * plotW
             }
         }
 
         func mapY(_ speedVal: Double) -> CGFloat {
-            if isDualBandY {
-                if speedVal <= 15.0 {
-                    let v = max(0.1, speedVal)
-                    let norm = (log10(v) - log10(0.1)) / (log10(15.0) - log10(0.1))
-                    return marginBottom + CGFloat(norm * 0.40) * plotH
+            if yFold.isFolded {
+                if speedVal <= yFold.lowerClusterMax {
+                    let logV = log10(max(1e-4, speedVal))
+                    let logMin = log10(max(1e-4, yFold.lowerClusterMin))
+                    let logMax = log10(max(1e-4, yFold.lowerClusterMax))
+                    let norm = (logV - logMin) / max(1e-4, logMax - logMin)
+                    return marginBottom + CGFloat(max(0.0, min(1.0, norm)) * 0.44) * plotH
+                } else if speedVal >= yFold.upperClusterMin {
+                    let logV = log10(max(1e-4, speedVal))
+                    let logMin = log10(max(1e-4, yFold.upperClusterMin))
+                    let logMax = log10(max(1e-4, yFold.upperClusterMax))
+                    let norm = (logV - logMin) / max(1e-4, logMax - logMin)
+                    return marginBottom + CGFloat(0.52 + max(0.0, min(1.0, norm)) * 0.48) * plotH
                 } else {
-                    let v = min(7500.0, max(800.0, speedVal))
-                    let norm = (log10(v) - log10(800.0)) / (log10(7500.0) - log10(800.0))
-                    return marginBottom + CGFloat(0.48 + norm * 0.52) * plotH
+                    let logV = log10(max(1e-4, speedVal))
+                    let logLow = log10(max(1e-4, yFold.lowerClusterMax))
+                    let logHigh = log10(max(1e-4, yFold.upperClusterMin))
+                    let norm = (logV - logLow) / max(1e-4, logHigh - logLow)
+                    return marginBottom + CGFloat(0.44 + norm * 0.08) * plotH
                 }
             } else {
-                let minLogY = log10(max(0.05, minY * 0.60))
-                let maxLogY = log10(max(10.0, maxY * 1.25))
-                let clamped = max(pow(10.0, minLogY), min(speedVal, pow(10.0, maxLogY)))
-                let logV = log10(clamped)
-                let norm = (logV - minLogY) / (maxLogY - minLogY)
+                let logMin = log10(max(1e-4, allSpeeds.first ?? 1.0))
+                let logMax = log10(max(1e-4, (allSpeeds.last ?? 1000.0) * 1.15))
+                let logV = log10(max(1e-4, speedVal))
+                let norm = (logV - logMin) / max(1e-4, logMax - logMin)
                 return marginBottom + CGFloat(norm) * plotH
             }
         }
 
-        // 3. 绘制极淡水平网格线 (Y 轴对数速度刻度 / 双波段折叠网格)
+        // 3. 绘制极淡水平网格线 (自适应聚类刻度)
         let gridColor = CGColor(red: 241/255.0, green: 245/255.0, blue: 249/255.0, alpha: 1.0)
         let axisTextColor = NSColor(calibratedRed: 100/255.0, green: 116/255.0, blue: 139/255.0, alpha: 1.0)
 
-        let candidateYTicks: [(val: Double, label: String)]
-        if isDualBandY {
-            candidateYTicks = [
-                (0.2, "0.2 MB/s"),
-                (0.5, "0.5 MB/s"),
-                (1.0, "1.0 MB/s"),
-                (2.0, "2.0 MB/s"),
-                (5.0, "5.0 MB/s"),
-                (10.0, "10 MB/s"),
-                (1000.0, "1,000 MB/s"),
-                (2000.0, "2,000 MB/s"),
-                (3000.0, "3,000 MB/s"),
-                (5000.0, "5,000 MB/s"),
-                (6000.0, "6,000 MB/s")
-            ]
+        var candidateYTicks: [(val: Double, label: String)] = []
+        if yFold.isFolded {
+            let lowerCandidate: [Double] = [0.2, 0.5, 0.7, 1.0, 2.0, 3.0, 5.0, 10.0]
+            for val in lowerCandidate where val >= yFold.lowerClusterMin * 0.95 && val <= yFold.lowerClusterMax * 1.05 {
+                candidateYTicks.append((val, String(format: "%.1f MB/s", val)))
+            }
+            let upperCandidate: [Double] = [1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 4000.0, 5000.0, 6000.0]
+            for val in upperCandidate where val >= yFold.upperClusterMin * 0.95 && val <= yFold.upperClusterMax * 1.05 {
+                let lbl = val >= 1000.0 ? String(format: "%.0f MB/s", val) : String(format: "%.1f MB/s", val)
+                candidateYTicks.append((val, lbl))
+            }
         } else {
-            candidateYTicks = [
-                (0.1, "0.1 MB/s"),
-                (0.2, "0.2 MB/s"),
-                (0.5, "0.5 MB/s"),
-                (1.0, "1.0 MB/s"),
-                (2.0, "2.0 MB/s"),
-                (5.0, "5.0 MB/s"),
-                (10.0, "10 MB/s"),
-                (20.0, "20 MB/s"),
-                (50.0, "50 MB/s"),
-                (100.0, "100 MB/s"),
-                (200.0, "200 MB/s"),
-                (500.0, "500 MB/s"),
-                (1000.0, "1,000 MB/s"),
-                (2000.0, "2,000 MB/s"),
-                (5000.0, "5,000 MB/s"),
-                (10000.0, "10 GB/s")
-            ]
+            let standardCandidate: [Double] = [0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0]
+            for val in standardCandidate where val >= (allSpeeds.first ?? 1.0) * 0.8 && val <= (allSpeeds.last ?? 1000.0) * 1.2 {
+                candidateYTicks.append((val, String(format: "%.1f MB/s", val)))
+            }
         }
 
         for tick in candidateYTicks {
@@ -212,40 +248,57 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         }
 
         // 3.1 绘制 Y 轴断裂折叠分割线 (Axis Break Band)
-        if isDualBandY {
-            let breakY = marginBottom + CGFloat(0.44) * plotH
-            ctx.setStrokeColor(CGColor(red: 203/255.0, green: 213/255.0, blue: 225/255.0, alpha: 0.8))
-            ctx.setLineWidth(1.0)
+        if yFold.isFolded {
+            let breakY = marginBottom + CGFloat(0.48) * plotH
+            ctx.setStrokeColor(CGColor(red: 203/255.0, green: 213/255.0, blue: 225/255.0, alpha: 0.9))
+            ctx.setLineWidth(1.2)
             ctx.setLineDash(phase: 0, lengths: [6.0, 4.0])
             ctx.strokeLineSegments(between: [CGPoint(x: marginLeft, y: breakY), CGPoint(x: marginLeft + plotW, y: breakY)])
             ctx.setLineDash(phase: 0, lengths: [])
 
-            let breakFont = NSFont.systemFont(ofSize: 12, weight: .medium)
+            let breakFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
             let breakAttrs: [NSAttributedString.Key: Any] = [
                 .font: breakFont,
-                .foregroundColor: NSColor(calibratedRed: 148/255.0, green: 163/255.0, blue: 184/255.0, alpha: 1.0)
+                .foregroundColor: NSColor(calibratedRed: 100/255.0, green: 116/255.0, blue: 139/255.0, alpha: 1.0)
             ]
-            let breakStr = NSAttributedString(string: "≈ [ 10 MB/s ~ 1,000 MB/s 闲置空隙折叠 ] ≈", attributes: breakAttrs)
+            let breakStr = NSAttributedString(string: yFold.breakLabel, attributes: breakAttrs)
             let bSize = breakStr.size()
+            
+            // 绘制折叠徽标背景白框
+            let badgeRect = CGRect(x: marginLeft + (plotW - bSize.width - 24) / 2, y: breakY - 10, width: bSize.width + 24, height: 20)
+            ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.95))
+            ctx.fill(badgeRect)
+            ctx.setStrokeColor(CGColor(red: 226/255.0, green: 232/255.0, blue: 240/255.0, alpha: 1.0))
+            ctx.setLineWidth(1.0)
+            ctx.stroke(badgeRect)
+
             NSGraphicsContext.saveGraphicsState()
             NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
             breakStr.draw(at: CGPoint(x: marginLeft + (plotW - bSize.width) / 2, y: breakY - bSize.height / 2))
             NSGraphicsContext.restoreGraphicsState()
         }
 
-        // 4. 绘制 X 轴（对数空间节省率 %）细分刻度与标签 (消除空白，精确延展)
-        let candidateXTicks: [Double]
-        if isPiecewiseX {
-            candidateXTicks = [
-                95.0, 95.2, 95.4, 95.6,
-                96.4, 96.5, 96.6, 96.7, 96.8, 96.9, 97.0, 97.05
-            ]
+        // 4. 绘制 X 轴自适应细分刻度与标签
+        var candidateXTicks: [Double] = []
+        if xFold.isFolded {
+            var v = floor(xFold.lowerClusterMin * 10.0) / 10.0
+            while v <= xFold.lowerClusterMax {
+                candidateXTicks.append(v)
+                v += 0.2
+            }
+            var v2 = floor(xFold.upperClusterMin * 10.0) / 10.0
+            while v2 <= xFold.upperClusterMax {
+                candidateXTicks.append(v2)
+                v2 += 0.1
+            }
         } else {
-            candidateXTicks = [
-                0.0, 20.0, 40.0, 60.0, 70.0, 80.0, 85.0, 90.0, 92.0, 94.0, 95.0,
-                95.5, 96.0, 96.1, 96.2, 96.3, 96.4, 96.5, 96.6, 96.7, 96.8, 96.9, 97.0, 97.05, 97.1, 97.2, 97.5,
-                98.0, 98.5, 99.0, 99.5, 99.8, 99.9
-            ]
+            let minVal = allSavings.first ?? 0.0
+            let maxVal = allSavings.last ?? 100.0
+            var v = floor(minVal * 10.0) / 10.0
+            while v <= maxVal {
+                candidateXTicks.append(v)
+                v += 0.2
+            }
         }
 
         var activeXTicks: [Double] = []
@@ -260,18 +313,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
 
         for xVal in activeXTicks {
             let x = mapX(xVal)
-            let label: String
-            if xVal >= 95.0 {
-                if xVal == 97.05 {
-                    label = "97.05%"
-                } else {
-                    label = String(format: "%.1f%%", xVal)
-                }
-            } else if xVal == floor(xVal) {
-                label = String(format: "%.0f%%", xVal)
-            } else {
-                label = String(format: "%.1f%%", xVal)
-            }
+            let label = String(format: "%.1f%%", xVal)
             let font = NSFont.systemFont(ofSize: 14, weight: .regular)
             let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: axisTextColor]
             let str = NSAttributedString(string: label, attributes: attrs)

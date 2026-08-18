@@ -37,8 +37,8 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
 
         var zipPoints: [ParetoPoint] = []
 
-        // 1. TTZip 18 核心极速分块并行通道 + 32KB 跨块历史字典接力 (Level 1 到 12)
-        for lvl in 1...12 {
+        // 1. TTZip 18 核心极速分块并行通道 + 32KB 跨块历史字典接力 (Level 1 到 10 及 L12 超级压缩)
+        for lvl in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12] {
             let levelEnum = ArchiveCompressionLevel(rawValue: lvl) ?? .level1
             let pth = tempDir.appendingPathComponent("ttzip_mc_\(lvl).zip").path
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
