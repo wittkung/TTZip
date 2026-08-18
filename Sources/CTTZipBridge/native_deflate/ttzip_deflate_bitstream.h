@@ -68,14 +68,72 @@ static inline void ttzip_bs_write_bits(ttzip_bitstream_t *bs, uint32_t bits, uns
     bs->bit_count += nbits;
 
     if (bs->out_next < bs->out_fast_end) {
-        /* Fast path: Unaligned 64-bit store on modern ARM64 / x86-64 hardware */
         memcpy(bs->out_next, &bs->bit_buffer, sizeof(uint64_t));
         unsigned bytes_to_advance = bs->bit_count >> 3;
         bs->out_next += bytes_to_advance;
-        bs->bit_buffer >>= (bytes_to_advance << 3);
+        if (bytes_to_advance >= 8) {
+            bs->bit_buffer = 0;
+        } else {
+            bs->bit_buffer >>= (bytes_to_advance << 3);
+        }
         bs->bit_count &= 7;
     } else {
-        /* Boundary fallback: Byte-by-byte safe emission */
+        while (bs->bit_count >= 8) {
+            if (bs->out_next < bs->out_end) {
+                *bs->out_next++ = (uint8_t)bs->bit_buffer;
+                bs->bit_buffer >>= 8;
+                bs->bit_count -= 8;
+            } else {
+                bs->overflow = true;
+                break;
+            }
+        }
+    }
+}
+
+/**
+ * @brief Emits up to 56 bits into the bitstream in a single branchless operation.
+ */
+static inline void ttzip_bs_write_bits64(ttzip_bitstream_t *bs, uint64_t bits, unsigned nbits) {
+    if (bs->bit_count + nbits > 64) {
+        if (bs->out_next < bs->out_fast_end) {
+            memcpy(bs->out_next, &bs->bit_buffer, sizeof(uint64_t));
+            unsigned bytes = bs->bit_count >> 3;
+            bs->out_next += bytes;
+            if (bytes >= 8) {
+                bs->bit_buffer = 0;
+            } else {
+                bs->bit_buffer >>= (bytes << 3);
+            }
+            bs->bit_count &= 7;
+        } else {
+            while (bs->bit_count >= 8) {
+                if (bs->out_next < bs->out_end) {
+                    *bs->out_next++ = (uint8_t)bs->bit_buffer;
+                    bs->bit_buffer >>= 8;
+                    bs->bit_count -= 8;
+                } else {
+                    bs->overflow = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    bs->bit_buffer |= bits << bs->bit_count;
+    bs->bit_count += nbits;
+
+    if (bs->out_next < bs->out_fast_end) {
+        memcpy(bs->out_next, &bs->bit_buffer, sizeof(uint64_t));
+        unsigned bytes_to_advance = bs->bit_count >> 3;
+        bs->out_next += bytes_to_advance;
+        if (bytes_to_advance >= 8) {
+            bs->bit_buffer = 0;
+        } else {
+            bs->bit_buffer >>= (bytes_to_advance << 3);
+        }
+        bs->bit_count &= 7;
+    } else {
         while (bs->bit_count >= 8) {
             if (bs->out_next < bs->out_end) {
                 *bs->out_next++ = (uint8_t)bs->bit_buffer;

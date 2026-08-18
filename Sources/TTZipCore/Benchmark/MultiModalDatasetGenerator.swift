@@ -123,4 +123,89 @@ public enum MultiModalDatasetGenerator {
             written += n
         }
     }
+
+    /// Generates a deterministic binary executable / machine-code byte stream.
+    public static func generateDeterministicBinaryDataset(destinationPath: String, sizeBytes: Int) throws {
+        guard let fileHandle = FileHandle(forWritingAtPath: destinationPath) ?? {
+            FileManager.default.createFile(atPath: destinationPath, contents: nil)
+            return FileHandle(forWritingAtPath: destinationPath)
+        }() else {
+            throw ArchiveError.readFailed(code: -1)
+        }
+        defer { try? fileHandle.close() }
+
+        let opcodes: [UInt32] = [
+            0xA9BF7BFD, // stp x29, x30, [sp, #-16]!
+            0x910003FD, // mov x29, sp
+            0x52800000, // mov w0, #0
+            0xD65F03C0, // ret
+            0x94000004, // bl +16
+            0xB94003E0, // ldr w0, [sp]
+            0x11000400, // add w0, w0, #1
+            0x7100281F  // cmp w0, #10
+        ]
+        var block = Data()
+        block.reserveCapacity(65536)
+        while block.count < 65536 {
+            let op = opcodes[(block.count / 4) % opcodes.count]
+            var val = op
+            block.append(Data(bytes: &val, count: 4))
+        }
+
+        var remaining = sizeBytes
+        while remaining > 0 {
+            let chunk = min(remaining, block.count)
+            try fileHandle.write(contentsOf: block.subdata(in: 0..<chunk))
+            remaining -= chunk
+        }
+    }
+
+    /// Generates a 100MB 5-Tier compound mixed-modality dataset.
+    public static func generateCompoundMixed100MBDataset(destinationPath: String, textSourcePath: String?) throws {
+        let tempDir = NSTemporaryDirectory() + "mixed_build_\(UUID().uuidString)"
+        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let pText = "\(tempDir)/part_text.bin"
+        let pBin = "\(tempDir)/part_bin.bin"
+        let pJson = "\(tempDir)/part_json.bin"
+        let pFloat = "\(tempDir)/part_float.bin"
+        let pEntropy = "\(tempDir)/part_entropy.bin"
+
+        let target20MB = 20_000_000
+
+        // 1. Text 20MB
+        if let src = textSourcePath, let data = try? Data(contentsOf: URL(fileURLWithPath: src)), data.count >= target20MB {
+            try data.subdata(in: 0..<target20MB).write(to: URL(fileURLWithPath: pText))
+        } else {
+            let cfg = SyntheticXmlCorpusConfig(totalByteCount: Int64(target20MB), repeatDistanceBytes: 4*1024*1024, repeatProbability: 0.7, seed: 0x12345)
+            try SyntheticXmlCorpusGenerator.generate(config: cfg, to: URL(fileURLWithPath: pText))
+        }
+
+        // 2. Binary 20MB
+        try generateDeterministicBinaryDataset(destinationPath: pBin, sizeBytes: target20MB)
+
+        // 3. JSON 20MB
+        try generateStructuredJsonDataset(destinationPath: pJson, recordCount: 140_000)
+
+        // 4. Float32 20MB
+        try generateFloat32SensorDataset(destinationPath: pFloat, sizeBytes: target20MB)
+
+        // 5. High Entropy 20MB
+        try generateHighEntropyBinaryDataset(destinationPath: pEntropy, sizeBytes: target20MB)
+
+        // Concatenate all 5 parts into destinationPath
+        FileManager.default.createFile(atPath: destinationPath, contents: nil)
+        guard let outHandle = FileHandle(forWritingAtPath: destinationPath) else {
+            throw ArchiveError.readFailed(code: -1)
+        }
+        defer { try? outHandle.close() }
+
+        for p in [pText, pBin, pJson, pFloat, pEntropy] {
+            if let d = try? Data(contentsOf: URL(fileURLWithPath: p)) {
+                let toWrite = d.count > target20MB ? d.subdata(in: 0..<target20MB) : d
+                try outHandle.write(contentsOf: toWrite)
+            }
+        }
+    }
 }

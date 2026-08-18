@@ -13,8 +13,11 @@
  */
 
 #include "ttzip_deflate_engine.h"
-#include <stdlib.h>
+#include "ttzip_deflate_bitstream.h"
+#include "ttzip_deflate_huffman.h"
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 /* Match finder forward declarations */
 size_t ttzip_deflate_fast_find_matches(
@@ -203,6 +206,9 @@ size_t ttzip_native_deflate_compress_block_with_history(
         }
 
         bool use_dynamic = options ? options->dynamic_huffman : true;
+        if (chunk_len < 4096 || num_tokens < 384) {
+            use_dynamic = false;
+        }
 
         if (use_dynamic) {
             uint8_t lens_litlen[288];
@@ -217,29 +223,59 @@ size_t ttzip_native_deflate_compress_block_with_history(
             ttzip_bs_write_bits(&bs, bfinal_bit | (2 << 1), 3);
             ttzip_write_dynamic_huffman_header(&bs, lens_litlen, 286, lens_offset, 30);
 
-            for (size_t i = 0; i < num_tokens; i++) {
-                uint16_t len = s_tls_fixed_tokens[i].length;
-                uint16_t off = s_tls_fixed_tokens[i].offset;
+            size_t i = 0;
+            while (i < num_tokens) {
+                uint16_t len0 = s_tls_fixed_tokens[i].length;
+                uint16_t off0 = s_tls_fixed_tokens[i].offset;
 
-                if (len == 0) {
-                    uint8_t lit = (uint8_t)off;
-                    ttzip_bs_write_bits(&bs, codewords_litlen[lit], lens_litlen[lit]);
+                if (len0 == 0) {
+                    if (i + 1 < num_tokens && s_tls_fixed_tokens[i + 1].length == 0) {
+                        uint8_t lit0 = (uint8_t)off0;
+                        uint8_t lit1 = (uint8_t)s_tls_fixed_tokens[i + 1].offset;
+                        uint32_t code0 = codewords_litlen[lit0];
+                        unsigned len_bits0 = lens_litlen[lit0];
+                        uint32_t code1 = codewords_litlen[lit1];
+                        unsigned len_bits1 = lens_litlen[lit1];
+
+                        uint64_t dual_bits = (uint64_t)code0 | (((uint64_t)code1) << len_bits0);
+                        ttzip_bs_write_bits64(&bs, dual_bits, len_bits0 + len_bits1);
+                        i += 2;
+                    } else {
+                        uint8_t lit = (uint8_t)off0;
+                        ttzip_bs_write_bits(&bs, codewords_litlen[lit], lens_litlen[lit]);
+                        i++;
+                    }
                 } else {
-                    uint8_t len_slot = s_length_slot[len];
-                    ttzip_bs_write_bits(&bs, codewords_litlen[257 + len_slot], lens_litlen[257 + len_slot]);
+                    uint8_t len_slot = s_length_slot[len0];
+                    uint32_t len_code = codewords_litlen[257 + len_slot];
+                    unsigned len_bits = lens_litlen[257 + len_slot];
                     uint8_t extra_len_bits = s_length_extra_bits[len_slot];
+                    uint32_t extra_len_val = len0 - s_length_base[len_slot];
+
+                    uint8_t off_slot = s_offset_slot[off0];
+                    uint32_t off_code = codewords_offset[off_slot];
+                    unsigned off_bits = lens_offset[off_slot];
+                    uint8_t extra_off_bits = s_offset_extra_bits[off_slot];
+                    uint32_t extra_off_val = off0 - s_offset_base[off_slot];
+
+                    uint64_t packed = (uint64_t)len_code;
+                    unsigned shift = len_bits;
+
                     if (extra_len_bits > 0) {
-                        uint32_t extra_val = len - s_length_base[len_slot];
-                        ttzip_bs_write_bits(&bs, extra_val, extra_len_bits);
+                        packed |= ((uint64_t)extra_len_val) << shift;
+                        shift += extra_len_bits;
                     }
 
-                    uint8_t off_slot = s_offset_slot[off];
-                    ttzip_bs_write_bits(&bs, codewords_offset[off_slot], lens_offset[off_slot]);
-                    uint8_t extra_off_bits = s_offset_extra_bits[off_slot];
+                    packed |= ((uint64_t)off_code) << shift;
+                    shift += off_bits;
+
                     if (extra_off_bits > 0) {
-                        uint32_t extra_val = off - s_offset_base[off_slot];
-                        ttzip_bs_write_bits(&bs, extra_val, extra_off_bits);
+                        packed |= ((uint64_t)extra_off_val) << shift;
+                        shift += extra_off_bits;
                     }
+
+                    ttzip_bs_write_bits64(&bs, packed, shift);
+                    i++;
                 }
             }
 
@@ -249,29 +285,59 @@ size_t ttzip_native_deflate_compress_block_with_history(
             uint32_t bfinal_bit = chunk_is_final ? 1 : 0;
             ttzip_bs_write_bits(&bs, bfinal_bit | (1 << 1), 3);
 
-            for (size_t i = 0; i < num_tokens; i++) {
-                uint16_t len = s_tls_fixed_tokens[i].length;
-                uint16_t off = s_tls_fixed_tokens[i].offset;
+            size_t i = 0;
+            while (i < num_tokens) {
+                uint16_t len0 = s_tls_fixed_tokens[i].length;
+                uint16_t off0 = s_tls_fixed_tokens[i].offset;
 
-                if (len == 0) {
-                    uint8_t lit = (uint8_t)off;
-                    ttzip_bs_write_bits(&bs, sc->codewords_litlen[lit], sc->lens_litlen[lit]);
+                if (len0 == 0) {
+                    if (i + 1 < num_tokens && s_tls_fixed_tokens[i + 1].length == 0) {
+                        uint8_t lit0 = (uint8_t)off0;
+                        uint8_t lit1 = (uint8_t)s_tls_fixed_tokens[i + 1].offset;
+                        uint32_t code0 = sc->codewords_litlen[lit0];
+                        unsigned len_bits0 = sc->lens_litlen[lit0];
+                        uint32_t code1 = sc->codewords_litlen[lit1];
+                        unsigned len_bits1 = sc->lens_litlen[lit1];
+
+                        uint64_t dual_bits = (uint64_t)code0 | (((uint64_t)code1) << len_bits0);
+                        ttzip_bs_write_bits64(&bs, dual_bits, len_bits0 + len_bits1);
+                        i += 2;
+                    } else {
+                        uint8_t lit = (uint8_t)off0;
+                        ttzip_bs_write_bits(&bs, sc->codewords_litlen[lit], sc->lens_litlen[lit]);
+                        i++;
+                    }
                 } else {
-                    uint8_t len_slot = s_length_slot[len];
-                    ttzip_bs_write_bits(&bs, sc->codewords_litlen[257 + len_slot], sc->lens_litlen[257 + len_slot]);
+                    uint8_t len_slot = s_length_slot[len0];
+                    uint32_t len_code = sc->codewords_litlen[257 + len_slot];
+                    unsigned len_bits = sc->lens_litlen[257 + len_slot];
                     uint8_t extra_len_bits = s_length_extra_bits[len_slot];
+                    uint32_t extra_len_val = len0 - s_length_base[len_slot];
+
+                    uint8_t off_slot = s_offset_slot[off0];
+                    uint32_t off_code = sc->codewords_offset[off_slot];
+                    unsigned off_bits = sc->lens_offset[off_slot];
+                    uint8_t extra_off_bits = s_offset_extra_bits[off_slot];
+                    uint32_t extra_off_val = off0 - s_offset_base[off_slot];
+
+                    uint64_t packed = (uint64_t)len_code;
+                    unsigned shift = len_bits;
+
                     if (extra_len_bits > 0) {
-                        uint32_t extra_val = len - s_length_base[len_slot];
-                        ttzip_bs_write_bits(&bs, extra_val, extra_len_bits);
+                        packed |= ((uint64_t)extra_len_val) << shift;
+                        shift += extra_len_bits;
                     }
 
-                    uint8_t off_slot = s_offset_slot[off];
-                    ttzip_bs_write_bits(&bs, sc->codewords_offset[off_slot], sc->lens_offset[off_slot]);
-                    uint8_t extra_off_bits = s_offset_extra_bits[off_slot];
+                    packed |= ((uint64_t)off_code) << shift;
+                    shift += off_bits;
+
                     if (extra_off_bits > 0) {
-                        uint32_t extra_val = off - s_offset_base[off_slot];
-                        ttzip_bs_write_bits(&bs, extra_val, extra_off_bits);
+                        packed |= ((uint64_t)extra_off_val) << shift;
+                        shift += extra_off_bits;
                     }
+
+                    ttzip_bs_write_bits64(&bs, packed, shift);
+                    i++;
                 }
             }
 

@@ -7,7 +7,6 @@
 
 import XCTest
 @testable import TTZipCore
-@testable import TTZipCLI
 
 final class InteractiveTUITests: XCTestCase {
     

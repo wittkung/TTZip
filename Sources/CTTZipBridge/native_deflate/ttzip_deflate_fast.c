@@ -19,6 +19,7 @@
 #include <arm_neon.h>
 
 static inline uint32_t ttzip_fast_match_len_arm64(const uint8_t *s1, const uint8_t *s2, uint32_t max_len) {
+    uint32_t len = 0;
     if (max_len >= 8) {
         uint64_t v1, v2;
         memcpy(&v1, s1, 8);
@@ -27,6 +28,7 @@ static inline uint32_t ttzip_fast_match_len_arm64(const uint8_t *s1, const uint8
         if (diff != 0) {
             return (uint32_t)__builtin_ctzll(diff) >> 3;
         }
+        len = 8;
     }
     if (max_len >= 16) {
         uint64_t v1, v2;
@@ -36,9 +38,9 @@ static inline uint32_t ttzip_fast_match_len_arm64(const uint8_t *s1, const uint8
         if (diff != 0) {
             return 8 + ((uint32_t)__builtin_ctzll(diff) >> 3);
         }
+        len = 16;
     }
     
-    uint32_t len = 16;
     while (len + 16 <= max_len) {
         uint8x16_t v1 = vld1q_u8(s1 + len);
         uint8x16_t v2 = vld1q_u8(s2 + len);
@@ -212,8 +214,10 @@ size_t ttzip_deflate_fast_find_matches(
                 size_t rem = (size_t)(in_end - in_next);
                 if (rem > max_tokens - num_tokens) rem = max_tokens - num_tokens;
                 for (size_t i = 0; i < rem; i++) {
+                    uint8_t lit = in_next[i];
                     tokens_out[num_tokens + i].length = 0;
-                    tokens_out[num_tokens + i].offset = in_next[i];
+                    tokens_out[num_tokens + i].offset = lit;
+                    freqs_out->litlen[lit]++;
                 }
                 num_tokens += rem;
                 in_next += rem;

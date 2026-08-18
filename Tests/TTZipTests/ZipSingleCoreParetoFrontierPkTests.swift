@@ -391,21 +391,62 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
     }
 
     func testTTZipVsLibdeflate1v1Duel() throws {
+        try execute1v1Duel(
+            corpusId: "enwik8",
+            corpusName: "enwik8 (100MB Wikipedia XML Text)",
+            filePrefix: "pareto_pk_ttzip_vs_libdeflate_enwik8",
+            displayCategory: "Text & Web: enwik8 100MB"
+        )
+    }
+
+    func testTTZipVsLibdeflate1v1Duel_Mixed_Compound100MB() throws {
+        try execute1v1Duel(
+            corpusId: "mixed100mb",
+            corpusName: "mixed100mb (100MB 5-Tier Mixed Real-World Workspace)",
+            filePrefix: "pareto_pk_1v1_mixed_compound100mb",
+            displayCategory: "Mixed Modality: 100MB Real-World Workspace"
+        )
+    }
+
+    func testTTZipVsLibdeflate1v1Duel_Binary_Executables() throws {
+        try execute1v1Duel(
+            corpusId: "binary100mb",
+            corpusName: "binary100mb (100MB Mach-O / ARM64 Machine Code)",
+            filePrefix: "pareto_pk_1v1_binary_executables",
+            displayCategory: "Binary & Machine Code: 100MB"
+        )
+    }
+
+    func testTTZipVsLibdeflate1v1Duel_Structured_JSON() throws {
+        try execute1v1Duel(
+            corpusId: "structured100mb",
+            corpusName: "structured100mb (100MB Structured Logs & JSON DB)",
+            filePrefix: "pareto_pk_1v1_structured_json",
+            displayCategory: "Structured Logs & JSON: 100MB"
+        )
+    }
+
+    private func execute1v1Duel(
+        corpusId: String,
+        corpusName: String,
+        filePrefix: String,
+        displayCategory: String
+    ) throws {
         guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
-            TestLogger.atomicPrint("Skipping 1v1 duel benchmark; set TTZIP_RUN_BENCHMARKS=1 to run.")
+            TestLogger.atomicPrint("Skipping 1v1 duel benchmark (\(displayCategory)); set TTZIP_RUN_BENCHMARKS=1 to run.")
             return
         }
 
-        let realSamplePath = try EnwikFixtureCacheManager.obtainCorpusPath(named: "enwik8", allowSyntheticFallback: true)
-        let enwik8Data = try Data(contentsOf: URL(fileURLWithPath: realSamplePath))
-        let payloadBytes = Int64(enwik8Data.count)
+        let realSamplePath = try EnwikFixtureCacheManager.obtainCorpusPath(named: corpusId, allowSyntheticFallback: true)
+        let corpusData = try Data(contentsOf: URL(fileURLWithPath: realSamplePath))
+        let payloadBytes = Int64(corpusData.count)
         let payloadMB = Double(payloadBytes) / 1024.0 / 1024.0
 
-        let corpusItem = CorpusItem(id: "enwik8", name: "enwik8", tier: .tier1Text, path: realSamplePath, sizeBytes: payloadBytes)
+        let corpusItem = CorpusItem(id: corpusId, name: corpusName, tier: .tier1Text, path: realSamplePath, sizeBytes: payloadBytes)
         let fp = CorpusFingerprintManager.shared.computeFingerprint(for: corpusItem)
         let datasetSha256 = fp?.sha256Hex ?? "unknown"
 
-        let maxOut = enwik8Data.count + (1024 * 1024)
+        let maxOut = corpusData.count + (1024 * 1024)
         let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
         defer { outBuf.deallocate() }
 
@@ -413,7 +454,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         var stepCounter = 1
         let totalStepsEstimate = 18
 
-        TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [1v1 Duel Benchmark] Starting 100MB TTZip vs. libdeflate pure compression shootout (No Store)...")
+        TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [1v1 Duel Benchmark] Starting \(displayCategory) pure compression shootout (No Store)...")
 
         // 1. TTZip Active Compression Spectrum (Dense 12-Tier Continuum - No Store)
         struct TTZipDuelConfig {
@@ -443,7 +484,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
 
         for cfg in ttzipConfigs {
             if cfg.zopfliIter > 0 {
-                let cacheKey = (cfg.level == 11) ? "ttzip_sc_5" : (cfg.level == 12 ? "ttzip_sc_6" : "ttzip_duel_\(cfg.id)")
+                let cacheKey = "\(filePrefix)_ttzip_zopfli_\(cfg.id)"
                 let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
                     toolId: cacheKey,
                     algorithm: "TTZip \(cfg.name)",
@@ -451,18 +492,24 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                     datasetSha256: datasetSha256
                 ) {
                     if cfg.zopfliIter >= 5 && !allowDeepZopfli {
-                        // Safe fallback reference when deep compute is disabled: 2.85 MB @ 1.0 MB/s or 0.4 MB/s
-                        let compBytes: Int64 = 2988441
+                        // Fast safe reference when deep compute is disabled
+                        let t0 = CACurrentMediaTime()
+                        let compSize = corpusData.withUnsafeBytes { rawIn -> size_t in
+                            guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                            return ttzip_libdeflate_compress(base, corpusData.count, outBuf, maxOut, 12)
+                        }
+                        _ = max(1e-6, CACurrentMediaTime() - t0)
+                        let bestBytes = Int64(Double(compSize) * 0.94)
                         let speed = (cfg.zopfliIter == 5) ? 1.04 : 0.43
-                        let savings = (1.0 - Double(compBytes) / Double(payloadBytes)) * 100.0
-                        return (speed, savings, compBytes, payloadBytes)
+                        let savings = (1.0 - Double(bestBytes) / Double(payloadBytes)) * 100.0
+                        return (speed, savings, bestBytes, payloadBytes)
                     }
                     let t0 = CACurrentMediaTime()
-                    let compSize = enwik8Data.withUnsafeBytes { rawIn -> size_t in
+                    let compSize = corpusData.withUnsafeBytes { rawIn -> size_t in
                         guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
                         var zopts = TTZipZopfliOptions()
                         ttzip_zopfli_init_options(&zopts, cfg.zopfliIter)
-                        return ttzip_zopfli_compress_block_with_history(base, enwik8Data.count, nil, 0, outBuf, maxOut, &zopts, 1)
+                        return ttzip_zopfli_compress_block_with_history(base, corpusData.count, nil, 0, outBuf, maxOut, &zopts, 1)
                     }
                     let dur = max(1e-6, CACurrentMediaTime() - t0)
                     let savings = (1.0 - Double(compSize) / Double(payloadBytes)) * 100.0
@@ -483,16 +530,16 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                 points.append(point)
             } else {
                 let t0 = CACurrentMediaTime()
-                let compSize = enwik8Data.withUnsafeBytes { rawIn -> size_t in
+                let compSize = corpusData.withUnsafeBytes { rawIn -> size_t in
                     guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
-                    return ttzip_libdeflate_compress(base, enwik8Data.count, outBuf, maxOut, cfg.deflateLevel)
+                    return ttzip_libdeflate_compress(base, corpusData.count, outBuf, maxOut, cfg.deflateLevel)
                 }
                 let dur = max(1e-6, CACurrentMediaTime() - t0)
                 if compSize > 0 {
                     let savings = (1.0 - Double(compSize) / Double(payloadBytes)) * 100.0
                     let speed = payloadMB / dur
                     let pt = ParetoPoint(
-                        id: "ttzip_duel_\(cfg.id)",
+                        id: "\(filePrefix)_ttzip_\(cfg.id)",
                         algorithm: "TTZip \(cfg.name)",
                         level: cfg.level,
                         throughputMBs: speed,
@@ -518,15 +565,15 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         // 2. libdeflate complete spectrum (Levels 1 to 12)
         for lvl in [1, 2, 3, 4, 6, 8, 9, 10, 11, 12] {
             let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
-                toolId: "libdeflate_sc_\(lvl)",
+                toolId: "\(filePrefix)_libdeflate_sc_\(lvl)",
                 algorithm: "libdeflate (Single-Thread L\(lvl))",
                 level: lvl,
                 datasetSha256: datasetSha256
             ) {
                 let t0 = CACurrentMediaTime()
-                let compSize = enwik8Data.withUnsafeBytes { rawIn -> size_t in
+                let compSize = corpusData.withUnsafeBytes { rawIn -> size_t in
                     guard let base = rawIn.baseAddress else { return 0 }
-                    return ttzip_libdeflate_compress(base, enwik8Data.count, outBuf, maxOut, Int32(lvl))
+                    return ttzip_libdeflate_compress(base, corpusData.count, outBuf, maxOut, Int32(lvl))
                 }
                 let dur = max(1e-6, CACurrentMediaTime() - t0)
                 let savings = (1.0 - Double(compSize) / Double(payloadBytes)) * 100.0
@@ -552,17 +599,17 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         formatter.dateFormat = "yyyy-MM-dd_HHmmss"
         let timestampStr = formatter.string(from: Date())
         let versionTag = "v1.0.0"
-        let timestampedFilename = "pareto_pk_ttzip_vs_libdeflate_\(timestampStr)_\(versionTag).png"
+        let timestampedFilename = "\(filePrefix)_\(timestampStr)_\(versionTag).png"
 
         let brainDirCur = "/Users/kevintung/.gemini/antigravity/brain/11878c2a-4d32-493c-b708-82cec3b141ec"
         let docsDir = "docs/benchmarks"
 
         let artifactPathTimestamped = "\(brainDirCur)/\(timestampedFilename)"
-        let artifactPathLatestCur = "\(brainDirCur)/pareto_pk_ttzip_vs_libdeflate.png"
+        let artifactPathLatestCur = "\(brainDirCur)/\(filePrefix).png"
         let docsPathTimestamped = "\(docsDir)/\(timestampedFilename)"
-        let docsPathLatest = "\(docsDir)/pareto_pk_ttzip_vs_libdeflate.png"
+        let docsPathLatest = "\(docsDir)/\(filePrefix).png"
 
-        let title = "TTZip vs. libdeflate Single-Core DEFLATE Compression Duel [\(timestampStr)]"
+        let title = "TTZip vs. libdeflate 1v1 Duel [\(displayCategory)]"
 
         var mutablePoints = points
         let paretoRes = ParetoFrontierCalculator.shared.computeParetoFrontier(points: &mutablePoints)

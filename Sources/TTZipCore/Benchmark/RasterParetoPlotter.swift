@@ -740,7 +740,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         ]
         let xAttrStr = NSAttributedString(string: xTitle, attributes: xAttrs)
 
-        let sourceStr = "Source: TTZip Benchmark Engine · 100MB Wikipedia Corpus (enwik8) · Apple Silicon M-Series (mach_absolute_time)"
+        let sourceStr = title.contains("[") ? "Source: TTZip Benchmark Engine · \(title) · Apple Silicon M-Series (mach_absolute_time)" : "Source: TTZip Benchmark Engine · 100MB Corpus · Apple Silicon M-Series (mach_absolute_time)"
         let sourceFont = NSFont.systemFont(ofSize: 12, weight: .regular)
         let sourceAttrs: [NSAttributedString.Key: Any] = [
             .font: sourceFont,

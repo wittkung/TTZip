@@ -77,8 +77,13 @@ public enum EnwikFixtureCacheManager {
         }
         
         let isEnwik9 = (corpusId.lowercased() == "enwik9")
+        let isMixed100MB = (corpusId.lowercased() == "mixed100mb")
+        let isBinary100MB = (corpusId.lowercased() == "binary100mb")
+        let isStructured100MB = (corpusId.lowercased() == "structured100mb")
+
         let targetSize = isEnwik9 ? enwik9ByteCount : enwik8ByteCount
-        let targetFileName = "\(corpusId.lowercased()).xml"
+        let ext = (isMixed100MB || isBinary100MB) ? "bin" : (isStructured100MB ? "json" : "xml")
+        let targetFileName = "\(corpusId.lowercased()).\(ext)"
         let targetURL = cacheDirectoryURL().appendingPathComponent(targetFileName)
         let lockFilePath = targetURL.path + ".lock"
         
@@ -100,43 +105,52 @@ public enum EnwikFixtureCacheManager {
                 }
             }
             
-            // 4. Download from mirrors
-            var downloadSucceeded = false
-            for mirror in defaultMirrors {
-                let urlString = isEnwik9 ? mirror.enwik9Url : mirror.enwik8Url
-                guard let url = URL(string: urlString) else { continue }
-                
-                if let downloadedData = downloadFileSynchronously(url: url) {
-                    let zipTempURL = tempURL.appendingPathExtension("zip")
-                    defer { try? FileManager.default.removeItem(at: zipTempURL) }
+            if isMixed100MB {
+                let enwik8Path = try? obtainCorpusPath(named: "enwik8", allowSyntheticFallback: true)
+                try MultiModalDatasetGenerator.generateCompoundMixed100MBDataset(destinationPath: tempURL.path, textSourcePath: enwik8Path)
+            } else if isBinary100MB {
+                try MultiModalDatasetGenerator.generateDeterministicBinaryDataset(destinationPath: tempURL.path, sizeBytes: Int(targetSize))
+            } else if isStructured100MB {
+                try MultiModalDatasetGenerator.generateStructuredJsonDataset(destinationPath: tempURL.path, recordCount: 700_000)
+            } else {
+                // 4. Download from mirrors for enwik8/enwik9
+                var downloadSucceeded = false
+                for mirror in defaultMirrors {
+                    let urlString = isEnwik9 ? mirror.enwik9Url : mirror.enwik8Url
+                    guard let url = URL(string: urlString) else { continue }
                     
-                    if (try? downloadedData.write(to: zipTempURL)) != nil {
-                        if extractZipPayload(from: zipTempURL, to: tempURL) {
-                            if let attrs = try? PlatformFileSystem.statFile(path: tempURL.path), attrs.size == targetSize {
-                                downloadSucceeded = true
-                                break
+                    if let downloadedData = downloadFileSynchronously(url: url) {
+                        let zipTempURL = tempURL.appendingPathExtension("zip")
+                        defer { try? FileManager.default.removeItem(at: zipTempURL) }
+                        
+                        if (try? downloadedData.write(to: zipTempURL)) != nil {
+                            if extractZipPayload(from: zipTempURL, to: tempURL) {
+                                if let attrs = try? PlatformFileSystem.statFile(path: tempURL.path), attrs.size == targetSize {
+                                    downloadSucceeded = true
+                                    break
+                                }
                             }
                         }
                     }
                 }
-            }
-            
-            // 5. Fallback to deterministic synthesis generator if remote download fails
-            if !downloadSucceeded {
-                if allowSyntheticFallback {
-                    let config = SyntheticXmlCorpusConfig(
-                        totalByteCount: targetSize,
-                        repeatDistanceBytes: isEnwik9 ? 32 * 1024 * 1024 : 16 * 1024 * 1024,
-                        repeatProbability: 0.70,
-                        seed: isEnwik9 ? 0x9876543210FEDCBA : 0x123456789ABCDEF0
-                    )
-                    try SyntheticXmlCorpusGenerator.generate(config: config, to: tempURL)
-                } else {
-                    throw NSError(
-                        domain: "EnwikFixtureCacheManager",
-                        code: 404,
-                        userInfo: [NSLocalizedDescriptionKey: "Failed to download corpus '\(corpusId)' and synthetic fallback is disabled."]
-                    )
+                
+                // 5. Fallback to deterministic synthesis generator if remote download fails
+                if !downloadSucceeded {
+                    if allowSyntheticFallback {
+                        let config = SyntheticXmlCorpusConfig(
+                            totalByteCount: targetSize,
+                            repeatDistanceBytes: isEnwik9 ? 32 * 1024 * 1024 : 16 * 1024 * 1024,
+                            repeatProbability: 0.70,
+                            seed: isEnwik9 ? 0x9876543210FEDCBA : 0x123456789ABCDEF0
+                        )
+                        try SyntheticXmlCorpusGenerator.generate(config: config, to: tempURL)
+                    } else {
+                        throw NSError(
+                            domain: "EnwikFixtureCacheManager",
+                            code: 404,
+                            userInfo: [NSLocalizedDescriptionKey: "Failed to download corpus '\(corpusId)' and synthetic fallback is disabled."]
+                        )
+                    }
                 }
             }
             
