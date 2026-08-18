@@ -214,18 +214,289 @@ void ttzip_filter_truncate_float64_neon(const double* src, double* dst, size_t c
 #endif
 }
 
+#include "include/CTTZipSIMD.h"
+
+void ttzip_filter_bitshuffle_forward_neon(const uint8_t* src, uint8_t* dst, size_t size, uint8_t typesize) {
+    if (!src || !dst || size == 0) return;
+    if (typesize == 0) typesize = 1;
+
+    // 1. Stage 1: Byte Shuffle
+    ttzip_filter_shuffle_forward(src, dst, size, typesize);
+
+    // 2. Stage 2: Bit-Plane Transposition (on each 8-byte sub-matrix)
+    size_t full_words = size / 8;
+    size_t offset = 0;
+
+#if (defined(__ARM_NEON) || defined(__aarch64__))
+    uint64x2_t mask1 = vdupq_n_u64(0x00AA00AA00AA00AAULL);
+    uint64x2_t mask2 = vdupq_n_u64(0x0000CCCC0000CCCCULL);
+    uint64x2_t mask3 = vdupq_n_u64(0x00000000F0F0F0F0ULL);
+
+    // 64-byte unrolled loop (4 NEON vectors = 8 matrices of 8x8 bits)
+    while (offset + 64 <= size) {
+        uint64x2_t v0 = vld1q_u64((const uint64_t*)(dst + offset));
+        uint64x2_t v1 = vld1q_u64((const uint64_t*)(dst + offset + 16));
+        uint64x2_t v2 = vld1q_u64((const uint64_t*)(dst + offset + 32));
+        uint64x2_t v3 = vld1q_u64((const uint64_t*)(dst + offset + 48));
+
+        v0 = ttzip_neon_transpose_8x8_2x(v0, mask1, mask2, mask3);
+        v1 = ttzip_neon_transpose_8x8_2x(v1, mask1, mask2, mask3);
+        v2 = ttzip_neon_transpose_8x8_2x(v2, mask1, mask2, mask3);
+        v3 = ttzip_neon_transpose_8x8_2x(v3, mask1, mask2, mask3);
+
+        vst1q_u64((uint64_t*)(dst + offset), v0);
+        vst1q_u64((uint64_t*)(dst + offset + 16), v1);
+        vst1q_u64((uint64_t*)(dst + offset + 32), v2);
+        vst1q_u64((uint64_t*)(dst + offset + 48), v3);
+
+        offset += 64;
+    }
+
+    // 16-byte single vector loop
+    while (offset + 16 <= size) {
+        uint64x2_t v = vld1q_u64((const uint64_t*)(dst + offset));
+        v = ttzip_neon_transpose_8x8_2x(v, mask1, mask2, mask3);
+        vst1q_u64((uint64_t*)(dst + offset), v);
+        offset += 16;
+    }
+#endif
+
+    // 8-byte scalar loop
+    while (offset + 8 <= size) {
+        uint64_t w = *(const uint64_t*)(dst + offset);
+        *(uint64_t*)(dst + offset) = ttzip_scalar_transpose_8x8(w);
+        offset += 8;
+    }
+
+    // Trailing 1..7 bytes remain as-is (tail boundary integrity)
+}
+
+void ttzip_filter_bitshuffle_backward_neon(const uint8_t* src, uint8_t* dst, size_t size, uint8_t typesize) {
+    if (!src || !dst || size == 0) return;
+    if (typesize == 0) typesize = 1;
+
+    // Bit-matrix transposition is symmetric involution ((M^T)^T = M)
+    // 1. Stage 1: Untranspose bits
+    if (src != dst) memcpy(dst, src, size);
+
+    size_t offset = 0;
+
+#if (defined(__ARM_NEON) || defined(__aarch64__))
+    uint64x2_t mask1 = vdupq_n_u64(0x00AA00AA00AA00AAULL);
+    uint64x2_t mask2 = vdupq_n_u64(0x0000CCCC0000CCCCULL);
+    uint64x2_t mask3 = vdupq_n_u64(0x00000000F0F0F0F0ULL);
+
+    while (offset + 64 <= size) {
+        uint64x2_t v0 = vld1q_u64((const uint64_t*)(dst + offset));
+        uint64x2_t v1 = vld1q_u64((const uint64_t*)(dst + offset + 16));
+        uint64x2_t v2 = vld1q_u64((const uint64_t*)(dst + offset + 32));
+        uint64x2_t v3 = vld1q_u64((const uint64_t*)(dst + offset + 48));
+
+        v0 = ttzip_neon_transpose_8x8_2x(v0, mask1, mask2, mask3);
+        v1 = ttzip_neon_transpose_8x8_2x(v1, mask1, mask2, mask3);
+        v2 = ttzip_neon_transpose_8x8_2x(v2, mask1, mask2, mask3);
+        v3 = ttzip_neon_transpose_8x8_2x(v3, mask1, mask2, mask3);
+
+        vst1q_u64((uint64_t*)(dst + offset), v0);
+        vst1q_u64((uint64_t*)(dst + offset + 16), v1);
+        vst1q_u64((uint64_t*)(dst + offset + 32), v2);
+        vst1q_u64((uint64_t*)(dst + offset + 48), v3);
+
+        offset += 64;
+    }
+
+    while (offset + 16 <= size) {
+        uint64x2_t v = vld1q_u64((const uint64_t*)(dst + offset));
+        v = ttzip_neon_transpose_8x8_2x(v, mask1, mask2, mask3);
+        vst1q_u64((uint64_t*)(dst + offset), v);
+        offset += 16;
+    }
+#endif
+
+    while (offset + 8 <= size) {
+        uint64_t w = *(const uint64_t*)(dst + offset);
+        *(uint64_t*)(dst + offset) = ttzip_scalar_transpose_8x8(w);
+        offset += 8;
+    }
+
+    // 2. Stage 2: Byte Unshuffle
+    uint8_t stack_tmp[65536];
+    uint8_t* tmp_buf = (size <= sizeof(stack_tmp)) ? stack_tmp : (uint8_t*)malloc(size);
+    if (tmp_buf) {
+        memcpy(tmp_buf, dst, size);
+        ttzip_filter_shuffle_backward(tmp_buf, dst, size, typesize);
+        if (tmp_buf != stack_tmp) free(tmp_buf);
+    }
+}
+
+#if (defined(__ARM_NEON) || defined(__aarch64__))
+static inline uint8x16_t neon_prefix_sum_16b(uint8x16_t x) {
+    uint8x16_t zero = vdupq_n_u8(0);
+    x = vaddq_u8(x, vextq_u8(zero, x, 15));
+    x = vaddq_u8(x, vextq_u8(zero, x, 14));
+    x = vaddq_u8(x, vextq_u8(zero, x, 12));
+    x = vaddq_u8(x, vextq_u8(zero, x, 8));
+    return x;
+}
+#endif
+
+void ttzip_filter_bytedelta_forward_neon(const uint8_t* src, uint8_t* dst, size_t size, uint8_t typesize) {
+    if (!src || !dst || size == 0) return;
+    if (typesize <= 1) {
+        // Flat byte stream differencing
+#if (defined(__ARM_NEON) || defined(__aarch64__))
+        if (size >= 16) {
+            uint8x16_t v_prev = vdupq_n_u8(0);
+            size_t offset = 0;
+            while (offset + 16 <= size) {
+                uint8x16_t v_curr = vld1q_u8(src + offset);
+                uint8x16_t v_prev_shifted = vextq_u8(v_prev, v_curr, 15);
+                uint8x16_t v_delta = vsubq_u8(v_curr, v_prev_shifted);
+                vst1q_u8(dst + offset, v_delta);
+                v_prev = v_curr;
+                offset += 16;
+            }
+            if (offset < size) {
+                uint8_t last = src[offset - 1];
+                for (size_t i = offset; i < size; i++) {
+                    dst[i] = (uint8_t)(src[i] - last);
+                    last = src[i];
+                }
+            }
+            return;
+        }
+#endif
+        uint8_t last = 0;
+        for (size_t i = 0; i < size; i++) {
+            dst[i] = (uint8_t)(src[i] - last);
+            last = src[i];
+        }
+        return;
+    }
+
+    // Transposed multi-plane differencing (plane by plane)
+    size_t num_elements = size / typesize;
+    for (size_t p = 0; p < typesize; p++) {
+        const uint8_t* p_src = src + p * num_elements;
+        uint8_t* p_dst = dst + p * num_elements;
+        uint8_t last = 0;
+        for (size_t i = 0; i < num_elements; i++) {
+            p_dst[i] = (uint8_t)(p_src[i] - last);
+            last = p_src[i];
+        }
+    }
+    size_t rem = size % typesize;
+    if (rem > 0) {
+        memcpy(dst + num_elements * typesize, src + num_elements * typesize, rem);
+    }
+}
+
+void ttzip_filter_bytedelta_backward_neon(const uint8_t* src, uint8_t* dst, size_t size, uint8_t typesize) {
+    if (!src || !dst || size == 0) return;
+    if (typesize <= 1) {
+#if (defined(__ARM_NEON) || defined(__aarch64__))
+        if (size >= 128) {
+            uint8_t carry = 0;
+            size_t offset = 0;
+            while (offset + 128 <= size) {
+                uint8x16_t v0 = vld1q_u8(src + offset + 0 * 16);
+                uint8x16_t v1 = vld1q_u8(src + offset + 1 * 16);
+                uint8x16_t v2 = vld1q_u8(src + offset + 2 * 16);
+                uint8x16_t v3 = vld1q_u8(src + offset + 3 * 16);
+                uint8x16_t v4 = vld1q_u8(src + offset + 4 * 16);
+                uint8x16_t v5 = vld1q_u8(src + offset + 5 * 16);
+                uint8x16_t v6 = vld1q_u8(src + offset + 6 * 16);
+                uint8x16_t v7 = vld1q_u8(src + offset + 7 * 16);
+
+                v0 = neon_prefix_sum_16b(v0);
+                v1 = neon_prefix_sum_16b(v1);
+                v2 = neon_prefix_sum_16b(v2);
+                v3 = neon_prefix_sum_16b(v3);
+                v4 = neon_prefix_sum_16b(v4);
+                v5 = neon_prefix_sum_16b(v5);
+                v6 = neon_prefix_sum_16b(v6);
+                v7 = neon_prefix_sum_16b(v7);
+
+                uint8_t s0 = vgetq_lane_u8(v0, 15);
+                uint8_t s1 = vgetq_lane_u8(v1, 15);
+                uint8_t s2 = vgetq_lane_u8(v2, 15);
+                uint8_t s3 = vgetq_lane_u8(v3, 15);
+                uint8_t s4 = vgetq_lane_u8(v4, 15);
+                uint8_t s5 = vgetq_lane_u8(v5, 15);
+                uint8_t s6 = vgetq_lane_u8(v6, 15);
+                uint8_t s7 = vgetq_lane_u8(v7, 15);
+
+                uint8_t b0 = carry;
+                uint8_t b1 = b0 + s0;
+                uint8_t b2 = b1 + s1;
+                uint8_t b3 = b2 + s2;
+                uint8_t b4 = b3 + s3;
+                uint8_t b5 = b4 + s4;
+                uint8_t b6 = b5 + s5;
+                uint8_t b7 = b6 + s6;
+                carry = b7 + s7;
+
+                v0 = vaddq_u8(v0, vdupq_n_u8(b0));
+                v1 = vaddq_u8(v1, vdupq_n_u8(b1));
+                v2 = vaddq_u8(v2, vdupq_n_u8(b2));
+                v3 = vaddq_u8(v3, vdupq_n_u8(b3));
+                v4 = vaddq_u8(v4, vdupq_n_u8(b4));
+                v5 = vaddq_u8(v5, vdupq_n_u8(b5));
+                v6 = vaddq_u8(v6, vdupq_n_u8(b6));
+                v7 = vaddq_u8(v7, vdupq_n_u8(b7));
+
+                vst1q_u8(dst + offset + 0 * 16, v0);
+                vst1q_u8(dst + offset + 1 * 16, v1);
+                vst1q_u8(dst + offset + 2 * 16, v2);
+                vst1q_u8(dst + offset + 3 * 16, v3);
+                vst1q_u8(dst + offset + 4 * 16, v4);
+                vst1q_u8(dst + offset + 5 * 16, v5);
+                vst1q_u8(dst + offset + 6 * 16, v6);
+                vst1q_u8(dst + offset + 7 * 16, v7);
+
+                offset += 128;
+            }
+            if (offset < size) {
+                for (size_t i = offset; i < size; i++) {
+                    carry += src[i];
+                    dst[i] = carry;
+                }
+            }
+            return;
+        }
+#endif
+        uint8_t running = 0;
+        for (size_t i = 0; i < size; i++) {
+            running += src[i];
+            dst[i] = running;
+        }
+        return;
+    }
+
+    size_t num_elements = size / typesize;
+    for (size_t p = 0; p < typesize; p++) {
+        const uint8_t* p_src = src + p * num_elements;
+        uint8_t* p_dst = dst + p * num_elements;
+        uint8_t running = 0;
+        for (size_t i = 0; i < num_elements; i++) {
+            running += p_src[i];
+            p_dst[i] = running;
+        }
+    }
+    size_t rem = size % typesize;
+    if (rem > 0) {
+        memcpy(dst + num_elements * typesize, src + num_elements * typesize, rem);
+    }
+}
+
 void ttzip_filter_delta_forward(uint8_t* buf, size_t size) {
     if (!buf || size <= 1) return;
-    for (size_t i = size - 1; i > 0; i--) {
-        buf[i] = (uint8_t)(buf[i] - buf[i - 1]);
-    }
+    ttzip_filter_bytedelta_forward_neon(buf, buf, size, 1);
 }
 
 void ttzip_filter_delta_backward(uint8_t* buf, size_t size) {
     if (!buf || size <= 1) return;
-    for (size_t i = 1; i < size; i++) {
-        buf[i] = (uint8_t)(buf[i] + buf[i - 1]);
-    }
+    ttzip_filter_bytedelta_backward_neon(buf, buf, size, 1);
 }
 
 int ttzip_filter_pipeline_apply_forward(
@@ -264,9 +535,11 @@ int ttzip_filter_pipeline_apply_forward(
             case TTZIP_FILTER_SHUFFLE:
                 ttzip_filter_shuffle_forward(cur_in, cur_out, size, typesize);
                 break;
+            case TTZIP_FILTER_BITSHUFFLE:
+                ttzip_filter_bitshuffle_forward_neon(cur_in, cur_out, size, typesize);
+                break;
             case TTZIP_FILTER_DELTA:
-                if (cur_in != cur_out) memcpy(cur_out, cur_in, size);
-                ttzip_filter_delta_forward(cur_out, size);
+                ttzip_filter_bytedelta_forward_neon(cur_in, cur_out, size, typesize);
                 break;
             case TTZIP_FILTER_TRUNCATE_FLOAT32:
                 ttzip_filter_truncate_float32_neon((const float*)cur_in, (float*)cur_out, size / sizeof(float), t_bits > 0 ? t_bits : 7);
@@ -327,13 +600,14 @@ int ttzip_filter_pipeline_apply_backward(
             case TTZIP_FILTER_SHUFFLE:
                 ttzip_filter_shuffle_backward(cur_in, cur_out, size, typesize);
                 break;
+            case TTZIP_FILTER_BITSHUFFLE:
+                ttzip_filter_bitshuffle_backward_neon(cur_in, cur_out, size, typesize);
+                break;
             case TTZIP_FILTER_DELTA:
-                if (cur_in != cur_out) memcpy(cur_out, cur_in, size);
-                ttzip_filter_delta_backward(cur_out, size);
+                ttzip_filter_bytedelta_backward_neon(cur_in, cur_out, size, typesize);
                 break;
             case TTZIP_FILTER_TRUNCATE_FLOAT32:
             case TTZIP_FILTER_TRUNCATE_FLOAT64:
-                // Truncation is lossy; backward pass preserves current data
                 if (cur_in != cur_out) memcpy(cur_out, cur_in, size);
                 break;
             case TTZIP_FILTER_NONE:
@@ -353,3 +627,4 @@ int ttzip_filter_pipeline_apply_backward(
     if (buf2 != stack_buf2) free(buf2);
     return 0;
 }
+

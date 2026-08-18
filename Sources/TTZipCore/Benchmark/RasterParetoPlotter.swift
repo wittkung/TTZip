@@ -94,7 +94,11 @@ public final class RasterParetoPlotter: @unchecked Sendable {
 
         let spanX = max(0.1, maxX - minX)
         let xStep: Double
-        if spanX <= 8.0 {
+        if spanX <= 2.5 {
+            xStep = 0.5
+        } else if spanX <= 5.0 {
+            xStep = 1.0
+        } else if spanX <= 8.0 {
             xStep = 2.0
         } else if spanX <= 25.0 {
             xStep = 5.0
@@ -104,9 +108,10 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             xStep = 20.0
         }
 
-        let padLeft = max(xStep, spanX * 0.15)
+        let padLeft = max(xStep * 0.6, spanX * 0.12)
         let domainMinX = max(0.0, floor((minX - padLeft) / xStep) * xStep)
-        let domainMaxX = maxX >= 85.0 ? 100.0 : min(100.0, ceil((maxX + xStep * 0.5) / xStep) * xStep)
+        let padRight = max(xStep * 0.6, spanX * 0.12)
+        let domainMaxX = min(100.0, ceil((maxX + padRight) / xStep) * xStep)
 
         let minLogY = max(0.5, floor(log10(max(1.0, minY))))
         let maxLogY = min(5.5, ceil(log10(max(10.0, maxY))) + 0.3)
@@ -286,8 +291,12 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let cleanName: String
             if fam == .sevenZip {
                 cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02", with: "7-zip").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "").replacingOccurrences(of: "-mmt=on", with: "")
+            } else if fam == .keka {
+                cleanName = p.algorithm.replacingOccurrences(of: "Keka", with: "keka").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
             } else if fam == .appleNative {
                 cleanName = p.algorithm.replacingOccurrences(of: "Apple Native", with: "apple").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+            } else if fam == .openSource {
+                cleanName = p.algorithm.lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
             } else if fam == .ttzip {
                 let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
                 let baseAlgo = p.algorithm.replacingOccurrences(of: "TTZip", with: "ttzip").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")

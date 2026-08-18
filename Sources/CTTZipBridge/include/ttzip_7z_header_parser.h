@@ -13,6 +13,8 @@
 #ifndef TTZIP_7Z_HEADER_PARSER_H
 #define TTZIP_7Z_HEADER_PARSER_H
 
+#include "ttzip_platform.h"
+#include "ttzip_platform.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -57,15 +59,15 @@ typedef struct {
     size_t num_stream_crcs;
 } ttzip_7z_header_info_t;
 
-size_t ttzip_7z_read_varint(const uint8_t* buf, size_t len, uint64_t* val);
+TTZIP_API size_t ttzip_7z_read_varint(const uint8_t* buf, size_t len, uint64_t* val);
 
-int ttzip_7z_parse_header_metadata(
+TTZIP_API int ttzip_7z_parse_header_metadata(
     const uint8_t* mapped_data,
     size_t file_size,
     ttzip_7z_header_info_t* out_info
 );
 
-void ttzip_7z_free_header_info(ttzip_7z_header_info_t* info);
+TTZIP_API void ttzip_7z_free_header_info(ttzip_7z_header_info_t* info);
 
 #ifdef __cplusplus
 }

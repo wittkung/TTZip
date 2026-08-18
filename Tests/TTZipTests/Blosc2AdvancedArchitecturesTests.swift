@@ -264,4 +264,101 @@ final class Blosc2AdvancedArchitecturesTests: XCTestCase {
         let expectedFirstIdx = (1 * 8 * 16 * 32) + (2 * 16 * 32) + (0 * 32) + 0
         XCTAssertEqual(sliceDst[0], Float(expectedFirstIdx) * 0.25, "First slice element must match expected tensor index value")
     }
+
+    // MARK: - 5. SIMD BitShuffle & ByteDelta Roundtrip Tests
+
+    func testBitShuffleNeonForwardBackwardRoundtrip() {
+        let count = 4096 // 16KB of Float32
+        var originalFloats = [Float](repeating: 0, count: count)
+        for i in 0..<count {
+            originalFloats[i] = sin(Float(i) * 0.1) * 50.0 + Float(i) * 0.05
+        }
+        let byteCount = count * MemoryLayout<Float>.size
+        let rawData = Data(bytes: originalFloats, count: byteCount)
+
+        var forwardBuf = Data(count: byteCount)
+        var backwardBuf = Data(count: byteCount)
+
+        rawData.withUnsafeBytes { rawIn in
+            forwardBuf.withUnsafeMutableBytes { rawOut in
+                ttzip_filter_bitshuffle_forward_neon(
+                    rawIn.bindMemory(to: UInt8.self).baseAddress!,
+                    rawOut.bindMemory(to: UInt8.self).baseAddress!,
+                    byteCount,
+                    4
+                )
+            }
+        }
+
+        forwardBuf.withUnsafeBytes { rawIn in
+            backwardBuf.withUnsafeMutableBytes { rawOut in
+                ttzip_filter_bitshuffle_backward_neon(
+                    rawIn.bindMemory(to: UInt8.self).baseAddress!,
+                    rawOut.bindMemory(to: UInt8.self).baseAddress!,
+                    byteCount,
+                    4
+                )
+            }
+        }
+
+        XCTAssertEqual(backwardBuf, rawData, "BitShuffle forward -> backward must be lossless bit-for-bit")
+    }
+
+    func testByteDeltaNeonForwardBackwardRoundtrip() {
+        let size = 65536 // 64KB
+        var originalBytes = [UInt8](repeating: 0, count: size)
+        for i in 0..<size {
+            originalBytes[i] = UInt8(truncatingIfNeeded: (i * 7 + i / 128))
+        }
+        let rawData = Data(originalBytes)
+
+        var forwardBuf = Data(count: size)
+        var backwardBuf = Data(count: size)
+
+        rawData.withUnsafeBytes { rawIn in
+            forwardBuf.withUnsafeMutableBytes { rawOut in
+                ttzip_filter_bytedelta_forward_neon(
+                    rawIn.bindMemory(to: UInt8.self).baseAddress!,
+                    rawOut.bindMemory(to: UInt8.self).baseAddress!,
+                    size,
+                    1
+                )
+            }
+        }
+
+        forwardBuf.withUnsafeBytes { rawIn in
+            backwardBuf.withUnsafeMutableBytes { rawOut in
+                ttzip_filter_bytedelta_backward_neon(
+                    rawIn.bindMemory(to: UInt8.self).baseAddress!,
+                    rawOut.bindMemory(to: UInt8.self).baseAddress!,
+                    size,
+                    1
+                )
+            }
+        }
+
+        XCTAssertEqual(backwardBuf, rawData, "128-byte unrolled ByteDelta forward -> backward must be lossless bit-for-bit")
+    }
+
+    func testBlosc2FilterBridgeMultiFilterPipeline() {
+        let count = 2048
+        var floats = [Float](repeating: 0, count: count)
+        for i in 0..<count {
+            floats[i] = Float(i) * 1.5
+        }
+        let rawData = Data(bytes: floats, count: count * 4)
+
+        let pipeline = Blosc2FilterBridge.PipelineConfig(
+            filters: [.shuffle, .delta],
+            typeSizes: [4, 4],
+            truncateBits: [0, 0]
+        )
+
+        let encoded = Blosc2FilterBridge.applyForward(pipeline: pipeline, data: rawData)
+        XCTAssertNotEqual(encoded, rawData)
+
+        let decoded = Blosc2FilterBridge.applyBackward(pipeline: pipeline, data: encoded)
+        XCTAssertEqual(decoded, rawData, "Filter pipeline bridge must execute lossless roundtrip")
+    }
 }
+

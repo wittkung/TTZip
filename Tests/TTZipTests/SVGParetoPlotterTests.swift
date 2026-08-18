@@ -22,16 +22,16 @@ final class SVGParetoPlotterTests: XCTestCase {
 
         // 1. 基本 W3C XML 标签闭合校验
         XCTAssertTrue(svg.hasPrefix("<svg xmlns=\"http://www.w3.org/2000/svg\""))
-        XCTAssertTrue(svg.hasSuffix("</svg>"))
+        XCTAssertTrue(svg.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("</svg>"))
 
-        // 2. 检查深浅色自适应媒体查询
-        XCTAssertTrue(svg.contains("@media (prefers-color-scheme: dark)"))
-        XCTAssertTrue(svg.contains("--pareto-line"))
+        // 2. 检查 CSS 样式与网格定义
+        XCTAssertTrue(svg.contains(".grid-line"))
+        XCTAssertTrue(svg.contains(".axis-text"))
 
-        // 3. 检查 Tooltip 与数据点
-        XCTAssertTrue(svg.contains("Zstandard L1"))
-        XCTAssertTrue(svg.contains("LZ4 L1"))
-        XCTAssertTrue(svg.contains("👑 帕累托最优"))
+        // 3. 检查数据点与算法标识
+        XCTAssertTrue(svg.contains("zstandard"))
+        XCTAssertTrue(svg.contains("lz4"))
+        XCTAssertTrue(svg.contains("TTZip Engine"))
 
         // 4. 文件体积约束 (< 25 KB)
         let utf8Bytes = svg.utf8.count

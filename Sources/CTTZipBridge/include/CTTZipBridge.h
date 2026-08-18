@@ -43,11 +43,18 @@
 #include "ttzip_lzma_hc4_neon.h"
 #include "ttzip_native_archive.h"
 #include "CTTZipBridge_ZipChunkedStream.h"
+#include "CTTZipChecksum.h"
 #include "ttzip_crc64.h"
 #include "CTTZipBridge_Snappy.h"
 #include "ttzip_branchless_decomp.h"
+#include "ttzip_7z_header_parser.h"
+#include "ttzip_tar_native.h"
+#include "CTTZipFilterPipeline.h"
+#include "CTTZipSuperChunk.h"
+#include "CTTZipHeuristicTuner.h"
 
 #ifdef __cplusplus
+
 extern "C" {
 #endif
 

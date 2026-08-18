@@ -88,4 +88,87 @@ final class TarNativeEngineTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: extFile1.path))
         XCTAssertEqual(try String(contentsOf: extFile1, encoding: .utf8), "Compressed GZ Content Stream")
     }
+    
+    func testTarSWAROctalAndChecksumVerification() throws {
+        // 1. 测试 64-bit SWAR 8 字节八进制解析 (8 个连续 ASCII 字符 '0'..'7')
+        let octalStr = "00000755"
+        let w_be = octalStr.utf8.reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
+        let parsedSwar = ttzip_octal_parse8_swar(w_be)
+        XCTAssertEqual(parsedSwar, 0o755, "SWAR octal parse should correctly decode 00000755 to 0o755")
+        
+        // 2. 测试 12 字节标准八进制尺寸解析 (包含尾部空格和 NUL)
+        let sizeStr = "00000001750 \0"
+        let sizeVal = sizeStr.withCString { ptr in
+            ttzip_tar_parse_octal(ptr, 12)
+        }
+        XCTAssertEqual(sizeVal, 0o1750, "Octal parser should decode 01750")
+        
+        // 3. 测试 GNU base-256 二进制大文件尺寸 (> 8 GiB)
+        var base256Buf = [UInt8](repeating: 0, count: 12)
+        base256Buf[0] = 0x80 // GNU binary indicator
+        // 10 GiB = 10 * 1024 * 1024 * 1024 = 10737418240 (0x280000000)
+        base256Buf[7] = 0x02
+        base256Buf[8] = 0x80
+        base256Buf[9] = 0x00
+        base256Buf[10] = 0x00
+        base256Buf[11] = 0x00
+        let gnuSize = base256Buf.withUnsafeBufferPointer { ptr in
+            ptr.baseAddress!.withMemoryRebound(to: CChar.self, capacity: 12) { cptr in
+                ttzip_tar_parse_octal(cptr, 12)
+            }
+        }
+        XCTAssertEqual(gnuSize, 10737418240, "GNU base-256 binary format must decode 10 GiB accurately")
+        
+        // 4. 测试 512 字节全零块快速检测
+        var zeroBlock = [UInt8](repeating: 0, count: 512)
+        XCTAssertTrue(zeroBlock.withUnsafeBufferPointer { ttzip_tar_is_zero_block_512($0.baseAddress) })
+        zeroBlock[255] = 1
+        XCTAssertFalse(zeroBlock.withUnsafeBufferPointer { ttzip_tar_is_zero_block_512($0.baseAddress) })
+        
+        // 5. 测试真实 TAR 头部的快速解析与双向校验和验证
+        var headerBlock = [UInt8](repeating: 0, count: 512)
+        let fileName = "test_dir/sample_file.txt"
+        for (i, b) in fileName.utf8.enumerated() { headerBlock[i] = b }
+        
+        // Mode 0644
+        let modeStr = "0000644\0"
+        for (i, b) in modeStr.utf8.enumerated() { headerBlock[100 + i] = b }
+        
+        // Size 1024 (0o2000)
+        let fileSizeStr = "00000002000\0"
+        for (i, b) in fileSizeStr.utf8.enumerated() { headerBlock[124 + i] = b }
+        
+        // Type '0' (regular)
+        headerBlock[156] = UInt8(ascii: "0")
+        
+        // Magic "ustar\0"
+        headerBlock[257] = UInt8(ascii: "u")
+        headerBlock[258] = UInt8(ascii: "s")
+        headerBlock[259] = UInt8(ascii: "t")
+        headerBlock[260] = UInt8(ascii: "a")
+        headerBlock[261] = UInt8(ascii: "r")
+        headerBlock[262] = 0
+        
+        // Checksum 计算：标准中 offset 148..155 预填 8 个空格 (0x20)
+        for i in 148..<156 { headerBlock[i] = 0x20 }
+        var unsignedSum: UInt32 = 0
+        var signedSum: Int32 = 0
+        headerBlock.withUnsafeBufferPointer { ptr in
+            ttzip_tar_checksum_512(ptr.baseAddress, &unsignedSum, &signedSum)
+        }
+        
+        let chkStr = String(format: "%06o\0 ", unsignedSum)
+        for (i, b) in chkStr.utf8.enumerated() where i < 8 { headerBlock[148 + i] = b }
+        
+        var entryInfo = ttzip_tar_entry_info_t()
+        let parseOk = headerBlock.withUnsafeBufferPointer { ptr in
+            ttzip_tar_header_parse_fast(ptr.baseAddress, &entryInfo)
+        }
+        
+        XCTAssertTrue(parseOk, "Header parse fast should return true")
+        XCTAssertTrue(entryInfo.checksum_valid, "Header checksum must validate successfully")
+        XCTAssertTrue(entryInfo.is_ustar, "Ustar magic must be recognized")
+        XCTAssertEqual(entryInfo.size, 1024, "Decoded size must be 1024")
+        XCTAssertEqual(entryInfo.mode, 0o644, "Decoded mode must be 0644")
+    }
 }

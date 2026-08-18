@@ -153,3 +153,74 @@ size_t ttzip_quantum_decompress_two_pass(
     size_t actual_out = ttzip_libdeflate_decompress(src, src_size, dst, dst_capacity);
     return actual_out;
 }
+
+#include "include/CTTZipSIMD.h"
+
+// 5. Special-Value Uniform Block Detection & High-Speed Memory Fill
+ttzip_special_desc_t ttzip_detect_uniform_block(const void* buf, size_t len, uint8_t typesize) {
+    ttzip_special_desc_t desc;
+    desc.is_uniform = false;
+    desc.special_code = TTZIP_SPECIAL_STANDARD;
+    desc.repeat_pattern = 0;
+    desc.uncompressed_size = len;
+
+    if (!buf || len == 0) {
+        desc.is_uniform = true;
+        desc.special_code = TTZIP_SPECIAL_ZERO;
+        return desc;
+    }
+
+    if (ttzip_simd_is_all_zero_64b(buf, len)) {
+        desc.is_uniform = true;
+        desc.special_code = TTZIP_SPECIAL_ZERO;
+        desc.repeat_pattern = 0;
+        return desc;
+    }
+
+    uint64_t pat = 0;
+    if (ttzip_simd_is_uniform_64b(buf, len, &pat)) {
+        desc.is_uniform = true;
+        desc.repeat_pattern = pat;
+        if (typesize == 4) {
+            uint32_t f32_val = (uint32_t)pat;
+            if ((f32_val & 0x7F800000) == 0x7F800000 && (f32_val & 0x007FFFFF) != 0) {
+                desc.special_code = TTZIP_SPECIAL_NAN;
+                return desc;
+            }
+        } else if (typesize == 8) {
+            if ((pat & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL && (pat & 0x000FFFFFFFFFFFFFULL) != 0) {
+                desc.special_code = TTZIP_SPECIAL_NAN;
+                return desc;
+            }
+        }
+        desc.special_code = TTZIP_SPECIAL_VALUE;
+        return desc;
+    }
+
+    return desc;
+}
+
+size_t ttzip_fill_special_value(void* dst, size_t dst_capacity, ttzip_special_desc_t desc) {
+    if (!dst || desc.uncompressed_size > dst_capacity) return 0;
+    if (desc.special_code == TTZIP_SPECIAL_ZERO || desc.special_code == TTZIP_SPECIAL_UNINIT) {
+        memset(dst, 0, desc.uncompressed_size);
+        return desc.uncompressed_size;
+    }
+    if (desc.special_code == TTZIP_SPECIAL_VALUE || desc.special_code == TTZIP_SPECIAL_NAN) {
+        uint64_t pat = desc.repeat_pattern;
+#if defined(__APPLE__)
+        memset_pattern8(dst, &pat, desc.uncompressed_size);
+#else
+        size_t words = desc.uncompressed_size / sizeof(uint64_t);
+        uint64_t* d64 = (uint64_t*)dst;
+        for (size_t i = 0; i < words; i++) d64[i] = pat;
+        size_t rem = desc.uncompressed_size % sizeof(uint64_t);
+        if (rem > 0) {
+            memcpy((uint8_t*)(d64 + words), &pat, rem);
+        }
+#endif
+        return desc.uncompressed_size;
+    }
+    return 0;
+}
+

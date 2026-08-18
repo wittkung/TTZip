@@ -442,3 +442,14 @@ bool ttzip_path_strip_components(const char* path, int strip_count, char* out_bu
     snprintf(out_buf, out_len, "%s", p);
     return out_buf[0] != '\0';
 }
+
+size_t ttzip_cache_get_optimal_block_size(void) {
+#if defined(__APPLE__) && (defined(__ARM_NEON) || defined(__aarch64__))
+    // Apple Silicon M1/M2/M3/M4: 128KB L1 Data Cache per Performance Core
+    return 128 * 1024;
+#else
+    // Generic x86-64 / other: 64KB L1/L2 boundary
+    return 64 * 1024;
+#endif
+}
+

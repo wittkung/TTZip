@@ -16,6 +16,7 @@
 #include "include/CTTZipCommon.h"
 #include "include/CTTZipBridge_Zstd.h"
 #include "include/ttzip_7z_header_parser.h"
+#include "include/ttzip_tar_native.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -170,22 +171,17 @@ int ttzip_native_inspect_archive(const char* archive_path, void* context, ttzip_
     } else if (fmt == TTZIP_NATIVE_FMT_TAR) {
         size_t offset = 0;
         int count = 0;
+        ttzip_tar_entry_info_t entry;
         while (offset + 512 <= file_size) {
             const uint8_t *block = byte_ptr + offset;
-            if (block[0] == 0) break;
-            char name[256] = {0};
-            memcpy(name, block, 100);
-            if (strlen(name) == 0) break;
+            if (!ttzip_tar_header_parse_fast(block, &entry)) break;
+            if (entry.is_eoa_zero || strlen(entry.name) == 0) break;
 
-            unsigned int octal_size = 0;
-            sscanf((const char*)block + 124, "%o", &octal_size);
-            int64_t entry_size = (int64_t)octal_size;
-            bool is_dir = (block[156] == '5') || (strlen(name) > 0 && name[strlen(name)-1] == '/');
-
-            callback(context, name, entry_size, is_dir);
+            bool is_dir = (entry.typeflag == '5') || (entry.name[strlen(entry.name)-1] == '/');
+            callback(context, entry.name, (int64_t)entry.size, is_dir);
             count++;
 
-            size_t blocks = ((size_t)entry_size + 511) / 512;
+            size_t blocks = ((size_t)entry.size + 511) / 512;
             offset += 512 + blocks * 512;
         }
         munmap(mapped, file_size);
@@ -197,22 +193,17 @@ int ttzip_native_inspect_archive(const char* archive_path, void* context, ttzip_
             if (decomp_size >= 262 && memcmp(decomp_buf + 257, "ustar", 5) == 0) {
                 size_t offset = 0;
                 int count = 0;
+                ttzip_tar_entry_info_t entry;
                 while (offset + 512 <= decomp_size) {
                     const uint8_t *block = decomp_buf + offset;
-                    if (block[0] == 0) break;
-                    char name[256] = {0};
-                    memcpy(name, block, 100);
-                    if (strlen(name) == 0) break;
+                    if (!ttzip_tar_header_parse_fast(block, &entry)) break;
+                    if (entry.is_eoa_zero || strlen(entry.name) == 0) break;
 
-                    unsigned int octal_size = 0;
-                    sscanf((const char*)block + 124, "%o", &octal_size);
-                    int64_t entry_size = (int64_t)octal_size;
-                    bool is_dir = (block[156] == '5') || (strlen(name) > 0 && name[strlen(name)-1] == '/');
-
-                    callback(context, name, entry_size, is_dir);
+                    bool is_dir = (entry.typeflag == '5') || (entry.name[strlen(entry.name)-1] == '/');
+                    callback(context, entry.name, (int64_t)entry.size, is_dir);
                     count++;
 
-                    size_t blocks = ((size_t)entry_size + 511) / 512;
+                    size_t blocks = ((size_t)entry.size + 511) / 512;
                     offset += 512 + blocks * 512;
                 }
                 free(decomp_buf);

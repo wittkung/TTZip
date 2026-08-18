@@ -59,6 +59,26 @@ void ttzip_filter_shuffle_forward(const uint8_t* src, uint8_t* dst, size_t size,
 void ttzip_filter_shuffle_backward(const uint8_t* src, uint8_t* dst, size_t size, uint8_t typesize);
 
 /**
+ * @brief Applies ARM NEON SIMD BitShuffle on a buffer (bit-plane transposition).
+ */
+void ttzip_filter_bitshuffle_forward_neon(const uint8_t* src, uint8_t* dst, size_t size, uint8_t typesize);
+
+/**
+ * @brief Applies ARM NEON SIMD BitUnshuffle on a buffer (bit-plane inverse transposition).
+ */
+void ttzip_filter_bitshuffle_backward_neon(const uint8_t* src, uint8_t* dst, size_t size, uint8_t typesize);
+
+/**
+ * @brief Applies 128-byte unrolled ARM NEON ByteDelta forward differencing.
+ */
+void ttzip_filter_bytedelta_forward_neon(const uint8_t* src, uint8_t* dst, size_t size, uint8_t typesize);
+
+/**
+ * @brief Applies 128-byte unrolled ARM NEON ByteDelta Kogge-Stone prefix-sum reconstruction.
+ */
+void ttzip_filter_bytedelta_backward_neon(const uint8_t* src, uint8_t* dst, size_t size, uint8_t typesize);
+
+/**
  * @brief Applies Delta differential transformation (forward).
  */
 void ttzip_filter_delta_forward(uint8_t* buf, size_t size);

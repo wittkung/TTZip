@@ -55,6 +55,27 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
             }
         }
 
+        // Helper: 运行外部 CLI 软件进程 (支持标准输出重定向写入文件)
+        func runProcessRedirect(_ exe: String, _ args: [String], outPath: String) -> Double {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: exe)
+            p.arguments = args
+            FileManager.default.createFile(atPath: outPath, contents: nil)
+            guard let fileHandle = FileHandle(forWritingAtPath: outPath) else { return 999.0 }
+            p.standardOutput = fileHandle
+            let t0 = CACurrentMediaTime()
+            do {
+                try p.run()
+                p.waitUntilExit()
+                try? fileHandle.close()
+                let t1 = CACurrentMediaTime()
+                return max(1e-6, t1 - t0)
+            } catch {
+                try? fileHandle.close()
+                return 999.0
+            }
+        }
+
         let writer = ArchiveEngineFactory.makeWriter()
 
         // =========================================================================
@@ -75,8 +96,14 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
             }
         }
 
-        // TTZip ZIP L1, L6, L9
-        for (lvl, lbl) in [(ArchiveCompressionLevel.level1, "TTZip (ZIP Fast)"), (ArchiveCompressionLevel.level6, "TTZip (ZIP Normal)"), (ArchiveCompressionLevel.level9, "TTZip (ZIP Ultra)")] {
+        // TTZip ZIP (L1, L3, L6, L9, L12)
+        for (lvl, lbl) in [
+            (ArchiveCompressionLevel.level1, "TTZip (ZIP Fast)"),
+            (ArchiveCompressionLevel.level3, "TTZip (ZIP Fast2)"),
+            (ArchiveCompressionLevel.level6, "TTZip (ZIP Normal)"),
+            (ArchiveCompressionLevel.level9, "TTZip (ZIP Max)"),
+            (ArchiveCompressionLevel.level12, "TTZip (ZIP Ultra)")
+        ] {
             let pth = tempDir.appendingPathComponent("ttzip_real_zip_\(lvl.rawValue).zip").path
             let t0 = CACurrentMediaTime()
             try writer.createArchiveSync(outputPath: pth, format: .zip, level: lvl, inputPaths: [realSamplePath])
@@ -118,8 +145,8 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         // =========================================================================
         let sevenZipPath = "/opt/homebrew/bin/7zz"
         if FileManager.default.fileExists(atPath: sevenZipPath) {
-            // 7-Zip ZIP (mx=1, 3, 6, 9)
-            for (mx, lbl) in [("1", "7-Zip 26.02 (ZIP Fast)"), ("3", "7-Zip 26.02 (ZIP Medium)"), ("6", "7-Zip 26.02 (ZIP Normal)"), ("9", "7-Zip 26.02 (ZIP Ultra)")] {
+            // 7-Zip ZIP (mx=1, 3, 5, 7, 9)
+            for (mx, lbl) in [("1", "7-Zip 26.02 (ZIP Fast)"), ("3", "7-Zip 26.02 (ZIP Fast2)"), ("5", "7-Zip 26.02 (ZIP Normal)"), ("7", "7-Zip 26.02 (ZIP Max)"), ("9", "7-Zip 26.02 (ZIP Ultra)")] {
                 let pth = tempDir.appendingPathComponent("7zip_real_zip_\(mx).zip").path
                 let dur = runProcess(sevenZipPath, ["a", "-tzip", "-mx=\(mx)", "-mmt=on", "-y", pth, realSamplePath])
                 let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
@@ -144,7 +171,24 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         }
 
         // =========================================================================
-        // 3. macOS 系统自带归档工具链 (/usr/bin/ditto, /usr/bin/zip -1, -3, -6, -9)
+        // 3. Keka 1.4.x macOS 发行版 (/opt/homebrew/bin/keka 7zz, -mmt=on 全核满开)
+        // =========================================================================
+        let kekaPath = "/opt/homebrew/bin/keka"
+        if FileManager.default.fileExists(atPath: kekaPath) {
+            for (mx, lbl) in [("1", "Keka (ZIP Fast)"), ("3", "Keka (ZIP Fast2)"), ("5", "Keka (ZIP Normal)"), ("7", "Keka (ZIP Max)"), ("9", "Keka (ZIP Ultra)")] {
+                let pth = tempDir.appendingPathComponent("keka_real_zip_\(mx).zip").path
+                let dur = runProcess(kekaPath, ["7zz", "a", "-tzip", "-mx=\(mx)", "-mmt=on", "-y", pth, realSamplePath])
+                let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+                if sz > 0 {
+                    let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                    let speed = payloadMB / dur
+                    softwarePoints.append(ParetoPoint(id: "keka_zip_\(mx)", algorithm: lbl, level: Int(mx) ?? 1, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+                }
+            }
+        }
+
+        // =========================================================================
+        // 4. macOS 系统自带归档工具链 (/usr/bin/ditto, /usr/bin/zip -1, -3, -6, -9)
         // =========================================================================
         let dittoPath = "/usr/bin/ditto"
         if FileManager.default.fileExists(atPath: dittoPath) {
@@ -168,6 +212,23 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
                     let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
                     let speed = payloadMB / dur
                     softwarePoints.append(ParetoPoint(id: "apple_zip_\(lvl)", algorithm: lbl, level: Int(lvl) ?? 1, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
+                }
+            }
+        }
+
+        // =========================================================================
+        // 5. pigz (Parallel Info-ZIP 多核极速, Mark Adler 官方, -p 18)
+        // =========================================================================
+        let pigzPath = "/opt/homebrew/bin/pigz"
+        if FileManager.default.fileExists(atPath: pigzPath) {
+            for (lvl, lbl) in [("1", "pigz (ZIP Fast)"), ("3", "pigz (ZIP Fast2)"), ("6", "pigz (ZIP Normal)"), ("9", "pigz (ZIP Ultra)")] {
+                let pth = tempDir.appendingPathComponent("pigz_real_zip_\(lvl).zip").path
+                let dur = runProcessRedirect(pigzPath, ["-K", "-\(lvl)", "-p", "18", "-k", "-f", "-c", realSamplePath], outPath: pth)
+                let sz = (try? FileManager.default.attributesOfItem(atPath: pth)[.size] as? Int64) ?? 0
+                if sz > 0 {
+                    let savings = (1.0 - (Double(sz) / Double(payloadBytes))) * 100.0
+                    let speed = payloadMB / dur
+                    softwarePoints.append(ParetoPoint(id: "pigz_zip_\(lvl)", algorithm: lbl, level: Int(lvl) ?? 1, throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes))
                 }
             }
         }

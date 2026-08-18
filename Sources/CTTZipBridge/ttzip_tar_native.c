@@ -375,3 +375,152 @@ int ttzip_extract_tar_native_c(
     archive_read_free(a);
     return TTZIP_OK;
 }
+
+/* ============================================================================
+ * Fast 64-bit SWAR, NEON Checksum, and Zero-Allocation TAR Header Parser
+ * ============================================================================ */
+
+uint64_t ttzip_octal_parse8_swar(uint64_t w_be) {
+    uint64_t d = w_be - 0x3030303030303030ULL;
+    uint64_t t1 = ((d & 0x0700070007000700ULL) >> 5) | (d & 0x0007000700070007ULL);
+    uint64_t t2 = ((t1 & 0x003F0000003F0000ULL) >> 10) | (t1 & 0x0000003F0000003FULL);
+    uint64_t res = ((t2 >> 20) & 0x00FFF000ULL) | (t2 & 0x00000FFFULL);
+    return res;
+}
+
+uint64_t ttzip_tar_parse_octal(const char* p, size_t len) {
+    if (!p || len == 0) return 0;
+
+    // GNU tar base-256 binary encoding (for sizes >= 8 GiB)
+    if (((uint8_t)p[0] & 0x80) != 0) {
+        uint64_t val = 0;
+        for (size_t i = 1; i < len; i++) {
+            val = (val << 8) | (uint8_t)p[i];
+        }
+        return val;
+    }
+
+    // Skip leading spaces and NULs
+    while (len > 0 && (*p == ' ' || *p == '\0')) {
+        p++;
+        len--;
+    }
+
+    uint64_t val = 0;
+    while (len > 0 && *p >= '0' && *p <= '7') {
+        val = (val << 3) | (uint64_t)(*p - '0');
+        p++;
+        len--;
+    }
+    return val;
+}
+
+bool ttzip_tar_is_zero_block_512(const uint8_t block[512]) {
+    if (!block) return false;
+    const uint64_t* w = (const uint64_t*)block;
+    uint64_t acc = 0;
+    for (int i = 0; i < 64; i++) {
+        acc |= w[i];
+    }
+    return acc == 0;
+}
+
+void ttzip_tar_checksum_512(const uint8_t block[512], uint32_t* out_unsigned_sum, int32_t* out_signed_sum) {
+    if (!block) return;
+
+#if defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(__aarch64__)
+    uint16x8_t uacc = vdupq_n_u16(0);
+    int16x8_t  sacc = vdupq_n_s16(0);
+
+    for (int i = 0; i < 512; i += 64) {
+        uint8x16_t v0 = vld1q_u8(block + i + 0);
+        uint8x16_t v1 = vld1q_u8(block + i + 16);
+        uint8x16_t v2 = vld1q_u8(block + i + 32);
+        uint8x16_t v3 = vld1q_u8(block + i + 48);
+
+        uacc = vpadalq_u8(uacc, v0);
+        uacc = vpadalq_u8(uacc, v1);
+        uacc = vpadalq_u8(uacc, v2);
+        uacc = vpadalq_u8(uacc, v3);
+
+        sacc = vpadalq_s8(sacc, vreinterpretq_s8_u8(v0));
+        sacc = vpadalq_s8(sacc, vreinterpretq_s8_u8(v1));
+        sacc = vpadalq_s8(sacc, vreinterpretq_s8_u8(v2));
+        sacc = vpadalq_s8(sacc, vreinterpretq_s8_u8(v3));
+    }
+
+    uint64x2_t u64 = vpaddlq_u32(vpaddlq_u16(uacc));
+    int64x2_t  s64 = vpaddlq_s32(vpaddlq_s16(sacc));
+    uint32_t raw_unsigned = (uint32_t)(vgetq_lane_u64(u64, 0) + vgetq_lane_u64(u64, 1));
+    int32_t  raw_signed   = (int32_t)(vgetq_lane_s64(s64, 0) + vgetq_lane_s64(s64, 1));
+#else
+    const uint64_t* w = (const uint64_t*)block;
+    uint64_t acc_even = 0, acc_odd = 0;
+    uint32_t neg_count = 0;
+    for (int i = 0; i < 64; i++) {
+        uint64_t val = w[i];
+        acc_even += (val & 0x00FF00FF00FF00FFULL);
+        acc_odd  += ((val >> 8) & 0x00FF00FF00FF00FFULL);
+        neg_count += (uint32_t)__builtin_popcountll(val & 0x8080808080808080ULL);
+    }
+    uint64_t acc = acc_even + acc_odd;
+    uint32_t raw_unsigned = (uint32_t)(acc & 0xFFFF) +
+                            (uint32_t)((acc >> 16) & 0xFFFF) +
+                            (uint32_t)((acc >> 32) & 0xFFFF) +
+                            (uint32_t)((acc >> 48) & 0xFFFF);
+    int32_t raw_signed = (int32_t)raw_unsigned - (int32_t)(neg_count * 256);
+#endif
+
+    uint32_t field_u = 0;
+    int32_t field_s = 0;
+    for (int i = 148; i < 156; i++) {
+        field_u += block[i];
+        field_s += (int8_t)block[i];
+    }
+
+    if (out_unsigned_sum) *out_unsigned_sum = raw_unsigned - field_u + 256;
+    if (out_signed_sum)   *out_signed_sum   = raw_signed - field_s + 256;
+}
+
+bool ttzip_tar_header_parse_fast(const uint8_t block[512], ttzip_tar_entry_info_t* out_entry) {
+    if (!block || !out_entry) return false;
+    memset(out_entry, 0, sizeof(ttzip_tar_entry_info_t));
+
+    if (ttzip_tar_is_zero_block_512(block)) {
+        out_entry->is_eoa_zero = true;
+        return true;
+    }
+
+    ttzip_tar_checksum_512(block, &out_entry->computed_unsigned, &out_entry->computed_signed);
+    out_entry->stored_checksum = (uint32_t)ttzip_tar_parse_octal((const char*)block + 148, 8);
+    out_entry->checksum_valid = (out_entry->stored_checksum == out_entry->computed_unsigned) ||
+                               ((int32_t)out_entry->stored_checksum == out_entry->computed_signed);
+
+    // Magic detection
+    if (memcmp(block + 257, "ustar\0", 6) == 0 || memcmp(block + 257, "ustar ", 6) == 0) {
+        out_entry->is_ustar = true;
+    }
+
+    // Name extraction (handling prefix if ustar)
+    if (out_entry->is_ustar && block[345] != '\0') {
+        char prefix[156] = {0};
+        memcpy(prefix, block + 345, 155);
+        size_t plen = strlen(prefix);
+        if (plen > 0) {
+            snprintf(out_entry->name, sizeof(out_entry->name), "%s/%.100s", prefix, (const char*)block);
+        } else {
+            memcpy(out_entry->name, block, 100);
+        }
+    } else {
+        memcpy(out_entry->name, block, 100);
+    }
+    out_entry->name[255] = '\0';
+
+    out_entry->mode = (uint32_t)ttzip_tar_parse_octal((const char*)block + 100, 8);
+    out_entry->size = ttzip_tar_parse_octal((const char*)block + 124, 12);
+    out_entry->mtime = (int64_t)ttzip_tar_parse_octal((const char*)block + 136, 12);
+    out_entry->typeflag = block[156];
+    if (out_entry->typeflag == '\0') out_entry->typeflag = '0';
+
+    return true;
+}

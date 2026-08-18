@@ -81,11 +81,17 @@ set(CTTZIP_CORE_SOURCES
     Sources/CTTZipBridge/CTTZipSliceProfiler.c
     Sources/CTTZipBridge/CTTZipIO.c
     Sources/CTTZipBridge/CTTZipBridge_ZipChunkedStream.c
+    Sources/CTTZipBridge/CTTZipAdler32Neon.c
+    Sources/CTTZipBridge/CTTZipSuperChunk.c
+    Sources/CTTZipBridge/CTTZipHeuristicTuner.c
     Sources/CTTZipBridge/ttzip_platform_detect.c
     Sources/CTTZipBridge/ttzip_lzma2_fast_encoder.c
     Sources/CTTZipBridge/ttzip_lzma2_branchless_rc.c
     Sources/CTTZipBridge/ttzip_7z_header_parser.c
     Sources/CTTZipBridge/ttzip_7z_header_writer.c
+    Sources/CTTZipBridge/ttzip_tar_native.c
+    Sources/CTTZipBridge/ttzip_native_archive.c
+    Sources/CTTZipBridge/ttzip_crc64.c
 )
 
 # 架构硬件加速分支

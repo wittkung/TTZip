@@ -23,7 +23,23 @@
 extern "C" {
 #endif
 
-#define TTZIP_QUANTUM_BLOCK_SIZE (128 * 1024)
+typedef enum {
+    TTZIP_SPECIAL_STANDARD = 0,
+    TTZIP_SPECIAL_ZERO     = 1,
+    TTZIP_SPECIAL_NAN      = 2,
+    TTZIP_SPECIAL_VALUE    = 3,
+    TTZIP_SPECIAL_UNINIT   = 4
+} ttzip_special_value_t;
+
+typedef struct {
+    bool is_uniform;
+    ttzip_special_value_t special_code;
+    uint64_t repeat_pattern;
+    size_t uncompressed_size;
+} ttzip_special_desc_t;
+
+ttzip_special_desc_t ttzip_detect_uniform_block(const void* buf, size_t len, uint8_t typesize);
+size_t ttzip_fill_special_value(void* dst, size_t dst_capacity, ttzip_special_desc_t desc);
 
 double ttzip_quantum_calc_entropy_neon(const void* buf, size_t len);
 void ttzip_quantum_copy_branchless_neon(void* dst, const void* src, size_t len);

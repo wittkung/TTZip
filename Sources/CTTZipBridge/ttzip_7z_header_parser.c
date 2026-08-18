@@ -16,31 +16,38 @@
 #include <stdlib.h>
 #include <string.h>
 
+static const uint64_t k7zVarintPayloadMask[9] = {
+    0x0000000000000000ULL, // k = 0
+    0x00000000000000FFULL, // k = 1
+    0x000000000000FFFFULL, // k = 2
+    0x0000000000FFFFFFULL, // k = 3
+    0x00000000FFFFFFFFULL, // k = 4
+    0x000000FFFFFFFFFFULL, // k = 5
+    0x0000FFFFFFFFFFFFULL, // k = 6
+    0x00FFFFFFFFFFFFFFULL, // k = 7
+    0xFFFFFFFFFFFFFFFFULL  // k = 8
+};
+
 size_t ttzip_7z_read_varint(const uint8_t* buf, size_t len, uint64_t* val) {
-    if (len == 0 || !val) return 0;
+    if (__builtin_expect(len == 0 || !val, 0)) return 0;
     uint8_t first = buf[0];
-    uint8_t mask = 0x80;
-    uint64_t value = 0;
-    size_t extra_bytes = 0;
-    
-    while (extra_bytes < 8 && (first & mask)) {
-        mask >>= 1;
-        extra_bytes++;
+    unsigned k = (unsigned)__builtin_clz((~(uint32_t)first << 24) | 0x00800000);
+
+    if (__builtin_expect(len >= 9, 1)) {
+        uint64_t raw_payload;
+        memcpy(&raw_payload, buf + 1, sizeof(uint64_t));
+        uint64_t high_part = ((uint64_t)(first & (0xFF >> (k + 1)))) << ((k & 7) * 8);
+        uint64_t low_part = raw_payload & k7zVarintPayloadMask[k];
+        *val = high_part | low_part;
+        return 1 + k;
+    } else {
+        if (1 + k > len) return 0;
+        uint64_t raw_payload = 0;
+        memcpy(&raw_payload, buf + 1, k);
+        uint64_t high_part = ((uint64_t)(first & (0xFF >> (k + 1)))) << ((k & 7) * 8);
+        *val = high_part | raw_payload;
+        return 1 + k;
     }
-    
-    if (extra_bytes == 0) {
-        *val = first;
-        return 1;
-    }
-    
-    if (1 + extra_bytes > len) return 0;
-    
-    value = ((uint64_t)(first & (mask - 1))) << (extra_bytes * 8);
-    for (size_t i = 1; i <= extra_bytes; i++) {
-        value |= ((uint64_t)buf[i]) << ((i - 1) * 8);
-    }
-    *val = value;
-    return 1 + extra_bytes;
 }
 
 int ttzip_7z_parse_header_metadata(
