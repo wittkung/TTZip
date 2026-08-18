@@ -294,41 +294,37 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let cy = mapY(p.throughputMBs)
             let fam = SoftwareFamilyClassifier.classify(algorithm: p.algorithm)
 
-            let isHeroPill = (fam == .ttzipExtreme && p.level == 1) || (fam == .ttzip && (p.level == 1 || p.level == 12)) || (p.algorithm.contains("ZIP Fast") && !p.algorithm.contains("pigz") && !p.algorithm.contains("7-zip") && !p.algorithm.contains("apple")) || p.algorithm.contains("TAR.ZST") || p.algorithm.contains("7Z Fast") || p.algorithm.contains("LZ4")
+            let isFlagshipEndpoint = (fam == .ttzipExtreme && p.level == 1) || (fam == .ttzip && (p.level == 1 || p.level == 12)) || (p.algorithm == "TTZip (ZIP Fast)" || p.algorithm == "TTZip (ZIP Ultra)")
+            let isHeroPill = isFlagshipEndpoint
             let isHeroNormal = fam.isHero && !isHeroPill
 
             let cleanName: String
-            if fam == .sevenZip {
-                cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02 (mx=", with: "7-zip-mx=")
-                    .replacingOccurrences(of: "7-Zip 26.02 (ZIP ", with: "7-zip-")
-                    .replacingOccurrences(of: "7-Zip 26.02 (7Z ", with: "7-zip-")
-                    .replacingOccurrences(of: ")", with: "")
-                    .lowercased()
-            } else if fam == .appleNative {
-                cleanName = p.algorithm.replacingOccurrences(of: "Apple Native (zip -", with: "apple-zip-")
-                    .replacingOccurrences(of: "Apple Native (", with: "apple-")
-                    .replacingOccurrences(of: ")", with: "")
-                    .lowercased()
-                    .replacingOccurrences(of: " ", with: "-")
-            } else if fam == .openSource {
-                cleanName = p.algorithm.replacingOccurrences(of: "pigz (-", with: "pigz-")
-                    .replacingOccurrences(of: "pigz (ZIP ", with: "pigz-")
-                    .replacingOccurrences(of: ")", with: "")
-                    .lowercased()
-            } else if fam == .ttzipExtreme {
+            if fam == .ttzipExtreme {
                 let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
-                let baseAlgo = p.algorithm.replacingOccurrences(of: "TTZip Extreme (ZIP ", with: "ttzip-extreme-")
-                    .replacingOccurrences(of: "TTZip Extreme (", with: "ttzip-extreme-")
-                    .replacingOccurrences(of: ")", with: "")
-                    .lowercased()
-                cleanName = "\(baseAlgo) (\(speedStr))"
+                if p.level == 1 {
+                    cleanName = "ttzip-extreme-l1 (\(speedStr))"
+                } else {
+                    cleanName = "L\(p.level)"
+                }
             } else if fam == .ttzip {
                 let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
-                let baseAlgo = p.algorithm.replacingOccurrences(of: "TTZip (ZIP ", with: "ttzip-")
-                    .replacingOccurrences(of: "TTZip (", with: "ttzip-")
-                    .replacingOccurrences(of: ")", with: "")
-                    .lowercased()
-                cleanName = "\(baseAlgo) (\(speedStr))"
+                if p.level == 1 {
+                    cleanName = "ttzip-l1 (\(speedStr))"
+                } else if p.level == 12 {
+                    cleanName = "ttzip-l12 (\(speedStr))"
+                } else {
+                    cleanName = "L\(p.level)"
+                }
+            } else if fam == .sevenZip {
+                cleanName = "mx=\(p.level)"
+            } else if fam == .openSource {
+                cleanName = "pigz-\(p.level)"
+            } else if fam == .appleNative {
+                if p.algorithm.contains("ditto") {
+                    cleanName = "ditto"
+                } else {
+                    cleanName = "zip-\(p.level)"
+                }
             } else {
                 cleanName = p.algorithm.lowercased()
             }
@@ -350,24 +346,24 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 }
                 borderCol = nil
             } else if isHeroNormal {
-                font = NSFont.systemFont(ofSize: 11, weight: .bold)
+                font = NSFont.systemFont(ofSize: 10, weight: .bold)
                 if fam == .ttzipExtreme {
                     textColor = NSColor(calibratedRed: 2/255.0, green: 132/255.0, blue: 199/255.0, alpha: 1.0)
-                    isCapsule = false
+                    isCapsule = true
                     bgCol = NSColor(calibratedRed: 240/255.0, green: 249/255.0, blue: 255/255.0, alpha: 0.95)
                     borderCol = NSColor(calibratedRed: 186/255.0, green: 230/255.0, blue: 253/255.0, alpha: 1.0)
                 } else {
                     textColor = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
-                    isCapsule = false
+                    isCapsule = true
                     bgCol = NSColor(calibratedRed: 239/255.0, green: 246/255.0, blue: 255/255.0, alpha: 0.95)
                     borderCol = NSColor(calibratedRed: 191/255.0, green: 219/255.0, blue: 254/255.0, alpha: 1.0)
                 }
             } else {
-                font = NSFont.systemFont(ofSize: 11, weight: .regular)
+                font = NSFont.systemFont(ofSize: 10, weight: .semibold)
                 let brandHex = fam.brandColorHex
                 textColor = NSColor(hexString: brandHex) ?? NSColor.darkGray
                 isCapsule = false
-                bgCol = NSColor.clear
+                bgCol = NSColor(calibratedWhite: 1.0, alpha: 0.85)
                 borderCol = nil
             }
 
@@ -435,50 +431,56 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let h = item.pillHeight
             let candidateSlots: [(x: CGFloat, y: CGFloat)]
             switch fam {
-            case .appleNative:
-                candidateSlots = [
-                    (cx - w - 12, cy - h / 2),       // 首选: Left-Center
-                    (cx - w - 12, cy - h - 6),       // 次选: Bottom-Left
-                    (cx - w - 12, cy + 6),           // 次选: Top-Left
-                    (cx - w / 2, cy - h - 14),       // S1: Bottom-Center
-                    (cx + 14, cy - h / 2)            // 兜底: Right-Center
-                ]
-            case .sevenZip:
-                candidateSlots = [
-                    (cx - w - 12, cy - h / 2),       // 首选: Left-Center
-                    (cx - w - 12, cy + 8),           // 次选: Top-Left
-                    (cx - w - 12, cy - h - 8),       // 次选: Bottom-Left
-                    (cx + 14, cy - h / 2),           // S2: Right-Center
-                    (cx - w / 2, cy - h - 14)        // S1: Bottom-Center
-                ]
-            case .openSource:
-                candidateSlots = [
-                    (cx - w / 2, cy - h - 14),       // 首选: Bottom-Center (在曲线下方，避开上方的 TTZip Extreme)
-                    (cx + 12, cy - h - 8),           // 次选: Bottom-Right
-                    (cx - w - 12, cy - h - 8),       // 次选: Bottom-Left
-                    (cx - w / 2, cy + 14),           // S0: Top-Center
-                    (cx + 14, cy - h / 2)            // S2: Right-Center
-                ]
             case .ttzipExtreme:
                 candidateSlots = [
-                    (cx - w / 2, cy + 14),           // 首选: Top-Center (在曲线上方)
-                    (cx + 14, cy + 10),              // 次选: Top-Right
-                    (cx - w - 12, cy + 10),          // 次选: Top-Left
-                    (cx + 14, cy - h / 2)            // 次选: Right-Center
+                    (cx - w / 2, cy + 12),           // Top-Center
+                    (cx + 12, cy - h / 2),           // Right
+                    (cx + 10, cy + 10),              // Top-Right
+                    (cx - w - 12, cy - h / 2),       // Left
+                    (cx - w - 10, cy + 10),          // Top-Left
+                    (cx - w / 2, cy - h - 12),       // Bottom-Center
+                    (cx + 10, cy - h - 10),          // Bottom-Right
+                    (cx - w - 10, cy - h - 10)       // Bottom-Left
                 ]
             case .ttzip:
                 candidateSlots = [
-                    (cx + 14, cy - h / 2),           // 首选: Right-Center (向右舒展)
-                    (cx - w / 2, cy + 14),           // 次选: Top-Center
-                    (cx + 12, cy + 10),              // S4: Top-Right
-                    (cx - w / 2, cy - h - 14)        // S1: Bottom-Center
+                    (cx - w / 2, cy - h - 12),       // Bottom-Center
+                    (cx + 12, cy - h / 2),           // Right
+                    (cx + 10, cy - h - 10),          // Bottom-Right
+                    (cx - w - 12, cy - h / 2),       // Left
+                    (cx - w - 10, cy - h - 10),      // Bottom-Left
+                    (cx - w / 2, cy + 12),           // Top-Center
+                    (cx + 10, cy + 10),              // Top-Right
+                    (cx - w - 10, cy + 10)           // Top-Left
+                ]
+            case .openSource:
+                candidateSlots = [
+                    (cx - w / 2, cy - h - 12),       // Bottom-Center
+                    (cx + 12, cy - h / 2),           // Right
+                    (cx - w - 12, cy - h / 2),       // Left
+                    (cx - w / 2, cy + 12),           // Top-Center
+                    (cx + 10, cy - h - 10),          // Bottom-Right
+                    (cx - w - 10, cy - h - 10)       // Bottom-Left
+                ]
+            case .sevenZip, .appleNative:
+                candidateSlots = [
+                    (cx - w - 12, cy - h / 2),       // Left-Center
+                    (cx - w - 10, cy + 10),          // Top-Left
+                    (cx - w - 10, cy - h - 10),      // Bottom-Left
+                    (cx - w / 2, cy - h - 12),       // Bottom-Center
+                    (cx + 12, cy - h / 2),           // Right-Center
+                    (cx - w / 2, cy + 12)            // Top-Center
                 ]
             default:
                 candidateSlots = [
-                    (cx - w / 2, cy + 14),
-                    (cx + 14, cy - h / 2),
-                    (cx - w - 14, cy - h / 2),
-                    (cx - w / 2, cy - h - 14)
+                    (cx - w / 2, cy - h - 10),
+                    (cx - w / 2, cy + 10),
+                    (cx + 10, cy - h / 2),
+                    (cx - w - 10, cy - h / 2),
+                    (cx + 8, cy - h - 8),
+                    (cx - w - 8, cy - h - 8),
+                    (cx + 8, cy + 8),
+                    (cx - w - 8, cy + 8)
                 ]
             }
 
