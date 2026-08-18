@@ -96,6 +96,27 @@ extension ArchiveWriter {
             }
         }
         
+        // 1.5. Single-File Extreme Multi-Block Parallel Route (Zopfli DAG + 32KB cross-block warmup)
+        if format == .zip && (level == .level6 || level == .level7) && (password == nil || password!.isEmpty) && (splitVolumeSizeBytes == nil || splitVolumeSizeBytes == 0),
+           inputPaths.count == 1, let singlePath = inputPaths.first {
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: singlePath, isDirectory: &isDir), !isDir.boolValue {
+                let attrs = (try? FileManager.default.attributesOfItem(atPath: singlePath)) ?? [:]
+                let fileSize = (attrs[.size] as? Int64) ?? 0
+                if fileSize >= 2 * 1024 * 1024 {
+                    let extremeOk = (try? ZipExtremeBlockWriter.shared.createExtremeArchive(
+                        outputPath: outputPath,
+                        inputPath: singlePath,
+                        level: level
+                    )) ?? false
+                    if extremeOk {
+                        notifyCompletion(totalBytes: fileSize, startTime: startTime, message: "ZIP Extreme archive created", progressHandler: progressHandler)
+                        return
+                    }
+                }
+            }
+        }
+        
         // 2. Native ZIP multi-threaded parallel compression engine (libdeflate + mmap + NEON CRC32)
         // 🔒 API CONTRACT: ZIP Parallel Compression Engine Route
         // SEE: .agents/rules/zip-engine-freeze.md

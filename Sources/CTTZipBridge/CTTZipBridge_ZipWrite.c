@@ -250,11 +250,9 @@ int ttzip_create_zip_parallel_c(
 
     // 1. Calculate total uncompressed bytes and construct 128-byte cache-line aligned payload Arena
     uint64_t total_uncompressed_bytes = 0;
-    size_t active_files_count = 0;
     for (size_t i = 0; i < list.count; i++) {
         if (!list.items[i].is_directory && list.items[i].uncompressed_size > 0) {
             total_uncompressed_bytes += (uint64_t)list.items[i].uncompressed_size;
-            active_files_count++;
         }
     }
 

@@ -20,6 +20,33 @@
 
 static inline uint32_t ttzip_fast_match_len_arm64(const uint8_t *s1, const uint8_t *s2, uint32_t max_len) {
     uint32_t len = 0;
+    if (max_len >= 8) {
+        uint64_t v1, v2;
+        memcpy(&v1, s1, 8);
+        memcpy(&v2, s2, 8);
+        uint64_t diff = v1 ^ v2;
+        if (diff != 0) {
+            return (uint32_t)__builtin_ctzll(diff) >> 3;
+        }
+        len = 8;
+    }
+    while (len + 16 <= max_len) {
+        uint8x16_t v1 = vld1q_u8(s1 + len);
+        uint8x16_t v2 = vld1q_u8(s2 + len);
+        uint8x16_t eq = vceqq_u8(v1, v2);
+        uint64x2_t eq64 = vreinterpretq_u64_u8(eq);
+        uint64_t low = vgetq_lane_u64(eq64, 0);
+        uint64_t high = vgetq_lane_u64(eq64, 1);
+        if (low != ~0ULL) {
+            uint64_t diff = low ^ ~0ULL;
+            return len + ((uint32_t)__builtin_ctzll(diff) >> 3);
+        }
+        if (high != ~0ULL) {
+            uint64_t diff = high ^ ~0ULL;
+            return len + 8 + ((uint32_t)__builtin_ctzll(diff) >> 3);
+        }
+        len += 16;
+    }
     while (len + 8 <= max_len) {
         uint64_t v1, v2;
         memcpy(&v1, s1 + len, 8);
@@ -160,18 +187,8 @@ size_t ttzip_deflate_fast_find_matches(
             uint8_t off_slot = s_offset_slot[best_offset];
             freqs_out->offset[off_slot]++;
 
-            /* Advance and update hash table */
-            for (uint32_t k = 1; k < best_len; k++) {
-                in_next++;
-                if (in_next + 4 <= in_end) {
-                    uint32_t s;
-                    memcpy(&s, in_next, 4);
-                    uint32_t h = ttzip_hash4(s);
-                    ptab->table[h][1] = ptab->table[h][0];
-                    ptab->table[h][0] = in_next;
-                }
-            }
-            in_next++;
+            /* Advance position */
+            in_next += best_len;
             if (in_next + 4 <= in_end) {
                 uint32_t s;
                 memcpy(&s, in_next, 4);

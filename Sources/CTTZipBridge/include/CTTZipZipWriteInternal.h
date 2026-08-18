@@ -44,6 +44,42 @@ typedef struct {
     size_t capacity;
 } ttzip_c_item_list_t;
 
+/**
+ * @brief Continuous memory arena for string storage (source and relative paths).
+ */
+typedef struct {
+    char* data;
+    size_t size;
+    size_t capacity;
+} ttzip_path_arena_t;
+
+/**
+ * @brief High-density compact item metadata representation for massive small file batching (48-64 bytes).
+ */
+typedef struct {
+    uint32_t src_path_offset;
+    uint16_t src_path_len;
+    uint32_t rel_path_offset;
+    uint16_t rel_path_len;
+    bool is_directory;
+    bool is_mmapped;
+    uint16_t compression_method;
+    uint16_t actual_method;
+    uint32_t crc32;
+    int64_t uncompressed_size;
+    int64_t compressed_size;
+    void* compressed_payload;
+    size_t arena_offset;
+    size_t arena_cap;
+} ttzip_compact_item_t;
+
+typedef struct {
+    ttzip_compact_item_t* items;
+    size_t count;
+    size_t capacity;
+    ttzip_path_arena_t arena;
+} ttzip_compact_item_list_t;
+
 typedef struct {
     size_t start_index;
     size_t count;

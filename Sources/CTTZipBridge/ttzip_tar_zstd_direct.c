@@ -531,7 +531,6 @@ int ttzip_extract_tar_zstd_direct_c(
 
     uint8_t tar_hdr[512];
     size_t hdr_pos = 0;
-    char current_filename[1024] = {0};
     uint64_t current_file_remaining = 0;
     uint64_t current_pad_remaining = 0;
     int current_out_fd = -1;

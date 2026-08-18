@@ -39,13 +39,23 @@ typedef struct __attribute__((aligned(64))) {
 } ttzip_deflate_fast_mf_t;
 
 /**
- * @brief Tier 3/4 Lazy Hash3 + Hash4 chained pointer match finder cache (aligned to 64-byte cache line).
+ * @brief Tier 3 Fast-Lazy 3-byte direct + 4-byte 2-way match finder cache.
+ */
+typedef struct __attribute__((aligned(64))) {
+    const uint8_t *hash3_tab[32768];
+    const uint8_t *hash4_tab[32768][2];
+} ttzip_deflate_fast_lazy_mf_t;
+
+/**
+ * @brief Tier 4 Deep-Lazy Hash3 + Hash4 chained match finder cache (192 KB compact relative indices).
  */
 typedef struct __attribute__((aligned(64))) {
     const uint8_t *hash3_tab[32768];
     const uint8_t *hash4_tab[32768];
     const uint8_t *next_tab[32768];
 } ttzip_deflate_lazy_mf_t;
+
+typedef ttzip_deflate_lazy_mf_t ttzip_deflate_deep_lazy_mf_t;
 
 /**
  * @brief Intermediate LZ77 token representing either a literal byte or a match pair.
@@ -69,12 +79,41 @@ extern const uint8_t  s_offset_extra_bits[30];
  * @brief Compression tuning options for native Deflate block compression.
  */
 typedef struct {
-    int32_t  tier_level;            /**< Compression tier (1..7). */
-    uint32_t max_chain_depth;       /**< Maximum hash chain traversal depth. */
-    uint32_t nice_match_len;        /**< Early match cutoff threshold. */
-    bool     dynamic_huffman;       /**< True to emit dynamic Huffman trees; false for static. */
-    bool     enable_history_warmup; /**< True to seed match finder with 32KB cross-tile history. */
+    int32_t  tier_level;               /**< Compression tier (1..7). */
+    uint32_t max_chain_depth;          /**< Maximum hash chain traversal depth. */
+    uint32_t nice_match_len;           /**< Early match cutoff threshold. */
+    uint32_t lookahead_steps;          /**< 0 = greedy, 1 = standard lazy, 2 = 2-step lazy. */
+    bool     skip_intermediate_hashes; /**< True to skip per-byte hash insertion in matches. */
+    bool     dynamic_huffman;          /**< True to emit dynamic Huffman trees; false for static. */
+    bool     enable_history_warmup;    /**< True to seed match finder with 32KB cross-tile history. */
 } ttzip_native_deflate_options_t;
+
+size_t ttzip_deflate_fast_lazy_find_matches(
+    ttzip_deflate_fast_lazy_mf_t *mf,
+    const uint8_t *in,
+    size_t in_size,
+    const uint8_t *history,
+    size_t history_size,
+    uint32_t max_chain_depth,
+    uint32_t nice_match_len,
+    ttzip_deflate_token_t *tokens_out,
+    size_t max_tokens,
+    ttzip_symbol_freqs_t *freqs_out
+);
+
+size_t ttzip_deflate_deep_lazy_find_matches(
+    ttzip_deflate_deep_lazy_mf_t *mf,
+    const uint8_t *in,
+    size_t in_size,
+    const uint8_t *history,
+    size_t history_size,
+    uint32_t max_chain_depth,
+    uint32_t nice_match_len,
+    uint32_t lookahead_steps,
+    ttzip_deflate_token_t *tokens_out,
+    size_t max_tokens,
+    ttzip_symbol_freqs_t *freqs_out
+);
 
 /**
  * @brief Compresses a single block or tile using the native in-process Deflate engine.

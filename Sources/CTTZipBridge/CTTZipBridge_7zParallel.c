@@ -17,17 +17,6 @@
 #include <stdio.h>
 #include <dispatch/dispatch.h>
 
-static ssize_t write_all(int fd, const void* buf, size_t count) {
-    size_t written = 0;
-    const char* ptr = (const char*)buf;
-    while (written < count) {
-        ssize_t res = write(fd, ptr + written, count - written);
-        if (res <= 0) return -1;
-        written += (size_t)res;
-    }
-    return (ssize_t)written;
-}
-
 int ttzip_7z_extract_parallel_c(
     const char* archive_path,
     const char* destination_dir,

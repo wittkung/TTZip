@@ -194,6 +194,7 @@ public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendabl
     case brotli        = "Brotli (Google)"
     case sevenZip      = "7-Zip"
     case pigz          = "pigz"
+    case minizipNg     = "minizip-ng"
     case libdeflate    = "libdeflate"
     case zopfli        = "zopfli"
     case advzip        = "advzip"
@@ -215,6 +216,7 @@ public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendabl
         case .brotli:        return "#EC4899" // Hot Pink
         case .sevenZip:      return "#D97706" // Amber / Warm Bronze
         case .pigz:          return "#059669" // Emerald Green
+        case .minizipNg:     return "#84CC16" // Lime Green / Chartreuse
         case .libdeflate:    return "#7C3AED" // Deep Purple
         case .zopfli:        return "#EA4335" // Google Red / Coral
         case .advzip:        return "#B45309" // Dark Amber
@@ -273,6 +275,8 @@ public struct SoftwareFamilyClassifier: Sendable {
             return .libdeflate
         } else if lower.contains("pigz") {
             return .pigz
+        } else if lower.contains("minizip") {
+            return .minizipNg
         } else if lower.contains("7-zip") || lower.contains("7zip") || lower.contains("7zz") || lower.contains("p7zip") {
             return .sevenZip
         } else if lower.contains("apple") || lower.contains("ditto") || lower.contains("bom") || lower.contains("archive utility") {

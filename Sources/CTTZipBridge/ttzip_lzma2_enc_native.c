@@ -382,6 +382,8 @@ int ttzip_create_7z_lzma2_native_c(
                 max_ns = blocks[b].encode_time_ns;
             }
         }
+        (void)sum_ns;
+        (void)max_ns;
     }
 
     bool compress_failed = false;

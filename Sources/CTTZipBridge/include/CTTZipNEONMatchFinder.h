@@ -196,4 +196,37 @@ static inline uint32_t ttzip_lz_hash24(uint32_t seq24, unsigned num_bits) {
     return (uint32_t)(seq24 * 0x1E35A7BDU) >> (32 - num_bits);
 }
 
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+static inline void ttzip_neon_hash4_calc(const uint8_t *in, uint32_t *h0, uint32_t *h1, uint32_t *h2, uint32_t *h3, unsigned hash_bits) {
+    uint8x16_t raw = vld1q_u8(in);
+    static const uint8_t tbl_mask[16] __attribute__((aligned(16))) = {
+        0, 1, 2, 3,
+        1, 2, 3, 4,
+        2, 3, 4, 5,
+        3, 4, 5, 6
+    };
+    uint8x16_t words = vqtbl1q_u8(raw, vld1q_u8(tbl_mask));
+    uint32x4_t seq4 = vreinterpretq_u32_u8(words);
+    uint32x4_t prod = vmulq_n_u32(seq4, 0x1E35A7BDU);
+    (void)hash_bits;
+    uint32x4_t hashes = vshrq_n_u32(prod, 17); // 32 - 15 = 17 bits shift for 15-bit table
+    *h0 = vgetq_lane_u32(hashes, 0);
+    *h1 = vgetq_lane_u32(hashes, 1);
+    *h2 = vgetq_lane_u32(hashes, 2);
+    *h3 = vgetq_lane_u32(hashes, 3);
+}
+#else
+static inline void ttzip_neon_hash4_calc(const uint8_t *in, uint32_t *h0, uint32_t *h1, uint32_t *h2, uint32_t *h3, unsigned hash_bits) {
+    uint32_t s0, s1, s2, s3;
+    memcpy(&s0, in + 0, 4);
+    memcpy(&s1, in + 1, 4);
+    memcpy(&s2, in + 2, 4);
+    memcpy(&s3, in + 3, 4);
+    *h0 = (s0 * 0x1E35A7BDU) >> (32 - hash_bits);
+    *h1 = (s1 * 0x1E35A7BDU) >> (32 - hash_bits);
+    *h2 = (s2 * 0x1E35A7BDU) >> (32 - hash_bits);
+    *h3 = (s3 * 0x1E35A7BDU) >> (32 - hash_bits);
+}
+#endif
+
 #endif // CTTZipNEONMatchFinder_h

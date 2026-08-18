@@ -391,7 +391,9 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
     write_u16_le(eocd + 20, 0);
 
     pwrite_all(out_fd, eocd, 22, (off_t)current_offset);
+    current_offset += 22;
 
+    ftruncate(out_fd, (off_t)current_offset);
     close(out_fd);
     free(offsets);
 

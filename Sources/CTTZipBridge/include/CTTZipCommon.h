@@ -141,7 +141,9 @@ static inline ssize_t ttzip_clamp_ssize(int64_t val) {
 
 typedef void (*ttzip_log_handler_t)(int level, const char* message);
 void ttzip_set_log_handler(ttzip_log_handler_t handler);
-void ttzip_log(int level, const char* fmt, ...);
+void ttzip_set_log_callback(ttzip_log_handler_t cb);
+void ttzip_log(int level, const char* fmt, ...) __attribute__((__format__(__printf__, 2, 3)));
+void ttzip_log_c(int level, const char* fmt, ...) __attribute__((__format__(__printf__, 2, 3)));
 
 /* ============================================================================
  * 6. Path and System Directory Operations

@@ -32,6 +32,7 @@ module CTTZipBridge {
     header "ttzip_huffman_inplace.h"
     header "ttzip_container_fast.h"
     header "CTTZipDiagnostics.h"
+    header "CTTZipDeflateEngine.h"
     export *
 }
 

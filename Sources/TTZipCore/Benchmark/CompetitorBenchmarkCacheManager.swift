@@ -92,12 +92,14 @@ public final class CompetitorBenchmarkCacheManager: @unchecked Sendable {
         algorithm: String,
         level: Int,
         datasetSha256: String,
+        forceRerun: Bool = false,
         runBlock: () throws -> (throughputMBs: Double, spaceSavingsPct: Double, compressedBytes: Int64, uncompressedBytes: Int64)
     ) rethrows -> ParetoPoint {
-        let isForceRerun = ProcessInfo.processInfo.environment["TTZIP_FORCE_BENCH_RERUN"] == "1"
+        let isGlobalForceRerun = ProcessInfo.processInfo.environment["TTZIP_FORCE_BENCH_RERUN"] == "1"
+        let shouldRerun = isGlobalForceRerun || forceRerun
         
         lock.lock()
-        if !isForceRerun, let entry = cacheEntries[toolId], entry.datasetSha256 == datasetSha256 {
+        if !shouldRerun, let entry = cacheEntries[toolId], entry.datasetSha256 == datasetSha256 {
             lock.unlock()
             return ParetoPoint(
                 id: entry.toolId,

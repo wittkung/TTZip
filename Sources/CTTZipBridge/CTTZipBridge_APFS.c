@@ -29,7 +29,12 @@ int ttzip_apfs_preallocate(int fd, int64_t target_size) {
     fst.fst_length = target_size;
     fst.fst_bytesalloc = 0;
     if (fcntl(fd, F_PREALLOCATE, &fst) == 0) {
-        return ftruncate(fd, target_size);
+        return 0;
+    }
+    // Fallback: If contiguous allocation fails due to fragmentation, retry non-contiguous allocation
+    fst.fst_flags = F_ALLOCATEALL;
+    if (fcntl(fd, F_PREALLOCATE, &fst) == 0) {
+        return 0;
     }
 #endif
     return ftruncate(fd, target_size);

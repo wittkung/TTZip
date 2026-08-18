@@ -28,9 +28,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# 1. 检出源码
-echo "--> Cloning libdeflate ${LIBDEFLATE_TAG}..."
-git clone --depth 1 --branch "${LIBDEFLATE_TAG}" "${LIBDEFLATE_REPO}" "${WORK_DIR}/src"
+# 1. 检出或同步源码
+if [ -d "${REPO_ROOT}/Vendor/libdeflate-upstream" ]; then
+    echo "--> Using local Vendor/libdeflate-upstream..."
+    mkdir -p "${WORK_DIR}/src"
+    cp -R "${REPO_ROOT}/Vendor/libdeflate-upstream/"* "${WORK_DIR}/src/"
+else
+    echo "--> Cloning libdeflate ${LIBDEFLATE_TAG}..."
+    git clone --depth 1 --branch "${LIBDEFLATE_TAG}" "${LIBDEFLATE_REPO}" "${WORK_DIR}/src"
+fi
 
 # 2. CMake 配置与编译 (Universal 2: arm64 + x86_64)
 echo "--> Configuring CMake build..."

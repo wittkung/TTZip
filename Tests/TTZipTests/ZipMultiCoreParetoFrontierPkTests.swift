@@ -40,10 +40,15 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
         }
 
         var zipPoints: [ParetoPoint] = []
+        var stepCounter = 1
+        let totalStepsEstimate = 23
+
+        TestLogger.atomicPrint("\n" + TestTerminalRenderer.badge(.perf) + " \(TestTerminalRenderer.ANSI.bold)[Multi-Core 18-Thread Benchmark] Starting 100MB enwik8 parallel PK...\(TestTerminalRenderer.ANSI.reset)")
 
         // 1. TTZip multi-core profiles (Tiers 0..5 live execution, Tiers 6/7 cached or forced via TTZIP_BENCH_ALL_LIVE=1).
         let datasetSha256 = fp?.sha256Hex ?? "unknown"
         let forceLiveAll = (ProcessInfo.processInfo.environment["TTZIP_BENCH_ALL_LIVE"] == "1" ||
+                            ProcessInfo.processInfo.environment["TTZIP_FORCE_RERUN_ZOPFLI"] == "1" ||
                             ProcessInfo.processInfo.environment["TTZIP_FORCE_BENCH_RERUN"] == "1")
 
         for (tierIdx, profile) in ZipCompressionProfile.allProfiles.enumerated() {
@@ -64,6 +69,17 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
                     let speed = payloadMB / durSec
                     return (throughputMBs: speed, spaceSavingsPct: savings, compressedBytes: sz, uncompressedBytes: payloadBytes)
                 }
+                let durMs = (payloadMB / point.throughputMBs) * 1000.0
+                let row = TestTerminalRenderer.renderAlignedRow(
+                    index: stepCounter,
+                    total: totalStepsEstimate,
+                    badge: .perf,
+                    target: "TTZip 18-Core",
+                    testName: "Tier \(tierIdx) (\(profile.name))",
+                    durationMs: durMs
+                )
+                TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: point.throughputMBs) + " | " + String(format: "%.2f MB", Double(point.compressedBytes)/(1024*1024)))
+                stepCounter += 1
                 zipPoints.append(point)
             } else {
                 let pth = tempDir.appendingPathComponent("ttzip_mc_\(tierIdx).zip").path
@@ -83,7 +99,16 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
                         compressedBytes: sz,
                         uncompressedBytes: payloadBytes
                     )
-                    TTLogger.debug("📊 [TTZip Tier \(tierIdx)] \(profile.name): deflateLvl=\(profile.deflateLevel), speed=\(String(format: "%.1f", speed)) MB/s, sz=\(String(format: "%.2f", Double(sz)/(1024*1024))) MB")
+                    let row = TestTerminalRenderer.renderAlignedRow(
+                        index: stepCounter,
+                        total: totalStepsEstimate,
+                        badge: .perf,
+                        target: "TTZip 18-Core",
+                        testName: "Tier \(tierIdx) (\(profile.name))",
+                        durationMs: durSec * 1000.0
+                    )
+                    TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: speed) + " | " + String(format: "%.2f MB", Double(sz)/(1024*1024)))
+                    stepCounter += 1
                     zipPoints.append(pt)
                 }
             }
@@ -131,6 +156,17 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
                     let speed = payloadMB / dur
                     return (speed, savings, sz, payloadBytes)
                 }
+                let durMs = (payloadMB / point.throughputMBs) * 1000.0
+                let row = TestTerminalRenderer.renderAlignedRow(
+                    index: stepCounter,
+                    total: totalStepsEstimate,
+                    badge: .perf,
+                    target: "pigz 18-Core",
+                    testName: label,
+                    durationMs: durMs
+                )
+                TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: point.throughputMBs) + " | " + String(format: "%.2f MB", Double(point.compressedBytes)/(1024*1024)))
+                stepCounter += 1
                 zipPoints.append(point)
             }
         }
@@ -163,13 +199,67 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
                 let speed = payloadMB / durAdv
                 return (speed, savings, szAdv, payloadBytes)
             }
+            let durMs = (payloadMB / advPoint.throughputMBs) * 1000.0
+            let row = TestTerminalRenderer.renderAlignedRow(
+                index: stepCounter,
+                total: totalStepsEstimate,
+                badge: .perf,
+                target: "AdvanceCOMP",
+                testName: "advzip -4",
+                durationMs: durMs
+            )
+            TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: advPoint.throughputMBs) + " | " + String(format: "%.2f MB", Double(advPoint.compressedBytes)/(1024*1024)))
+            stepCounter += 1
             zipPoints.append(advPoint)
         }
 
-        // 4. Compute multi-core Pareto frontier and export plot.
+        // 4. minizip-ng (/opt/homebrew/bin/minizip-ng, Levels 1, 6, 9).
+        let minizipNgPath = "/opt/homebrew/bin/minizip-ng"
+        if FileManager.default.fileExists(atPath: minizipNgPath) {
+            let mzConfigs: [(Int, String)] = [
+                (1, "minizip-ng -1 (Fast)"),
+                (6, "minizip-ng -6 (Normal)"),
+                (9, "minizip-ng -9 (Maximum)")
+            ]
+            for (lvl, label) in mzConfigs {
+                let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
+                    toolId: "minizip_ng_\(lvl)",
+                    algorithm: label,
+                    level: lvl,
+                    datasetSha256: datasetSha256
+                ) {
+                    let outPath = tempDir.appendingPathComponent("minizip_ng_\(lvl).zip").path
+                    let p = Process()
+                    p.executableURL = URL(fileURLWithPath: minizipNgPath)
+                    p.arguments = ["-\(lvl)", outPath, realSamplePath]
+                    let t0 = PlatformMonotonicTimer.nowNanoseconds()
+                    try? p.run()
+                    p.waitUntilExit()
+                    let dur = max(1e-6, Double(PlatformMonotonicTimer.nowNanoseconds() - t0) / 1_000_000_000.0)
+                    let sz = (try? FileManager.default.attributesOfItem(atPath: outPath)[.size] as? Int64) ?? 0
+                    let savings = (1.0 - Double(sz) / Double(payloadBytes)) * 100.0
+                    let speed = payloadMB / dur
+                    return (speed, savings, sz, payloadBytes)
+                }
+                let durMs = (payloadMB / point.throughputMBs) * 1000.0
+                let row = TestTerminalRenderer.renderAlignedRow(
+                    index: stepCounter,
+                    total: totalStepsEstimate,
+                    badge: .perf,
+                    target: "minizip-ng",
+                    testName: label,
+                    durationMs: durMs
+                )
+                TestLogger.atomicPrint(row + " | " + TestTerminalRenderer.formatThroughput(mbs: point.throughputMBs) + " | " + String(format: "%.2f MB", Double(point.compressedBytes)/(1024*1024)))
+                stepCounter += 1
+                zipPoints.append(point)
+            }
+        }
+
+        // 5. Compute multi-core Pareto frontier and export plot.
         let artifactPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/pareto_pk_zip_multicore.png"
         let docsPath = "docs/benchmarks/pareto_pk_zip_multicore.png"
-        let title = "ZIP Format Multi-Core Pareto Benchmark (18-Core: TTZip vs. pigz)"
+        let title = "ZIP Format Multi-Core Pareto Benchmark (18-Core: TTZip vs. pigz vs. minizip-ng)"
 
         var mutableZipPoints = zipPoints
         let paretoRes = ParetoFrontierCalculator.shared.computeParetoFrontier(points: &mutableZipPoints)

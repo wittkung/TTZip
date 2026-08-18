@@ -157,7 +157,6 @@ int ttzip_lzma2_decompress_mt_c(
 
 static char g_7zz_bin_path[1024] = "";
 static pthread_mutex_t g_7zz_path_lock = PTHREAD_MUTEX_INITIALIZER;
-static int g_dev_null_fd = -1;
 
 static const char* const SEVENZIP_CANDIDATE_PATHS[] = {
     "/opt/homebrew/bin/7zz",
@@ -167,17 +166,6 @@ static const char* const SEVENZIP_CANDIDATE_PATHS[] = {
     "/usr/local/bin/7z",
     NULL
 };
-
-static int get_dev_null_fd(void) {
-    if (g_dev_null_fd < 0) {
-        g_dev_null_fd = open("/dev/null", O_WRONLY);
-    }
-    return g_dev_null_fd;
-}
-
-static char** get_process_environ(void) {
-    return *_NSGetEnviron();
-}
 
 static char g_resolved_7zz_bin_path[1024] = "";
 static bool g_has_resolved_7zz = false;
