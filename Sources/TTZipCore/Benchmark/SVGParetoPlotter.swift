@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// 零依赖响应式矢量 SVG 生成器 (对标 Google DeepSWE / Gemini 3.7 Flash 官方帕累托图设计规范)
+/// 零依赖响应式矢量 SVG 生成器 (X 轴: 空间压缩率 %, Y 轴: 吞吐速度 MB/s 对数刻度)
 public final class SVGParetoPlotter: @unchecked Sendable {
     public static let shared = SVGParetoPlotter()
     private init() {}
@@ -27,44 +27,44 @@ public final class SVGParetoPlotter: @unchecked Sendable {
         let plotW = max(200.0, width - marginLeft - marginRight)
         let plotH = max(150.0, height - marginTop - marginBottom)
 
-        // 1. 自适应视口动态步长与边界计算
+        // 1. 自适应 X 轴（压缩率 %）与 Y 轴（吞吐速度 MB/s 对数）
         let allSavings = result.allPoints.map { $0.spaceSavingsPct }
         let allSpeeds = result.allPoints.map { $0.throughputMBs }
 
-        let minY = allSavings.min() ?? 0.0
-        let maxY = allSavings.max() ?? 100.0
-        let minX = allSpeeds.min() ?? 10.0
-        let maxX = allSpeeds.max() ?? 10000.0
+        let minX = allSavings.min() ?? 80.0
+        let maxX = allSavings.max() ?? 100.0
+        let minY = allSpeeds.min() ?? 10.0
+        let maxY = allSpeeds.max() ?? 10000.0
 
-        let span = max(0.1, maxY - minY)
-        let yStep: Double
-        if span <= 8.0 {
-            yStep = 2.0
-        } else if span <= 25.0 {
-            yStep = 5.0
-        } else if span <= 55.0 {
-            yStep = 10.0
+        let spanX = max(0.1, maxX - minX)
+        let xStep: Double
+        if spanX <= 8.0 {
+            xStep = 2.0
+        } else if spanX <= 25.0 {
+            xStep = 5.0
+        } else if spanX <= 55.0 {
+            xStep = 10.0
         } else {
-            yStep = 20.0
+            xStep = 20.0
         }
 
-        let padBottom = max(yStep, span * 0.15)
-        let domainMinY = max(0.0, floor((minY - padBottom) / yStep) * yStep)
-        let domainMaxY = maxY >= 85.0 ? 100.0 : min(100.0, ceil((maxY + yStep * 0.5) / yStep) * yStep)
+        let padLeft = max(xStep, spanX * 0.15)
+        let domainMinX = max(0.0, floor((minX - padLeft) / xStep) * xStep)
+        let domainMaxX = maxX >= 85.0 ? 100.0 : min(100.0, ceil((maxX + xStep * 0.5) / xStep) * xStep)
 
-        let minLogX = max(0.5, floor(log10(max(1.0, minX))))
-        let maxLogX = min(5.5, ceil(log10(max(10.0, maxX))) + 0.3)
+        let minLogY = max(0.5, floor(log10(max(1.0, minY))))
+        let maxLogY = min(5.5, ceil(log10(max(10.0, maxY))) + 0.3)
 
-        func mapX(_ val: Double) -> Double {
-            let clamped = max(pow(10.0, minLogX), min(val, pow(10.0, maxLogX)))
-            let logV = log10(clamped)
-            let norm = (logV - minLogX) / (maxLogX - minLogX)
+        func mapX(_ savingsVal: Double) -> Double {
+            let clamped = max(domainMinX, min(savingsVal, domainMaxX))
+            let norm = (clamped - domainMinX) / max(1e-6, domainMaxX - domainMinX)
             return marginLeft + norm * plotW
         }
 
-        func mapY(_ val: Double) -> Double {
-            let clamped = max(domainMinY, min(val, domainMaxY))
-            let norm = (clamped - domainMinY) / max(1e-6, domainMaxY - domainMinY)
+        func mapY(_ speedVal: Double) -> Double {
+            let clamped = max(pow(10.0, minLogY), min(speedVal, pow(10.0, maxLogY)))
+            let logV = log10(clamped)
+            let norm = (logV - minLogY) / (maxLogY - minLogY)
             return (height - marginBottom) - norm * plotH
         }
 
@@ -95,18 +95,8 @@ public final class SVGParetoPlotter: @unchecked Sendable {
 
         """
 
-        // 3. 水平网格线与 Y 轴刻度
-        for yVal in stride(from: domainMinY, through: domainMaxY, by: yStep) {
-            let py = mapY(yVal)
-            svg += """
-              <line x1="\(Int(marginLeft))" y1="\(String(format: "%.1f", py))" x2="\(Int(marginLeft + plotW))" y2="\(String(format: "%.1f", py))" class="grid-line"/>
-              <text x="\(Int(marginLeft - 16))" y="\(String(format: "%.1f", py + 4))" text-anchor="end" class="axis-text">\(String(format: "%.0f%%", yVal))</text>
-
-            """
-        }
-
-        // 4. X 轴刻度线与标签
-        let candidateTicks: [(val: Double, label: String)] = [
+        // 3. 水平网格线与 Y 轴速度刻度
+        let candidateYTicks: [(val: Double, label: String)] = [
             (10.0, "10 MB/s"),
             (50.0, "50 MB/s"),
             (100.0, "100 MB/s"),
@@ -117,23 +107,51 @@ public final class SVGParetoPlotter: @unchecked Sendable {
             (10000.0, "10,000 MB/s")
         ]
 
-        for tick in candidateTicks {
+        for tick in candidateYTicks {
             let logVal = log10(tick.val)
-            if logVal >= minLogX && logVal <= maxLogX {
-                let px = mapX(tick.val)
+            if logVal >= minLogY && logVal <= maxLogY {
+                let py = mapY(tick.val)
                 svg += """
-                  <text x="\(String(format: "%.1f", px))" y="\(Int(height - marginBottom + 30))" text-anchor="middle" class="axis-text">\(tick.label)</text>
+                  <line x1="\(Int(marginLeft))" y1="\(String(format: "%.1f", py))" x2="\(Int(marginLeft + plotW))" y2="\(String(format: "%.1f", py))" class="grid-line"/>
+                  <text x="\(Int(marginLeft - 16))" y="\(String(format: "%.1f", py + 4))" text-anchor="end" class="axis-text">\(tick.label)</text>
 
                 """
             }
         }
 
-        // 5. 软件家族聚类与 Fritsch-Carlson 样条曲线生成
-        let trajectories = SoftwareFamilyClassifier.groupTrajectories(from: result.allPoints)
+        // 4. X 轴（空间节省率 %）刻度线与标签
+        for xVal in stride(from: domainMinX, through: domainMaxX, by: xStep) {
+            let px = mapX(xVal)
+            svg += """
+              <text x="\(String(format: "%.1f", px))" y="\(Int(height - marginBottom + 30))" text-anchor="middle" class="axis-text">\(String(format: "%.0f%%", xVal))</text>
+
+            """
+        }
+
+        // 5. 软件家族聚类与 Fritsch-Carlson 样条曲线生成 (按 X 轴压缩率升序排列)
+        var groupedPoints: [SoftwareFamily: [ParetoPoint]] = [:]
+        for p in result.allPoints {
+            let fam = SoftwareFamilyClassifier.classify(algorithm: p.algorithm)
+            groupedPoints[fam, default: []].append(p)
+        }
+
+        var trajectories: [SoftwareFamilyTrajectory] = []
+        for fam in SoftwareFamily.allCases {
+            if var famPoints = groupedPoints[fam], !famPoints.isEmpty {
+                famPoints.sort { (a, b) -> Bool in
+                    if a.spaceSavingsPct != b.spaceSavingsPct {
+                        return a.spaceSavingsPct < b.spaceSavingsPct
+                    }
+                    return a.throughputMBs < b.throughputMBs
+                }
+                let heroPill = fam.isHero ? (famPoints.max(by: { $0.throughputMBs < $1.throughputMBs })) : nil
+                trajectories.append(SoftwareFamilyTrajectory(family: fam, points: famPoints, heroPillPoint: heroPill))
+            }
+        }
 
         // 5.1 绘制 TTZip Hero 半透明演进光晕带 (DeepSWE Ribbon Beam)
         for traj in trajectories where traj.family.isHero {
-            let pts = traj.points.map { (x: mapX($0.throughputMBs), y: mapY($0.spaceSavingsPct)) }
+            let pts = traj.points.map { (x: mapX($0.spaceSavingsPct), y: mapY($0.throughputMBs)) }
             if pts.count >= 2 {
                 let segments = FritschCarlsonSplineCalculator.calculateBezierSegments(points: pts)
                 var pathStr = "M \(String(format: "%.1f", pts[0].x)) \(String(format: "%.1f", pts[0].y)) "
@@ -149,7 +167,7 @@ public final class SVGParetoPlotter: @unchecked Sendable {
 
         // 5.2 绘制各软件家族主轨迹实线 (Solid Family Curves)
         for traj in trajectories {
-            let pts = traj.points.map { (x: mapX($0.throughputMBs), y: mapY($0.spaceSavingsPct)) }
+            let pts = traj.points.map { (x: mapX($0.spaceSavingsPct), y: mapY($0.throughputMBs)) }
             if pts.count >= 2 {
                 let segments = FritschCarlsonSplineCalculator.calculateBezierSegments(points: pts)
                 var pathStr = "M \(String(format: "%.1f", pts[0].x)) \(String(format: "%.1f", pts[0].y)) "
@@ -166,17 +184,17 @@ public final class SVGParetoPlotter: @unchecked Sendable {
 
         // 6. 绘制散点与药丸卡片
         for p in result.allPoints {
-            let px = mapX(p.throughputMBs)
-            let py = mapY(p.spaceSavingsPct)
+            let px = mapX(p.spaceSavingsPct)
+            let py = mapY(p.throughputMBs)
             let fam = SoftwareFamilyClassifier.classify(algorithm: p.algorithm)
 
+            let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
             let cleanName: String
             if fam == .sevenZip {
                 cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02", with: "7-zip").lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
             } else if fam == .appleNative {
                 cleanName = "apple-ditto-zip"
             } else if fam == .ttzip {
-                let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
                 if p.algorithm.contains("TAR.ZST") {
                     cleanName = "ttzip-tar-zst (\(speedStr))"
                 } else if p.algorithm.contains("LZ4") {
@@ -235,7 +253,7 @@ public final class SVGParetoPlotter: @unchecked Sendable {
 
         // 7. 底部居中 X 轴标题与数据源声明
         svg += """
-          <text x="\(Int(width / 2))" y="\(Int(height - marginBottom + 65))" text-anchor="middle" font-size="14" font-weight="500" fill="#475569">Compression Throughput (MB/s, Log Scale)</text>
+          <text x="\(Int(width / 2))" y="\(Int(height - marginBottom + 65))" text-anchor="middle" font-size="14" font-weight="500" fill="#475569">Space Savings Ratio (%, Higher is Better)</text>
           <text x="\(Int(width / 2))" y="\(Int(height - 25))" text-anchor="middle" font-size="12" fill="#94A3B8">Source: TTZip Benchmark Engine · 100MB Wikipedia Corpus (enwik8) · Apple Silicon M-Series (mach_absolute_time)</text>
         </svg>
         """
