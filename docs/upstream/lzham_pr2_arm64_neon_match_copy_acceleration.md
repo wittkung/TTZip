@@ -3,7 +3,7 @@
 **Target Repository**: `richgel999/lzham_codec`  
 **Target Branch**: `master`  
 **Working Branch**: `feat/arm64-neon-match-copy-acceleration`  
-**Commit**: `70d6ba6` (`feat(decomp): add ARM64 NEON vectorized match copy fast-path`)  
+**Commit**: `d6ef429` (`feat(decomp): add ARM64 NEON vectorized match copy fast-path`)  
 
 ---
 
@@ -40,7 +40,9 @@ Benchmarked on Apple M-series (ARM64, 3.2 GHz) comparing baseline scalar copy vs
 
 ---
 
-### Compatibility
+### Verification & Compatibility
 
-- Zero changes to bitstream format or compression ratios.
-- Pure C++03 / C11 compatible without external dependencies.
+- [x] **macOS 14.0+ (Apple Silicon arm64, AppleClang)**: Verified bit-exact decompression via `lzhamtest -v`.
+- [x] **Linux (AArch64 / ARMv8-A)**: Verified NEON intrinsics compile cleanly with GCC and Clang.
+- [x] **x86 / Non-ARM Platforms**: Verified 100% transparent fallback to original `LZHAM_MEMCPY` path.
+- [x] **Zero Bitstream Format Changes**: Compression ratio and archive compatibility remain 100% untouched.
