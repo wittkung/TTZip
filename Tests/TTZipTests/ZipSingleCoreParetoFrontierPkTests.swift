@@ -43,7 +43,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
             defer { outBuf.deallocate() }
 
-            if tierIdx >= 5 {
+            if profile.zopfliIterations > 0 {
                 let forceRerunHigh = ProcessInfo.processInfo.environment["TTZIP_FORCE_RERUN_ZOPFLI"] == "1" || ProcessInfo.processInfo.environment["TTZIP_FORCE_RERUN_TTZIP_HIGH"] == "1"
                 let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
                     toolId: "ttzip_sc_\(tierIdx)",
