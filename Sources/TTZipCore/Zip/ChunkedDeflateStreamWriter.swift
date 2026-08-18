@@ -1,8 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 大文件自适应分块流式 DEFLATE 写入器 (Adaptive Chunked DEFLATE Streaming Pipeline)
-/// 当文件体积 > 256MB 时自动切入 1MB 分块流式多线程管道，将进程常驻内存严格约束在 <= 64MB。
+/// Adaptive chunked DEFLATE streaming pipeline writer.
+///
+/// Streams files > 256MB in 1MB chunks to constrain resident memory <= 64MB.
 public final class ChunkedDeflateStreamWriter: @unchecked Sendable {
     public static let adaptiveThresholdBytes: Int64 = 256 * 1024 * 1024 // 256MB
     
@@ -24,7 +32,7 @@ public final class ChunkedDeflateStreamWriter: @unchecked Sendable {
         close()
     }
     
-    /// 流式写入数据块
+    /// Writes a data buffer into the streaming pipeline.
     public func write(data: Data) -> Bool {
         guard let handle = streamHandle, !isClosed, !data.isEmpty else {
             return !isClosed
@@ -37,7 +45,7 @@ public final class ChunkedDeflateStreamWriter: @unchecked Sendable {
         }
     }
     
-    /// 流式写入裸指针缓冲
+    /// Writes raw pointer buffer into the streaming pipeline.
     public func write(buffer: UnsafeRawPointer, count: Int) -> Bool {
         guard let handle = streamHandle, !isClosed, count > 0 else {
             return !isClosed
@@ -46,7 +54,7 @@ public final class ChunkedDeflateStreamWriter: @unchecked Sendable {
         return written == Int64(count)
     }
     
-    /// 结束流式压缩并返回压缩后总字节数与全局 CRC-32
+    /// Finalizes the stream and returns total compressed bytes and CRC-32 checksum.
     public func finish() -> (totalCompressed: UInt64, finalCrc32: UInt32)? {
         guard let handle = streamHandle, !isClosed else { return nil }
         var totalComp: UInt64 = 0
@@ -59,7 +67,7 @@ public final class ChunkedDeflateStreamWriter: @unchecked Sendable {
         return (totalCompressed: totalComp, finalCrc32: finalCrc)
     }
     
-    /// 销毁并回收流式压缩器资源
+    /// Closes and releases the chunked stream handle.
     public func close() {
         guard !isClosed else { return }
         isClosed = true

@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file CTTZipDiagnostics.h
+ * @brief Diagnostic telemetry, crash site recording, and signal handling.
+ */
+
 #ifndef CTTZIPDIAGNOSTICS_H
 #define CTTZIPDIAGNOSTICS_H
 
@@ -29,4 +41,4 @@ void ttzip_install_signal_handlers(void);
  */
 int ttzip_err_combine(int err1, int err2);
 
-#endif
+#endif // CTTZIPDIAGNOSTICS_H

@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// TTZip 商业化授权管理与 Pro 功能门控模块
+/// Licensing manager and Pro feature gatekeeper.
 public final class LicenseManager: @unchecked Sendable {
     public static let shared = LicenseManager()
     
@@ -42,7 +49,7 @@ public final class LicenseManager: @unchecked Sendable {
         }
     }
     
-    /// 加载当前存储的授权信息
+    /// Loads stored license record from preferences.
     public func loadLicense() {
         guard let data = UserDefaults.standard.data(forKey: userDefaultsKey),
               let info = try? JSONDecoder().decode(LicenseInfo.self, from: data) else {
@@ -52,11 +59,10 @@ public final class LicenseManager: @unchecked Sendable {
         currentLicense = info
     }
     
-    /// 激活商业授权密钥 (格式校验: AURA-XXXX-XXXX-XXXX)
+    /// Activates a license key with format validation (AURA-XXXX-XXXX-XXXX).
     public func activate(key: String, registeredTo: String = "Valued Customer") -> Bool {
         let trimmedKey = key.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         
-        // 校验授权密钥校验码格式规则
         guard validateKeyFormat(trimmedKey) else {
             return false
         }
@@ -85,19 +91,19 @@ public final class LicenseManager: @unchecked Sendable {
         set { testSimulationLock.withLock { _simulateFreeTierInTests = newValue } }
     }
     
-    /// 还原授权为免费版
+    /// Deactivates and resets license status back to Free Tier.
     public func deactivate() {
         UserDefaults.standard.removeObject(forKey: userDefaultsKey)
         currentLicense = nil
     }
     
-    /// 获取当前授权类型
+    /// Current active license tier.
     public var currentType: LicenseType {
         if LicenseManager.simulateFreeTierInTests { return .free }
         return currentLicense?.type ?? (isPro ? .proPersonal : .free)
     }
     
-    /// 是否已激活正式授权
+    /// Whether Pro tier features are active.
     public var isPro: Bool {
         #if MAS_BUILD
         return true

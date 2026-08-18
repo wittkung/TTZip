@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_7z_kdf_arm64.h
+ * @brief ARMv8 Cryptographic Extensions accelerated 7Z SHA-256 key derivation.
+ */
+
 #ifndef TTZIP_7Z_KDF_ARM64_H
 #define TTZIP_7Z_KDF_ARM64_H
 
@@ -9,7 +21,7 @@
 extern "C" {
 #endif
 
-// 7z AES-256 加密会话结构体 (只读共享，杜绝多文件重复派生)
+// 7Z AES-256 Crypto Session Struct (Read-only shared across threads)
 typedef struct {
     bool     is_active;
     uint8_t  aes_key[32];
@@ -17,8 +29,6 @@ typedef struct {
     uint32_t num_cycles_power;
 } ttzip_7z_crypto_session_t;
 
-// ARMv8 Cryptographic Extensions 加速的 7z SHA-256 KDF 算法
-// 524,288 轮迭代耗时从 630ms 降低至 ~10ms
 int ttzip_7z_kdf_sha256_armv8(
     const char* password,
     const uint8_t* salt,
@@ -27,7 +37,6 @@ int ttzip_7z_kdf_sha256_armv8(
     uint8_t out_key[32]
 );
 
-// 初始化 7z 加密会话
 int ttzip_7z_crypto_session_init(
     ttzip_7z_crypto_session_t* session,
     const char* password,

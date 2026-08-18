@@ -1,23 +1,30 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 6 大标准分层测试体系枚举 (Tier 0 - Tier 5)
+/// 6-tier standardized test hierarchy (Tier 0 through Tier 5).
 public enum TestTier: Int, CaseIterable, Identifiable, Sendable, Comparable {
-    /// Tier 0: 纯内存微单元测试 (SIMD、算法、模式、快速单测，<= 5ms)
+    /// Tier 0: In-memory micro unit tests (SIMD, algorithms, design patterns, <= 5ms).
     case tier0 = 0
     
-    /// Tier 1: 格式契约与集成往返测试 (16 种格式编码/解码往返、AES-256 加密往返)
+    /// Tier 1: Format contracts and integration roundtrip tests (16 formats, AES-256 roundtrip).
     case tier1 = 1
     
-    /// Tier 2: 系统级差分预言机与黄金缺陷语料库测试 (/usr/bin/tar、/usr/bin/unzip、.uu 语料)
+    /// Tier 2: System-level differential oracle and golden corpus tests (/usr/bin/tar, /usr/bin/unzip, .uu corpus).
     case tier2 = 2
     
-    /// Tier 3: 全格式 262 维度历史最优性能与吞吐硬门禁 (严格对标 604d44d 最优基线)
+    /// Tier 3: 262-dimension full-format peak throughput regression gates (strictly matching 604d44d baseline).
     case tier3 = 3
     
-    /// Tier 4: 崩溃现场优先落盘变异模糊测试 (Fuzzing、畸变包防御)
+    /// Tier 4: Crash-first fuzzing and mutation testing against malformed archives.
     case tier4 = 4
     
-    /// Tier 5: 1GB/2GB 巨型分卷高熵高压压力测试与竞品 1v1 PK
+    /// Tier 5: 1GB/2GB multi-volume high-entropy stress testing and competitor 1v1 PK.
     case tier5 = 5
     
     public var id: Int { rawValue }

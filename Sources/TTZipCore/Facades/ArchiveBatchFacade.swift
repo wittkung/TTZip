@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 批量压缩任务参数包装
+/// Batch compression task specification.
 public struct BatchCompressTask: Identifiable, Sendable {
     public let id: UUID
     public let inputs: [String]
@@ -29,7 +36,7 @@ public struct BatchCompressTask: Identifiable, Sendable {
     }
 }
 
-/// 批量解压任务参数包装
+/// Batch extraction task specification.
 public struct BatchExtractTask: Identifiable, Sendable {
     public let id: UUID
     public let archivePath: String
@@ -49,7 +56,7 @@ public struct BatchExtractTask: Identifiable, Sendable {
     }
 }
 
-/// 批量任务执行统一结果
+/// Outcome payload for a batch task execution.
 public struct BatchTaskResult: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let success: Bool
@@ -72,7 +79,7 @@ public struct BatchTaskResult: Identifiable, Sendable, Equatable {
     }
 }
 
-/// 批处理外观接口协议
+/// Batch processing facade protocol.
 public protocol ArchiveBatchFacading: Sendable {
     func batchCompress(
         tasks: [BatchCompressTask],
@@ -87,7 +94,6 @@ public protocol ArchiveBatchFacading: Sendable {
         progress: (@Sendable (Int, Int) -> Void)?
     ) async -> [BatchTaskResult]
     
-    // MARK: - 【3.4 命令模式 (Command Pattern)】基于 MacroArchiveCommand 的批处理与自动回滚支持
     func batchExecuteMacro(
         commands: [ArchiveCommandProtocol],
         description: String?
@@ -102,7 +108,6 @@ public protocol ArchiveBatchFacading: Sendable {
         autoVaultUnlock: Bool
     ) async throws -> CommandResult
     
-    // MARK: - 【3.5 状态模式 (State Pattern)】批处理状态机管理与批量控制 API
     func getTaskStateMachine(id: UUID) -> ArchiveTaskStateMachine?
     func pauseAllTasks()
     func resumeAllTasks()
@@ -164,9 +169,7 @@ extension ArchiveBatchFacading {
     }
 }
 
-
-/// 【2.5 外观模式 (Facade Pattern)】批处理与并行任务调度门面 (`ArchiveBatchFacade`)
-/// 屏蔽 UI 拖拽多文件归档、批量解压并发控制与 TaskGroup 并行调度的复杂编排
+/// Unified batch operations facade orchestrating parallel TaskGroups, transactional macro commands, and state machines.
 public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable {
     public static let shared = ArchiveBatchFacade()
     
@@ -182,7 +185,7 @@ public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable
         self.engineFacade = engineFacade
     }
     
-    // MARK: - 【3.5 状态模式 (State Pattern)】批处理状态机与批量控制 API
+    // MARK: - State Machine and Batch Control
     
     public func getTaskStateMachine(id: UUID) -> ArchiveTaskStateMachine? {
         batchLock.lock()
@@ -226,7 +229,7 @@ public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable
         return sm
     }
     
-    // MARK: - 1. 批量并行归档压缩 (Batch Compress API)
+    // MARK: - Batch Parallel Compression
     
     public func batchCompress(
         tasks: [BatchCompressTask],
@@ -243,7 +246,6 @@ public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable
             var submitted = 0
             var completed = 0
             
-            // 初始化首批并发任务
             for _ in 0..<min(concurrency, total) {
                 if Task.isCancelled { break }
                 let task = tasks[submitted]
@@ -330,7 +332,7 @@ public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable
         }
     }
     
-    // MARK: - 2. 批量并行归档解压 (Batch Extract API)
+    // MARK: - Batch Parallel Extraction
     
     public func batchExtract(
         tasks: [BatchExtractTask],
@@ -432,14 +434,14 @@ public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable
         }
     }
     
-    // MARK: - 【3.4 命令模式 (Command Pattern)】事务型宏命令批处理
+    // MARK: - Transactional Macro Batch Operations
     
     public func batchExecuteMacro(
         commands: [ArchiveCommandProtocol],
         description: String? = nil
     ) async throws -> CommandResult {
         let macro = MacroArchiveCommand(
-            description: description ?? "事务型批量任务 (包含 \(commands.count) 个子步骤)",
+            description: description ?? "Transactional batch task (\(commands.count) sub-steps)",
             commands: commands
         )
         return try await engineFacade.executeCommand(macro)
@@ -459,7 +461,7 @@ public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable
                 engineFacade: self.engineFacade
             )
         }
-        return try await batchExecuteMacro(commands: commands, description: "事务型批量打包压缩 (\(tasks.count) 个任务)")
+        return try await batchExecuteMacro(commands: commands, description: "Transactional batch compression (\(tasks.count) tasks)")
     }
     
     public func batchExtractTransactional(
@@ -475,7 +477,6 @@ public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable
                 engineFacade: self.engineFacade
             )
         }
-        return try await batchExecuteMacro(commands: commands, description: "事务型批量解压缩 (\(tasks.count) 个任务)")
+        return try await batchExecuteMacro(commands: commands, description: "Transactional batch extraction (\(tasks.count) tasks)")
     }
 }
-

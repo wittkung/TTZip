@@ -162,14 +162,14 @@ final class MediatorPatternTests: XCTestCase {
         wait(for: [exp], timeout: 3.0)
         XCTAssertTrue(retryCalled)
         
-        // 检查中介者自动化流水线日志
+        // Check mediator automation pipeline logs
         let logs = mediator.logs
-        XCTAssertTrue(logs.contains(where: { $0.contains("Step 1: 解压失败需要密码") }))
-        XCTAssertTrue(logs.contains(where: { $0.contains("Step 2: 密码库成功检索到合适口令") }))
-        XCTAssertTrue(logs.contains(where: { $0.contains("Step 3: 密码已解锁 -> 触发重试解压") }))
+        XCTAssertTrue(logs.contains(where: { $0.contains("Step 1: Extraction failed") }))
+        XCTAssertTrue(logs.contains(where: { $0.contains("Step 2: Password") }))
+        XCTAssertTrue(logs.contains(where: { $0.contains("Step 3: Password unlocked") }))
     }
     
-    // MARK: - 5. Core 引擎安全拦截与临时文件清理闭环测试
+    // MARK: - 5. Core engine security scan and temp cleanup flow test
     func testCoreEngineSecurityScanAndTempCleanupFlow() {
         let mediator = CoreEngineMediator.shared
         let auditComp = MockMediatorComponent(componentId: "AuditComp")
@@ -186,9 +186,9 @@ final class MediatorPatternTests: XCTestCase {
         
         XCTAssertTrue(cleanupHappened)
         let logs = mediator.logs
-        XCTAssertTrue(logs.contains(where: { $0.contains("Step 5: 解压成功") }))
-        XCTAssertTrue(logs.contains(where: { $0.contains("Step 6: 安全扫描完成") }))
-        XCTAssertTrue(logs.contains(where: { $0.contains("Step 7: 临时文件清理完毕") }))
+        XCTAssertTrue(logs.contains(where: { $0.contains("Step 5: Extraction succeeded") }))
+        XCTAssertTrue(logs.contains(where: { $0.contains("Step 6: Security scan completed") }))
+        XCTAssertTrue(logs.contains(where: { $0.contains("Step 7: Temporary cleanup completed") }))
     }
     
     // MARK: - 6. 100+ 高并发线程下事件中介派发的线程安全性测试 (Zero Deadlock)

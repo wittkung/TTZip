@@ -1,14 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 【3.6 模板方法模式 (Template Method Pattern)】7Z 格式特化模板
-/// 实现 Solid 固实块解析、7z CRC32 魔数与 Signature 校验、分卷拼装
+/// Specialized 7-Zip format workflow template (Template Method Pattern).
+/// Handles solid block stream decoding, 7z signature and CRC32 verification, and split-volume assembly.
 public final class SevenZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @unchecked Sendable {
     public override init() {
         super.init()
     }
 
-    // MARK: - Step 1: Hook 钩子 (前置校验)
+    // MARK: - Step 1: Pre-execution Validation Hook
     public override func preExecutionCheck(context: ArchiveTemplateContext) throws {
         try super.preExecutionCheck(context: context)
         if context.operation == .extract || context.operation == .inspect {
@@ -20,8 +27,7 @@ public final class SevenZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @un
         }
     }
 
-    // MARK: - Step 3: 原语步骤 (执行核心 7Z 算法)
-    // MARK: - Step 3: 原语步骤 (执行核心 7Z 算法)
+    // MARK: - Step 3: Core Algorithm Primitive
     public override func executeCoreAlgorithm(context: ArchiveTemplateContext) throws -> WorkflowResult {
         switch context.operation {
         case .compress:
@@ -60,7 +66,6 @@ public final class SevenZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @un
         case .extract:
             let pathLower = context.archivePath.lowercased()
             if pathLower.hasSuffix(".001") {
-                // 分卷拼装
                 let joinedTemp = (context.tempDir as NSString?)?.appendingPathComponent("joined_\(UUID().uuidString).7z") ?? FileManager.default.temporaryDirectory.appendingPathComponent("joined_\(UUID().uuidString).7z").path
                 defer { try? FileManager.default.removeItem(atPath: joinedTemp) }
                 let helperExtractor = ArchiveExtractor(targetFormat: .sevenZip)
@@ -150,7 +155,7 @@ public final class SevenZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @un
         }
     }
 
-    // MARK: - Step 4: Hook 钩子 (校验 7z 魔数 7z\xBC\xAF\x27\x1C 与 CRC32 Header)
+    // MARK: - Step 4: Output Integrity Hook (Validates 7z magic bytes 0x37 0x7A 0xBC 0xAF 0x27 0x1C)
     public override func verifyOutputIntegrity(context: ArchiveTemplateContext, result: inout WorkflowResult) throws {
         try super.verifyOutputIntegrity(context: context, result: &result)
 
@@ -163,7 +168,6 @@ public final class SevenZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @un
                 throw ArchiveError.readFailed(code: -504)
             }
 
-            // 7z magic bytes: '7' 'z' 0xBC 0xAF 0x27 0x1C
             let is7zMagic = (data[0] == 0x37 && data[1] == 0x7A && data[2] == 0xBC && data[3] == 0xAF && data[4] == 0x27 && data[5] == 0x1C)
             guard is7zMagic else {
                 throw ArchiveError.readFailed(code: -505)

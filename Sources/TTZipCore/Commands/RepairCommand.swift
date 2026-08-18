@@ -1,7 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档修复具体命令 (Concrete Command for Repair)
-/// 封装归档包扫描与修复逻辑；支持撤销清理修复产物及还原原始损坏文件备份
+/// Concrete command encapsulating archive scanning and recovery with transactional rollback.
 public final class RepairCommand: ArchiveCommandProtocol, @unchecked Sendable {
     public let commandId: String
     public let description: String
@@ -29,7 +35,7 @@ public final class RepairCommand: ArchiveCommandProtocol, @unchecked Sendable {
         self.engineFacade = engineFacade
         
         let file = (damagedPath as NSString).lastPathComponent
-        self.description = description ?? "修复损坏归档包 [\(file)]"
+        self.description = description ?? "Repair damaged archive [\(file)]"
     }
     
     deinit {
@@ -40,7 +46,6 @@ public final class RepairCommand: ArchiveCommandProtocol, @unchecked Sendable {
         let startTime = CFAbsoluteTimeGetCurrent()
         let fm = FileManager.default
         
-        // 1. 如果修复输出目标文件已存在或覆盖原文件，先进行备份
         let backupPathCandidate = "\(outputPath).bak_\(UUID().uuidString)"
         var backupMade: String? = nil
         if fm.fileExists(atPath: outputPath) {
@@ -48,7 +53,6 @@ public final class RepairCommand: ArchiveCommandProtocol, @unchecked Sendable {
             backupMade = backupPathCandidate
         }
         
-        // 2. 执行归档修复引擎（若引擎抛错，立刻清理刚才创建的备份文件，防止磁盘残留！）
         let recoveredCount: Int
         do {
             recoveredCount = try await engineFacade.repairArchive(damagedPath: damagedPath, outputPath: outputPath)
@@ -77,7 +81,7 @@ public final class RepairCommand: ArchiveCommandProtocol, @unchecked Sendable {
         return CommandResult(
             commandId: commandId,
             success: true,
-            message: "归档包修复成功，恢复了 \(recoveredCount) 个数据块",
+            message: "Archive repaired successfully, recovered \(recoveredCount) data blocks",
             artifactsCreated: artifacts,
             backupPaths: backupDict,
             executionDuration: duration,
@@ -88,19 +92,17 @@ public final class RepairCommand: ArchiveCommandProtocol, @unchecked Sendable {
     public func undo() async throws {
         let (executed, artifacts, backup) = getUndoStateSnapshot()
         guard executed else {
-            throw CommandError.invalidState(reason: "修复命令尚未执行，无法撤销")
+            throw CommandError.invalidState(reason: "Repair command has not been executed; cannot undo.")
         }
         
         let fm = FileManager.default
         
-        // 1. 清理修复后生成的文件
         for path in artifacts {
             if fm.fileExists(atPath: path) {
                 try? fm.removeItem(atPath: path)
             }
         }
         
-        // 2. 还原备份
         if let backup = backup, fm.fileExists(atPath: backup) {
             if fm.fileExists(atPath: outputPath) {
                 try? fm.removeItem(atPath: outputPath)
@@ -108,7 +110,7 @@ public final class RepairCommand: ArchiveCommandProtocol, @unchecked Sendable {
             do {
                 try fm.moveItem(atPath: backup, toPath: outputPath)
             } catch {
-                throw CommandError.undoFailed(reason: "修复备份还原失败: \(error.localizedDescription)")
+                throw CommandError.undoFailed(reason: "Failed to restore original backup during repair undo: \(error.localizedDescription)")
             }
         }
         
@@ -126,8 +128,7 @@ public final class RepairCommand: ArchiveCommandProtocol, @unchecked Sendable {
         }
     }
     
-    // MARK: - 内部锁辅助方法
-
+    // MARK: - Internal Synchronization Helpers
     
     private func saveExecutionState(artifacts: [String], backupPath: String?) {
         lock.lock()

@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 主页与资源解压面板容器
+/// Home explorer container holding toolbar header and directory browser.
 public struct HomeExplorerContainerView: View {
     @ObservedObject public var viewModel: AppViewState
     public let isRightSidebarVisible: Bool
@@ -13,28 +20,26 @@ public struct HomeExplorerContainerView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header 栏 - 顶部对齐高度 52pt
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("EXPLORER")
                         .font(.system(size: 9, weight: .bold, design: .serif))
                         .tracking(2)
                         .foregroundStyle(TTZipTheme.kintsugiGold)
-                    Text("资源文件浏览器")
+                    Text("File Explorer")
                         .font(.system(size: 16, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                 }
                 
                 Spacer()
                 
-                // 根目录授权按钮
                 Button(action: {
                     RootFolderAccessManager.shared.requestRootAccess(for: RootFolderAccessManager.shared.highestRootURL(for: viewModel.currentDirectory))
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "lock.open.fill")
                             .font(.system(size: 9, weight: .bold))
-                        Text("根目录授权")
+                        Text("Root Access")
                             .font(.system(size: 10, weight: .semibold))
                     }
                     .foregroundStyle(TTZipTheme.kintsugiGold)
@@ -44,9 +49,8 @@ public struct HomeExplorerContainerView: View {
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .help("一次性授权最上层根目录，此后上下层目录无缝切换无需重复授权")
+                .help("Grant root access to parent directory to browse without sandbox prompts")
                 
-                // 路径 Breadcrumb 动态标牌
                 HStack(spacing: 4) {
                     Image(systemName: "folder.fill")
                         .font(.system(size: 10))
@@ -63,7 +67,6 @@ public struct HomeExplorerContainerView: View {
             .padding(.horizontal, 20)
             .frame(height: 52)
             
-            // 统一置顶分割线 (金缮金强调线对齐)
             Rectangle()
                 .fill(TTZipTheme.kintsugiGold)
                 .frame(height: 1.5)

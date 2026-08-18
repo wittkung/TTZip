@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import Security
 import LocalAuthentication
 import CTTZipBridge
 
-// MARK: - PasswordVaultManager 持久化、AES-GCM 加密与 Keychain 扩展
+// MARK: - PasswordVaultManager Persistence, AES-GCM Encryption & Keychain Extension
 
 extension PasswordVaultManager {
     
@@ -145,7 +152,7 @@ extension PasswordVaultManager {
     }
     
     func loadVaultLocked(password: String) {
-        // 1. 尝试优先读取 v4 加密密码库
+        // 1. Prioritize v4 vault format
         if FileManager.default.fileExists(atPath: vaultFileURL.path) {
             do {
                 let encryptedData = try Data(contentsOf: vaultFileURL)
@@ -156,11 +163,11 @@ extension PasswordVaultManager {
                     return
                 }
             } catch {
-                // v4 加载失败
+                // v4 load failure fallback
             }
         }
         
-        // 2. 自动迁移平滑机制：若 v4 不存在，尝试读取旧版 v3 加密密码库
+        // 2. Automatic migration fallback from legacy v3 format
         if FileManager.default.fileExists(atPath: v3VaultFileURL.path) {
             do {
                 let v3Data = try Data(contentsOf: v3VaultFileURL)
@@ -169,16 +176,16 @@ extension PasswordVaultManager {
                     let decoded = try decoder.decode([PasswordVaultEntry].self, from: rawJSON)
                     setEntriesInternal(decoded)
                     
-                    // 解密成功后立刻用 v4 (PBKDF2-SHA256 + 随机盐) 加密存盘并清理 v3 文件
+                    // Seamless re-encryption with v4 (PBKDF2-SHA256 + random salt)
                     activeMasterPassword = password
                     _isUnlocked = true
                     saveVaultLocked()
                     try? FileManager.default.removeItem(at: v3VaultFileURL)
-                    TTLogger.info("🔐 [PasswordVaultManager] 密码库成功从 v3 (SHA1) 无感升级迁移至 v4 (SHA256 + Random Salt)。")
+                    TTLogger.info("[PasswordVaultManager] Upgraded vault from v3 (SHA1) to v4 (SHA256 + Random Salt)")
                     return
                 }
             } catch {
-                // v3 解密失败
+                // v3 decrypt failure fallback
             }
         }
         
@@ -196,7 +203,7 @@ extension PasswordVaultManager {
                 try encryptedData.write(to: vaultFileURL, options: .atomic)
             }
         } catch {
-            TTLogger.error("密码库加密保存失败: \(error.localizedDescription)")
+            TTLogger.error("Failed to encrypt vault: \(error.localizedDescription)")
         }
     }
     

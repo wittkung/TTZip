@@ -1,11 +1,23 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 损坏归档修复与容灾恢复引擎
+/// Disaster recovery and damaged archive repair engine.
 public final class ArchiveRepairEngine: @unchecked Sendable {
     public init() {}
     
-    /// 扫描损坏的归档文件并重构提取可读的数据块至修复包 (结合 ArchiveRepairStrategyContext 策略模式)
+    /// Scans a damaged archive and reconstructs readable payload data into a repaired archive.
+    /// - Parameters:
+    ///   - damagedArchivePath: Path to the corrupted archive file.
+    ///   - repairedOutputPath: Destination path for the recovered archive.
+    /// - Returns: Count of successfully salvaged entries.
+    /// - Throws: `ArchiveError` if file cannot be accessed or repair fails.
     public func repairArchive(damagedArchivePath: String, repairedOutputPath: String) async throws -> Int {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: damagedArchivePath) else {

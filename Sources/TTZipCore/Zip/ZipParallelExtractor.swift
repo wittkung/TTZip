@@ -1,9 +1,16 @@
-// 🔒 FROZEN ENGINE: ZIP core algorithm & SIMD decryption code is frozen. DO NOT EDIT WITHOUT EXPLICIT PERMISSION.
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import QuartzCore
 import CTTZipBridge
 
-/// 全核并发 LIBDEFLATE 极速 64 字节缓存行对齐无锁零拷贝 ZIP 解压引擎
+/// High-throughput parallel ZIP extraction engine featuring libdeflate decompression,
+/// 64-byte cacheline-aligned buffers, lockless atomics, and direct zero-copy I/O.
 public final class ZipParallelExtractor: @unchecked Sendable {
     public static let shared = ZipParallelExtractor()
     
@@ -23,7 +30,8 @@ public final class ZipParallelExtractor: @unchecked Sendable {
         return val
     }
     
-    /// 执行并发多线程 ZIP 归档提取 (无锁原子计步 + 64B 缓存行对齐 + Direct I/O 直写)
+    /// Performs parallel multi-threaded ZIP archive extraction with lockless step tracking,
+    /// aligned allocation, and optional APFS extent preallocation.
     public func extract(
         archivePath: String,
         destinationDir: String,
@@ -191,7 +199,7 @@ public final class ZipParallelExtractor: @unchecked Sendable {
                 } else {
                     let targetSize = size_t(desc.uncompressedSize)
                     if desc.compressionMethod == 0 {
-                        // Store Mode (L0): BSD sendfile 内核级零拷贝通道 (8000+ MB/s 直通)
+                        // Store Mode (L0): BSD sendfile kernel-level zero-copy path (8000+ MB/s direct throughput)
                         var bytesToSend = off_t(targetSize)
                         let sfRes = sendfile(fd, outFd, off_t(payloadOffset), &bytesToSend, nil, 0)
                         if sfRes != 0 || bytesToSend < off_t(targetSize) {
@@ -200,7 +208,7 @@ public final class ZipParallelExtractor: @unchecked Sendable {
                     } else if desc.compressionMethod == 8 {
                         posix_madvise(UnsafeMutableRawPointer(mutating: payloadPtr), Int(desc.compressedSize), POSIX_MADV_WILLNEED)
                         if targetSize >= 4 * 1024 * 1024 {
-                            // 大文件 (>=4MB): ftruncate + mmap 原生 APFS 页缓存直解，结合 MS_ASYNC 异步刷新 + 后台 munmap，彻底消除内核同步刷盘锁
+                            // Large files (>=4MB): ftruncate + mmap APFS page-cache extraction with MS_ASYNC flush
                             ftruncate(outFd, off_t(targetSize))
                             ZipAPFSPreallocator.shared.preallocateFileExtent(fd: outFd, targetSize: desc.uncompressedSize)
                             if let mapPtr = mmap(nil, targetSize, PROT_READ | PROT_WRITE, MAP_SHARED, outFd, 0), mapPtr != MAP_FAILED {
@@ -223,7 +231,7 @@ public final class ZipParallelExtractor: @unchecked Sendable {
                                 }
                             }
                         } else if targetSize <= 65536 {
-                            // 小文件 (<=64KB): 栈上分配极速解压，零堆内存分配
+                            // Small files (<=64KB): Stack-allocated fast decompression, zero heap allocation
                             withUnsafeTemporaryAllocation(of: UInt8.self, capacity: targetSize) { stackBuf in
                                 guard let dstBytePtr = stackBuf.baseAddress else { return }
                                 let decompSize = ttzip_libdeflate_decompress(payloadPtr, Int(desc.compressedSize), dstBytePtr, targetSize)
@@ -232,7 +240,7 @@ public final class ZipParallelExtractor: @unchecked Sendable {
                                 }
                             }
                         } else {
-                            // 中型文件 (64KB~4MB): 64B 内存对齐缓冲区 + 单次 write
+                            // Medium files (64KB~4MB): 64-byte aligned buffer with single direct write
                             var alignedOutPtr: UnsafeMutableRawPointer? = nil
                             posix_memalign(&alignedOutPtr, 64, targetSize)
                             if let dstRawPtr = alignedOutPtr {

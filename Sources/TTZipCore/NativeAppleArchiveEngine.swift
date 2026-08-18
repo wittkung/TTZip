@@ -1,9 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 @preconcurrency import AppleArchive
 import System
 
-/// Apple Archive (`.aar`) 100% 进程内纯原生流式编解码引擎
-/// 基于 macOS AppleArchive 系统框架与 LZFSE 硬件加速流式处理
+/// Native in-process Apple Archive (`.aar`) streaming codec engine.
+///
+/// Utilizes AppleArchive framework with LZFSE hardware acceleration.
 public final class NativeAppleArchiveEngine: Sendable {
     public static let shared = NativeAppleArchiveEngine()
     
@@ -13,7 +21,7 @@ public final class NativeAppleArchiveEngine: Sendable {
         return ArchiveHeader.FieldKeySet("TYP,PAT,LNK,DEV,DAT,UID,GID,MOD,FLAG,MTM,CTM") ?? ArchiveHeader.FieldKeySet("TYP,PAT,DAT") ?? ArchiveHeader.FieldKeySet()
     }
 
-    /// 进程内流式压缩为 Apple Archive (.aar) 格式
+    /// Stream compresses a file or directory into Apple Archive (.aar) container.
     public func compress(
         sourcePath: String,
         outputPath: String
@@ -63,7 +71,7 @@ public final class NativeAppleArchiveEngine: Sendable {
         return true
     }
 
-    /// 进程内流式解压 Apple Archive (.aar) 格式
+    /// Stream extracts an Apple Archive (.aar) container.
     public func extract(
         archivePath: String,
         destinationDir: String
@@ -105,7 +113,7 @@ public final class NativeAppleArchiveEngine: Sendable {
         return true
     }
 
-    /// 进程内读取 Apple Archive (.aar) 目录结构与元数据
+    /// Inspects an Apple Archive (.aar) and lists metadata entries.
     public func inspect(archivePath: String) throws -> [ArchiveEntry] {
         let srcFilePath = FilePath(archivePath)
         guard let readFileStream = ArchiveByteStream.fileStream(

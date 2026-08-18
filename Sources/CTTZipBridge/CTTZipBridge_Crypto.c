@@ -1,4 +1,10 @@
-// 🔒 FROZEN ENGINE: ZIP core algorithm & SIMD decryption code is frozen. DO NOT EDIT WITHOUT EXPLICIT PERMISSION.
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipBridge_Crypto.h"
 #include "include/CTTZipBridge.h"
 #include "include/CTTZipCommon.h"
@@ -335,7 +341,7 @@ int ttzip_aes256_ctr_crypt(
     const uint8x16_t* rk_ptr = rk;
 
     size_t num_blocks = (length + 15) / 16;
-    size_t chunk_blocks = 4096; // 64KB chunks for maximum CPU multi-core scaling and L1/L2 cache locality
+    size_t chunk_blocks = 4096; // 64KB chunks for optimal CPU multi-core scaling and L1/L2 cache locality
     size_t total_chunks = (num_blocks + chunk_blocks - 1) / chunk_blocks;
 
     if (total_chunks <= 1) {
@@ -571,7 +577,6 @@ static uint8_t* convert_utf8_to_utf16le(const char* utf8, size_t* out_bytes) {
     free(utf16_buf);
     *out_bytes = byte_count;
     return res;
-
 }
 
 int ttzip_7z_kdf_sha256(

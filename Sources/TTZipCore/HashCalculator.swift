@@ -1,8 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import CTTZipBridge
 import zlib
 
+/// Supported cryptographic and verification hash algorithms.
 public enum HashType: String, Sendable {
     case crc32 = "CRC32"
     case sha256 = "SHA-256"
@@ -10,7 +18,7 @@ public enum HashType: String, Sendable {
     case sha1 = "SHA-1"
 }
 
-/// 苹果芯片多核 64MB 切片并发 + 页对齐高吞吐哈希与散列计算引擎 (6.0+ GB/s)
+/// Multi-core parallel chunked hash and checksum calculator (6.0+ GB/s).
 public final class HashCalculator: HashCalculating, @unchecked Sendable {
     internal let hardwareTuner: HardwareTunerProtocol
 
@@ -139,4 +147,3 @@ public final class HashCalculator: HashCalculating, @unchecked Sendable {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
-

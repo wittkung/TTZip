@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
@@ -14,7 +21,7 @@ public struct BenchmarkCompetitorPanel: View {
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass.circle.fill")
                         .foregroundStyle(TTZipTheme.kintsugiGold)
-                    Text("竞品软件感知与真实验证")
+                    Text("Competitor Sensing & Validation")
                         .font(.system(size: 12, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                 }
@@ -25,7 +32,7 @@ public struct BenchmarkCompetitorPanel: View {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 10))
-                        Text("重新检测")
+                        Text("Re-detect")
                             .font(.system(size: 10.5, weight: .medium))
                     }
                     .foregroundStyle(.secondary)
@@ -44,7 +51,7 @@ public struct BenchmarkCompetitorPanel: View {
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(tool.isInstalled ? Color.primary : Color.secondary)
                             
-                            Text(tool.isInstalled ? "已检测" : "未安装")
+                            Text(tool.isInstalled ? "Detected" : "Not Installed")
                                 .font(.system(size: 9, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -64,10 +71,10 @@ public struct BenchmarkCompetitorPanel: View {
             if !hasSevenZip {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("需要对比 Keka / 7-Zip 真实性能？")
+                        Text("Compare Keka / 7-Zip Performance?")
                             .font(.system(size: 11.5, weight: .bold))
                             .foregroundStyle(TTZipTheme.kintsugiGold)
-                        Text("当前未检测到 Keka 或 7-Zip CLI。拒绝假数据，可一键部署 7-Zip (7zz) 工具链以开启真实对比。")
+                        Text("Neither Keka nor 7-Zip CLI was detected. Deploy 7-Zip (7zz) toolchain for empirical comparison.")
                             .font(.system(size: 10.5))
                             .foregroundStyle(.secondary)
                     }
@@ -83,7 +90,7 @@ public struct BenchmarkCompetitorPanel: View {
                                 Image(systemName: "square.and.arrow.down.fill")
                                     .font(.system(size: 11))
                             }
-                            Text(viewModel.isInstallingToolchain ? "部署中..." : "一键部署 7-Zip 工具链")
+                            Text(viewModel.isInstallingToolchain ? "Deploying..." : "Deploy 7-Zip Toolchain")
                                 .font(.system(size: 11, weight: .bold))
                         }
                         .foregroundStyle(.white)

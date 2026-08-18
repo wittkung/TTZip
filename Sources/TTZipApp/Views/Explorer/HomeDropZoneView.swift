@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 主页拖拽释放处理与面板
+/// Home drop zone view for drag-and-drop file processing.
 public struct HomeDropZoneView: View {
     @ObservedObject public var viewModel: AppViewState
     @Binding public var isDropTargeted: Bool
@@ -52,11 +59,11 @@ public struct HomeDropZoneView: View {
             }
             
             VStack(spacing: 4) {
-                Text(isDropTargeted ? "松开即刻处理" : "拖入文件或归档包至此")
+                Text(isDropTargeted ? "Release to Process" : "Drop files or archives here")
                     .font(.system(size: 17, weight: .medium, design: .serif))
                     .foregroundStyle(.primary)
                 
-                Text("支持 7Z, ZIP, RAR, TAR.ZST 极速解压与多核打包")
+                Text("Supports fast extraction and compression for 7Z, ZIP, RAR, TAR.ZST, etc.")
                     .font(TTZipTheme.Typography.callout)
                     .foregroundStyle(.secondary)
             }
@@ -64,7 +71,7 @@ public struct HomeDropZoneView: View {
             VStack(spacing: 10) {
                 HStack(spacing: TTZipTheme.Spacing.md) {
                     Button(action: pickAndOpenArchive) {
-                        Label("浏览文件", systemImage: "folder.badge.plus")
+                        Label("Browse", systemImage: "folder.badge.plus")
                             .font(.system(size: 13, weight: .medium))
                             .padding(.horizontal, TTZipTheme.Spacing.md)
                             .padding(.vertical, 7)
@@ -79,7 +86,7 @@ public struct HomeDropZoneView: View {
                     .clipShape(Capsule())
                     
                     Button(action: { withAnimation { viewModel.openCompressWorkspace() } }) {
-                        Label("新建压缩包", systemImage: "archivebox")
+                        Label("New Archive", systemImage: "archivebox")
                             .font(.system(size: 13, weight: .medium))
                             .padding(.horizontal, TTZipTheme.Spacing.md)
                             .padding(.vertical, 7)
@@ -99,7 +106,7 @@ public struct HomeDropZoneView: View {
                         .fill(TTZipTheme.bambooGreen)
                         .frame(width: 6, height: 6)
                     
-                    Text(viewModel.statusMessage.isEmpty ? "系统已就绪" : viewModel.statusMessage)
+                    Text(viewModel.statusMessage.isEmpty ? "Ready" : viewModel.statusMessage)
                         .font(.system(size: 11, weight: .regular, design: .monospaced))
                         .foregroundStyle(.primary.opacity(0.75))
                 }

@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - ComparisonOperator (比较运算符)
+// MARK: - ComparisonOperator
 
 public enum ComparisonOperator: String, Sendable, Equatable {
     case greaterThan = ">"
@@ -13,7 +20,7 @@ public enum ComparisonOperator: String, Sendable, Equatable {
     public var symbol: String { rawValue }
 }
 
-// MARK: - MatchAllExpression (匹配任意终结符)
+// MARK: - MatchAllExpression
 
 public struct MatchAllExpression: ArchiveFilterExpressionProtocol {
     public init() {}
@@ -27,7 +34,7 @@ public struct MatchAllExpression: ArchiveFilterExpressionProtocol {
     }
 }
 
-// MARK: - MatchNoneExpression (无匹配终结符)
+// MARK: - MatchNoneExpression
 
 public struct MatchNoneExpression: ArchiveFilterExpressionProtocol {
     public init() {}
@@ -41,7 +48,7 @@ public struct MatchNoneExpression: ArchiveFilterExpressionProtocol {
     }
 }
 
-// MARK: - ExtensionExpression (后缀匹配终结符)
+// MARK: - ExtensionExpression
 
 public struct ExtensionExpression: ArchiveFilterExpressionProtocol {
     public let extensions: Set<String>
@@ -64,7 +71,6 @@ public struct ExtensionExpression: ArchiveFilterExpressionProtocol {
         if extensions.contains(entryExt) {
             return true
         }
-        // 兜底检查: 如果 extensionName 为空，解析 pathExtension
         let pathExt = (entry.name as NSString).pathExtension.lowercased()
         return extensions.contains(pathExt)
     }
@@ -75,7 +81,7 @@ public struct ExtensionExpression: ArchiveFilterExpressionProtocol {
     }
 }
 
-// MARK: - FilenameGlobExpression (通配符文件名终结符)
+// MARK: - FilenameGlobExpression
 
 public struct FilenameGlobExpression: ArchiveFilterExpressionProtocol {
     public let pattern: String
@@ -88,12 +94,10 @@ public struct FilenameGlobExpression: ArchiveFilterExpressionProtocol {
     
     private static func buildRegex(from globPattern: String) -> NSRegularExpression? {
         let escaped = NSRegularExpression.escapedPattern(for: globPattern)
-        // 替换通配符 \* 和 \? 为正则模式
         var regexString = escaped
             .replacingOccurrences(of: "\\*", with: ".*")
             .replacingOccurrences(of: "\\?", with: ".")
         
-        // 如果没有显式通配符，默认进行子串匹配
         if !globPattern.contains("*") && !globPattern.contains("?") {
             regexString = ".*" + regexString + ".*"
         } else {
@@ -120,7 +124,7 @@ public struct FilenameGlobExpression: ArchiveFilterExpressionProtocol {
     }
 }
 
-// MARK: - SizeExpression (尺寸比较终结符)
+// MARK: - SizeExpression
 
 public struct SizeExpression: ArchiveFilterExpressionProtocol {
     public let targetBytes: Int64
@@ -184,7 +188,7 @@ public struct SizeExpression: ArchiveFilterExpressionProtocol {
     }
 }
 
-// MARK: - DateRangeExpression (修改时间范围终结符)
+// MARK: - DateRangeExpression
 
 public struct DateRangeExpression: ArchiveFilterExpressionProtocol {
     public let targetDate: Date
@@ -210,7 +214,6 @@ public struct DateRangeExpression: ArchiveFilterExpressionProtocol {
         let trimmed = spec.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return nil }
         
-        // 尝试解析相对时间 (例如 7d, 24h, 30m, 1y)
         var numberPart = ""
         var unitPart = ""
         
@@ -235,8 +238,6 @@ public struct DateRangeExpression: ArchiveFilterExpressionProtocol {
             default: return nil
             }
             
-            // modified:<7d  => 修改时间在 7 天内 => entry.date >= refDate - 7d (运算符映射: <7d 对应 >= (now - 7d))
-            // modified:>30d => 修改时间在 30 天前 => entry.date <= refDate - 30d (运算符映射: >30d 对应 <= (now - 30d))
             let calculatedDate = referenceDate.addingTimeInterval(-seconds)
             let mappedOp: ComparisonOperator
             switch defaultOp {
@@ -252,13 +253,11 @@ public struct DateRangeExpression: ArchiveFilterExpressionProtocol {
             return (calculatedDate, mappedOp)
         }
         
-        // 尝试 ISO8601 日期解析
         let formatter = ISO8601DateFormatter()
         if let isoDate = formatter.date(from: trimmed) {
             return (isoDate, defaultOp)
         }
         
-        // 尝试 yyyy-MM-dd 日期解析
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
         if let date = df.date(from: trimmed) {

@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AppKit
 import TTZipCore
 
-/// 原生 macOS 图像全能放大缩小/平移手势画板
+/// Interactive zoom and pan image preview canvas.
 public struct InteractiveZoomImageView: View {
     public let image: NSImage
     
@@ -89,7 +96,7 @@ public struct InteractiveZoomImageView: View {
                             .foregroundStyle(.primary)
                     }
                     .buttonStyle(.plain)
-                    .help("缩小 (-)")
+                    .help("Zoom Out (-)")
                     
                     Text("\(Int(round(scale * 100)))%")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
@@ -106,7 +113,7 @@ public struct InteractiveZoomImageView: View {
                             .foregroundStyle(.primary)
                     }
                     .buttonStyle(.plain)
-                    .help("放大 (+)")
+                    .help("Zoom In (+)")
                     
                     if scale != 1.0 || offset != .zero {
                         Divider()
@@ -124,7 +131,7 @@ public struct InteractiveZoomImageView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
-                        .help("重置 100%")
+                        .help("Reset 100%")
                     }
                 }
                 .padding(.horizontal, 10)

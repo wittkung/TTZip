@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
@@ -58,11 +65,11 @@ public struct FolderCompositionPieChartView: View {
             
             let color: Color = {
                 switch item.category {
-                case "视频": return .red
-                case "音频": return .purple
-                case "图片": return .blue
-                case "文档/代码/字幕": return TTZipTheme.bambooGreen
-                case "归档包": return .orange
+                case "Video", "视频": return .red
+                case "Audio", "音频": return .purple
+                case "Image", "图片": return .blue
+                case "Document", "文档/代码/字幕": return TTZipTheme.bambooGreen
+                case "Archive", "归档包": return .orange
                 default: return .gray
                 }
             }()
@@ -92,7 +99,7 @@ public struct FolderCompositionPieChartView: View {
                     Text("\(totalCount)")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.primary)
-                    Text("文件")
+                    Text("Files")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                 }
@@ -112,7 +119,7 @@ public struct FolderCompositionPieChartView: View {
                         
                         Spacer()
                         
-                        Text("\(seg.count)项 (\(Int(round(seg.percentage * 100)))%)")
+                        Text("\(seg.count) items (\(Int(round(seg.percentage * 100)))%)")
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }

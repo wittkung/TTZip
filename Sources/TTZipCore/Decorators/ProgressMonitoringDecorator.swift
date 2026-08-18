@@ -1,7 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 进度监控与 ETA 估算具体装饰器 (Concrete Decorator)
-/// 透明叠加平滑进度与剩余时间 (ETA) 算能估算，在压缩/解压流中自动进行状态更新与回调通知。
+/// Concrete decorator adding smooth progress notifications and ETA estimates.
 open class ProgressMonitoringDecorator: ArchiveOperationDecorator, @unchecked Sendable {
     public var progressHandler: (@Sendable (ArchiveProgress) -> Void)?
     private let lock = NSLock()
@@ -27,7 +33,6 @@ open class ProgressMonitoringDecorator: ArchiveOperationDecorator, @unchecked Se
         return startTime ?? Date()
     }
 
-    /// 透明叠加平滑进度与 ETA 估算的压缩处理
     open override func compressStream(
         inputPaths: [String],
         outputPath: String,
@@ -36,12 +41,11 @@ open class ProgressMonitoringDecorator: ArchiveOperationDecorator, @unchecked Se
         let now = Date()
         recordStartTime(now)
 
-        reportProgress(fraction: 0.05, statusMessage: "正在准备打包输入文件...", totalBytes: 0, processedBytes: 0)
+        reportProgress(fraction: 0.05, statusMessage: "Preparing input files...", totalBytes: 0, processedBytes: 0)
 
-        // 估算输入文件总尺寸
         let estimatedTotalBytes = calculateTotalInputSize(inputPaths: inputPaths)
 
-        reportProgress(fraction: 0.15, statusMessage: "启动引擎流式压缩...", totalBytes: estimatedTotalBytes, processedBytes: 0)
+        reportProgress(fraction: 0.15, statusMessage: "Streaming compression in progress...", totalBytes: estimatedTotalBytes, processedBytes: 0)
 
         let resultBytes = try await super.compressStream(
             inputPaths: inputPaths,
@@ -54,7 +58,7 @@ open class ProgressMonitoringDecorator: ArchiveOperationDecorator, @unchecked Se
 
         reportProgress(
             fraction: 1.0,
-            statusMessage: String(format: "打包压缩完成 (耗时 %.2fs, 速率 %.1f MB/s)", duration, throughput),
+            statusMessage: String(format: "Compression completed (duration %.2fs, throughput %.1f MB/s)", duration, throughput),
             totalBytes: estimatedTotalBytes,
             processedBytes: resultBytes
         )
@@ -62,7 +66,6 @@ open class ProgressMonitoringDecorator: ArchiveOperationDecorator, @unchecked Se
         return resultBytes
     }
 
-    /// 透明叠加平滑进度与 ETA 估算的解压处理
     open override func extractStream(
         archivePath: String,
         destinationDir: String,
@@ -73,7 +76,7 @@ open class ProgressMonitoringDecorator: ArchiveOperationDecorator, @unchecked Se
 
         let archiveSize = (try? FileManager.default.attributesOfItem(atPath: archivePath)[.size] as? Int64) ?? 0
 
-        reportProgress(fraction: 0.10, statusMessage: "正在解析归档元数据并准备解压...", totalBytes: archiveSize, processedBytes: 0)
+        reportProgress(fraction: 0.10, statusMessage: "Reading archive metadata...", totalBytes: archiveSize, processedBytes: 0)
 
         let extractedBytes = try await super.extractStream(
             archivePath: archivePath,
@@ -86,7 +89,7 @@ open class ProgressMonitoringDecorator: ArchiveOperationDecorator, @unchecked Se
 
         reportProgress(
             fraction: 1.0,
-            statusMessage: String(format: "解压提取完成 (耗时 %.2fs, 速率 %.1f MB/s)", duration, throughput),
+            statusMessage: String(format: "Extraction completed (duration %.2fs, throughput %.1f MB/s)", duration, throughput),
             totalBytes: extractedBytes,
             processedBytes: extractedBytes
         )

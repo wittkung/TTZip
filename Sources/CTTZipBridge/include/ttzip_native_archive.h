@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_native_archive.h
+ * @brief Unified container format auto-detection, native inspection, and extraction entry points.
+ */
+
 #ifndef TTZIP_NATIVE_ARCHIVE_H
 #define TTZIP_NATIVE_ARCHIVE_H
 

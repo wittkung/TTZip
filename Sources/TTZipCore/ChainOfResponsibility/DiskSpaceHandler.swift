@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 3. 目标磁盘剩余可用空间与 APFS/HFS+ 预配校验处理者 (DiskSpaceHandler)
+/// Disk space and volume pre-flight validation handler.
 public final class DiskSpaceHandler: BaseArchiveValidationHandler, @unchecked Sendable {
     private let fileManager: FileManager
     
@@ -10,7 +17,6 @@ public final class DiskSpaceHandler: BaseArchiveValidationHandler, @unchecked Se
     }
     
     override public func process(context: ArchiveValidationContext) throws -> ArchiveValidationResult {
-        // 确定需要校验的目标目录
         let targetDir: String
         if let dest = context.destinationPath, !dest.isEmpty {
             if fileManager.fileExists(atPath: dest) {
@@ -27,7 +33,6 @@ public final class DiskSpaceHandler: BaseArchiveValidationHandler, @unchecked Se
         let checkedDir = targetDir.isEmpty ? "." : targetDir
         let availableFreeBytes = fetchFreeDiskSpaceBytes(at: checkedDir)
         
-        // 计算预估所需空间
         var requiredBytes: UInt64 = 0
         if let estimated = context.estimatedUncompressedSize, estimated > 0 {
             requiredBytes = estimated
@@ -36,11 +41,9 @@ public final class DiskSpaceHandler: BaseArchiveValidationHandler, @unchecked Se
             for path in context.sourcePaths {
                 inputBytes += calculatePathSize(at: path)
             }
-            // 压缩操作需要至少能够容纳原始尺寸（最坏不压缩或压缩元数据开销）
             requiredBytes = inputBytes
         }
         
-        // 如果无法确定所需尺寸（比如 inspect / extract 且没有提供预估尺寸），免除严格断言但要求至少 1MB 可用
         if requiredBytes == 0 {
             requiredBytes = 1024 * 1024
         }
@@ -52,17 +55,15 @@ public final class DiskSpaceHandler: BaseArchiveValidationHandler, @unchecked Se
         return .success
     }
     
-    /// 获取指定路径挂载卷的剩余可用磁盘空间 (Bytes)，支持不存在目标路径向最近祖先递归检索
     private func fetchFreeDiskSpaceBytes(at path: String) -> UInt64 {
         let existingDir = findExistingAncestorPath(for: path)
         guard let attrs = try? fileManager.attributesOfFileSystem(forPath: existingDir),
               let freeSizeNum = attrs[.systemFreeSize] as? NSNumber else {
-            return UInt64.max // 无法检测时放行
+            return UInt64.max
         }
         return freeSizeNum.uint64Value
     }
     
-    /// 自动向上递归查找已存在的最近祖先目录路径
     private func findExistingAncestorPath(for path: String) -> String {
         var currentPath = (path as NSString).standardizingPath
         if currentPath.isEmpty { return "." }
@@ -86,7 +87,6 @@ public final class DiskSpaceHandler: BaseArchiveValidationHandler, @unchecked Se
         return NSTemporaryDirectory()
     }
     
-    /// 递归计算文件或目录的总字节大小
     private func calculatePathSize(at path: String) -> UInt64 {
         var isDir: ObjCBool = false
         guard fileManager.fileExists(atPath: path, isDirectory: &isDir) else { return 0 }

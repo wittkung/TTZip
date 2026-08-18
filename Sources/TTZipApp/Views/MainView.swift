@@ -1,5 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
+import AppKit
 
 @MainActor
 public enum AppLogoCache {
@@ -57,11 +65,9 @@ public struct MainView: View {
             }()
             
             ZStack(alignment: .top) {
-                // 1. 全文纸质纹理与流体背景
                 TTZipFluidBackgroundView(baseColor: TTZipTheme.bambooGreen)
                     .allowsHitTesting(false)
                 
-                // 2. 主体 HStack (侧边栏 + 中央工作区 + 右侧 Inspector)
                 HStack(spacing: 0) {
                     MacEditorialSidebar(
                         activeTab: $viewModel.activeTab,
@@ -105,7 +111,6 @@ public struct MainView: View {
                     }
                 }
                 
-                // 3. 右侧侧边栏折叠感应按键区
                 if isRightPanelAvailable {
                     HStack(spacing: 0) {
                         Spacer()
@@ -120,7 +125,6 @@ public struct MainView: View {
                     .ignoresSafeArea()
                 }
                 
-                // 4. 全局玻璃拟态 Spotlight 搜索框
                 if viewModel.activeTab == .home {
                     HStack {
                         Spacer().frame(width: 60)
@@ -152,10 +156,10 @@ public struct MainView: View {
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
                 if viewModel.currentArchivePath != nil {
-                    Button { pickAndOpenArchive() } label: { Label("打开归档包", systemImage: "folder.badge.plus") }
+                    Button { pickAndOpenArchive() } label: { Label("Open Archive", systemImage: "folder.badge.plus") }
                         .keyboardShortcut("o", modifiers: [.command])
                     
-                    Button { withAnimation { viewModel.openCompressWorkspace() } } label: { Label("新建压缩包", systemImage: "archivebox.circle") }
+                    Button { withAnimation { viewModel.openCompressWorkspace() } } label: { Label("New Archive", systemImage: "archivebox.circle") }
                         .keyboardShortcut("n", modifiers: [.command])
                     
                     if viewModel.activeTab == .home {
@@ -163,15 +167,15 @@ public struct MainView: View {
                             if let targetPath = viewModel.selectedDiskItem?.path ?? viewModel.currentArchivePath {
                                 Task { await viewModel.quickExtractArchive(archivePath: targetPath) }
                             } else {
-                                viewModel.statusMessage = "💡 请先选择要解压的归档包项目"
+                                viewModel.statusMessage = "Select an archive item to extract"
                             }
-                        } label: { Label("一键解压", systemImage: "arrow.down.circle.fill") }
+                        } label: { Label("Quick Extract", systemImage: "arrow.down.circle.fill") }
                         .keyboardShortcut("e", modifiers: [.command])
                         
-                        Button { viewModel.showExtractModal = true } label: { Label("高级解压...", systemImage: "slider.horizontal.3") }
+                        Button { viewModel.showExtractModal = true } label: { Label("Extract To...", systemImage: "slider.horizontal.3") }
                         .keyboardShortcut("e", modifiers: [.option, .command])
                         
-                        Button { withAnimation { viewModel.reset() } } label: { Label("关闭", systemImage: "xmark.circle") }
+                        Button { withAnimation { viewModel.reset() } } label: { Label("Close", systemImage: "xmark.circle") }
                         .keyboardShortcut("w", modifiers: [.command])
                     }
                 }
@@ -207,7 +211,7 @@ public struct MainView: View {
             if let path = notif.object as? String {
                 viewModel.pendingEncryptedPath = path
                 viewModel.showPasswordPrompt = true
-                viewModel.statusMessage = "🔒 归档文件已被加密，请输入解压口令以查看内容"
+                viewModel.statusMessage = "Archive encrypted. Password required to explore contents"
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TTZipQuickExtractArchive"))) { notif in
@@ -223,8 +227,6 @@ public struct MainView: View {
         }
     }
     
-    // MARK: - Detail Content Area
-    
     @ViewBuilder
     private var detailArea: some View {
         if let previewURL = viewModel.activePreviewFileURL, let name = viewModel.activePreviewFileName {
@@ -233,7 +235,7 @@ public struct MainView: View {
                     Button(action: { viewModel.closeMediaPreview() }) {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.left")
-                            Text("返回画板")
+                            Text("Back")
                         }
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(TTZipTheme.bambooGreen)
@@ -291,11 +293,11 @@ public struct MainView: View {
             if searchService.isSearching {
                 HStack(spacing: 8) {
                     ProgressView().scaleEffect(0.7)
-                    Text("正在搜索...").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("Searching...").font(.system(size: 11)).foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 12)
             } else if searchService.searchResults.isEmpty {
-                Text("未找到相关匹配文件").font(.system(size: 11)).foregroundStyle(.secondary).padding(.vertical, 12)
+                Text("No matching files found").font(.system(size: 11)).foregroundStyle(.secondary).padding(.vertical, 12)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
@@ -342,7 +344,7 @@ public struct MainView: View {
     }
     
     private func pickAndOpenArchive() {
-        if let firstPath = SystemDialogHelper.pickFiles(prompt: "选择归档包", canChooseDirectories: false, allowsMultipleSelection: false).first {
+        if let firstPath = SystemDialogHelper.pickFiles(prompt: "Select Archive", canChooseDirectories: false, allowsMultipleSelection: false).first {
             viewModel.openArchiveAsFolder(url: URL(fileURLWithPath: firstPath))
         }
     }

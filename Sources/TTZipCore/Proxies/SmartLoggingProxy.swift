@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 智能审计日志记录结构
+/// Audit log record for tracked proxy operations.
 public struct SmartLogRecord: Sendable, Equatable, Identifiable {
     public let id: UUID
     public let timestamp: Date
@@ -26,8 +33,9 @@ public struct SmartLogRecord: Sendable, Equatable, Identifiable {
     }
 }
 
-/// 【2.7 代理模式 (Proxy Pattern)】智能引用代理 (Smart Proxy)
-/// `SmartLoggingProxy` 负责自动记录日志、高精度审计耗时与追踪并发活跃引用计数 (Concurrent Reference Counting)
+/// Smart reference counting and timing audit proxy (Smart Proxy Pattern).
+///
+/// Tracks concurrent active operations and logs detailed latency metrics without mutating underlying engine implementations.
 public final class SmartLoggingProxy: TTZipEngineFacading, @unchecked Sendable {
     public static let shared = SmartLoggingProxy()
     
@@ -63,7 +71,7 @@ public final class SmartLoggingProxy: TTZipEngineFacading, @unchecked Sendable {
         self.targetEngine = targetEngine
     }
     
-    // MARK: - 智能操作包装与引用计数递增/递减 (Smart Ref Count & Timing Execution)
+    // MARK: - Smart Execution Wrapper
     
     public func execute<T: Sendable>(operationName: String, action: () async throws -> T) async rethrows -> T {
         startOperation()
@@ -142,7 +150,7 @@ public final class SmartLoggingProxy: TTZipEngineFacading, @unchecked Sendable {
         }
     }
     
-    // MARK: - TTZipEngineFacading 代理实现 (Proxy Operations)
+    // MARK: - Engine Delegation
     
     public func quickCompress(
         inputs: [String],

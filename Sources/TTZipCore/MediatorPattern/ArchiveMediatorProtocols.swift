@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 【3.8 中介者模式 (Mediator Pattern)】事件类型与数据载荷定义
+// MARK: - Mediator Event Definitions
 
-/// GUI UI 组件交互事件枚举
+/// GUI and UI layer interaction events.
 public enum AppMediatorEvent: Sendable, Equatable {
     case requestPasswordPrompt(archivePath: String)
     case passwordUnlocked(archivePath: String, password: String)
@@ -15,7 +22,6 @@ public enum AppMediatorEvent: Sendable, Equatable {
     case taskStateChanged(taskId: String, stateDescription: String)
     case openTab(tabIndex: Int)
 
-    /// 事件描述或分类
     public var eventName: String {
         switch self {
         case .requestPasswordPrompt: return "requestPasswordPrompt"
@@ -32,7 +38,7 @@ public enum AppMediatorEvent: Sendable, Equatable {
     }
 }
 
-/// Core 引擎服务协同事件枚举
+/// Core engine coordination and workflow events.
 public enum CoreEngineMediatorEvent: Sendable, Equatable {
     case extractionFailedNeedPassword(archivePath: String)
     case vaultPasswordUnlocked(archivePath: String, password: String)
@@ -41,7 +47,6 @@ public enum CoreEngineMediatorEvent: Sendable, Equatable {
     case securityScanRequested(targetPath: String)
     case cleanupTempFiles(tempPaths: [String])
 
-    /// 事件描述或分类
     public var eventName: String {
         switch self {
         case .extractionFailedNeedPassword: return "extractionFailedNeedPassword"
@@ -54,39 +59,39 @@ public enum CoreEngineMediatorEvent: Sendable, Equatable {
     }
 }
 
-// MARK: - 中介者与组件核心协议定义
+// MARK: - Mediator Protocols
 
-/// 中介者协议定义 (Mediator Protocol)
+/// Central mediator interface protocol coordinating events between components (Mediator Pattern).
 public protocol ArchiveMediatorProtocol: AnyObject, Sendable {
-    /// 注册组件到中介者
+    /// Registers component with the mediator.
     func register(component: ArchiveMediatorComponentProtocol)
     
-    /// 从中介者注销组件
+    /// Unregisters component from the mediator.
     func unregister(component: ArchiveMediatorComponentProtocol)
     
-    /// 发送 GUI 应用事件
+    /// Dispatches UI app events.
     func send(event: AppMediatorEvent, from component: ArchiveMediatorComponentProtocol?)
     
-    /// 发送 Core 引擎服务协同事件
+    /// Dispatches core engine coordination events.
     func send(event: CoreEngineMediatorEvent, from component: ArchiveMediatorComponentProtocol?)
 }
 
-/// 协同组件协议定义 (Mediator Component Protocol)
+/// Interface protocol for components interacting via a mediator.
 public protocol ArchiveMediatorComponentProtocol: AnyObject, Sendable {
-    /// 组件唯一标识符
+    /// Unique component identifier.
     var componentId: String { get }
     
-    /// 所属中介者弱引用 (或可设置句柄)
+    /// Weak reference or binding to mediator instance.
     var mediator: ArchiveMediatorProtocol? { get set }
     
-    /// 接收 GUI UI 组件事件通知
+    /// Receives UI app events.
     func receive(event: AppMediatorEvent)
     
-    /// 接收 Core 引擎服务协同事件通知
+    /// Receives core engine coordination events.
     func receive(event: CoreEngineMediatorEvent)
 }
 
-// MARK: - 协议默认实现 (Default Implementations)
+// MARK: - Default Implementations
 
 extension ArchiveMediatorComponentProtocol {
     public var componentId: String {

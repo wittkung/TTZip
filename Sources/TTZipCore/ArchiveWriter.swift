@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import CTTZipBridge
 
-/// 高性能归档文件压缩打包引擎
+/// High-performance multi-format archive compression engine.
 public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
     internal let zipEngine: ZipEngineProtocol
     internal let sevenZipEngine: SevenZipEngineProtocol
@@ -24,7 +31,7 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         self.targetFormat = targetFormat
     }
     
-    /// 异步将指定输入文件路径列表打包压缩为目标归档文件
+    /// Asynchronously compresses files and directories into an archive with validation and progress tracking.
     public func createArchive(
         outputPath: String,
         format: ArchiveCompressionFormat = .zip,
@@ -80,7 +87,7 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         _ = try await template.performWorkflowAsync(context: context)
     }
 
-    /// 同步创建归档文件 (零 Swift Task 队列切换开销，模板方法驱动)
+    /// Synchronously creates an archive bypassing Task queue context-switches.
     @inline(__always)
     public func createArchiveSync(
         outputPath: String,
@@ -109,7 +116,7 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         _ = try template.performWorkflow(context: context)
     }
 
-    /// 【3.6 模板方法模式 (Template Method Pattern)】使用算法骨架进行归档压缩打包
+    /// Template Method Pattern execution of archive compression workflow.
     public func createArchiveViaTemplate(
         outputPath: String,
         format: ArchiveCompressionFormat = .zip,
@@ -137,6 +144,3 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         return try template.performWorkflow(context: context)
     }
 }
-
-
-

@@ -1,14 +1,30 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// libdeflate 原生 C 引擎适配器 (Adapter Pattern)
-/// 将 libdeflate_deflate_compress 与 ttzip_libdeflate_* 适配为内存安全的 Data / RawPointer Swift 接口
+/// Adapter Pattern: libdeflate high-throughput C engine adapter.
+///
+/// Bridges `libdeflate_deflate_compress` and `ttzip_libdeflate_*` C functions
+/// with memory-safe `Data` and `UnsafeRawPointer` Swift interfaces with thread-local pooling.
 public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
     public static let shared = LibdeflateCAdapter()
     
     private init() {}
     
-    /// 执行 Thread-Local 复用池的高吞吐 RawPointer Deflate 压缩
+    /// Executes high-throughput raw pointer Deflate compression with thread-local state recycling.
+    /// - Parameters:
+    ///   - src: Pointer to uncompressed source bytes.
+    ///   - srcSize: Uncompressed byte count.
+    ///   - dst: Pointer to output destination buffer.
+    ///   - dstCapacity: Allocated capacity of destination buffer.
+    ///   - level: Compression level (1 to 12).
+    /// - Returns: Number of compressed bytes written, or 0 on failure.
     public func compress(
         src: UnsafeRawPointer,
         srcSize: Int,
@@ -19,7 +35,13 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
         return ttzip_libdeflate_compress(src, srcSize, dst, dstCapacity, Int32(level))
     }
     
-    /// 执行 Thread-Local 复用池的高吞吐 RawPointer Deflate 解压
+    /// Executes high-throughput raw pointer Deflate decompression with thread-local state recycling.
+    /// - Parameters:
+    ///   - src: Pointer to compressed source bytes.
+    ///   - srcSize: Compressed byte count.
+    ///   - dst: Pointer to uncompressed output destination buffer.
+    ///   - dstCapacity: Expected capacity of destination buffer.
+    /// - Returns: Number of decompressed bytes written, or 0 on failure.
     public func decompress(
         src: UnsafeRawPointer,
         srcSize: Int,
@@ -29,7 +51,11 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
         return ttzip_libdeflate_decompress(src, srcSize, dst, dstCapacity)
     }
     
-    /// Data 快捷包装接口：类型安全且零内存泄漏 Deflate 压缩 (享元模式 Buffer 复用)
+    /// Convenience interface: memory-safe Deflate compression using buffer flyweights.
+    /// - Parameters:
+    ///   - data: Input payload Data.
+    ///   - level: Deflate compression level.
+    /// - Returns: Compressed Data, or `nil` on failure.
     public func compressData(_ data: Data, level: Int = 6) -> Data? {
         guard !data.isEmpty else { return Data() }
         let maxBound = data.count + (data.count >> 3) + 128
@@ -55,7 +81,11 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
         }
     }
     
-    /// Data 快捷包装接口：类型安全且零内存泄漏 Deflate 解压 (享元模式 Buffer 复用)
+    /// Convenience interface: memory-safe Deflate decompression using buffer flyweights.
+    /// - Parameters:
+    ///   - data: Input compressed payload Data.
+    ///   - originalSize: Expected uncompressed byte count.
+    /// - Returns: Decompressed Data, or `nil` on failure.
     public func decompressData(_ data: Data, originalSize: Int) -> Data? {
         guard !data.isEmpty else { return Data() }
         let pageSize: MemoryPageSize = originalSize > 4096 ? .page64K : .page4K
@@ -80,7 +110,11 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
         }
     }
     
-    /// 创建面向超大单文件 (> 256MB) 的 1MB 分块流式多线程写入器
+    /// Creates a 1MB chunked multi-threaded streaming writer for large files (> 256MB).
+    /// - Parameters:
+    ///   - outFd: File descriptor to write compressed chunks into.
+    ///   - level: Compression level.
+    /// - Returns: `ChunkedDeflateStreamWriter` instance, or `nil` on initialization error.
     public func createChunkedWriter(outFd: Int32, level: Int = 6) -> ChunkedDeflateStreamWriter? {
         return ChunkedDeflateStreamWriter(outFd: outFd, level: level)
     }

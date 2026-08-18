@@ -1,20 +1,27 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 存储容量格式化标准
+/// Storage capacity formatting standard.
 public enum ByteSizeStandard: Sendable {
-    /// 国际十进制 SI 标准 (1 KB = 1000 B, 1 MB = 1000 KB, macOS 默认)
+    /// International decimal SI standard (1 KB = 1000 B, 1 MB = 1000 KB, macOS default).
     case metricSI
-    /// 国际二进制 IEC 标准 (1 KiB = 1024 B, 1 MiB = 1024 KiB)
+    /// International binary IEC standard (1 KiB = 1024 B, 1 MiB = 1024 KiB).
     case binaryIEC
 }
 
-/// 高性能无堆分配本地化字节容量格式化引擎
+/// Zero-heap-allocation byte capacity formatting engine.
 public enum ByteSizeFormatter {
     
     private static let metricUnits = ["B", "KB", "MB", "GB", "TB", "PB"]
     private static let binaryUnits = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
     
-    /// 格式化字节尺寸
+    /// Formats byte count according to standard and localized decimal conventions.
     public static func format(bytes: Int64, style: ByteSizeStandard = .metricSI, language: AppLanguage = .en) -> String {
         guard bytes >= 0 else { return "0 B" }
         if bytes < 1000 && style == .metricSI { return "\(bytes) B" }

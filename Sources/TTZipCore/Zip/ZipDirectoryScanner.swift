@@ -1,5 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
+/// Value type representing a filesystem entry scheduled for ZIP compression.
 public struct ZipFileItemToCompress: Sendable {
     public let srcPath: String
     public let relPath: String
@@ -14,6 +22,7 @@ public struct ZipFileItemToCompress: Sendable {
     }
 }
 
+/// Zero-cost directory scanner extracting canonical paths and relative hierarchy for ZIP pipelines.
 public enum ZipDirectoryScanner {
     public static func scan(inputPaths: [String], skipMacJunk: Bool = true) -> [ZipFileItemToCompress] {
         var items: [ZipFileItemToCompress] = []

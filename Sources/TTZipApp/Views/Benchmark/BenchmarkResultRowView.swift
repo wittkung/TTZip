@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
@@ -12,7 +19,6 @@ public struct BenchmarkResultRowView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // 头部：算法名称、压缩体积对比、推荐 Badge
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
@@ -29,7 +35,7 @@ public struct BenchmarkResultRowView: View {
                             .clipShape(Capsule())
                     }
                     
-                    Text("体积减少 \(String(format: "%.1f", result.spaceSavedPercent))% （\(formatBytes(result.originalSizeBytes)) ➔ \(formatBytes(result.compressedSizeBytes))）")
+                    Text("Size reduced \(String(format: "%.1f", result.spaceSavedPercent))% (\(formatBytes(result.originalSizeBytes)) ➔ \(formatBytes(result.compressedSizeBytes)))")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -37,7 +43,6 @@ public struct BenchmarkResultRowView: View {
                 Spacer()
             }
             
-            // 核心双向吞吐率可视化对比图表
             GeometryReader { geometry in
                 let width = geometry.size.width
                 let center = width / 2
@@ -49,13 +54,11 @@ public struct BenchmarkResultRowView: View {
                 let decompWidth = max(4, (center - 12) * decompRatio)
                 
                 ZStack(alignment: .leading) {
-                    // 中轴隔离线
                     Rectangle()
                         .fill(Color.primary.opacity(0.12))
                         .frame(width: 1.5, height: 26)
                         .offset(x: center)
                     
-                    // 压缩速率 (向左延伸, 竹青绿渐变)
                     ZStack(alignment: .trailing) {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(
@@ -82,7 +85,6 @@ public struct BenchmarkResultRowView: View {
                     .frame(width: compWidth, alignment: .trailing)
                     .offset(x: center - compWidth - 1.5)
                     
-                    // 压缩速率文字补充 (若条宽较窄)
                     if compWidth <= 90 {
                         HStack(spacing: 3) {
                             Text("\(String(format: "%.0f", result.throughputMBs)) MB/s")
@@ -94,7 +96,6 @@ public struct BenchmarkResultRowView: View {
                         .offset(x: center - compWidth - 110, y: 0)
                     }
                     
-                    // 解压速率 (向右延伸, 极光蓝渐变)
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(
@@ -116,7 +117,6 @@ public struct BenchmarkResultRowView: View {
                     .frame(width: decompWidth, alignment: .leading)
                     .offset(x: center + 1.5)
                     
-                    // 解压速率文字补充 (若条宽较窄)
                     if decompWidth <= 80 {
                         Text("\(String(format: "%.0f", result.decompressionThroughputMBs)) MB/s")
                             .font(.system(size: 9.5, weight: .bold, design: .monospaced))
@@ -124,24 +124,22 @@ public struct BenchmarkResultRowView: View {
                             .offset(x: center + decompWidth + 6, y: 0)
                     }
                     
-                    // 左右侧图例说明
-                    Text("压缩 ◀")
+                    Text("Compress ◀")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.secondary)
                         .offset(x: 4, y: 0)
                     
-                    Text("▶ 解压")
+                    Text("▶ Decompress")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.secondary)
-                        .offset(x: width - 36, y: 0)
+                        .offset(x: width - 70, y: 0)
                 }
             }
             .frame(height: 28)
             
-            // 真实已安装竞品物理压测对比列表 (仅当实际检测到并测算过时显示)
             if !result.installedCompetitorScores.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("实测第三方竞品性能对比 (Empirical Measurements):")
+                    Text("Empirical Competitor Benchmarks:")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.secondary)
                         .padding(.top, 4)
@@ -157,12 +155,12 @@ public struct BenchmarkResultRowView: View {
                             
                             Spacer()
                             
-                            Text("实测 \(String(format: "%.1f", score.measuredThroughputMBs)) MB/s")
+                            Text("\(String(format: "%.1f", score.measuredThroughputMBs)) MB/s")
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                                 .foregroundStyle(.secondary)
                             
                             let relativeRatio = max(1.0, result.throughputMBs / max(1.0, score.measuredThroughputMBs))
-                            Text("TTZip 领先 \(String(format: "%.1f", relativeRatio))x")
+                            Text("TTZip \(String(format: "%.1f", relativeRatio))x")
                                 .font(.system(size: 9.5, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)

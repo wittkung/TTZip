@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import AppKit
 
-/// 文件系统 GUI 桌面定位服务抽象接口
+/// Abstraction interface for GUI desktop file reveal service.
 public protocol FileViewerServiceProtocol: Sendable {
-    /// 在系统的 Finder / 文件管理器中定位并选中指定文件或文件夹
+    /// Reveals and selects file or folder in macOS Finder.
     func revealInFinder(at path: String)
 }
 
-/// macOS NSWorkspace 桌面定位默认实现
+/// macOS NSWorkspace desktop file viewer default implementation.
 public final class MacNSWorkspaceFileViewer: FileViewerServiceProtocol {
     public init() {}
     

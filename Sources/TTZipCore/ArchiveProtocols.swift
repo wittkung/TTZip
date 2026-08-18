@@ -1,22 +1,36 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档加密形态分类体系 (3-Tier Encryption Topology)
+/// 3-Tier archive encryption classification topology.
 public enum ArchiveEncryptionTier: String, Sendable, Codable, Equatable {
-    case none = "NONE"                          // Tier 0: 无加密
-    case dataOnly = "DATA_ONLY"                  // Tier 1: 数据加密 (元数据明文，可免密浏览目录结构)
-    case headerAndData = "HEADER_AND_DATA"      // Tier 2: 头部与数据双重加密 (必须先输入密码才能浏览)
-    case unsupported = "UNSUPPORTED"            // 格式不支持或无法可靠检测加密
+    /// Tier 0: Unencrypted archive.
+    case none = "NONE"
+    /// Tier 1: Entry payloads are encrypted, but metadata headers remain in cleartext (browsable without password).
+    case dataOnly = "DATA_ONLY"
+    /// Tier 2: Both metadata headers and entry payloads are encrypted (password required to list directory tree).
+    case headerAndData = "HEADER_AND_DATA"
+    /// Encryption status cannot be reliably determined or is unsupported.
+    case unsupported = "UNSUPPORTED"
 }
 
-/// 归档读取引擎协议
+/// Core archive inspection and metadata discovery interface.
 public protocol ArchiveReading: Sendable {
+    /// Inspects archive contents and returns a flat array of archive entries.
     func inspect(archivePath: String) async throws -> [ArchiveEntry]
+    
+    /// Inspects archive contents with optional password or candidate password list.
     func inspect(archivePath: String, password: String?, candidatePasswords: [String]?) async throws -> [ArchiveEntry]
     
-    /// 异步检查并以组合模式 (Composite Pattern) 目录树结构返回归档内容
+    /// Asynchronously inspects archive and returns a hierarchical directory tree (Composite Pattern).
     func inspectTree(archivePath: String, password: String?, candidatePasswords: [String]?) async throws -> ArchiveCompositeDirectory
     
-    /// 零解压开销快速探测归档加密形态 (3-Tier Introspection)
+    /// Fast zero-decompression probe of archive encryption tier.
     func probeEncryption(archivePath: String) async throws -> ArchiveEncryptionTier
 }
 
@@ -53,7 +67,7 @@ extension ArchiveReading {
     }
 }
 
-/// 归档打包压缩引擎协议
+/// Core archive creation and compression engine interface.
 public protocol ArchiveWriting: Sendable {
     func createArchive(
         outputPath: String,
@@ -180,7 +194,7 @@ extension ArchiveWriting {
     }
 }
 
-/// 归档解压提取引擎协议
+/// Core archive decompression and extraction engine interface.
 public protocol ArchiveExtracting: Sendable {
     func extract(
         archivePath: String,
@@ -284,7 +298,7 @@ extension ArchiveExtracting {
     }
 }
 
-/// 归档数据完整性校验引擎协议
+/// Archive data integrity and checksum verification interface.
 public protocol ArchiveIntegrityChecking: Sendable {
     func computeCRC32(filePath: String) -> String
     func computeSHA256(filePath: String) async throws -> String
@@ -317,13 +331,13 @@ extension ArchiveIntegrityChecking {
     }
 }
 
-/// 哈希与散列计算引擎协议
+/// Cryptographic hash calculation interface.
 public protocol HashCalculating: Sendable {
     func computeHashSync(filePath: String, type: HashType) throws -> String
     func computeHash(filePath: String, type: HashType) async throws -> String
 }
 
-/// Zip 加密解密引擎协议
+/// ZIP format hardware-accelerated encryption and decryption engine interface.
 public protocol ZipCryptoEngineProtocol: Sendable {
     func decryptZipCrypto(payload: Data, password: String) -> Data?
     func encryptAES256(payload: Data, password: String, actualCompressionMethod: UInt16) -> (payload: Data, compressionMethod: UInt16, extraField: Data)?
@@ -332,7 +346,7 @@ public protocol ZipCryptoEngineProtocol: Sendable {
     func decryptAES256(payload: Data, password: String) -> Data?
 }
 
-/// 7z 加密解密引擎协议
+/// 7z format PBKDF2-SHA256 and AES-256-CBC engine interface.
 public protocol SevenZipCryptoEngineProtocol: Sendable {
     func deriveKey(password: String, salt: Data, numCyclesPower: Int) -> Data
     func processParallelAES256(
@@ -343,4 +357,3 @@ public protocol SevenZipCryptoEngineProtocol: Sendable {
         chunkSize: Int
     ) -> Data?
 }
-

@@ -1,5 +1,9 @@
-// CTTZipBridge_7zNativeDecoder.c
-// TTZip 原生进程内 7Z 多核并行解压引擎管道调度器
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
 
 #include "include/CTTZipBridge_7zNativeDecoder.h"
 #include "include/ttzip_7z_header_parser.h"
@@ -53,7 +57,7 @@ int ttzip_7z_extract_native_parallel_c(
         return TTZIP_ERR_MMAP_FAILED;
     }
 
-    // 1. 零拷贝解析 7z 头部与元数据
+    // 1. Zero-copy header and metadata parsing
     TTZIP_SLICE_SCOPE_BEGIN("1_7zDec_HeaderParse");
     ttzip_7z_header_info_t info;
     int parse_res = ttzip_7z_parse_header_metadata((const uint8_t*)mapped, file_size, &info);
@@ -74,7 +78,7 @@ int ttzip_7z_extract_native_parallel_c(
     size_t payload_len = info.payload_len;
     uint8_t* decrypted_payload = NULL;
 
-    // 2. 若加密，执行 ARM64 NEON 硬件 AES-256-CBC 向量化解密
+    // 2. Hardware AES-256-CBC decryption via ARM64 NEON if encrypted
     if (info.is_encrypted && payload_len > 0) {
         if (!password || password[0] == '\0') {
             ttzip_7z_free_header_info(&info);
@@ -115,7 +119,7 @@ int ttzip_7z_extract_native_parallel_c(
         payload_start = decrypted_payload;
     }
 
-    // 3. 执行多核并行多块解码
+    // 3. Parallel multi-block decompression
     uint8_t* unpack_buf = NULL;
     size_t total_unpack_bytes = 0;
     if (payload_len > 0) {
@@ -148,7 +152,7 @@ int ttzip_7z_extract_native_parallel_c(
         free(decrypted_payload);
     }
 
-    // 4. 目录树恢复与文件写盘聚合
+    // 4. Directory reconstruction and file writing
     TTZIP_SLICE_SCOPE_BEGIN("3_7zDec_DiskWrite");
     bool crc_mismatch = false;
     if (info.num_files > 0) {

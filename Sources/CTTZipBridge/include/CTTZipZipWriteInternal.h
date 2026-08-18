@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file CTTZipZipWriteInternal.h
+ * @brief Internal data structures and prototypes for multi-core ZIP archive disk writer.
+ */
+
 #ifndef CTTZIP_ZIP_WRITE_INTERNAL_H
 #define CTTZIP_ZIP_WRITE_INTERNAL_H
 
@@ -34,4 +46,4 @@ typedef struct {
 
 int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_t* list, bool has_password);
 
-#endif
+#endif // CTTZIP_ZIP_WRITE_INTERNAL_H

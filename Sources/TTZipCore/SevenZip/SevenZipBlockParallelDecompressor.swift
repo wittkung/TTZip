@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 7z 多固实块 (Multi-Solid Blocks) 全核并发 LZMA2/Zstd 解压调度器
+/// Multi-solid block concurrent LZMA2/Zstd decompressor scheduler.
 public final class SevenZipBlockParallelDecompressor: @unchecked Sendable {
     public static let shared = SevenZipBlockParallelDecompressor()
     
     private init() {}
     
-    /// 将划分好 independent 4GB 固实块分发至全核 CPU 并行解码
+    /// Dispatches independent solid blocks across CPU cores for concurrent decompression.
     public func decompressSolidBlocksConcurrently(
         blocks: [(offset: Int64, compressedSize: Int64, uncompressedSize: Int64)],
         archiveBytePtr: UnsafePointer<UInt8>,
@@ -29,7 +36,7 @@ public final class SevenZipBlockParallelDecompressor: @unchecked Sendable {
                 if srcOffset + cSize > pointerBox.size { return }
                 let srcPtr = pointerBox.pointer.advanced(by: srcOffset)
                 
-                // 64 字节 Cache Line 物理对齐内存 Buffer
+                // 64-byte cache line aligned buffer
                 var alignedOutPtr: UnsafeMutableRawPointer? = nil
                 let pageSize = 64
                 let alignedLength = ((uSize + pageSize - 1) / pageSize) * pageSize
@@ -38,15 +45,15 @@ public final class SevenZipBlockParallelDecompressor: @unchecked Sendable {
                 guard let dstRawPtr = alignedOutPtr else { return }
                 let dstBytePtr = dstRawPtr.assumingMemoryBound(to: UInt8.self)
                 
-                // 优先尝试 Quantum 两阶段 128KB 物理 Block 极速矢量解压 (RLE + Thread-Local libdeflate)
+                // Two-pass block decompression fallback
                 let decompSize = ttzip_quantum_decompress_two_pass(srcPtr, cSize, dstBytePtr, uSize)
                 var actualSize = (decompSize == uSize) ? uSize : 0
                 if decompSize != uSize {
-                    let appleDecomp = ttzip_zstd_decompress(srcPtr, cSize, dstBytePtr, uSize)
-                    if appleDecomp == 0 {
+                    let zstdDecomp = ttzip_zstd_decompress(srcPtr, cSize, dstBytePtr, uSize)
+                    if zstdDecomp == 0 {
                         OSAtomicCompareAndSwap32Barrier(1, 0, flagPtr)
                     } else {
-                        actualSize = appleDecomp
+                        actualSize = zstdDecomp
                     }
                 }
                 

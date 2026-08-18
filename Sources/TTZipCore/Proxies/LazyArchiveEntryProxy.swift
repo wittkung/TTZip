@@ -1,13 +1,19 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 【2.7 代理模式 (Proxy Pattern)】虚拟代理 (Virtual Proxy)
-/// `LazyArchiveEntryProxy` 封装归档条目的延迟加载机制
-/// 打开大型归档包时仅解析轻量元数据，当且仅当显式访问 POSIX 属性、媒体元数据、缩略图或哈希校验时，才触发延迟加载与缓存
+/// Virtual proxy encapsulating lazy-loading semantics for heavy entry attributes (Virtual Proxy Pattern).
+///
+/// Keeps entry scanning lightweight by resolving POSIX attributes, thumbnails, and cryptographic hashes only on demand.
 public final class LazyArchiveEntryProxy: Identifiable, @unchecked Sendable, Equatable {
     public var id: String { entry.path }
     public let entry: ArchiveEntry
     
-    // 线程安全互斥锁与状态追踪
     private let lock = NSLock()
     
     private var _posixAttributes: [FileAttributeKey: Any]?
@@ -40,7 +46,7 @@ public final class LazyArchiveEntryProxy: Identifiable, @unchecked Sendable, Equ
         self.hashProvider = hashProvider
     }
     
-    // MARK: - 基础转发属性 (轻量开销，无需延迟)
+    // MARK: - Passthrough Attributes (Zero-Cost Access)
     
     public var path: String { entry.path }
     public var name: String { entry.name }
@@ -52,16 +58,14 @@ public final class LazyArchiveEntryProxy: Identifiable, @unchecked Sendable, Equ
     public var mimeType: String { entry.mimeType }
     public var formattedSize: String { entry.formattedSize }
     
-    // MARK: - 延迟加载属性 (Virtual Proxy Core)
+    // MARK: - Lazy Loaded Virtual Proxy Attributes
     
-    /// 是否已加载 POSIX 属性
     public var isPosixLoaded: Bool {
         lock.lock()
         defer { lock.unlock() }
         return _posixAttributes != nil
     }
     
-    /// POSIX 文件扩展属性 (首次访问时触发延迟解析)
     public var posixAttributes: [FileAttributeKey: Any] {
         lock.lock()
         defer { lock.unlock() }
@@ -75,7 +79,6 @@ public final class LazyArchiveEntryProxy: Identifiable, @unchecked Sendable, Equ
         return loaded
     }
     
-    /// POSIX 权限位 (0o644, 0o755 等)
     public var posixPermissions: UInt16 {
         lock.lock()
         defer { lock.unlock() }
@@ -94,14 +97,12 @@ public final class LazyArchiveEntryProxy: Identifiable, @unchecked Sendable, Equ
         return perms
     }
     
-    /// 是否已加载媒体元数据
     public var isMediaMetadataLoaded: Bool {
         lock.lock()
         defer { lock.unlock() }
         return _mediaMetadata != nil
     }
     
-    /// 媒体与文档扩展元数据 (如 EXIF、分辨率、音频采样率，延迟解析)
     public var mediaMetadata: [String: String] {
         lock.lock()
         defer { lock.unlock() }
@@ -115,14 +116,12 @@ public final class LazyArchiveEntryProxy: Identifiable, @unchecked Sendable, Equ
         return loaded
     }
     
-    /// 是否已加载缩略图
     public var isThumbnailLoaded: Bool {
         lock.lock()
         defer { lock.unlock() }
         return _thumbnailData != nil
     }
     
-    /// 预览缩略图二进制数据 (延迟解析)
     public var thumbnailData: Data? {
         lock.lock()
         defer { lock.unlock() }
@@ -136,14 +135,12 @@ public final class LazyArchiveEntryProxy: Identifiable, @unchecked Sendable, Equ
         return loaded
     }
     
-    /// 是否已加载 SHA-256 哈希
     public var isHashLoaded: Bool {
         lock.lock()
         defer { lock.unlock() }
         return _sha256Hash != nil
     }
     
-    /// 条目 SHA-256 校验和 (延迟计算)
     public var sha256Hash: String {
         lock.lock()
         defer { lock.unlock() }
@@ -157,9 +154,9 @@ public final class LazyArchiveEntryProxy: Identifiable, @unchecked Sendable, Equ
         return loaded
     }
     
-    // MARK: - 静态工厂与转换辅助
+    // MARK: - Factory & Conversion Helpers
     
-    /// 根据磁盘真实路径自动预置 物理文件 POSIX/缩略图延迟解析器
+    /// Factory creating lazy proxy bound to physical file resolvers.
     public static func create(for entry: ArchiveEntry, diskPath: String? = nil) -> LazyArchiveEntryProxy {
         guard let path = diskPath, FileManager.default.fileExists(atPath: path) else {
             return LazyArchiveEntryProxy(entry: entry)
@@ -178,7 +175,6 @@ public final class LazyArchiveEntryProxy: Identifiable, @unchecked Sendable, Equ
         }
         
         let thumbnailResolver: @Sendable () -> Data? = {
-            // 简单的二进制图像/文本预览生成代理
             if ["png", "jpg", "jpeg", "gif", "txt", "json", "xml", "md"].contains(entry.extensionName.lowercased()) {
                 return try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
             }

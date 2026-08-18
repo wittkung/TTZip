@@ -1,5 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
+/// Value type representing metrics and outcomes from password recovery exploration.
 public struct PasswordRecoveryResult: Sendable {
     public let foundPassword: String?
     public let totalAttempts: Int64
@@ -10,8 +18,9 @@ public struct PasswordRecoveryResult: Sendable {
     }
 }
 
-/// 【3.5 状态模式 (State Pattern)】多核并行归档密码校验与恢复引擎
-/// 贯穿支持 ArchiveTaskStateMachine 状态机生命周期控制（Pause/Resume/Cancel/Checkpoint 断点续传）
+/// State Pattern & Memento Pattern: Multi-threaded password verification and recovery engine.
+///
+/// Supports full lifecycle task state machine control (Pause / Resume / Cancel / Checkpoint save & restore).
 public final class PasswordRecoveryEngine: @unchecked Sendable {
     public let checkpointCaretaker: TaskCheckpointCaretaker
     
@@ -19,7 +28,7 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
         self.checkpointCaretaker = checkpointCaretaker
     }
     
-    /// 针对受密码保护的归档文件执行策略链比对与标头校验，支持 ArchiveTaskStateMachine 状态控制
+    /// Tests dictionary candidate passwords against encrypted archive headers.
     public func recoverPassword(
         archivePath: String,
         dictionary: [String],
@@ -38,7 +47,6 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
             try? stateMachine?.fail(error: err)
             throw err
         }
-        
         
         let sm = stateMachine ?? ArchiveTaskStateMachine(
             taskName: "PasswordRecovery:\((archivePath as NSString).lastPathComponent)",
@@ -60,7 +68,7 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
         let start = Date()
         
         for i in startIndex..<totalCount {
-            // 响应 PausedState 挂起状态
+            // Handle PausedState
             while sm.currentState is PausedState {
                 let pauseMemento = TaskCheckpointMemento(
                     taskID: sm.id,
@@ -80,12 +88,12 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
                 }
             }
             
-            // 响应 CancellingState 善后终止状态
+            // Handle CancellingState
             if Task.isCancelled || sm.currentState is CancellingState {
                 if !(sm.currentState is FailedState) {
                     try? sm.cancel()
                 }
-                throw CommandError.executionFailed(reason: "密码破解任务已被中断取消")
+                throw CommandError.executionFailed(reason: "Password recovery task was cancelled")
             }
             
             let pwd = dictionary[i]
@@ -142,7 +150,7 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
         return result
     }
     
-    /// 深度校验给出的密码能否正确解开归档标头或内容 (100% 进程内纯 C 引擎快速微提取探测)
+    /// Probes archive header password in-process without extracting entire archive.
     private static func testArchivePassword(archivePath: String, password: String) async -> Bool {
         let tempDir = (NSTemporaryDirectory() as NSString).appendingPathComponent("TTZip_PwdTest_\(UUID().uuidString)")
         try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
@@ -158,7 +166,7 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
         }
     }
 
-    /// 【3.6 模板方法模式 (Template Method Pattern)】使用密码恢复骨架模板执行破解与恢复
+    /// Template Method Pattern execution of password recovery workflow.
     public func recoverPasswordViaTemplate(
         archivePath: String,
         dictionary: [String],

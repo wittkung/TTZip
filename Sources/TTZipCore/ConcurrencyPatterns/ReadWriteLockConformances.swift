@@ -1,19 +1,25 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 【Pattern 4.2 读写锁 / 线程安全缓存模式】读写锁缓存接入协议 (Read-Write Lock Cacheable Protocol)
-/// 统一规范 TTZip Core 代理与关键服务组件的并发缓存监控、清理与指标导出
+/// Protocol for cacheable components with read-write lock synchronization.
 public protocol ReadWriteLockCacheable: Sendable {
-    /// 缓存名称/标识
+    /// Human-readable cache identifier.
     var cacheName: String { get }
     
-    /// 当前缓存条目总数
+    /// Current count of items stored in cache.
     var cacheEntryCount: Int { get }
     
-    /// 清空热内存缓存
+    /// Evicts all cached entries.
     func purgeCache()
 }
 
-// MARK: - ArchiveInspectionCacheProxy ReadWriteLockCacheable 适配
+// MARK: - ArchiveInspectionCacheProxy Conformance
 
 extension ArchiveInspectionCacheProxy: ReadWriteLockCacheable {
     public var cacheName: String {
@@ -29,7 +35,7 @@ extension ArchiveInspectionCacheProxy: ReadWriteLockCacheable {
     }
 }
 
-// MARK: - CharsetDetectionStrategyContext ReadWriteLockCacheable 适配
+// MARK: - CharsetDetectionStrategyContext Conformance
 
 extension CharsetDetectionStrategyContext: ReadWriteLockCacheable {
     public var cacheName: String {
@@ -37,7 +43,7 @@ extension CharsetDetectionStrategyContext: ReadWriteLockCacheable {
     }
     
     public var cacheEntryCount: Int {
-        return 0 // CharsetDetector 在内部单例 Context 中托管 ReadWriteLockCache
+        return 0
     }
     
     public func purgeCache() {
@@ -45,7 +51,7 @@ extension CharsetDetectionStrategyContext: ReadWriteLockCacheable {
     }
 }
 
-// MARK: - PresetManager ReadWriteLockCacheable 适配
+// MARK: - PresetManager Conformance
 
 extension PresetManager: ReadWriteLockCacheable {
     public var cacheName: String {

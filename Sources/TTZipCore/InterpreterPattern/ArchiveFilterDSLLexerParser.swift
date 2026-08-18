@@ -1,7 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - ArchiveFilterDSLLexer (词法分析器)
+// MARK: - ArchiveFilterDSLLexer
 
+/// Lexer performing tokenization of DSL filter query strings.
 public final class ArchiveFilterDSLLexer: Sendable {
     private let input: String
     
@@ -18,13 +26,13 @@ public final class ArchiveFilterDSLLexer: Sendable {
         while index < length {
             let char = chars[index]
             
-            // 1. 跳过空白字符
+            // 1. Whitespace skipping
             if char.isWhitespace {
                 index += 1
                 continue
             }
             
-            // 2. 括号与标点符号
+            // 2. Parentheses and punctuation
             if char == "(" {
                 tokens.append(.leftParen)
                 index += 1
@@ -46,7 +54,7 @@ public final class ArchiveFilterDSLLexer: Sendable {
                 continue
             }
             
-            // 3. 比较运算符
+            // 3. Comparison operators
             if char == ">" {
                 if index + 1 < length && chars[index + 1] == "=" {
                     tokens.append(.greaterThanOrEqual)
@@ -79,7 +87,6 @@ public final class ArchiveFilterDSLLexer: Sendable {
             }
             if char == "!" {
                 if index + 1 < length && chars[index + 1] == "=" {
-                    // != 运算符处理
                     tokens.append(.identifier("!="))
                     index += 2
                 } else {
@@ -89,7 +96,7 @@ public final class ArchiveFilterDSLLexer: Sendable {
                 continue
             }
             
-            // 4. 双字符逻辑运算符 && 和 ||
+            // 4. Logical operators (&& and ||)
             if char == "&" {
                 if index + 1 < length && chars[index + 1] == "&" {
                     tokens.append(.and)
@@ -105,7 +112,7 @@ public final class ArchiveFilterDSLLexer: Sendable {
                 }
             }
             
-            // 5. 字符串字面量 ("..." 或 '...')
+            // 5. String literals
             if char == "\"" || char == "'" {
                 let quote = char
                 index += 1
@@ -137,7 +144,7 @@ public final class ArchiveFilterDSLLexer: Sendable {
                 continue
             }
             
-            // 6. 标识符 / 关键字 / 纯数字 / 包含通配符的单词
+            // 6. Identifiers, keywords, numbers, or glob words
             var valueStr = ""
             let startPos = index
             while index < length {
@@ -145,7 +152,6 @@ public final class ArchiveFilterDSLLexer: Sendable {
                 if c.isWhitespace || c == "(" || c == ")" || c == ":" || c == "," || c == ">" || c == "<" || c == "=" || c == "\"" || c == "'" {
                     break
                 }
-                // 处理逻辑运算符中断
                 if c == "&" && index + 1 < length && chars[index + 1] == "&" { break }
                 if c == "|" && index + 1 < length && chars[index + 1] == "|" { break }
                 
@@ -157,7 +163,6 @@ public final class ArchiveFilterDSLLexer: Sendable {
                 throw DSLParseError.invalidSyntax(message: "Unexpected character '\(char)'", position: startPos)
             }
             
-            // 检查逻辑关键字 (大小写不敏感)
             let upper = valueStr.uppercased()
             if upper == "AND" {
                 tokens.append(.and)
@@ -176,8 +181,9 @@ public final class ArchiveFilterDSLLexer: Sendable {
     }
 }
 
-// MARK: - ArchiveFilterDSLParser (递归下降语法解析器)
+// MARK: - ArchiveFilterDSLParser
 
+/// Recursive descent parser constructing `ArchiveFilterExpressionProtocol` AST trees.
 public final class ArchiveFilterDSLParser: Sendable {
     private let tokens: [DSLToken]
     
@@ -210,20 +216,18 @@ public final class ArchiveFilterDSLParser: Sendable {
             let parser = ArchiveFilterDSLParser(tokens: parsedTokens)
             return try parser.parse()
         } catch {
-            // 容错降级逻辑: 无法作为复杂 DSL 解析时，自动降级为文件名通配模糊查询
             return FilenameGlobExpression(pattern: trimmed)
         }
     }
     
-    // MARK: - 递归下降算符优先级处理
+    // MARK: - Recursive Descent Precedence Parsers
     
-    // 优先级 1: OR 表达式 (最低优先级)
     private func parseOrExpression(tokens: [DSLToken], index: inout Int) throws -> any ArchiveFilterExpressionProtocol {
         var left = try parseAndExpression(tokens: tokens, index: &index)
         
         while index < tokens.count {
             if tokens[index] == .or {
-                index += 1 // 消费 OR
+                index += 1
                 let right = try parseAndExpression(tokens: tokens, index: &index)
                 left = OrExpression(left: left, right: right)
             } else {
@@ -233,17 +237,15 @@ public final class ArchiveFilterDSLParser: Sendable {
         return left
     }
     
-    // 优先级 2: AND 表达式 (及隐式 AND 连接)
     private func parseAndExpression(tokens: [DSLToken], index: inout Int) throws -> any ArchiveFilterExpressionProtocol {
         var left = try parseNotExpression(tokens: tokens, index: &index)
         
         while index < tokens.count {
             if tokens[index] == .and {
-                index += 1 // 消费 AND
+                index += 1
                 let right = try parseNotExpression(tokens: tokens, index: &index)
                 left = AndExpression(left: left, right: right)
             } else if canStartPrimaryExpression(at: index, tokens: tokens) {
-                // 隐式 AND 拼接: 例如 ext:pdf size:>10MB
                 let right = try parseNotExpression(tokens: tokens, index: &index)
                 left = AndExpression(left: left, right: right)
             } else {
@@ -253,17 +255,15 @@ public final class ArchiveFilterDSLParser: Sendable {
         return left
     }
     
-    // 优先级 3: NOT 单目表达式
     private func parseNotExpression(tokens: [DSLToken], index: inout Int) throws -> any ArchiveFilterExpressionProtocol {
         if index < tokens.count && tokens[index] == .not {
-            index += 1 // 消费 NOT
+            index += 1
             let operand = try parseNotExpression(tokens: tokens, index: &index)
             return NotExpression(operand: operand)
         }
         return try parsePrimaryExpression(tokens: tokens, index: &index)
     }
     
-    // 优先级 4: 基本表达元 (Primary Expression)
     private func parsePrimaryExpression(tokens: [DSLToken], index: inout Int) throws -> any ArchiveFilterExpressionProtocol {
         guard index < tokens.count else {
             throw DSLParseError.unexpectedToken(token: nil, expected: "expression")
@@ -271,28 +271,24 @@ public final class ArchiveFilterDSLParser: Sendable {
         
         let currentToken = tokens[index]
         
-        // A. 括号表达式 (...)
         if currentToken == .leftParen {
-            index += 1 // 消费 '('
+            index += 1
             let innerExpr = try parseOrExpression(tokens: tokens, index: &index)
             guard index < tokens.count && tokens[index] == .rightParen else {
                 throw DSLParseError.unexpectedToken(token: index < tokens.count ? tokens[index] : nil, expected: ")")
             }
-            index += 1 // 消费 ')'
+            index += 1
             return innerExpr
         }
         
-        // B. Key:Value 结构 (例如 ext:pdf, size:>50MB, modified:<7d, name:*draft*)
         if case .identifier(let fieldName) = currentToken {
             let lowerField = fieldName.lowercased()
             if index + 1 < tokens.count && tokens[index + 1] == .colon {
-                // 这是一个 Key:Value 结构
-                index += 2 // 消费 fieldName 与 ':'
+                index += 2
                 return try parseKeyValueExpression(field: lowerField, tokens: tokens, index: &index)
             }
         }
         
-        // C. 普通文本 / 模糊通配符匹配 (无 key 前缀)
         switch currentToken {
         case .identifier(let val):
             index += 1
@@ -308,9 +304,7 @@ public final class ArchiveFilterDSLParser: Sendable {
         }
     }
     
-    // 解析 Key:Value 语法结构
     private func parseKeyValueExpression(field: String, tokens: [DSLToken], index: inout Int) throws -> any ArchiveFilterExpressionProtocol {
-        // 提取可选的运算符 (如 >, <, >=, <=, =)
         var op: ComparisonOperator = .greaterThan
         var hasExplicitOp = false
         
@@ -341,7 +335,6 @@ public final class ArchiveFilterDSLParser: Sendable {
             }
         }
         
-        // 提取 Field 对应的值字符串 (支持逗号分隔列表，如 ext:jpg,png)
         var rawValueParts: [String] = []
         while index < tokens.count {
             switch tokens[index] {
@@ -358,7 +351,6 @@ public final class ArchiveFilterDSLParser: Sendable {
                 break
             }
             
-            // 如果紧接着是逗号，消费逗号并继续收集下一个值段
             if index < tokens.count && tokens[index] == .comma {
                 index += 1
             } else {
@@ -372,7 +364,6 @@ public final class ArchiveFilterDSLParser: Sendable {
         
         let rawValue = rawValueParts.joined(separator: ",")
         
-        // 根据 field 分派终结符类型
         switch field {
         case "ext", "extension", "type":
             let exts = rawValue.components(separatedBy: ",")
@@ -396,12 +387,10 @@ public final class ArchiveFilterDSLParser: Sendable {
             return expr
             
         default:
-            // 未知 Key 时降级为 FilenameGlobExpression
             return FilenameGlobExpression(pattern: "\(field):\(rawValue)")
         }
     }
     
-    // 判断 index 处的 token 是否能作为 Primary Expression 的起始符号
     private func canStartPrimaryExpression(at index: Int, tokens: [DSLToken]) -> Bool {
         guard index < tokens.count else { return false }
         switch tokens[index] {

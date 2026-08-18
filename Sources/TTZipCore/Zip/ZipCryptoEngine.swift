@@ -1,15 +1,23 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import CommonCrypto
 import CTTZipBridge
 
-/// 针对传统 ZipCrypto 与 WinZip AES-256 加密解密的高性能原生硬件加速引擎
+/// High-performance native cryptographic engine supporting traditional PKZIP ZipCrypto
+/// and WinZip AES-256 CTR mode with SIMD / NEON hardware acceleration.
 public final class ZipCryptoEngine: ZipCryptoEngineProtocol, @unchecked Sendable {
     public static let shared = ZipCryptoEngine()
     
     private init() {}
     
-    // MARK: - 1. PKZIP 传统 ZipCrypto 3-Key 解密流
+    // MARK: - 1. PKZIP Traditional ZipCrypto 3-Key Stream
     
     public struct ZipCryptoKeys {
         public var key0: UInt32 = 0x12345678
@@ -43,7 +51,7 @@ public final class ZipCryptoEngine: ZipCryptoEngineProtocol, @unchecked Sendable
         }
     }
     
-    /// 解密传统 ZipCrypto 数据 Payload (首先切除前 12 字节 header)
+    /// Decrypts traditional ZipCrypto payload (strips the initial 12-byte header).
     public func decryptZipCrypto(payload: Data, password: String) -> Data? {
         guard payload.count >= 12 else { return nil }
         var keys = ZipCryptoKeys(password: password)
@@ -63,13 +71,11 @@ public final class ZipCryptoEngine: ZipCryptoEngineProtocol, @unchecked Sendable
             }
         }
         
-        // 切除前 12 字节校验头
+        // Strip the 12-byte encryption check header
         return decrypted.subdata(in: 12..<decrypted.count)
     }
     
-    // MARK: - 2. WinZip AES-256 原生 Apple CryptoKit 硬件解密
-    
-    // MARK: - 2. WinZip AES-256 原生 Apple CommonCrypto / SIMD 硬件极速加解密
+    // MARK: - 2. WinZip AES-256 Native Apple CommonCrypto / SIMD Acceleration
 
     public func encryptAES256(payload: Data, password: String, actualCompressionMethod: UInt16) -> (payload: Data, compressionMethod: UInt16, extraField: Data)? {
         guard payload.count > 0, !password.isEmpty else { return nil }

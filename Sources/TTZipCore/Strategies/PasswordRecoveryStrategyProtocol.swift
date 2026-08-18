@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 密码恢复策略上下文与参数封装
+/// Password recovery execution parameters and context.
 public struct PasswordRecoveryContext: Sendable {
     public let archivePath: String
     public let dictionary: [String]
@@ -20,26 +27,26 @@ public struct PasswordRecoveryContext: Sendable {
     }
 }
 
-/// 【3.1 策略模式】密码恢复策略统一抽象接口协议
+/// Abstract password recovery strategy interface (Strategy Pattern).
 public protocol PasswordRecoveryStrategyProtocol: Sendable {
-    /// 策略可读名称
+    /// Strategy name.
     var strategyName: String { get }
     
-    /// 判断在给定 Context 下是否具备执行条件
+    /// Determines whether strategy can execute under given context.
     func canExecute(context: PasswordRecoveryContext) -> Bool
     
-    /// 执行密码比对策略，并在找到正确密码时返回
+    /// Executes password search strategy and returns recovered password with attempt counts.
     func recover(
         context: PasswordRecoveryContext,
         verifier: @Sendable @escaping (String) async -> Bool
     ) async throws -> (foundPassword: String?, attempts: Int64)
 }
 
-// MARK: - 具体密码恢复策略实现 (Concrete Password Recovery Strategies)
+// MARK: - Concrete Password Recovery Strategies
 
-/// 1. 密码保险库历史优先尝试策略 (`PasswordVaultHistoryStrategy`)
+/// 1. Password vault history candidate matching strategy (`PasswordVaultHistoryStrategy`).
 public final class PasswordVaultHistoryStrategy: PasswordRecoveryStrategyProtocol {
-    public let strategyName: String = "密码保险库历史匹配策略"
+    public let strategyName: String = "Password Vault History Strategy"
     private let vaultProvider: @Sendable () -> PasswordVaultManaging
     
     public init(vaultProvider: @Sendable @escaping () -> PasswordVaultManaging = { PasswordVaultManager.shared }) {
@@ -69,9 +76,9 @@ public final class PasswordVaultHistoryStrategy: PasswordRecoveryStrategyProtoco
     }
 }
 
-/// 2. 多核并发字典匹配恢复策略 (`DictionaryRecoveryStrategy`)
+/// 2. Multi-core parallel dictionary recovery strategy (`DictionaryRecoveryStrategy`).
 public final class DictionaryRecoveryStrategy: PasswordRecoveryStrategyProtocol {
-    public let strategyName: String = "多核并行字典破解策略"
+    public let strategyName: String = "Parallel Dictionary Recovery Strategy"
     
     public init() {}
     
@@ -85,7 +92,6 @@ public final class DictionaryRecoveryStrategy: PasswordRecoveryStrategyProtocol 
     ) async throws -> (foundPassword: String?, attempts: Int64) {
         let dict = context.dictionary
         
-        // 小字典无需 TaskGroup 开销，同步单线程快速验证
         if dict.count <= 100 {
             var attempts: Int64 = 0
             for pwd in dict {
@@ -97,7 +103,6 @@ public final class DictionaryRecoveryStrategy: PasswordRecoveryStrategyProtocol 
             return (nil, attempts)
         }
         
-        // 大字典多核并行验证
         let threads = AppleSiliconTuner.shared.topology.totalCores
         let chunkSize = max(1, dict.count / threads)
         
@@ -140,14 +145,13 @@ public final class DictionaryRecoveryStrategy: PasswordRecoveryStrategyProtocol 
     }
 }
 
-/// 3. 组合字符集多核并发暴力穷举策略 (`BruteForceRecoveryStrategy`)
+/// 3. Multi-core combinatoric brute force search strategy (`BruteForceRecoveryStrategy`).
 public final class BruteForceRecoveryStrategy: PasswordRecoveryStrategyProtocol {
-    public let strategyName: String = "字符集多核并行暴力穷举策略"
+    public let strategyName: String = "Parallel Brute Force Search Strategy"
     
     public init() {}
     
     public func canExecute(context: PasswordRecoveryContext) -> Bool {
-        // 当提供了有效字符集与穷举长度限制，且 (未提供字典 或 显式指定短穷举) 时执行
         return !context.charset.isEmpty && context.maxBruteForceLength > 0 && (context.dictionary.isEmpty || context.maxBruteForceLength <= 3)
     }
     
@@ -166,7 +170,6 @@ public final class BruteForceRecoveryStrategy: PasswordRecoveryStrategyProtocol 
             if Task.isCancelled { break }
             
             if len == 1 || charset.count < threads {
-                // 短单字符极小空间快速处理
                 var indices = Array(repeating: 0, count: len)
                 while true {
                     if Task.isCancelled { break }
@@ -186,7 +189,6 @@ public final class BruteForceRecoveryStrategy: PasswordRecoveryStrategyProtocol 
                     if pos < 0 { break }
                 }
             } else {
-                // 多核 TaskGroup 空间分片并行穷举
                 let chunkSize = max(1, charset.count / threads)
                 var foundPwd: String? = nil
                 
@@ -247,9 +249,9 @@ public final class BruteForceRecoveryStrategy: PasswordRecoveryStrategyProtocol 
     }
 }
 
-// MARK: - Strategy Executor & Context (密码恢复策略链执行器)
+// MARK: - Strategy Executor & Context
 
-/// 密码恢复策略调配执行器 (`PasswordRecoveryStrategyExecutor`)
+/// Coordinator executing password recovery strategies in prioritized sequence.
 public final class PasswordRecoveryStrategyExecutor: @unchecked Sendable {
     public static let shared = PasswordRecoveryStrategyExecutor()
     private let lock = NSLock()
@@ -285,7 +287,7 @@ public final class PasswordRecoveryStrategyExecutor: @unchecked Sendable {
         return strategies
     }
     
-    /// 按策略链优先级依次执行密码破解与恢复
+    /// Executes password recovery against configured strategy sequence.
     public func recoverPassword(
         context: PasswordRecoveryContext,
         verifier: @Sendable @escaping (String) async -> Bool

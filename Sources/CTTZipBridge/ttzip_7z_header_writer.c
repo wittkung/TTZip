@@ -1,5 +1,14 @@
-// ttzip_7z_header_writer.c
-// TTZip 原生 7z 容器头部元数据序列化与落盘中枢 (拆分自 ttzip_lzma2_enc_native.c，严格控制单文件 < 500 行)
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_7z_header_writer.c
+ * @brief TTZip native 7Z container header metadata serializer and disk flush coordinator.
+ */
 
 #include "include/ttzip_7z_header_writer.h"
 #include "include/CTTZipBridge.h"

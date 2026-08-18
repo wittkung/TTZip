@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 跨平台路径清洗与安全审计分析结果
+/// Cross-platform path sanitization and normalization analysis outcome.
 public struct PlatformPathNormalizationResult: Sendable, Equatable {
     public let originalPath: String
     public let normalizedPath: String
@@ -32,7 +39,7 @@ public struct PlatformPathNormalizationResult: Sendable, Equatable {
     }
 }
 
-/// 跨平台统一文件元数据
+/// Unified cross-platform file system metadata attributes.
 public struct PlatformFileAttributes: Sendable, Equatable {
     public let size: Int64
     public let isDirectory: Bool
@@ -64,7 +71,7 @@ public struct PlatformFileAttributes: Sendable, Equatable {
     }
 }
 
-/// 虚拟内存映射结果实体
+/// Virtual memory mapping descriptor.
 public struct PlatformMmapResult: @unchecked Sendable {
     public let pointer: UnsafeRawPointer
     public let size: Int
@@ -87,7 +94,7 @@ public struct PlatformMmapResult: @unchecked Sendable {
     }
 }
 
-/// CPU 架构与硬件加速特性集合
+/// CPU architecture and SIMD hardware acceleration feature mask.
 public struct CPUFeatureSet: Sendable, Equatable {
     public let architecture: String
     public let logicalCores: Int

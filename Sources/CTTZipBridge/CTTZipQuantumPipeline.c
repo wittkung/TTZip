@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipQuantumPipeline.h"
 #include "include/CTTZipBridge.h"
 #include <string.h>
@@ -7,16 +14,15 @@
 #include <arm_neon.h>
 #endif
 
-// 1. ARM NEON 矢量硬件 4KB 极速 Shannon 熵过滤器
+// 1. ARM NEON vector hardware 4KB rapid Shannon entropy filter
 double ttzip_quantum_calc_entropy_neon(const void* buf, size_t len) {
     if (!buf || len == 0) return 0.0;
     
-    // 只取前 4KB 数据做 001ms 瞬时热点取样
+    // Sample initial 4KB chunk for fast entropy classification
     size_t sample_size = len > 4096 ? 4096 : len;
     const uint8_t* u8_ptr = (const uint8_t*)buf;
     uint32_t counts[256] = {0};
     
-    // 矢量化或高效平铺累加
     for (size_t i = 0; i < sample_size; i++) {
         counts[u8_ptr[i]]++;
     }
@@ -35,7 +41,7 @@ double ttzip_quantum_calc_entropy_neon(const void* buf, size_t len) {
     return entropy;
 }
 
-// 2. 128-Bit ARM NEON 64-Byte 突发无分支 (Branchless) 内存拷贝
+// 2. 128-Bit ARM NEON 64-byte burst branchless memory copy
 void ttzip_quantum_copy_branchless_neon(void* dst, const void* src, size_t len) {
     if (!dst || !src || len == 0) return;
     
@@ -44,7 +50,6 @@ void ttzip_quantum_copy_branchless_neon(void* dst, const void* src, size_t len) 
     
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
     size_t i = 0;
-    // 每次 64 字节 (4 个 128-bit 寄存器) 突发写落盘
     for (; i + 64 <= len; i += 64) {
         uint8x16_t v0 = vld1q_u8(s + i);
         uint8x16_t v1 = vld1q_u8(s + i + 16);
@@ -56,7 +61,6 @@ void ttzip_quantum_copy_branchless_neon(void* dst, const void* src, size_t len) 
         vst1q_u8(d + i + 32, v2);
         vst1q_u8(d + i + 48, v3);
     }
-    // 剩余尾字节
     if (i < len) {
         memcpy(d + i, s + i, len - i);
     }
@@ -65,7 +69,7 @@ void ttzip_quantum_copy_branchless_neon(void* dst, const void* src, size_t len) 
 #endif
 }
 
-// 3. 矢量 RLE 超高速预压缩检测 (0.001ms 瞬时压缩全 0 或重复字节)
+// 3. Vector RLE pre-compression probe for duplicate/zero byte streams
 size_t ttzip_quantum_rle_compress_neon(const void* src, size_t src_size, void* dst, size_t dst_capacity) {
     if (!src || !dst || src_size == 0 || dst_capacity < 9) return 0;
     
@@ -81,7 +85,6 @@ size_t ttzip_quantum_rle_compress_neon(const void* src, size_t src_size, void* d
     for (; i + 16 <= src_size; i += 16) {
         uint8x16_t chunk = vld1q_u8(s + i);
         uint8x16_t cmp = vceqq_u8(chunk, pattern);
-        // 如果 16 字节不全相等
         uint64x2_t v64 = vreinterpretq_u64_u8(cmp);
         if (vgetq_lane_u64(v64, 0) != 0xFFFFFFFFFFFFFFFFULL || vgetq_lane_u64(v64, 1) != 0xFFFFFFFFFFFFFFFFULL) {
             all_same = false;
@@ -106,7 +109,7 @@ size_t ttzip_quantum_rle_compress_neon(const void* src, size_t src_size, void* d
 #endif
     
     if (all_same) {
-        // 头部 magic 标记 RLE: [0x54, 0x54, 0x52, 0x4C, Byte, 4-byte count]
+        // Header magic tag for RLE: [0x54, 0x54, 0x52, 0x4C, Byte, 4-byte count]
         d[0] = 0x54; d[1] = 0x54; d[2] = 0x52; d[3] = 0x4C;
         d[4] = first_byte;
         uint32_t count = (uint32_t)src_size;
@@ -114,7 +117,7 @@ size_t ttzip_quantum_rle_compress_neon(const void* src, size_t src_size, void* d
         return 9;
     }
     
-    return 0; // 无法使用 RLE 编码
+    return 0;
 }
 
 size_t ttzip_quantum_rle_decompress_neon(const void* src, size_t src_size, void* dst, size_t dst_capacity) {
@@ -133,7 +136,7 @@ size_t ttzip_quantum_rle_decompress_neon(const void* src, size_t src_size, void*
     return 0;
 }
 
-// 4. Quantum 两阶段 (Two-Pass) 解耦解压架构
+// 4. Quantum Two-Pass decoupled decompression
 size_t ttzip_quantum_decompress_two_pass(
     const void* src,
     size_t src_size,
@@ -142,11 +145,11 @@ size_t ttzip_quantum_decompress_two_pass(
 ) {
     if (!src || !dst || src_size == 0) return 0;
     
-    // 1. 尝试 RLE 瞬时解压
+    // 1. Check RLE fast path
     size_t rle_out = ttzip_quantum_rle_decompress_neon(src, src_size, dst, dst_capacity);
     if (rle_out > 0) return rle_out;
     
-    // 2. 直通 libdeflate Thread-Local 复用池解压
+    // 2. Direct libdeflate thread-local decompressor
     size_t actual_out = ttzip_libdeflate_decompress(src, src_size, dst, dst_capacity);
     return actual_out;
 }

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AppKit
 import WebKit
@@ -69,7 +76,7 @@ public struct EBookReaderPreviewView: View {
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "arrow.up.forward.app.fill")
-                                Text("系统阅读器打开")
+                                Text("Open in Reader")
                             }
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.white)
@@ -85,7 +92,7 @@ public struct EBookReaderPreviewView: View {
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "folder.fill")
-                                Text("Finder 中定位")
+                                Text("Reveal in Finder")
                             }
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.primary)
@@ -150,7 +157,7 @@ public struct InteractiveEPUBReaderView: View {
                                 .font(.system(size: 11))
                                 .foregroundStyle(TTZipTheme.bambooGreen)
                             
-                            Text(bookModel.chapters.indices.contains(selectedChapterIndex) ? bookModel.chapters[selectedChapterIndex].title : "章节")
+                            Text(bookModel.chapters.indices.contains(selectedChapterIndex) ? bookModel.chapters[selectedChapterIndex].title : "Chapter")
                                 .font(.system(size: 11, weight: .bold))
                                 .lineLimit(1)
                             
@@ -187,7 +194,7 @@ public struct InteractiveEPUBReaderView: View {
                             Image(systemName: "textformat")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundStyle(TTZipTheme.bambooGreen)
-                            Text("排版")
+                            Text("Typography")
                                 .font(.system(size: 10, weight: .bold))
                                 .lineLimit(1)
                             Image(systemName: "chevron.down")
@@ -211,7 +218,7 @@ public struct InteractiveEPUBReaderView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .help("自定义字体、字号与阅读主题")
+                .help("Customize font, size, and theme")
                 .popover(isPresented: $showTypographyPopover, arrowEdge: .bottom) {
                     EPUBTypographyPopoverView(
                         fontFamily: $fontFamily,
@@ -304,7 +311,7 @@ public struct InteractiveEPUBReaderView: View {
                 .padding(10)
             } else {
                 Spacer()
-                Text("暂无可加载章节内容")
+                Text("No chapter content available")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -330,7 +337,7 @@ public struct EPUBTypographyPopoverView: View {
                 Image(systemName: "textformat")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(TTZipTheme.bambooGreen)
-                Text("阅读排版与主题")
+                Text("Typography & Theme")
                     .font(.system(size: 12, weight: .bold))
                 Spacer()
             }
@@ -338,21 +345,21 @@ public struct EPUBTypographyPopoverView: View {
             Divider()
             
             VStack(alignment: .leading, spacing: 6) {
-                Text("字体系列")
+                Text("Font Family")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
                 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                    fontChip("思源宋体", key: "serif")
-                    fontChip("楷体书法", key: "kaiti")
-                    fontChip("苹方黑体", key: "sans")
-                    fontChip("仿宋排版", key: "fangsong")
+                    fontChip("Serif", key: "serif")
+                    fontChip("Kaiti", key: "kaiti")
+                    fontChip("Sans-Serif", key: "sans")
+                    fontChip("Fangsong", key: "fangsong")
                 }
             }
             
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("字号大小")
+                    Text("Font Size")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -389,14 +396,14 @@ public struct EPUBTypographyPopoverView: View {
             }
             
             VStack(alignment: .leading, spacing: 6) {
-                Text("阅读背景")
+                Text("Theme")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
                 
                 HStack(spacing: 12) {
-                    themeOptionButton(name: "纯白", key: "light", fill: Color.white, stroke: Color.gray.opacity(0.3))
-                    themeOptionButton(name: "羊皮纸", key: "sepia", fill: Color(red: 0.97, green: 0.94, blue: 0.88), stroke: Color.gray.opacity(0.3))
-                    themeOptionButton(name: "夜间", key: "dark", fill: Color(red: 0.12, green: 0.12, blue: 0.12), stroke: Color.gray.opacity(0.3))
+                    themeOptionButton(name: "Light", key: "light", fill: Color.white, stroke: Color.gray.opacity(0.3))
+                    themeOptionButton(name: "Sepia", key: "sepia", fill: Color(red: 0.97, green: 0.94, blue: 0.88), stroke: Color.gray.opacity(0.3))
+                    themeOptionButton(name: "Dark", key: "dark", fill: Color(red: 0.12, green: 0.12, blue: 0.12), stroke: Color.gray.opacity(0.3))
                     
                     Button(action: { themeMode = "transparent" }) {
                         VStack(spacing: 3) {
@@ -410,7 +417,7 @@ public struct EPUBTypographyPopoverView: View {
                             }
                             .overlay(Circle().strokeBorder(themeMode == "transparent" ? TTZipTheme.bambooGreen : Color.clear, lineWidth: 2))
                             
-                            Text("✨全透明")
+                            Text("Glass")
                                 .font(.system(size: 9, weight: themeMode == "transparent" ? .bold : .regular))
                                 .foregroundStyle(themeMode == "transparent" ? TTZipTheme.bambooGreen : .secondary)
                         }
@@ -453,5 +460,3 @@ public struct EPUBTypographyPopoverView: View {
         .buttonStyle(.plain)
     }
 }
-
-

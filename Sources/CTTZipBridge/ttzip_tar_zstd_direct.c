@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_tar_zstd_direct.c
+ * @brief High-speed zero-copy Direct TAR.ZST pipeline and state-machine extractor.
+ */
+
 #include "include/ttzip_tar_zstd_direct.h"
 #include "include/CTTZipBridge.h"
 #include "include/CTTZipBridge_Archive.h"
@@ -16,7 +28,6 @@
 #include <archive_entry.h>
 #include <dispatch/dispatch.h>
 
-// 标准 USTAR 512 字节头部格式化器
 static void format_ustar_header(
     uint8_t header[512],
     const char* rel_path,
@@ -95,7 +106,7 @@ static int add_item_to_zstd_stream(
         if (!formatted_rel) return TTZIP_ERR_OUT_OF_MEMORY;
     }
     
-    // 0. 若路径超过 100 字节，写入标准 Pax LongLink 头部
+    // 0. If path > 100 bytes, write standard Pax LongLink header
     size_t fmt_len = strlen(formatted_rel);
     if (fmt_len > 100) {
         size_t name_len = fmt_len + 1;
@@ -136,7 +147,7 @@ static int add_item_to_zstd_stream(
     uint8_t tar_hdr[512];
     format_ustar_header(tar_hdr, formatted_rel, &st);
     
-    // 1. 写入 Tar Header 512B
+    // 1. Write Tar Header 512B
     ZSTD_inBuffer in_hdr = { tar_hdr, 512, 0 };
     while (in_hdr.pos < in_hdr.size) {
         ZSTD_compressStream2(cctx, out, &in_hdr, ZSTD_e_continue);
@@ -149,7 +160,7 @@ static int add_item_to_zstd_stream(
         }
     }
     
-    // 2. 若为常规文件，以 Direct mmap 零拷贝写入 (mmap 失败时安全降级为分块流式读取)
+    // 2. Regular file zero-copy direct write
     if (S_ISREG(st.st_mode) && st.st_size > 0) {
         int in_fd = open(full_path, O_RDONLY);
         if (in_fd >= 0) {
@@ -193,7 +204,7 @@ static int add_item_to_zstd_stream(
             close(in_fd);
         }
         
-        // Tar 512 字节对齐填充
+        // Tar 512-byte alignment padding
         size_t rem = (size_t)(st.st_size % 512);
         if (rem > 0) {
             size_t pad = 512 - rem;
@@ -212,7 +223,7 @@ static int add_item_to_zstd_stream(
         }
     }
     
-    // 3. 若为目录，递归子项
+    // 3. Directory recursion
     if (S_ISDIR(st.st_mode)) {
         DIR* dir = opendir(full_path);
         if (dir) {
@@ -286,7 +297,7 @@ static int ttzip_create_tar_zstd_raw_direct_c(const char* output_path, const cha
     memcpy(out_map, &magic, 4);
     
     // 2. Frame Header: Single Segment, 4-byte FCS
-    out_map[4] = 0xA0; // Single Segment, 4-byte FCS
+    out_map[4] = 0xA0;
     uint32_t fcs32 = (uint32_t)total_tar;
     memcpy(out_map + 5, &fcs32, 4);
     
@@ -445,7 +456,6 @@ int ttzip_create_tar_zstd_direct_c(
         }
     }
     
-    // 写入 Tar 结束标记 (1024 字节全零)
     uint8_t end_tar[1024] = {0};
     ZSTD_inBuffer in_end = { end_tar, 1024, 0 };
     while (in_end.pos < in_end.size) {
@@ -455,7 +465,6 @@ int ttzip_create_tar_zstd_direct_c(
         }
     }
     
-    // 收尾并刷盘
     size_t remaining;
     do {
         remaining = ZSTD_compressStream2(cctx, &out, &(ZSTD_inBuffer){NULL, 0, 0}, ZSTD_e_end);
@@ -470,7 +479,6 @@ int ttzip_create_tar_zstd_direct_c(
     return TTZIP_OK;
 }
 
-// 从 8 进制字符串解析 64 位整数
 static inline uint64_t parse_octal(const char* p, size_t len) {
     uint64_t val = 0;
     while (len > 0 && (*p == ' ' || *p == '\0')) { p++; len--; }
@@ -504,7 +512,6 @@ int ttzip_extract_tar_zstd_direct_c(
         return TTZIP_ERR_FILE_NOT_FOUND;
     }
 
-    // 采用 Direct In-Process ZSTD 解码器
     ZSTD_DCtx* dctx = ZSTD_createDCtx();
     if (!dctx) {
         if (in_fd != STDIN_FILENO) close(in_fd);
@@ -526,7 +533,6 @@ int ttzip_extract_tar_zstd_direct_c(
     ZSTD_inBuffer in = { in_buf, 0, 0 };
     ZSTD_outBuffer out = { out_buf, out_cap, 0 };
 
-    // 内部 Tar 状态机
     uint8_t tar_hdr[512];
     size_t hdr_pos = 0;
     char current_filename[1024] = {0};
@@ -551,7 +557,6 @@ int ttzip_extract_tar_zstd_direct_c(
             ssize_t rd = read(in_fd, in_buf, in_cap);
             if (rd < 0) { ret_code = TTZIP_ERR_OPEN_FAILED; break; }
             if (rd == 0) {
-                // EOF on input
                 if (out.pos == 0) break;
             }
             in.src = in_buf;
@@ -574,7 +579,7 @@ int ttzip_extract_tar_zstd_direct_c(
         const uint8_t* p = (const uint8_t*)out.dst;
 
         while (chunk_pos < chunk_avail) {
-            // 1. 如果正在写入当前文件载荷
+            // 1. Write file payload
             if (in_file_payload) {
                 size_t needed = (size_t)(current_file_remaining < (uint64_t)(chunk_avail - chunk_pos) ? current_file_remaining : (uint64_t)(chunk_avail - chunk_pos));
                 if (needed > 0) {
@@ -603,7 +608,7 @@ int ttzip_extract_tar_zstd_direct_c(
                 continue;
             }
 
-            // 2. 如果正在跳过 512 字节对齐填充
+            // 2. Skip alignment padding
             if (current_pad_remaining > 0) {
                 size_t skip = (size_t)(current_pad_remaining < (uint64_t)(chunk_avail - chunk_pos) ? current_pad_remaining : (uint64_t)(chunk_avail - chunk_pos));
                 chunk_pos += skip;
@@ -611,7 +616,7 @@ int ttzip_extract_tar_zstd_direct_c(
                 continue;
             }
 
-            // 3. 如果正在读取 LongLink 变长文件名
+            // 3. Read LongLink variable-length filename
             if (in_long_name) {
                 size_t needed = (size_t)(long_name_len < (uint64_t)(chunk_avail - chunk_pos) ? long_name_len : (uint64_t)(chunk_avail - chunk_pos));
                 if (needed > 0) {
@@ -630,7 +635,7 @@ int ttzip_extract_tar_zstd_direct_c(
                 continue;
             }
 
-            // 4. 组装 512 字节 Tar Header
+            // 4. Assemble 512-byte Tar Header
             size_t needed_hdr = 512 - hdr_pos;
             size_t take = needed_hdr < (chunk_avail - chunk_pos) ? needed_hdr : (chunk_avail - chunk_pos);
             memcpy(tar_hdr + hdr_pos, p + chunk_pos, take);
@@ -639,7 +644,6 @@ int ttzip_extract_tar_zstd_direct_c(
 
             if (hdr_pos == 512) {
                 hdr_pos = 0;
-                // 检查是否全零块
                 bool is_all_zero = true;
                 for (int i = 0; i < 512; i++) {
                     if (tar_hdr[i] != 0) { is_all_zero = false; break; }
@@ -647,7 +651,6 @@ int ttzip_extract_tar_zstd_direct_c(
                 if (is_all_zero) {
                     zero_block_count++;
                     if (zero_block_count >= 2) {
-                        // Tar 正常结束
                         stream_ended = true;
                         break;
                     }
@@ -666,7 +669,6 @@ int ttzip_extract_tar_zstd_direct_c(
                     continue;
                 }
 
-                const char* entry_name = (long_name_buf[0] != '\0') ? long_name_buf : (const char*)tar_hdr;
                 char resolved_name[1024];
                 if (long_name_buf[0] != '\0') {
                     strncpy(resolved_name, long_name_buf, sizeof(resolved_name) - 1);
@@ -678,7 +680,6 @@ int ttzip_extract_tar_zstd_direct_c(
                 }
 
                 if (skip_mac_junk && ttzip_is_mac_junk(resolved_name)) {
-                    // 跳过该条目数据与填充
                     current_file_remaining = fsize;
                     current_pad_remaining = ((fsize + 511) & ~(uint64_t)511) - fsize;
                     continue;

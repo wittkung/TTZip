@@ -1,7 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 【3.2 观察者模式 (Observer Pattern)】线程安全的高性能进度广播总线 (`ArchiveProgressBroadcaster`)
-/// 负责在压缩、解压、修复与批处理任务进行中向所有订阅者线程安全地分发实时进度与吞吐率数据
+/// Thread-safe high-throughput progress broadcaster dispatching real-time telemetry metrics.
 public final class ArchiveProgressBroadcaster: @unchecked Sendable {
     public static let shared = ArchiveProgressBroadcaster()
     
@@ -10,7 +16,7 @@ public final class ArchiveProgressBroadcaster: @unchecked Sendable {
     
     private init() {}
     
-    /// 注册进度观察者（支持指定 UI 主线程或自定义队列分发）
+    /// Registers a progress observer with optional dispatch queue specification.
     public func addObserver(_ observer: ArchiveProgressObserverProtocol, dispatchQueue: DispatchQueue? = nil) {
         lock.lock()
         defer { lock.unlock() }
@@ -24,7 +30,7 @@ public final class ArchiveProgressBroadcaster: @unchecked Sendable {
         }
     }
     
-    /// 移除指定进度观察者
+    /// Unregisters a progress observer.
     public func removeObserver(_ observer: ArchiveProgressObserverProtocol) {
         lock.lock()
         defer { lock.unlock() }
@@ -32,7 +38,7 @@ public final class ArchiveProgressBroadcaster: @unchecked Sendable {
         observers.removeAll { $0.observer === observer || !$0.isAlive }
     }
     
-    /// 清空所有注册的进度观察者
+    /// Removes all registered observers.
     public func removeAllObservers() {
         lock.lock()
         defer { lock.unlock() }
@@ -40,7 +46,7 @@ public final class ArchiveProgressBroadcaster: @unchecked Sendable {
         observers.removeAll()
     }
     
-    /// 当前活动观察者数量
+    /// Count of currently active registered observers.
     public var observerCount: Int {
         lock.lock()
         defer { lock.unlock() }
@@ -49,7 +55,7 @@ public final class ArchiveProgressBroadcaster: @unchecked Sendable {
         return observers.count
     }
     
-    /// 广播单文件/单任务进度更新
+    /// Broadcasts single operation progress update.
     public func broadcastProgress(_ progress: ArchiveProgressInfo) {
         lock.lock()
         observers.removeAll { !$0.isAlive }
@@ -63,7 +69,7 @@ public final class ArchiveProgressBroadcaster: @unchecked Sendable {
         }
     }
     
-    /// 广播批处理任务整体进度更新
+    /// Broadcasts batch task progress update.
     public func broadcastBatchProgress(_ progress: BatchProgressInfo) {
         lock.lock()
         observers.removeAll { !$0.isAlive }

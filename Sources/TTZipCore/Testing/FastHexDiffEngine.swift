@@ -1,24 +1,30 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 零堆分配的高性能 16 字节对齐 HexDump 差分格式化引擎 (对标 libarchive `hexdump` 与 `assertion_equal_mem`)
+/// High-performance 16-byte aligned HexDump binary diff engine with zero heap allocation (aligned with libarchive `hexdump` and `assertion_equal_mem`).
 public enum FastHexDiffEngine: Sendable {
     private static let hexDigits: [UInt8] = Array("0123456789ABCDEF".utf8)
     
-    /// 快速比对两个缓冲区并在首个分歧处生成 16 字节对齐的差分窗口
+    /// Quickly compares two buffers and generates a 16-byte aligned diff window at the first divergence offset.
     ///
     /// - Parameters:
-    ///   - expected: 期望缓冲区切片
-    ///   - actual: 实际缓冲区切片
-    ///   - maxWindow: 差分展示最大字节数（默认 256 字节，防止刷屏）
-    ///   - useAnsi: 是否启用 ANSI 终端高亮颜色 (默认 true)
-    /// - Returns: 若完全一致返回 nil；若分歧返回格式化的差分文本
+    ///   - expected: Expected buffer pointer.
+    ///   - actual: Actual buffer pointer.
+    ///   - maxWindow: Maximum window size in bytes (defaults to 256 to prevent terminal flood).
+    ///   - useAnsi: Whether to enable ANSI color formatting (defaults to true).
+    /// - Returns: nil if buffers match exactly; formatted diff text otherwise.
     public static func generateDiff(
         expected: UnsafeRawBufferPointer,
         actual: UnsafeRawBufferPointer,
         maxWindow: Int = 256,
         useAnsi: Bool = true
     ) -> String? {
-        // 快速处理零长度特例
         if expected.count == 0 && actual.count == 0 {
             return nil
         }
@@ -29,10 +35,9 @@ public enum FastHexDiffEngine: Sendable {
         if minLen > 0, let pExp = expected.baseAddress, let pAct = actual.baseAddress {
             var offset = 0
             
-            // 1. 64 字节 SIMD 块跳跃寻找首个分歧块 (利用 libc/NEON 高度优化的 memcmp)
+            // 1. 64-byte block acceleration via libc/NEON optimized memcmp
             while offset + 64 <= minLen {
                 if memcmp(pExp.advanced(by: offset), pAct.advanced(by: offset), 64) != 0 {
-                    // 在发生分歧的 64 字节块内，先以 8 字节 (64-bit 字) 快速收敛，再精确到单字节
                     var inner = offset
                     let innerEnd = offset + 64
                     while inner + 8 <= innerEnd {
@@ -53,7 +58,7 @@ public enum FastHexDiffEngine: Sendable {
                 offset += 64
             }
             
-            // 若 64 字节块内未发生分歧，检查尾部剩余字节
+            // Tail scan
             if mismatchOffset == minLen {
                 while offset + 8 <= minLen {
                     if pExp.loadUnaligned(fromByteOffset: offset, as: UInt64.self) != pAct.loadUnaligned(fromByteOffset: offset, as: UInt64.self) {
@@ -73,17 +78,17 @@ public enum FastHexDiffEngine: Sendable {
             mismatchOffset = 0
         }
         
-        // 2. 若全部公共前缀一致且长度相同，则完全匹配，零堆分配立即返回 nil
+        // 2. Exact match check
         if mismatchOffset == minLen && expected.count == actual.count {
             return nil
         }
         
-        // 3. 计算 16 字节对齐的滑动展示窗口 (保留前置 64 字节上下文)
+        // 3. Sliding 16-byte aligned display window
         let start = max(0, (mismatchOffset - 64) & ~0x0F)
         let totalMaxLen = max(expected.count, actual.count)
         let end = min(totalMaxLen, start + maxWindow)
         
-        // 4. 预分配字符串缓冲组装格式化差分视图
+        // 4. Format output view
         var result = ""
         result.reserveCapacity(4096)
         
@@ -95,7 +100,7 @@ public enum FastHexDiffEngine: Sendable {
         for lineStart in stride(from: start, to: end, by: 16) {
             result.append(String(format: "  %08X  ", lineStart))
             
-            // Expected Hex 列 (16 字节，每字节固定 3 字符对齐)
+            // Expected Hex
             for i in lineStart..<lineStart + 16 {
                 if i < expected.count {
                     let b = expected[i]
@@ -123,7 +128,7 @@ public enum FastHexDiffEngine: Sendable {
             }
             result.append("  ")
             
-            // Actual Hex 列 (16 字节，每字节固定 3 字符对齐)
+            // Actual Hex
             for i in lineStart..<lineStart + 16 {
                 if i < actual.count {
                     let b = actual[i]
@@ -193,7 +198,7 @@ public enum FastHexDiffEngine: Sendable {
         return result
     }
     
-    /// Data 便捷重载
+    /// Data overload
     public static func generateDiff(
         expected: Data,
         actual: Data,

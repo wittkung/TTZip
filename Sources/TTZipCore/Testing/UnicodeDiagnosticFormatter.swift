@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// Unicode 标量展开与字符串编码诊断分析器 (对标 libarchive `strdump` 与 `_utf8_to_unicode`)
+/// Unicode scalar expansion and string encoding diagnostic analyzer (aligned with libarchive `strdump` and `_utf8_to_unicode`).
 public enum UnicodeDiagnosticFormatter: Sendable {
     
-    /// 将字符串展开为 Unicode 标量 16 进制序列与字符集统计
+    /// Expands string into hexadecimal Unicode scalar sequences and charset metrics.
     public static func dumpScalars(_ string: String) -> String {
         var scalarHexes: [String] = []
         for scalar in string.unicodeScalars {
@@ -17,7 +24,7 @@ public enum UnicodeDiagnosticFormatter: Sendable {
         return "\"\(escapeNonPrintable(string))\" [\(scalarSeq)] (chars: \(string.count), scalars: \(string.unicodeScalars.count), utf8: \(string.utf8.count)B)"
     }
     
-    /// 对比两个字符串并输出多维度差分诊断报告
+    /// Compares two strings and generates multi-dimensional divergence diagnostic reports.
     public static func analyzeStringMismatch(expected: String, actual: String) -> String {
         if expected.utf8.elementsEqual(actual.utf8) {
             return "Strings are strictly byte-for-byte identical."
@@ -27,7 +34,7 @@ public enum UnicodeDiagnosticFormatter: Sendable {
         report += "  Expected : " + dumpScalars(expected) + "\n"
         report += "  Actual   : " + dumpScalars(actual) + "\n"
         
-        // APFS NFD (Decomposed) vs NFC (Precomposed) 正规化冲突检测
+        // APFS NFD (Decomposed) vs NFC (Precomposed) normalization analysis
         let expNFC = (expected as NSString).precomposedStringWithCanonicalMapping
         let actNFC = (actual as NSString).precomposedStringWithCanonicalMapping
         let expNFD = (expected as NSString).decomposedStringWithCanonicalMapping
@@ -41,9 +48,8 @@ public enum UnicodeDiagnosticFormatter: Sendable {
         
         return report
     }
-
     
-    /// 转义控制字符与不可见字符
+    /// Escapes non-printable control characters.
     private static func escapeNonPrintable(_ string: String) -> String {
         var result = ""
         for scalar in string.unicodeScalars {

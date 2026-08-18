@@ -1,10 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 /**
  * @file CTTZipPlatformTimer.c
- * @brief 跨平台纳秒级单调硬件计时器与时钟校准实现
- * @details 采用零系统调用、128 位宽整数防溢出与静态时基缓存架构，
- *          完全对齐 TurboBench 与 lzbench 高精度单调时钟规范。
- * @version 1.0
- * @author TTZip Core Engineering Team
+ * @brief Cross-platform nanosecond monotonic hardware timer and calibration implementation.
+ * @details Conforms strictly to TurboBench and lzbench precision monotonic timer standards
+ *          with zero system calls on the critical timing path and 128-bit overflow safety.
  */
 
 #include "include/CTTZipPlatformTimer.h"
@@ -19,7 +24,6 @@
   #include <time.h>
 #endif
 
-/* 静态全局时钟配置与校准缓存 */
 static bool                      g_timer_initialized = false;
 static ttzip_timer_calibration_t g_calibration_cache = {
     .platform_os = "Unknown",
@@ -62,8 +66,6 @@ void ttzip_platform_timer_init(void) {
     g_calibration_cache.timebase_denom = g_darwin_tb.denom;
     g_calibration_cache.timer_backend = "mach_absolute_time";
 
-    /* 计算时钟基础频率 (Hz) */
-    /* 1,000,000,000 * denom / numer */
     uint64_t freq = (1000000000ULL * (uint64_t)g_darwin_tb.denom) / (uint64_t)g_darwin_tb.numer;
     g_calibration_cache.frequency_hz = freq;
     g_calibration_cache.resolution_nanos = (double)g_darwin_tb.numer / (double)g_darwin_tb.denom;
@@ -115,7 +117,7 @@ void ttzip_platform_timer_init(void) {
     g_calibration_cache.resolution_nanos = 1.0;
 #endif
 
-    /* 测算单次调用平均开销 (Overhead) */
+    // Measure invocation overhead
     g_timer_initialized = true;
     uint64_t t_start = ttzip_platform_monotonic_nanos();
     const int probe_count = 1000;

@@ -1,6 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
+/// Unified error taxonomy for archive operations across all formats.
 public enum ArchiveError: Error, LocalizedError, Equatable {
     case fileNotFound
     case readFailed(code: Int32)
@@ -16,25 +24,27 @@ public enum ArchiveError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .fileNotFound:
-            return "指定归档文件路径不存在"
+            return "Archive file not found at specified path"
         case .readFailed(let code):
-            return "读取归档失败，错误代码: \(code)"
+            return "Failed to read archive header or entries (code: \(code))"
         case .invalidFormat:
-            return "无法识别的归档格式"
+            return "Unrecognized or invalid archive format"
         case .passwordRequired:
-            return "归档已被加密，请输入解压密码"
+            return "Archive is password-protected. Please enter password"
         case .passwordRequiredDetailed(_, let tier):
-            return tier == .headerAndData ? "归档头部与文件名已被加密，请输入解压密码以浏览内容" : "归档数据已被加密，请输入解压密码"
+            return tier == .headerAndData
+                ? "Archive header and entries are encrypted. Password required to list contents"
+                : "Archive payload data is encrypted. Password required to extract"
         case .wrongPassword:
-            return "解压密码错误，请重新输入"
+            return "Incorrect password for archive"
         case .unsupportedEncryptionMethod(_, let method):
-            return "当前系统暂不支持该加密算法: \(method)"
+            return "Unsupported cryptographic algorithm or encryption method: \(method)"
         case .corruptedData(_, let entryPath):
-            return "条目校验失败或数据已损坏: \(entryPath)"
+            return "Data corruption or checksum mismatch detected in entry: \(entryPath)"
         case .cancelled:
-            return "归档操作已被取消"
+            return "Archive operation was cancelled by user"
         case .invalidState:
-            return "归档任务状态非法或拒绝转移"
+            return "Archive engine task entered an invalid state"
         }
     }
 }
@@ -43,7 +53,7 @@ private final class EntryAccumulator {
     var entries: [ArchiveEntry] = []
 }
 
-/// 高性能流式归档文件读取引擎 (100% 进程内纯原生 C 驱动，零 Subprocess)
+/// High-performance stream-based archive reader (100% in-process C binding).
 public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
     internal let hardwareTuner: HardwareTunerProtocol
     public let targetFormat: ArchiveCompressionFormat?
@@ -56,7 +66,7 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
         self.targetFormat = targetFormat
     }
     
-    /// 异步检查并读取归档文件的目录结构列表 (支持 Swift 6 Task 取消感知与加密密码解析)
+    /// Asynchronously inspects archive hierarchy with cooperative Swift 6 Task cancellation support.
     public func inspect(archivePath: String) async throws -> [ArchiveEntry] {
         return try await inspect(archivePath: archivePath, password: nil)
     }
@@ -67,7 +77,7 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
             throw ArchiveError.fileNotFound
         }
         
-        // 0 字节空文件直接返回空条目
+        // Zero-byte empty file returns empty list directly
         if fileSize == 0 {
             return []
         }
@@ -77,7 +87,7 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
         return try await Task.detached(priority: .userInitiated) {
             let lower = archivePath.lowercased()
             
-            // 针对分卷 .001 处理
+            // Handle split multi-volume archives (.001)
             var targetInspectPath = archivePath
             var cleanupTempPath: String? = nil
             if lower.hasSuffix(".001") {
@@ -131,7 +141,7 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                     return accumulator.entries
                 }
                 
-                // 若为 7z 或带密码加密包，尝试利用进程内 C 提取引擎沙盒探测
+                // For encrypted archives or complex 7z containers, fallback to sandboxed probing
                 let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("inspect_temp_\(UUID().uuidString)").path
                 try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
                 defer { try? FileManager.default.removeItem(atPath: tempDir) }
@@ -206,7 +216,7 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                 return entries
             }
             
-            // 尝试密码库口令池
+            // Try password candidate pool
             let candidates = candidatePasswords ?? (PasswordVaultManager.shared.autoUnlockArchives ? PasswordVaultManager.shared.candidatePasswordsForAutoUnlock() : [])
             if password == nil || password?.isEmpty == true {
                 for cand in candidates {
@@ -216,7 +226,7 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                 }
             }
             
-            // 若 7z 或 zip 加密包且无密码或密码错误
+            // Password required error
             if (lower.contains(".7z") || lower.contains(".zip") || lower.contains(".rar")) && (password == nil || password?.isEmpty == true) {
                 throw ArchiveError.passwordRequired
             }

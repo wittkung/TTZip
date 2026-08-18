@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 目录树构建性能指标
+/// Directory tree building performance metric.
 public struct TreeBuildMetric: Codable, Sendable, Equatable {
     public let entryCount: Int
     public let rootNodeCount: Int
@@ -15,7 +22,7 @@ public struct TreeBuildMetric: Codable, Sendable, Equatable {
     }
 }
 
-/// 搜索与过滤性能指标
+/// Search and filtering performance metric.
 public struct SearchFilterMetric: Codable, Sendable, Equatable {
     public let datasetSize: Int
     public let query: String
@@ -32,7 +39,7 @@ public struct SearchFilterMetric: Codable, Sendable, Equatable {
     }
 }
 
-/// LRU 内存缓存性能指标
+/// LRU memory cache performance metric.
 public struct LRUCacheMetric: Codable, Sendable, Equatable {
     public let operationsCount: Int
     public let capacity: Int
@@ -49,7 +56,7 @@ public struct LRUCacheMetric: Codable, Sendable, Equatable {
     }
 }
 
-/// 进度更新节流性能指标
+/// Progress event throttling performance metric.
 public struct ProgressThrottleMetric: Codable, Sendable, Equatable {
     public let totalEvents: Int
     public let emittedEvents: Int
@@ -66,7 +73,7 @@ public struct ProgressThrottleMetric: Codable, Sendable, Equatable {
     }
 }
 
-/// 前端性能全套基准测试汇总报告
+/// Consolidated frontend performance report model.
 public struct FrontendPerformanceReport: Codable, Sendable, Equatable {
     public let timestamp: Date
     public let hardwareSummary: String

@@ -1,7 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 全核并发 LIBDEFLATE 极速 ZIP 打包压缩引擎
+/// Multi-threaded parallel ZIP archive creation engine powered by libdeflate,
+/// dynamic entropy bypass, ZIP64 support, and optional WinZip AES-256 encryption.
 public final class ZipParallelWriter: @unchecked Sendable {
     public static let shared = ZipParallelWriter()
     
@@ -59,7 +67,7 @@ public final class ZipParallelWriter: @unchecked Sendable {
             
             let crc: UInt32
             if password != nil && !password!.isEmpty {
-                crc = 0 // WinZip AES-256 规范强制要求 CRC32 设为 0
+                crc = 0 // WinZip AES-256 specification requires CRC32 to be set to 0 in local header
             } else {
                 crc = rawData.withUnsafeBytes { ptr -> UInt32 in
                     guard let base = ptr.baseAddress else { return 0 }
@@ -337,7 +345,7 @@ public final class ZipParallelWriter: @unchecked Sendable {
             state: .completed,
             bytesProcessed: totalOriginalBytes,
             totalBytes: totalOriginalBytes,
-            currentFileName: "ZIP 打包完成",
+            currentFileName: "ZIP archive creation completed",
             throughputMBs: throughput
         ))
         

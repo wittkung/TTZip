@@ -1,11 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import os
 
-/// 线程安全的测试日志收集器与 POSIX 原子刷新中枢 (Atomic Chunk Flush)
+/// Thread-safe test log collector and POSIX atomic chunk flush coordinator.
 ///
-/// 在测试执行期间将日志捕获于内存会话中。
-/// - 成功用例：内存静默清空，终端 0 噪音；
-/// - 失败用例：单次原子输出完整证据链，100% 杜绝多线程测试输出交织。
+/// Buffers diagnostic logs in memory during test execution:
+/// - Passing test cases: silent memory cleanup with zero terminal noise.
+/// - Failing test cases: atomic single-chunk diagnostic dump preventing interleaved stdout writes.
 public final class TestLogCollector: @unchecked Sendable {
     public static let shared = TestLogCollector()
     
@@ -17,27 +24,27 @@ public final class TestLogCollector: @unchecked Sendable {
     
     private init() {}
     
-    /// 向指定会话追加日志
+    /// Appends log line to specified session.
     public func record(sessionID: String, message: String) {
         os_unfair_lock_lock(&lock)
         sessionBuffers[sessionID, default: []].append(message)
         os_unfair_lock_unlock(&lock)
     }
     
-    /// 向当前 TaskLocal 会话追加日志（若有）
+    /// Appends log line to current TaskLocal session if active.
     public func recordCurrent(message: String) {
         guard let sid = Self.currentSessionID else { return }
         record(sessionID: sid, message: message)
     }
     
-    /// 测试通过时静默清空会话内存
+    /// Clears session buffer upon test success.
     public func clear(sessionID: String) {
         os_unfair_lock_lock(&lock)
         sessionBuffers.removeValue(forKey: sessionID)
         os_unfair_lock_unlock(&lock)
     }
     
-    /// 测试失败时原子化刷新完整诊断报告到标准输出
+    /// Atomically flushes complete diagnostic report to standard output upon test failure.
     public func flushOnFailure(sessionID: String, failureHeader: String) {
         os_unfair_lock_lock(&lock)
         let logs = sessionBuffers.removeValue(forKey: sessionID) ?? []
@@ -57,14 +64,13 @@ public final class TestLogCollector: @unchecked Sendable {
         }
         output += "==========================================================================================\n\n"
         
-        // POSIX 原子文件锁刷新，杜绝多线程日志撕裂
         flockfile(stdout)
         fputs(output, stdout)
         fflush(stdout)
         funlockfile(stdout)
     }
     
-    /// 获取当前缓冲区日志快照（供生成 Markdown / JSON 报告使用）
+    /// Retrieves current captured logs snapshot for reporting.
     public func getCapturedLogs(sessionID: String) -> [String] {
         os_unfair_lock_lock(&lock)
         defer { os_unfair_lock_unlock(&lock) }

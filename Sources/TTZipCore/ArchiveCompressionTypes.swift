@@ -1,5 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
+/// Supported archive compression and container formats.
 public enum ArchiveCompressionFormat: String, Sendable, CaseIterable, Codable {
     case sevenZip = "7z"
     case zip = "zip"
@@ -18,7 +26,7 @@ public enum ArchiveCompressionFormat: String, Sendable, CaseIterable, Codable {
     case dmg = "dmg"
     case iso = "iso"
     
-    // 兼容复合与历史别名
+    // Composite aliases
     case tarGz = "tar.gz"
     case tarZst = "tar.zst"
     case tarBz2 = "tar.bz2"
@@ -70,12 +78,12 @@ public enum ArchiveCompressionFormat: String, Sendable, CaseIterable, Codable {
         }
     }
 
-    /// 7Z / DMG / ISO / Split Volume (.001) 兼容文件扩展名集合
+    /// 7Z / DMG / ISO / Split Volume (.001) compatible extensions set.
     public static let sevenZipFamilyExtensions: Set<String> = [
         ".7z", ".cb7", ".dmg", ".iso", ".001"
     ]
 
-    /// TAR 衍生全变体与 UnRAR / libarchive 全兼容文件扩展名集合
+    /// TAR derivative and libarchive compatible extensions set.
     public static let tarFamilyExtensions: Set<String> = [
         ".tar", ".tar.gz", ".tgz", ".tar.zst", ".tzst",
         ".tar.xz", ".txz", ".tar.bz2", ".tbz2", ".tar.lz",
@@ -84,7 +92,7 @@ public enum ArchiveCompressionFormat: String, Sendable, CaseIterable, Codable {
         ".aar", ".wim", ".dmg", ".iso", ".rar", ".cbr"
     ]
 
-    /// 根据扩展名或路径判定是否为归档文件格式
+    /// Determines whether a filename or path represents a known archive format.
     public static func isArchiveExtension(_ ext: String, path: String = "") -> Bool {
         let lowerExt = ext.lowercased()
         if ArchiveCompressionFormat(rawValue: lowerExt) != nil {
@@ -105,7 +113,7 @@ public enum ArchiveCompressionFormat: String, Sendable, CaseIterable, Codable {
         return false
     }
 
-    /// 根据扩展名或格式名称解析归档压缩格式
+    /// Resolves compression format from extension or name string.
     public static func from(extensionOrName: String) -> ArchiveCompressionFormat? {
         let cleaned = extensionOrName.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         if let direct = ArchiveCompressionFormat(rawValue: cleaned) {
@@ -131,33 +139,30 @@ public enum ArchiveCompressionFormat: String, Sendable, CaseIterable, Codable {
         }
     }
 
-
-
-    /// 根据扩展名与归档标记解析描述性类型名称
+    /// Resolves descriptive kind string for an item.
     public static func kindDescription(forExtension ext: String, isArchive: Bool, path: String = "") -> String {
         let lowerExt = ext.lowercased()
         if isArchive {
-            return "归档压缩包"
+            return "Archive Package"
         }
         if let format = ArchiveCompressionFormat(rawValue: lowerExt) {
-            return "\(format.displayName) 文件"
+            return "\(format.displayName) Archive"
         }
         
         switch lowerExt {
-        case "jpg", "jpeg": return "JPEG 图像"
-        case "png": return "PNG 图像"
-        case "gif": return "GIF 动画图像"
-        case "webp": return "WebP 图像"
-        case "heic": return "HEIC 高效图像"
-        case "pdf": return "PDF 文档"
-        case "mp4", "mov": return "MPEG-4 视频"
-        case "mp3", "wav", "m4a": return "音频文件"
-        case "txt", "md": return "文本文档"
-        case "swift", "py", "json": return "代码源文件"
-        default: return "\(ext.uppercased()) 文件"
+        case "jpg", "jpeg": return "JPEG Image"
+        case "png": return "PNG Image"
+        case "gif": return "GIF Animation"
+        case "webp": return "WebP Image"
+        case "heic": return "HEIC Image"
+        case "pdf": return "PDF Document"
+        case "mp4", "mov": return "MPEG-4 Video"
+        case "mp3", "wav", "m4a": return "Audio File"
+        case "txt", "md": return "Text Document"
+        case "swift", "py", "json": return "Source Code"
+        default: return "\(ext.uppercased()) File"
         }
     }
-
     
     public var shortcutBadge: String {
         switch self {
@@ -209,7 +214,7 @@ public enum ArchiveCompressionFormat: String, Sendable, CaseIterable, Codable {
         return self == .sevenZip || self == .zip
     }
     
-    /// 该格式支持的有效压缩级别列表
+    /// Supported compression levels for format.
     public var supportedLevels: [ArchiveCompressionLevel] {
         switch self {
         case .tar, .dmg, .iso, .aar:
@@ -220,6 +225,7 @@ public enum ArchiveCompressionFormat: String, Sendable, CaseIterable, Codable {
     }
 }
 
+/// Compression level scale (-5 to 22).
 public enum ArchiveCompressionLevel: Int, Sendable, CaseIterable, Identifiable, Codable {
     case fast5 = -5
     case fast4 = -4
@@ -250,7 +256,7 @@ public enum ArchiveCompressionLevel: Int, Sendable, CaseIterable, Identifiable, 
     case level21 = 21
     case level22 = 22
     
-    // 快捷兼容别名
+    // Convenience presets
     public static var fastest: ArchiveCompressionLevel { .level1 }
     public static var fast: ArchiveCompressionLevel { .level3 }
     public static var medium: ArchiveCompressionLevel { .level5 }
@@ -262,24 +268,24 @@ public enum ArchiveCompressionLevel: Int, Sendable, CaseIterable, Identifiable, 
     
     public var title: String {
         switch self {
-        case .fast5: return "⚡ 极限极速 (-5)"
-        case .fast4: return "⚡ 极限极速 (-4)"
-        case .fast3: return "⚡ 超极速 (-3)"
-        case .fast2: return "⚡ 超极速 (-2)"
-        case .fast1: return "⚡ 极速+ (-1)"
-        case .store: return "📦 仅存储 (0)"
-        case .level1: return "⚡ 极速 (1)"
-        case .level2: return "⚡ 极速+ (2)"
-        case .level3: return "🚀 较快 (3)"
-        case .level4: return "🚀 较快+ (4)"
-        case .level5: return "⚖️ 平衡 (5)"
-        case .level6: return "⚖️ 标准 (6)"
-        case .level7: return "💎 较高 (7)"
-        case .level8: return "💎 高 (8)"
-        case .level9: return "✨ 极限 (9)"
-        case .level10, .level11, .level12, .level13, .level14, .level15: return "✨ 极限+ (\(rawValue))"
-        case .level16, .level17, .level18, .level19: return "🔥 超极限 (\(rawValue))"
-        case .level20, .level21, .level22: return "🔥 变态极限 (\(rawValue))"
+        case .fast5: return "⚡ Fastest (-5)"
+        case .fast4: return "⚡ Fastest (-4)"
+        case .fast3: return "⚡ Fast (-3)"
+        case .fast2: return "⚡ Fast (-2)"
+        case .fast1: return "⚡ Fast (-1)"
+        case .store: return "📦 Store (0)"
+        case .level1: return "⚡ Fast (1)"
+        case .level2: return "⚡ Fast+ (2)"
+        case .level3: return "🚀 Fast (3)"
+        case .level4: return "🚀 Fast+ (4)"
+        case .level5: return "⚖️ Balanced (5)"
+        case .level6: return "⚖️ Standard (6)"
+        case .level7: return "💎 High (7)"
+        case .level8: return "💎 Maximum (8)"
+        case .level9: return "✨ Ultra (9)"
+        case .level10, .level11, .level12, .level13, .level14, .level15: return "✨ Ultra+ (\(rawValue))"
+        case .level16, .level17, .level18, .level19: return "🔥 Extreme (\(rawValue))"
+        case .level20, .level21, .level22: return "🔥 Ultra-Extreme (\(rawValue))"
         }
     }
     
@@ -289,20 +295,20 @@ public enum ArchiveCompressionLevel: Int, Sendable, CaseIterable, Identifiable, 
     
     public var detailDescription: String {
         switch self {
-        case .fast5, .fast4, .fast3, .fast2, .fast1: return "极致无损极速压缩，适合内部高速网络传输或高带宽流式处理"
-        case .store: return "仅归档打包不压缩，极速 I/O 吞吐，适合已压缩音视频/安装包"
-        case .level1: return "全核最高并发吞吐，最轻量字典匹配，快速打包传输"
-        case .level2: return "轻量级 LZ77 快速级别 2，兼顾响应与初期吞吐"
-        case .level3: return "轻量字典算法匹配，兼顾打包速度与初始体积"
-        case .level4: return "中轻度字典匹配，平衡速度与中间体积"
-        case .level5: return "中度算法匹配，平衡体积压缩比与 CPU 计算消耗"
-        case .level6: return "经典标准平衡点，通用场景首选推荐"
-        case .level7: return "深度字典与模式查找，进一步缩减存储空间"
-        case .level8: return "高阶深度算法匹配，追求极小体积"
-        case .level9: return "最大化深度算法字典查找，极限节省磁盘存储空间"
-        case .level10, .level11, .level12, .level13, .level14, .level15: return "突破级深度字典查找，在可控内存下逼近极限体积"
-        case .level16, .level17, .level18, .level19: return "极高内存占用的大规模历史查表匹配，只为极小空间设计"
-        case .level20, .level21, .level22: return "彻底无视内存占用与吞吐极限的变态级算法搜索（限 Zstd）"
+        case .fast5, .fast4, .fast3, .fast2, .fast1: return "Ultra-high throughput streaming compression"
+        case .store: return "Store without compression, maximum I/O throughput"
+        case .level1: return "Maximum multi-threaded throughput with lightweight matching"
+        case .level2: return "Lightweight LZ77 level 2"
+        case .level3: return "Fast dictionary matching balancing speed and ratio"
+        case .level4: return "Medium-fast dictionary matching"
+        case .level5: return "Balanced compression ratio and CPU utilization"
+        case .level6: return "Standard balanced profile for general workloads"
+        case .level7: return "Deep dictionary pattern matching"
+        case .level8: return "High compression ratio profile"
+        case .level9: return "Maximum dictionary search depth for minimal archive size"
+        case .level10, .level11, .level12, .level13, .level14, .level15: return "Extended dictionary search depth"
+        case .level16, .level17, .level18, .level19: return "High-memory table matching for minimal disk footprint"
+        case .level20, .level21, .level22: return "Exhaustive search compression (Zstandard only)"
         }
     }
     
@@ -311,38 +317,38 @@ public enum ArchiveCompressionLevel: Int, Sendable, CaseIterable, Identifiable, 
         self = ArchiveCompressionLevel(rawValue: clamped) ?? .level6
     }
     
-    /// 基于物理实测数据动态换算的相对压缩吞吐速度百分比 (最快标为 100%)
+    /// Measured relative throughput percentage (100% is peak).
     public func relativeSpeedPercentage(for format: ArchiveCompressionFormat? = nil) -> Int {
         let targetFormat = format ?? .zip
         return BenchmarkSpeedCache.shared.relativeSpeedPercentage(format: targetFormat, level: self)
     }
     
-    /// 实测相对速度标注徽章
+    /// Speed badge label.
     public func speedBadge(for format: ArchiveCompressionFormat? = nil) -> String {
         let pct = relativeSpeedPercentage(for: format)
-        return "\(pct)% 速度"
+        return "\(pct)% Speed"
     }
     
-    /// 基于物理实测数据动态获取的压缩体积百分比 (%)
+    /// Compression ratio percentage.
     public func compressionRatioPercent(for format: ArchiveCompressionFormat? = nil) -> Double {
         let targetFormat = format ?? .zip
         return BenchmarkSpeedCache.shared.compressionRatioPercent(format: targetFormat, level: self)
     }
     
-    /// 实测相对压缩体积与空间节省标注徽章
+    /// Ratio badge label.
     public func ratioBadge(for format: ArchiveCompressionFormat? = nil) -> String {
         let targetFormat = format ?? .zip
         return BenchmarkSpeedCache.shared.ratioBadge(format: targetFormat, level: self)
     }
 }
 
-/// 针对 ZIP 格式独立定制的高级参数配置
+/// Advanced configuration options specific to ZIP format.
 public struct ZipFormatOptions: Sendable, Equatable, Codable {
     public var zipEncryptionMethod: String // AES-256 / AES-128 / ZipCrypto
-    public var zipEncodingUTF8: Bool // 强制 UTF-8 语言编码标志
-    public var preservePosixAttributes: Bool // 保留 macOS / POSIX 文件权限与扩展属性
+    public var zipEncodingUTF8: Bool // UTF-8 language encoding flag
+    public var preservePosixAttributes: Bool // Preserve POSIX permissions and extended attributes
     public var zip64Mode: String // Auto / Always / Never
-    public var enableZeroCopy: Bool // APFS 物理零拷贝 Extent 克隆
+    public var enableZeroCopy: Bool // APFS physical zero-copy clone
     
     public init(
         zipEncryptionMethod: String = "AES-256",
@@ -359,12 +365,12 @@ public struct ZipFormatOptions: Sendable, Equatable, Codable {
     }
 }
 
-/// 针对 7Z 格式独立定制的高级参数配置
+/// Advanced configuration options specific to 7Z format.
 public struct SevenZipFormatOptions: Sendable, Equatable, Codable {
     public var algorithm: String // LZMA2 / LZMA / PPMd / BZip2
     public var dictionarySizeMB: Int // 16MB / 32MB / 64MB / 128MB / 256MB / 512MB
-    public var enableSolidArchive: Bool // 固实压缩 (Solid)
-    public var encryptFileNames: Bool // 标头加密 (mhe=on)
+    public var enableSolidArchive: Bool // Solid archiving
+    public var encryptFileNames: Bool // Encrypted headers (mhe=on)
     public var matchFinder: String // HC4 / BT4
     public var numFastBytes: Int // 5..273
     
@@ -385,14 +391,14 @@ public struct SevenZipFormatOptions: Sendable, Equatable, Codable {
     }
 }
 
-/// 针对 Zstandard (zst) 格式独立定制的高级参数配置
+/// Advanced configuration options specific to Zstandard (zst) format.
 public struct ZstdFormatOptions: Sendable, Equatable, Codable {
     public var zstdLevel: Int // 1..22
-    public var zstdEnableLDM: Bool // 长距离匹配 (Long Distance Matching)
-    public var zstdJobSizeMB: Int // 1MB..512MB 多线程块大小
-    public var zstdWindowLog: Int // 10..31 滑动窗口 Log2
-    public var zstdChecksum: Bool // XXHash64 帧完整性校验和
-    public var zstdDictPath: String? // Zstandard 外部训练字典文件路径
+    public var zstdEnableLDM: Bool // Long Distance Matching
+    public var zstdJobSizeMB: Int // 1MB..512MB multi-threaded chunk size
+    public var zstdWindowLog: Int // 10..31 sliding window log2
+    public var zstdChecksum: Bool // XXHash64 frame checksum
+    public var zstdDictPath: String? // External training dictionary file path
     
     public init(
         zstdLevel: Int = 3,
@@ -411,7 +417,7 @@ public struct ZstdFormatOptions: Sendable, Equatable, Codable {
     }
 }
 
-/// 针对 TAR 家族 (TAR, GZ, BZ2, XZ, LZIP, LZ4, BROTLI, LRZIP, SNAPPY) 的高级配置
+/// Advanced configuration options specific to TAR family.
 public struct TarFormatOptions: Sendable, Equatable, Codable {
     public var preservePosixPermissions: Bool
     public var usePaxHeader: Bool
@@ -428,7 +434,7 @@ public struct TarFormatOptions: Sendable, Equatable, Codable {
     }
 }
 
-/// 针对 Apple Archive (.aar) 原生流式归档的高级配置
+/// Advanced configuration options specific to Apple Archive (.aar).
 public struct AppleArchiveFormatOptions: Sendable, Equatable, Codable {
     public var compressionAlgorithm: String // LZFSE / LZ4 / ZSTD / LZMA
     public var preserveExtendedAttributes: Bool
@@ -445,7 +451,7 @@ public struct AppleArchiveFormatOptions: Sendable, Equatable, Codable {
     }
 }
 
-/// 针对 DMG / ISO 磁盘映像的高级配置
+/// Advanced configuration options specific to DMG / ISO disk images.
 public struct DiskImageFormatOptions: Sendable, Equatable, Codable {
     public var volumeName: String
     public var enableJolietExtension: Bool
@@ -462,7 +468,7 @@ public struct DiskImageFormatOptions: Sendable, Equatable, Codable {
     }
 }
 
-/// 针对 WIM 映像归档的高级配置
+/// Advanced configuration options specific to WIM image archives.
 public struct WimFormatOptions: Sendable, Equatable, Codable {
     public var compressionType: String // LZX / XPRESS / NONE
     public var imageName: String
@@ -479,7 +485,7 @@ public struct WimFormatOptions: Sendable, Equatable, Codable {
     }
 }
 
-/// 全局多格式统一高级专业配置包装模型
+/// Unified multi-format advanced configuration options model.
 public struct ArchiveAdvancedOptions: Sendable, Equatable {
     public var cpuThreads: Int
     public var zipOptions: ZipFormatOptions
@@ -490,7 +496,7 @@ public struct ArchiveAdvancedOptions: Sendable, Equatable {
     public var diskImageOptions: DiskImageFormatOptions
     public var wimOptions: WimFormatOptions
     
-    // 快捷兼容属性暴露
+    // Convenient property accessors
     public var algorithm: String {
         get { sevenZipOptions.algorithm }
         set { sevenZipOptions.algorithm = newValue }
@@ -607,9 +613,9 @@ public struct ArchiveAdvancedOptions: Sendable, Equatable {
     }
 }
 
-// MARK: - PrototypeCopyable 原型模式扩展
+// MARK: - PrototypeCopyable Prototype Pattern Extension
 extension ArchiveAdvancedOptions: PrototypeCopyable {
-    /// 原型模式深拷贝独立快照
+    /// Deep-copies this configuration model.
     public func clone() -> ArchiveAdvancedOptions {
         return ArchiveAdvancedOptions(
             cpuThreads: self.cpuThreads,
@@ -623,4 +629,3 @@ extension ArchiveAdvancedOptions: PrototypeCopyable {
         )
     }
 }
-

@@ -1,21 +1,27 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 字符集检测与乱码修复引擎
+/// Character encoding detection and filename sanitization interface.
 public enum CharsetDetector {
-    /// 自动检测传入 Data 数据的字符编码格式名称（如 GB18030, UTF-8）
+    /// Detects charset encoding name (e.g. GB18030, UTF-8, Shift-JIS) from raw byte sequence.
     public static func detectCharset(data: Data) -> String {
         return CharsetDetectionStrategyContext.shared.detectCharset(data: data)
     }
     
-    /// 尝试将原始字节文件名修复为正确无乱码的 Swift String (结合 CharsetDetectionStrategyContext)
+    /// Sanitizes raw filename byte sequences into valid Unicode Swift String.
     public static func sanitizeFilename(bytes: Data) -> String {
         return CharsetDetectionStrategyContext.shared.sanitizeFilename(bytes: bytes)
     }
     
-    /// 清空字符集识别与文件名修复缓存
+    /// Clears charset detection LRU caching structures.
     public static func clearCache() {
         CharsetDetectionStrategyContext.shared.clearCache()
     }
 }
-

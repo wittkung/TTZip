@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 专为 7z 格式 Level 0 (Store 模式) 打造的零拷贝物理落盘与 mmap 直写引擎
+/// Fast store mode (Level 0) stream writer for 7z container creation without compression overhead.
 public final class SevenZipStoreStreamWriter: @unchecked Sendable {
     public static let shared = SevenZipStoreStreamWriter()
     
     private init() {}
     
-    /// 同步极速创建 7z Store (L0) 归档文件
+    /// Synchronously creates a 7z Store (L0) archive container.
     public func createStoreArchive(
         outputPath: String,
         inputPaths: [String],
@@ -53,11 +60,10 @@ public final class SevenZipStoreStreamWriter: @unchecked Sendable {
                 state: .completed,
                 bytesProcessed: totalInputSize,
                 totalBytes: totalInputSize,
-                currentFileName: "7z Store 极速打包完成 (\(formattedTotal))",
+                currentFileName: "7z Store packaging complete (\(formattedTotal))",
                 throughputMBs: throughput
             ))
         }
         return success
     }
 }
-

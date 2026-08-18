@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipUtils.h"
 #include "include/CTTZipSysAlloc.h"
 
@@ -13,6 +20,8 @@
 #include <arm_acle.h>
 #include <zlib.h>
 #include <readpassphrase.h>
+#include <dispatch/dispatch.h>
+#include <libdeflate.h>
 
 #define AURA_IO_BUFFER_SIZE (4 * 1024 * 1024)
 
@@ -68,10 +77,6 @@ char* ttzip_detect_charset(const char* bytes, size_t length) {
     const char* detected = ttzip_detect_encoding_fast((const uint8_t*)bytes, length);
     return strdup(detected);
 }
-
-#include <dispatch/dispatch.h>
-#include <libdeflate.h>
-#include <zlib.h>
 
 uint32_t ttzip_compute_buffer_crc32(const void* buf, size_t len) {
     if (!buf || len == 0) return 0;
@@ -240,7 +245,7 @@ static void ttzip_calculate_dynamic_sampling_params(
     size_t* out_chunk_size
 ) {
     if (total_size <= 1024 * 1024) {
-        // <= 1MB: 1 point, full size (100% 采样)
+        // <= 1MB: 1 point, full size (100% sampling)
         *out_num_points = 1;
         *out_chunk_size = total_size;
     } else if (total_size <= 16 * 1024 * 1024) {
@@ -256,7 +261,7 @@ static void ttzip_calculate_dynamic_sampling_params(
         *out_num_points = 9;
         *out_chunk_size = 128 * 1024;
     } else {
-        // > 1GB: 17~33 points, 256KB each (4MB ~ 8MB 锁死上限)
+        // > 1GB: 17~33 points, 256KB each (4MB ~ 8MB capped)
         size_t gb = total_size / (1024 * 1024 * 1024ULL);
         int points = 17 + (int)(gb * 2);
         if (points > 33) points = 33;

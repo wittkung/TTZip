@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 7z 全核高密度多固实块 (-ms=128m) 物理极限打包压缩引擎 (Delegate to SevenZipEngine)
+/// Delegate facade dispatching parallel 7z archive creation operations.
 public final class SevenZipParallelWriter: @unchecked Sendable {
     public static let shared = SevenZipParallelWriter()
     

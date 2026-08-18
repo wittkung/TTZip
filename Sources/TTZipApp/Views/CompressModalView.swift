@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 import AppKit
@@ -29,7 +36,7 @@ public struct CompressModalView: View {
     @State private var isCompressionGuidePresented: Bool = false
     @State private var isPasswordVaultPresented: Bool = false
     
-    @State private var cpuThreadsOption: String = "全核"
+    @State private var cpuThreadsOption: String = "All Cores"
     @State private var dictionarySizeMB: Int = 32
     @State private var compressionAlgorithm: String = "LZMA2"
     @State private var zipEncryptionMethod: String = "AES-256"
@@ -66,17 +73,14 @@ public struct CompressModalView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // Header 报头
             CompressModalHeaderView(
                 selectedPresetID: $selectedPresetID,
                 onOpenGuide: { isCompressionGuidePresented = true },
                 onClose: { isPresented = false }
             )
             
-            // 主 ScrollView - 精简高效整合
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    // 1. 待压缩源文件清单
                     CompressFileListView(
                         itemsList: $itemsList,
                         selectedItemIDs: $selectedItemIDs,
@@ -87,7 +91,6 @@ public struct CompressModalView: View {
                         onRemoveSelected: removeSelectedItems
                     )
                     
-                    // 2. 目标配置与动态格式专属高级参数统一整合卡片
                     CompressIntegratedConfigSectionView(
                         outputName: $outputName,
                         targetDirectory: $targetDirectory,
@@ -124,13 +127,12 @@ public struct CompressModalView: View {
             
             Divider()
             
-            // 底部控制按钮栏
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "circle.grid.2x2.fill")
                         .font(.system(size: 10))
                         .foregroundStyle(TTZipTheme.bambooGreen)
-                    Text("共 \(itemsList.count) 项 · 总体积 \(ByteCountFormatterCache.string(fromByteCount: totalSizeBytes))")
+                    Text("Total \(itemsList.count) items · \(ByteCountFormatterCache.string(fromByteCount: totalSizeBytes))")
                         .font(.system(size: 11.5, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
@@ -138,7 +140,7 @@ public struct CompressModalView: View {
                 Spacer()
                 
                 Button(action: { isPresented = false }) {
-                    Text("取消")
+                    Text("Cancel")
                         .font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
@@ -151,7 +153,7 @@ public struct CompressModalView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.up.forward.app.fill")
                             .font(.system(size: 11, weight: .bold))
-                        Text("开始压缩 (⌘↵)")
+                        Text("Compress (⌘↵)")
                             .font(.system(size: 12, weight: .bold))
                     }
                     .foregroundStyle(.white)
@@ -186,7 +188,7 @@ public struct CompressModalView: View {
             VStack {
                 HStack {
                     Spacer()
-                    Button("关闭") { isPasswordVaultPresented = false }
+                    Button("Close") { isPasswordVaultPresented = false }
                 }
                 .padding()
                 PasswordVaultView(onSelectPassword: { pwd in
@@ -297,8 +299,7 @@ public struct CompressModalView: View {
         )
         let valResult = (try? ArchiveValidationPipeline.buildDefaultCompressPipeline().validate(context: valCtx)) ?? .success
         if case .failure(let err) = valResult {
-            // 前置拦截失败 - 更新状态并立即 return 退出
-            TTLogger.warning("⚠️ 压缩前置校验拦截: \(err.localizedDescription)")
+            TTLogger.warning("Compression validation intercept: \(err.localizedDescription)")
             return
         }
         

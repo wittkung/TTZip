@@ -1,22 +1,29 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档操作基础装饰器抽象 (Base Decorator in Decorator Pattern)
-/// 遵循 `ArchiveEngineImplementorProtocol` 接口，持有一份内层 `inner` 实现者的引用。
-/// 所有具体的装饰器扩展类继承该基类，并透传或重写 `compressStream` 与 `extractStream` 行为。
+/// Base decorator in the Decorator Pattern for archive operations.
+///
+/// Implements `ArchiveEngineImplementorProtocol` and forwards operations to the inner component.
 open class ArchiveOperationDecorator: ArchiveEngineImplementorProtocol, @unchecked Sendable {
-    /// 持有的被包装组件（可以是一个基础 Implementor，也可以是另一个 Decorator，形成 Decorator Chain）
+    /// Wrapped inner implementor or decorator.
     public var inner: ArchiveEngineImplementorProtocol
 
     public init(inner: ArchiveEngineImplementorProtocol) {
         self.inner = inner
     }
 
-    /// 对应的归档格式，透传至内层组件
+    /// Supported archive format forwarded to the inner component.
     open var supportedFormat: ArchiveCompressionFormat {
         return inner.supportedFormat
     }
 
-    /// 基础压缩流透传
+    /// Base compression stream forwarding.
     open func compressStream(
         inputPaths: [String],
         outputPath: String,
@@ -29,7 +36,7 @@ open class ArchiveOperationDecorator: ArchiveEngineImplementorProtocol, @uncheck
         )
     }
 
-    /// 基础解压流透传
+    /// Base extraction stream forwarding.
     open func extractStream(
         archivePath: String,
         destinationDir: String,
@@ -43,32 +50,32 @@ open class ArchiveOperationDecorator: ArchiveEngineImplementorProtocol, @uncheck
     }
 }
 
-// MARK: - Fluent Chaining API (装饰器链式叠加扩展)
+// MARK: - Fluent Chaining API
 
 extension ArchiveEngineImplementorProtocol {
-    /// 叠加透明加密/解密装饰器
+    /// Decorates the engine with transparent encryption / decryption capabilities.
     public func withEncryption(password: String?) -> EncryptionDecorator {
         return EncryptionDecorator(inner: self, password: password)
     }
 
-    /// 叠加平滑进度监控与 ETA 估算装饰器
+    /// Decorates the engine with progress monitoring and ETA tracking.
     public func withProgressMonitoring(
         progressHandler: (@Sendable (ArchiveProgress) -> Void)?
     ) -> ProgressMonitoringDecorator {
         return ProgressMonitoringDecorator(inner: self, progressHandler: progressHandler)
     }
 
-    /// 叠加分卷切片管理装饰器
+    /// Decorates the engine with split-volume management.
     public func withSplitVolume(splitVolumeSizeBytes: Int64?) -> SplitVolumeDecorator {
         return SplitVolumeDecorator(inner: self, splitVolumeSizeBytes: splitVolumeSizeBytes)
     }
 
-    /// 叠加数据校验和 (CRC32/SHA256) 实时校验装饰器
+    /// Decorates the engine with checksum verification (CRC-32 / SHA-256).
     public func withChecksumVerification(algorithm: HashType = .crc32) -> ChecksumVerificationDecorator {
         return ChecksumVerificationDecorator(inner: self, algorithm: algorithm)
     }
 
-    /// 叠加吞吐率 (MB/s) 与耗时瓶颈测量装饰器
+    /// Decorates the engine with throughput and timing metrics collection.
     public func withPerformanceMetrics() -> PerformanceMetricsDecorator {
         return PerformanceMetricsDecorator(inner: self)
     }

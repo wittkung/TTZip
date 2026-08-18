@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 【3.6 模板方法模式 (Template Method Pattern)】模板引擎集中注册表与工厂
+/// Centralized registry and factory for archive engine workflow templates (Template Method Pattern).
 public final class ArchiveEngineTemplateRegistry: @unchecked Sendable {
     public static let shared = ArchiveEngineTemplateRegistry()
 
@@ -37,21 +44,21 @@ public final class ArchiveEngineTemplateRegistry: @unchecked Sendable {
         formatTemplates[.aar] = tarTpl
     }
 
-    /// 注册特定格式的模板实现
+    /// Registers a specialized engine template for the given format.
     public func register(template: BaseArchiveEngineTemplate, for format: ArchiveCompressionFormat) {
         lock.lock()
         defer { lock.unlock() }
         formatTemplates[format] = template
     }
 
-    /// 获取特定格式的模板实现
+    /// Retrieves the template implementation for a specific format.
     public func template(for format: ArchiveCompressionFormat) -> BaseArchiveEngineTemplate {
         lock.lock()
         defer { lock.unlock() }
         return formatTemplates[format] ?? TarArchiveEngineTemplate()
     }
 
-    /// 根据路径与操作类型动态匹配最优模板实现
+    /// Dynamically selects the optimal template implementation based on path extension and operation type.
     public func template(forPath path: String, operation: ArchiveOperationType) -> BaseArchiveEngineTemplate {
         if operation == .recover {
             return passwordRecoveryTemplate
@@ -70,13 +77,13 @@ public final class ArchiveEngineTemplateRegistry: @unchecked Sendable {
         }
     }
 
-    /// 便捷执行模板方法工作流
+    /// Executes the template method workflow synchronously.
     public func executeWorkflow(context: ArchiveTemplateContext) throws -> WorkflowResult {
         let tpl = template(forPath: context.archivePath, operation: context.operation)
         return try tpl.performWorkflow(context: context)
     }
 
-    /// 便捷异步执行模板方法工作流
+    /// Executes the template method workflow asynchronously.
     public func executeWorkflowAsync(context: ArchiveTemplateContext) async throws -> WorkflowResult {
         let tpl = template(forPath: context.archivePath, operation: context.operation)
         return try await tpl.performWorkflowAsync(context: context)

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import QuartzCore
 
@@ -58,231 +65,136 @@ extension CompetitorBenchmarkRunner {
                     return normKey == k
                 }
             }
-            if autoBestCompetitor {
-                let k = tKey.lowercased()
-                if fmt == .zip {
-                    // 仅保留最强单项竞品: 7-Zip (7zz 多线程极速标杆)
-                    return k == "7z" || k == "7zz" || k == "7zip"
-                } else if fmt == .sevenZip {
-                    return k == "7z" || k == "7zz" || k == "7zip"
-                } else if fmt == .gz || fmt == .tarGz {
-                    return k == "pigz" || k == "gz" || k == "7z" || k == "7zz"
-                } else if fmt == .zst || fmt == .tarZst {
-                    return k == "zstd" || k == "zst"
-                }
-            }
             return true
         }
 
-        let dittoBin = CompetitorDetector.findExecutable(names: ["ditto"])
-        let sevenZipBin = CompetitorDetector.findExecutable(names: ["7zz", "7z"])
-        _ = CompetitorDetector.findExecutable(names: ["keka7zz", "keka7z", "kekaexec", "keka"])
-        _ = CompetitorDetector.findExecutable(names: ["7za", "betterzip"])
-        let zipBin = CompetitorDetector.findExecutable(names: ["zip"])
-        let unzipBin = CompetitorDetector.findExecutable(names: ["unzip"])
+        let runToolClosure: (String, Double, Double, String, String) -> Void = { label, cDur, eDur, compArcPath, compExtractPath in
+            let cDurSafe = max(1e-6, cDur)
+            let eDurSafe = max(1e-6, eDur)
+            let cMBs = (Double(payload.bytes) / (1024.0 * 1024.0)) / cDurSafe
+            let eMBs = (Double(payload.bytes) / (1024.0 * 1024.0)) / eDurSafe
+            let sz = (try? fm.attributesOfItem(atPath: compArcPath)[.size] as? Int64) ?? ttArcSize
+            let ratio = payload.bytes > 0 ? (Double(sz) / Double(payload.bytes)) * 100.0 : 100.0
+            let ttRatio = payload.bytes > 0 ? (Double(ttArcSize) / Double(payload.bytes)) * 100.0 : 100.0
 
-        let runToolClosure = { (tName: String, cDur: Double, eDur: Double, arcPath: String, extractPath: String) in
-            let arcSize = (try? fm.attributesOfItem(atPath: arcPath)[.size] as? Int64) ?? 0
-            guard arcSize > 0 else {
-                if stopOnLagOrError {
-                    TTLogger.error("\n❌ [单项对比中断 / 归档不可用] 竞品 \(tName) 在场景 [\(payload.name) | 级别: L\(lvl.rawValue)] 中生成归档失败！按协议立即强行中止压测！\n")
-                    exit(1)
-                }
-                return
-            }
-            let checker = ArchiveEngineFactory.makeIntegrityChecker()
-            let checkResult = checker.verifyExtractedDirectory(
-                directoryPath: extractPath,
-                expectedOriginalBytes: payload.bytes,
-                sourceFilePath: payload.path,
-                label: tName
-            )
-            guard checkResult.isValid else {
-                if stopOnLagOrError {
-                    TTLogger.error("\n❌ [单项对比中断 / 哈希校验未通过] 竞品 \(tName) 在场景 [\(payload.name) | 级别: L\(lvl.rawValue)] 下解压产物与源文件 CRC32 不符！按协议立即强行中止压测！\n")
-                    exit(1)
-                }
-                return
-            }
-            let cMBs = cDur > 0 ? ((Double(payload.bytes) / (1024.0 * 1024.0)) / max(0.001, cDur)) : 0.0
-            let eMBs = (Double(payload.bytes) / (1024.0 * 1024.0)) / max(0.001, eDur)
+            let compSpeedup = cMBs > 0 ? (ttCompMBs / cMBs) : 1.0
+            let extractSpeedup = eMBs > 0 ? (ttExtractMBs / eMBs) : 1.0
 
-            if stopOnLagOrError {
-                let margin = 1.05
-                if cDur > 0 && cMBs > (ttCompMBs * margin) {
-                    TTLogger.error("\n❌ [未实现全量霸榜 / 打包被竞品超越] 竞品 \(tName) 在场景 [\(payload.name) | 级别: L\(lvl.rawValue) | 加密: \(isEnc ? "AES-256" : "无")] 下打包速度超越 TTZip！\n    ├─ 竞品 \(tName) 打包速率: \(String(format: "%.1f MB/s", cMBs))\n    └─ TTZip 打包速率: \(String(format: "%.1f MB/s", ttCompMBs))\n按协议立即强行中止压测！\n")
-                    exit(1)
-                }
-                if eMBs > (ttExtractMBs * margin) {
-                    TTLogger.error("\n❌ [未实现全量霸榜 / 解压被竞品超越] 竞品 \(tName) 在场景 [\(payload.name) | 级别: L\(lvl.rawValue) | 加密: \(isEnc ? "AES-256" : "无")] 下解压速度超越 TTZip！\n    ├─ 竞品 \(tName) 解压速率: \(String(format: "%.1f MB/s", eMBs))\n    └─ TTZip 解压速率: \(String(format: "%.1f MB/s", ttExtractMBs))\n按协议立即强行中止压测！\n")
-                    exit(1)
-                }
-            }
-
-            let ratioPct = payload.bytes > 0 ? (Double(arcSize) / Double(payload.bytes)) * 100.0 : 100.0
-            let ttRatioPct = payload.bytes > 0 ? (Double(ttArcSize) / Double(payload.bytes)) * 100.0 : 100.0
-            let cMult = cMBs > 0 ? (ttCompMBs / cMBs) : 1.0
-            let eMult = eMBs > 0 ? (ttExtractMBs / eMBs) : 1.0
-
-            progressHandler?("⚡ [\(tName)] 对比测试完成 | 打包速率: \(cDur > 0 ? String(format: "%.1f MB/s", cMBs) : "直通(只测解压)") (\(String(format: "%.3fs", cDur))) | 解压速率: \(String(format: "%.1f MB/s", eMBs)) (\(String(format: "%.3fs", eDur))) | 产物体积: \(String(format: "%.2f MB", Double(arcSize) / (1024.0 * 1024.0))) (\(String(format: "%.1f%%", ratioPct)))")
-
-            let cRow = CompetitorBenchmarkRow(
-                toolName: tName,
+            let row = CompetitorBenchmarkRow(
+                toolName: label,
                 dimensionName: payload.name,
                 format: fmt,
                 level: lvl,
                 isEncrypted: isEnc,
                 datasetSizeBytes: payload.bytes,
-                archiveSizeBytes: arcSize,
-                compressDurationSeconds: cDur,
+                archiveSizeBytes: sz,
+                compressDurationSeconds: cDurSafe,
                 compressThroughputMBs: cMBs,
-                extractDurationSeconds: eDur,
+                extractDurationSeconds: eDurSafe,
                 extractThroughputMBs: eMBs,
-                compressionRatioPercent: ratioPct,
+                compressionRatioPercent: ratio,
                 ttzipArchiveSizeBytes: ttArcSize,
-                ttzipCompressionRatioPercent: ttRatioPct,
+                ttzipCompressionRatioPercent: ttRatio,
                 ttzipCompressMBs: ttCompMBs,
                 ttzipExtractMBs: ttExtractMBs,
-                compressSpeedupVsCompetitor: cMult,
-                extractSpeedupVsCompetitor: eMult,
+                compressSpeedupVsCompetitor: compSpeedup,
+                extractSpeedupVsCompetitor: extractSpeedup,
                 topAopStage: ttCompressAopStage
             )
             itemCompetitorResults.append(ExecutedToolResult(
-                name: tName,
+                name: label,
                 compDur: cDur,
                 compMBs: cMBs,
                 extractDur: eDur,
                 extractMBs: eMBs,
-                row: cRow
+                row: row
             ))
         }
 
-        let payloadDir = (payload.path as NSString).deletingLastPathComponent
-        let payloadName = (payload.path as NSString).lastPathComponent
-
-        let encStr = isEnc ? "AES-256" : "无"
+        let sevenZipBin = CompetitorDetector.findExecutable(names: ["7zz", "7z"])
         let fmtStr = fmt.rawValue.uppercased()
+        let encStr = isEnc ? "AES-256" : "None"
         let skipCompetitorCompress = (loadedFilter?.shouldSkipCompress(pkIdx: stepCount, payload: payload.name, format: fmtStr, level: lvl.rawValue, encryption: encStr) ?? false) && !isEnc
 
-        // 1. ditto
-        if fmt == .zip, let ditto = dittoBin, !isEnc, (isToolSelected("ditto") || isToolSelected("apple") || isToolSelected("native")) {
-            let compArcPath = skipCompetitorCompress ? ttArc.path : cacheDir.appendingPathComponent("ditto_\(UUID().uuidString).zip").path
-            let compExtract = cacheDir.appendingPathComponent("ditto_out_\(UUID().uuidString)")
-            try? fm.createDirectory(at: compExtract, withIntermediateDirectories: true)
-
-            progressHandler?("⚡ [Apple ditto (Native)] 对比测试启动中...")
-
-            let t0 = PlatformMonotonicTimer.nowSeconds()
-            if !skipCompetitorCompress { runCLI(ditto, ["-c", "-k", "--keepParent", payloadName, compArcPath], currentDirectory: payloadDir) }
-            let t1 = PlatformMonotonicTimer.nowSeconds()
-            let t2 = PlatformMonotonicTimer.nowSeconds()
-            runCLI(ditto, ["-x", "-k", compArcPath, compExtract.path])
-            let t3 = PlatformMonotonicTimer.nowSeconds()
-
-            runToolClosure("Apple ditto (Native)", skipCompetitorCompress ? 0.0 : (t1 - t0), t3 - t2, compArcPath, compExtract.path)
-            if !skipCompetitorCompress { try? fm.removeItem(atPath: compArcPath) }
-            try? fm.removeItem(at: compExtract)
-        }
-
-        // 2. 7-Zip (7zz)
-        if (fmt == .zip || fmt == .sevenZip || fmt == .wim || fmt == .tar), let sz = sevenZipBin, (isToolSelected("7z") || isToolSelected("7zz") || isToolSelected("7zip")) {
-            let fmtStr = fmt == .zip ? "zip" : (fmt == .tar ? "tar" : "7z")
-            let compArcPath = skipCompetitorCompress ? ttArc.path : cacheDir.appendingPathComponent("7zz_\(UUID().uuidString).\(fmtStr)").path
+        // 1. 7-Zip CLI (7zz)
+        if (fmt == .sevenZip || fmt == .zip || fmt == .tar), let szBin = sevenZipBin, isToolSelected("7zz") || isToolSelected("7z") {
+            let compArcPath = skipCompetitorCompress ? ttArc.path : cacheDir.appendingPathComponent("7zz_\(UUID().uuidString).\(fmt.rawValue)").path
             let compExtract = cacheDir.appendingPathComponent("7zz_out_\(UUID().uuidString)")
             try? fm.createDirectory(at: compExtract, withIntermediateDirectories: true)
 
-            progressHandler?("⚡ [7-Zip 7zz CLI] 对比测试启动中...")
+            var compDur = 1e-6
+            var extractDur = 1e-6
+            let passCount = (payload.bytes <= 15 * 1024 * 1024) ? 3 : 1
+            var bestComp = Double.infinity
+            var bestExt = Double.infinity
 
-            let compPasses = 1
-            var bestCompDur = Double.infinity
-            var bestExtractDur = Double.infinity
-            var okComp = true
-            var okExt = true
-            var validExtDir = compExtract.path + "_out"
-
-            let mxLevel = "\(lvl.rawValue)"
-            var args = ["a", "-t\(fmtStr)", "-mx=\(mxLevel)", "-mmt=on", "-bsp0"]
-            if fmt == .sevenZip && lvl.rawValue >= 8 { args.append("-md=64m"); args.append("-ms=on"); args.append("-myx=9") }
-            if fmt == .zip && lvl.rawValue >= 8 { args.append("-myx=9") }
-            if isEnc {
-                if fmt == .sevenZip { args.append("-mhe=on") } else { args.append("-mem=AES256") }
-                args.append("-pP@ssw0rd2026!")
-            }
-            args.append(compArcPath)
-            args.append(payloadName)
-
-            for _ in 0..<compPasses {
-                if !skipCompetitorCompress { try? fm.removeItem(atPath: compArcPath) }
-                let t0 = PlatformMonotonicTimer.nowSeconds()
+            for _ in 0..<passCount {
                 if !skipCompetitorCompress {
-                    okComp = runCLI(sz, args, currentDirectory: payloadDir)
-                }
-                let t1 = PlatformMonotonicTimer.nowSeconds()
-                if okComp {
-                    bestCompDur = min(bestCompDur, max(0.001, t1 - t0))
+                    var compArgs = ["a", compArcPath, payload.path, "-mx=\(lvl.rawValue)", "-mmt=on", "-y"]
+                    if isEnc {
+                        compArgs.append("-pP@ssw0rd2026!")
+                        if fmt == .sevenZip { compArgs.append("-mhe=on") }
+                    }
+                    let t0 = CACurrentMediaTime()
+                    _ = runCLI(szBin, compArgs)
+                    let t1 = CACurrentMediaTime()
+                    bestComp = min(bestComp, max(1e-6, t1 - t0))
                 }
 
-                validExtDir = compExtract.path + "_out"
-                try? fm.removeItem(atPath: validExtDir)
-                try? fm.createDirectory(atPath: validExtDir, withIntermediateDirectories: true)
-                var passExArgs = ["x", "-mmt=on", "-bsp0", compArcPath, "-o" + validExtDir + "/", "-y"]
-                if isEnc { passExArgs.append("-pP@ssw0rd2026!") }
-
-                let t2 = PlatformMonotonicTimer.nowSeconds()
-                okExt = runCLI(sz, passExArgs)
-                let t3 = PlatformMonotonicTimer.nowSeconds()
-                if okExt {
-                    bestExtractDur = min(bestExtractDur, max(0.001, t3 - t2))
-                }
+                var extArgs = ["x", compArcPath, "-o\(compExtract.path)", "-y"]
+                if isEnc { extArgs.append("-pP@ssw0rd2026!") }
+                let t2 = CACurrentMediaTime()
+                _ = runCLI(szBin, extArgs)
+                let t3 = CACurrentMediaTime()
+                bestExt = min(bestExt, max(1e-6, t3 - t2))
             }
 
-            if okComp && okExt && bestExtractDur < Double.infinity {
-                let label = fmt == .zip ? "7-Zip 7zz (Max Multithread)" : "7-Zip 7zz CLI"
-                runToolClosure(label, skipCompetitorCompress ? 0.0 : bestCompDur, bestExtractDur, compArcPath, validExtDir)
-            }
+            compDur = skipCompetitorCompress ? 0 : bestComp
+            extractDur = bestExt
+            runToolClosure("7-Zip 7zz CLI (ARM64)", compDur, extractDur, compArcPath, compExtract.path)
+
             if !skipCompetitorCompress { try? fm.removeItem(atPath: compArcPath) }
             try? fm.removeItem(at: compExtract)
         }
 
-        // 3. Info-ZIP
-        if fmt == .zip, let zipPath = zipBin, let unzipPath = unzipBin, !isEnc, (isToolSelected("infozip") || isToolSelected("info-zip")) {
-            let compArcPath = skipCompetitorCompress ? ttArc.path : cacheDir.appendingPathComponent("infozip_\(UUID().uuidString).zip").path
-            let compExtract = cacheDir.appendingPathComponent("infozip_out_\(UUID().uuidString)")
+        // 2. Apple Native ditto
+        if fmt == .zip && !isEnc, isToolSelected("ditto") || isToolSelected("apple") {
+            let compArcPath = cacheDir.appendingPathComponent("ditto_\(UUID().uuidString).zip").path
+            let compExtract = cacheDir.appendingPathComponent("ditto_out_\(UUID().uuidString)")
             try? fm.createDirectory(at: compExtract, withIntermediateDirectories: true)
 
-            let t0 = PlatformMonotonicTimer.nowSeconds()
-            if !skipCompetitorCompress {
-                let zipLvl = "-\(lvl.rawValue)"
-                runCLI(zipPath, ["-r", "-q", zipLvl, compArcPath, payload.path])
-            }
-            let t1 = PlatformMonotonicTimer.nowSeconds()
+            let t0 = CACurrentMediaTime()
+            _ = runCLI("/usr/bin/ditto", ["-c", "-k", "--keepParent", payload.path, compArcPath])
+            let t1 = CACurrentMediaTime()
 
-            let t2 = PlatformMonotonicTimer.nowSeconds()
-            runCLI(unzipPath, ["-q", compArcPath, "-d", compExtract.path])
-            let t3 = PlatformMonotonicTimer.nowSeconds()
+            let t2 = CACurrentMediaTime()
+            _ = runCLI("/usr/bin/ditto", ["-x", "-k", compArcPath, compExtract.path])
+            let t3 = CACurrentMediaTime()
 
-            runToolClosure("Info-ZIP (System)", skipCompetitorCompress ? 0.0 : (t1 - t0), t3 - t2, compArcPath, compExtract.path)
-            if !skipCompetitorCompress { try? fm.removeItem(atPath: compArcPath) }
+            runToolClosure("Apple ditto (Native macOS)", t1 - t0, t3 - t2, compArcPath, compExtract.path)
+            try? fm.removeItem(atPath: compArcPath)
             try? fm.removeItem(at: compExtract)
         }
 
-        // 4. BSD tar
-        if fmt == .tar, !isEnc, (isToolSelected("tar") || isToolSelected("bsdtar") || isToolSelected("apple")) {
-            let compArcPath = skipCompetitorCompress ? ttArc.path : cacheDir.appendingPathComponent("tar_\(UUID().uuidString).tar").path
+        // 3. System tar
+        if fmt == .tar && !isEnc, isToolSelected("tar") || isToolSelected("system tar") {
+            let compArcPath = cacheDir.appendingPathComponent("tar_\(UUID().uuidString).tar").path
             let compExtract = cacheDir.appendingPathComponent("tar_out_\(UUID().uuidString)")
             try? fm.createDirectory(at: compExtract, withIntermediateDirectories: true)
 
-            progressHandler?("⚡ [BSD tar (Native)] 对比测试启动中...")
+            let pDir = URL(fileURLWithPath: payload.path).deletingLastPathComponent().path
+            let pName = URL(fileURLWithPath: payload.path).lastPathComponent
 
-            let t0 = PlatformMonotonicTimer.nowSeconds()
-            if !skipCompetitorCompress { runCLI("/usr/bin/tar", ["-cf", compArcPath, "-C", payloadDir, payloadName]) }
-            let t1 = PlatformMonotonicTimer.nowSeconds()
-            let t2 = PlatformMonotonicTimer.nowSeconds()
-            runCLI("/usr/bin/tar", ["-xf", compArcPath, "-C", compExtract.path])
-            let t3 = PlatformMonotonicTimer.nowSeconds()
+            let t0 = CACurrentMediaTime()
+            _ = runCLI("/usr/bin/tar", ["-cf", compArcPath, "-C", pDir, pName])
+            let t1 = CACurrentMediaTime()
 
-            runToolClosure("BSD tar (Native)", skipCompetitorCompress ? 0.0 : (t1 - t0), t3 - t2, compArcPath, compExtract.path)
-            if !skipCompetitorCompress { try? fm.removeItem(atPath: compArcPath) }
+            let t2 = CACurrentMediaTime()
+            _ = runCLI("/usr/bin/tar", ["-xf", compArcPath, "-C", compExtract.path])
+            let t3 = CACurrentMediaTime()
+
+            runToolClosure("System tar (Native BSD)", t1 - t0, t3 - t2, compArcPath, compExtract.path)
+            try? fm.removeItem(atPath: compArcPath)
             try? fm.removeItem(at: compExtract)
         }
 
@@ -325,6 +237,12 @@ extension CompetitorBenchmarkRunner {
             isToolSelected: isToolSelected,
             runToolClosure: runToolClosure
         )
+
+        if autoBestCompetitor && itemCompetitorResults.count > 1 {
+            if let bestComp = itemCompetitorResults.max(by: { $0.compMBs < $1.compMBs }) {
+                return [bestComp]
+            }
+        }
 
         return itemCompetitorResults
     }

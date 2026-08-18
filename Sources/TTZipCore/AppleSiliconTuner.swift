@@ -1,10 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// Apple Silicon M 系列芯片专属性能与硬件自动调优引擎
+/// Hardware profiling and dynamic tuning engine for Apple Silicon SoC architectures.
 public final class AppleSiliconTuner: @unchecked Sendable {
     public static let shared = AppleSiliconTuner()
     
+    /// Physical chip topology metadata.
     public struct ChipTopology: Sendable {
         public let chipName: String
         public let totalCores: Int
@@ -18,7 +26,7 @@ public final class AppleSiliconTuner: @unchecked Sendable {
         }
     }
     
-    /// 自动智能匹配的芯片最佳参数推荐配置
+    /// Auto-tuned recommended operational configuration profile.
     public struct AutoTunedConfig: Sendable {
         public let recommendedDictionarySizeMB: Int
         public let recommendedChunkSizeBytes: Int
@@ -54,7 +62,7 @@ public final class AppleSiliconTuner: @unchecked Sendable {
             }
         }
         
-        // 如果 machdep.cpu.brand_string 未返回具体代数，获取 hw.model 备用
+        // Fallback to hw.model if machdep.cpu.brand_string is generic
         if chipName == "Apple Silicon" || chipName.contains("Apple processor") {
             sysctlbyname("hw.model", nil, &size, nil, 0)
             if size > 0 {
@@ -70,7 +78,7 @@ public final class AppleSiliconTuner: @unchecked Sendable {
             }
         }
         
-        // 2. 核心数与架构查询
+        // Query cores and architecture via sysctl
         var ncpu: Int32 = 0
         var intSize = MemoryLayout<Int32>.size
         sysctlbyname("hw.ncpu", &ncpu, &intSize, nil, 0)
@@ -94,8 +102,6 @@ public final class AppleSiliconTuner: @unchecked Sendable {
         pageVal = pageSize > 0 ? Int(pageSize) : PlatformOperatingSystem.current.defaultPageAlignment
         realMem = memSize > 0 ? memSize : 8 * 1024 * 1024 * 1024
         #endif
-
-
         
         self.topology = ChipTopology(
             chipName: chipName,
@@ -106,7 +112,7 @@ public final class AppleSiliconTuner: @unchecked Sendable {
             pageSizeBytes: pageVal
         )
         
-        // 3. 根据统一内存容量与核心数，智能计算最佳硬件推演配置
+        // Auto-calculate optimal configuration based on unified memory capacity
         let memGB = Double(realMem) / (1024.0 * 1024.0 * 1024.0)
         
         let dictSize: Int
@@ -116,33 +122,33 @@ public final class AppleSiliconTuner: @unchecked Sendable {
         let summary: String
         
         if memGB >= 96.0 {
-            // M Max / Ultra 128GB 物理极限配置 (128GB Unified Memory)
-            dictSize = 4096 // 4GB (4096MB) 物理极限算法字典
-            chunkSize = 512 * 1024 * 1024 // 512MB 固实块切分
-            bufSize = 64 * 1024 * 1024    // 64MB 页对齐 I/O 缓存
+            // M Max / Ultra 128GB profile
+            dictSize = 4096 // 4GB dictionary
+            chunkSize = 512 * 1024 * 1024 // 512MB solid chunk
+            bufSize = 64 * 1024 * 1024    // 64MB page-aligned I/O buffer
             isHighMem = true
-            summary = "👑 物理极限 128GB Unified Memory 模式: 4096MB (4GB) 极限算法字典 + 64MB 页面缓存 (适用 \(chipName))"
+            summary = "128GB Unified Memory: 4096MB dictionary + 64MB page buffer (\(chipName))"
         } else if memGB >= 48.0 {
-            // M Max 64GB 旗舰配置
-            dictSize = 2048 // 2GB (2048MB) 巨型算法字典
-            chunkSize = 256 * 1024 * 1024 // 256MB
-            bufSize = 32 * 1024 * 1024    // 32MB 物理页对齐缓存
+            // M Max 64GB profile
+            dictSize = 2048 // 2GB dictionary
+            chunkSize = 256 * 1024 * 1024 // 256MB solid chunk
+            bufSize = 32 * 1024 * 1024    // 32MB page-aligned buffer
             isHighMem = true
-            summary = "🚀 旗舰 64GB 模式: 2048MB (2GB) 算法字典 + 32MB 物理页对齐缓存 (适用 \(chipName))"
+            summary = "64GB Unified Memory: 2048MB dictionary + 32MB page buffer (\(chipName))"
         } else if memGB >= 24.0 {
-            // M Pro 进阶配置 (32GB / 36GB Unified Memory)
-            dictSize = 1024 // 1GB (1024MB)
-            chunkSize = 128 * 1024 * 1024 // 128MB
-            bufSize = 16 * 1024 * 1024    // 16MB
+            // M Pro 32GB/36GB profile
+            dictSize = 1024 // 1GB dictionary
+            chunkSize = 128 * 1024 * 1024 // 128MB solid chunk
+            bufSize = 16 * 1024 * 1024    // 16MB page buffer
             isHighMem = true
-            summary = "进阶 32GB 模式: 1024MB (1GB) 算法字典 + 16MB 物理页对齐缓存 (适用 \(chipName))"
+            summary = "32GB Unified Memory: 1024MB dictionary + 16MB page buffer (\(chipName))"
         } else {
-            // M 基础款配置 (8GB / 16GB / 24GB Unified Memory)
+            // Base profile (8GB / 16GB)
             dictSize = 64
-            chunkSize = 16 * 1024 * 1024 // 16MB
-            bufSize = 4 * 1024 * 1024    // 4MB
+            chunkSize = 16 * 1024 * 1024 // 16MB chunk
+            bufSize = 4 * 1024 * 1024    // 4MB buffer
             isHighMem = false
-            summary = "轻量极速模式: 预置 64MB 算法字典 + 4MB 物理页缓存 (适用 \(chipName))"
+            summary = "Standard Memory: 64MB dictionary + 4MB page buffer (\(chipName))"
         }
         
         self.autoTunedConfig = AutoTunedConfig(
@@ -154,44 +160,44 @@ public final class AppleSiliconTuner: @unchecked Sendable {
         )
     }
     
-    /// 针对轻量算法 / 低发热持续吞吐的最佳 P-Core / Super-Core 核心数 (避免异构核调度墙)
+    /// Optimal thread count for performance cores.
     public var optimalEfficiencyThreads: Int {
         return topology.performanceCores > 0 ? topology.performanceCores : min(8, topology.totalCores)
     }
     
-    /// 针对计算密集型 (xz -9 / zstd -19) 打满全核的最大线程数
+    /// Maximum thread count for burst compute tasks.
     public var optimalBurstThreads: Int {
         return topology.totalCores
     }
     
-    /// 针对并行压缩任务默认最佳线程数（100% 打满全部 CPU 核心）
+    /// Default optimal thread count for parallel compression pipelines.
     public var optimalCompressionThreads: Int {
         return topology.totalCores
     }
     
-    /// 128GB 内存场景下的 Zstd 长距离匹配 (Long Distance Matching) windowLog 参数 (最高 31)
+    /// Optimal Zstandard Long Distance Matching windowLog parameter (up to 31).
     public var optimalZstdLongWindowLog: Int {
         return topology.unifiedMemoryGB >= 48.0 ? 31 : (topology.unifiedMemoryGB >= 24.0 ? 27 : 0)
     }
     
-    /// 16KB 物理页面对齐的最佳 I/O 缓冲区尺寸
+    /// Optimal page-aligned I/O buffer size.
     public var optimalAlignedBufferSize: Int {
         return autoTunedConfig.recommendedBufferSize
     }
     
-    /// 硬件架构与智能调优摘要描述
+    /// Formatted hardware and topology summary.
     public var hardwareSummary: String {
         return "\(topology.chipName) (\(topology.totalCores) Cores: \(topology.performanceCores) P-Cores + \(topology.efficiencyCores) E-Cores), \(String(format: "%.1f", topology.unifiedMemoryGB)) GB Unified Memory, \(topology.pageSizeBytes / 1024)KB Page Aligned"
     }
     
-    /// APFS 零拷贝硬件级超高速克隆文件 (clonefile)
+    /// APFS zero-copy kernel clone file.
     @discardableResult
     public func apfsZeroCopyClone(from srcPath: String, to destPath: String) -> Bool {
         try? FileManager.default.removeItem(atPath: destPath)
         return clonefile(srcPath, destPath, 0) == 0
     }
     
-    /// 将当前底层 Task/Thread 的调度 QoS 提升至最高物理优先级 (QOS_CLASS_USER_INTERACTIVE)
+    /// Elevates current thread QoS priority to `QOS_CLASS_USER_INTERACTIVE`.
     public func boostCurrentThreadPriority() {
         let dict = Thread.current.threadDictionary
         if dict["_tt_boosted"] == nil {

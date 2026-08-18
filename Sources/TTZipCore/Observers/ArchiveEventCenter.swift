@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
 private struct EventSubscription: Sendable {
@@ -5,8 +12,7 @@ private struct EventSubscription: Sendable {
     let filterEvents: Set<ArchiveEventType>?
 }
 
-/// 【3.2 观察者模式 (Observer Pattern)】全局事件发布-订阅中心 (`ArchiveEventCenter`)
-/// 采用弱引用包装器 (WeakObserverWrapper) 彻底消除循环引用，支持解耦发布/订阅系统级异步事件
+/// Global event publish-subscribe event center leveraging weak references to prevent retain cycles.
 public final class ArchiveEventCenter: ArchiveEventCenterProtocol, @unchecked Sendable {
     public static let shared = ArchiveEventCenter()
     
@@ -15,11 +21,11 @@ public final class ArchiveEventCenter: ArchiveEventCenterProtocol, @unchecked Se
     
     private init() {}
     
-    /// 订阅全局系统事件
+    /// Subscribes to global system events.
     /// - Parameters:
-    ///   - observer: 实现了 `ArchiveEventObserverProtocol` 的观察者
-    ///   - events: 仅关注的事件集合（传入 nil 则接收全部事件）
-    ///   - dispatchQueue: 指定回调分发的 GCD 队列
+    ///   - observer: Observer conforming to `ArchiveEventObserverProtocol`.
+    ///   - events: Target event types filter (or nil for all events).
+    ///   - dispatchQueue: Target dispatch queue for callbacks.
     public func addObserver(
         _ observer: ArchiveEventObserverProtocol,
         forEvents events: Set<ArchiveEventType>? = nil,
@@ -39,7 +45,7 @@ public final class ArchiveEventCenter: ArchiveEventCenterProtocol, @unchecked Se
         }
     }
     
-    /// 移除指定事件观察者
+    /// Unregisters an event observer.
     public func removeObserver(_ observer: ArchiveEventObserverProtocol) {
         lock.lock()
         defer { lock.unlock() }
@@ -47,7 +53,7 @@ public final class ArchiveEventCenter: ArchiveEventCenterProtocol, @unchecked Se
         subscriptions.removeAll { $0.wrapper.observer === observer || !$0.wrapper.isAlive }
     }
     
-    /// 清空所有注册的事件观察者
+    /// Removes all registered observers.
     public func removeAllObservers() {
         lock.lock()
         defer { lock.unlock() }
@@ -55,7 +61,7 @@ public final class ArchiveEventCenter: ArchiveEventCenterProtocol, @unchecked Se
         subscriptions.removeAll()
     }
     
-    /// 当前活动订阅者数量
+    /// Count of currently active subscribers.
     public var observerCount: Int {
         lock.lock()
         defer { lock.unlock() }
@@ -64,7 +70,7 @@ public final class ArchiveEventCenter: ArchiveEventCenterProtocol, @unchecked Se
         return subscriptions.count
     }
     
-    /// 发布系统事件
+    /// Posts a system event to all matching subscribers.
     public func post(event: ArchiveEvent) {
         lock.lock()
         subscriptions.removeAll { !$0.wrapper.isAlive }
@@ -82,7 +88,7 @@ public final class ArchiveEventCenter: ArchiveEventCenterProtocol, @unchecked Se
         }
     }
     
-    // MARK: - 便捷事件发布 API
+    // MARK: - Convenience Event Dispatchers
     
     public func postArchiveCompleted(
         archivePath: String,

@@ -1,7 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档压缩具体命令 (Concrete Command for Compression)
-/// 封装归档压缩逻辑；在撤销 (Undo) 时能够精准清理创建的压缩包（含分卷），并还原原先可能被覆盖的文件备份
+/// Concrete command encapsulating archive compression with transactional rollback support.
 public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable {
     public let commandId: String
     public let description: String
@@ -51,7 +57,7 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
         self.engineFacade = engineFacade
         
         let targetName = (outputPath as NSString).lastPathComponent
-        self.description = description ?? "压缩文件至 [\(targetName)] (\(format.rawValue.uppercased()))"
+        self.description = description ?? "Compress files to [\(targetName)] (\(format.rawValue.uppercased()))"
     }
     
     deinit {
@@ -66,10 +72,8 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
         let baseName = (outputPath as NSString).lastPathComponent
         let baseStem = (baseName as NSString).deletingPathExtension
         
-        // 1. 压缩前快照：收集输出目录已有文件集合
         let preExistingInOutputDir = scanDirectorySet(dirPath: outputDir)
         
-        // 如果目标路径或相关分卷包已存在，先行制作临时备份，防止覆盖不可逆
         var backupDict: [String: String] = [:]
         if fm.fileExists(atPath: outputDir) {
             if let dirContents = try? fm.contentsOfDirectory(atPath: outputDir) {
@@ -84,7 +88,6 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
             }
         }
         
-        // 2. 执行引擎层压缩（若引擎抛错，立刻清理刚才创建的备份文件，防止磁盘残留！）
         let result = try await {
             do {
                 return try await engineFacade.quickCompress(
@@ -111,7 +114,6 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
         let endTime = CFAbsoluteTimeGetCurrent()
         let duration = endTime - startTime
         
-        // 3. 收集生成的产物文件（主压缩包及所有分卷包 .z01, .z02, .zip.001, .001 等）
         let postExistingInOutputDir = scanDirectorySet(dirPath: outputDir)
         let newlyCreated = postExistingInOutputDir.subtracting(preExistingInOutputDir)
         
@@ -139,7 +141,7 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
         return CommandResult(
             commandId: commandId,
             success: true,
-            message: "归档压缩完成: 耗时 \(String(format: "%.2f", duration))s",
+            message: "Archive compression completed in \(String(format: "%.2f", duration))s",
             artifactsCreated: sortedArtifacts,
             backupPaths: backupDict,
             executionDuration: duration,
@@ -150,7 +152,7 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
     public func undo() async throws {
         let (executed, artifacts, backups) = getUndoStateSnapshot()
         guard executed else {
-            throw CommandError.invalidState(reason: "命令尚未执行，无法撤销")
+            throw CommandError.invalidState(reason: "Command has not been executed yet; cannot undo.")
         }
         
         let fm = FileManager.default
@@ -158,14 +160,12 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
         let baseName = (outputPath as NSString).lastPathComponent
         let baseStem = (baseName as NSString).deletingPathExtension
         
-        // 1. 清理压缩生成的产物（主文件与已记录的切片包）
         for path in artifacts {
             if fm.fileExists(atPath: path) {
                 try? fm.removeItem(atPath: path)
             }
         }
         
-        // 2. 扫荡输出目录中生成的任意分卷切片（非备份且非原本存在的衍生分卷）
         if fm.fileExists(atPath: outputDir), let dirContents = try? fm.contentsOfDirectory(atPath: outputDir) {
             for item in dirContents {
                 if !item.contains(".bak_") {
@@ -177,7 +177,6 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
             }
         }
         
-        // 3. 还原原有文件覆盖备份
         var unRestoredBackups: [String: String] = [:]
         for (origPath, backupPath) in backups {
             if fm.fileExists(atPath: backupPath) {
@@ -194,7 +193,7 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
         
         if !unRestoredBackups.isEmpty {
             saveExecutionState(artifacts: [], backupMap: unRestoredBackups)
-            throw CommandError.undoFailed(reason: "撤销部分备份还原失败，已保留剩余备份映射")
+            throw CommandError.undoFailed(reason: "Failed to restore all backup files during undo.")
         } else {
             resetExecutionStateOnUndoSuccess()
         }
@@ -210,7 +209,7 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
         backupFileMap.removeAll()
     }
     
-    // MARK: - 内部同步锁辅助方法
+    // MARK: - Internal Synchronization Helpers
     
     private func saveExecutionState(artifacts: [String], backupMap: [String: String]) {
         lock.lock()
@@ -234,13 +233,10 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
         self.backupFileMap.removeAll()
     }
     
-    // MARK: - 私有辅助匹配函数
-    
     private func isSplitVolumeMatch(fileName: String, baseName: String, baseStem: String) -> Bool {
         if fileName.hasPrefix(baseName + ".") { return true }
         if fileName.hasPrefix(baseStem + ".") {
             let ext = (fileName as NSString).pathExtension.lowercased()
-            // 匹配 .z01, .z02 ... 或数字分卷 .001, .002 或 .part1 ...
             if ext.hasPrefix("z") && ext.dropFirst().allSatisfy({ $0.isNumber }) { return true }
             if ext.allSatisfy({ $0.isNumber }) && !ext.isEmpty { return true }
             if ext.hasPrefix("part") { return true }
@@ -262,9 +258,9 @@ public final class CompressCommand: ArchiveCommandProtocol, @unchecked Sendable 
     }
 }
 
-// MARK: - Fluent Builder Extension for CompressCommand
+// MARK: - Fluent Builder for CompressCommand
 
-/// CompressCommand 链式建造者 (Fluent Builder Pattern)
+/// Fluent builder constructing `CompressCommand` instances.
 public struct CompressCommandBuilder: Sendable {
     public var commandId: String = UUID().uuidString
     public var description: String? = nil

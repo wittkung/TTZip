@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_lzma2_branchless_rc.h
+ * @brief High-speed branchless LZMA2 range coder decoding primitives.
+ */
+
 #ifndef TTZIP_LZMA2_BRANCHLESS_RC_H
 #define TTZIP_LZMA2_BRANCHLESS_RC_H
 
@@ -9,7 +21,6 @@
 extern "C" {
 #endif
 
-/// 7z LZMA2 Range Coder 状态结构体
 typedef struct {
     uint32_t range;
     uint32_t code;
@@ -18,10 +29,8 @@ typedef struct {
     uint32_t corrupt;
 } ttzip_lzma_rc_state_t;
 
-/// 初始化 Branchless Range Coder 解码器
 void ttzip_lzma_rc_init(ttzip_lzma_rc_state_t* rc, const uint8_t* in_buf, size_t in_size);
 
-/// ARM64 无分支单 bit 概率解码
 static inline uint32_t ttzip_lzma_rc_decode_bit_branchless(ttzip_lzma_rc_state_t* rc, uint16_t* prob) {
     uint32_t r = rc->range;
     uint32_t c = rc->code;
@@ -48,7 +57,6 @@ static inline uint32_t ttzip_lzma_rc_decode_bit_branchless(ttzip_lzma_rc_state_t
     return is_bit_1;
 }
 
-/// 快速连续无分支解码定长 Direct Bits
 uint32_t ttzip_lzma_rc_decode_direct_bits(ttzip_lzma_rc_state_t* rc, unsigned num_bits);
 
 #ifdef __cplusplus

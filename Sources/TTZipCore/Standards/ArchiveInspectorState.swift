@@ -48,7 +48,7 @@ public struct ArchiveInspectorState: Sendable, Equatable {
     }
 }
 
-/// 归档诊断快照缓存条目键
+/// Cache key for archive diagnostics snapshots.
 public struct ArchiveDiagnosticsCacheKey: Hashable, Sendable {
     public let filePath: String
     public let fileByteSize: Int64

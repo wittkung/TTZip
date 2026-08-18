@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 跨平台工业级路径清洗、规范化与安全审计中枢
+/// Cross-platform path sanitization, normalization, and security auditing subsystem.
 ///
-/// 对标 libarchive `archive_read_disk_posix.c` 与 `archive_read_disk_windows.c`，提供：
-/// - 栈式分段 Zip Slip 目录穿越中和 ($O(N)$ 零堆碎片)
-/// - Windows DOS 保留设备名 (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`, `PhysicalDrive`) 深度拦截
-/// - NTFS 备用数据流 (Alternate Data Stream, ADS) 冒号流剥离
-/// - 32,767 字符 Win32 超长路径 (`\\?\` 与 `\\?\UNC\`) 自动正规化
-/// - APFS NFD (Decomposed) 到标准 NFC (Precomposed) Unicode 正规化
+/// Aligned with libarchive `archive_read_disk_posix.c` and `archive_read_disk_windows.c`:
+/// - Stack-based Zip Slip directory traversal neutralization with zero heap fragmentation
+/// - DOS reserved device name interception (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`, `PhysicalDrive`)
+/// - NTFS Alternate Data Stream (ADS) colon stripping
+/// - Win32 extended-length path normalization (`\\?\` and `\\?\UNC\`)
+/// - APFS NFD (Decomposed) to standard NFC (Precomposed) normalization
 public enum PlatformPathSanitizer: Sendable {
     
     private static let windowsReservedNames: Set<String> = [
@@ -16,13 +23,10 @@ public enum PlatformPathSanitizer: Sendable {
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
     ]
     
-    /// 对任意输入路径执行跨平台无死角安全清洗与规范化分析
+    /// Executes cross-platform security sanitization and canonical normalization.
     ///
-    /// - Parameter path: 原始输入相对或绝对路径字符串
-    /// - Returns: 包含规范化路径、是否越界、是否包含保留设备名与 ADS 信息的强类型结果
-    ///
-    /// - Complexity: $O(N)$，其中 $N$ 为路径字符长度
-    /// - Note: [Security Invariant] 返回的 `normalizedPath` 绝不以 `/` 开头、绝不包含 `..`、绝不包含 ADS 冒号流
+    /// - Parameter path: Input relative or absolute path.
+    /// - Returns: Normalized path result containing canonical path, boundary flags, and reserved name markers.
     public static func sanitize(path: String) -> PlatformPathNormalizationResult {
         guard !path.isEmpty else {
             return PlatformPathNormalizationResult(
@@ -41,7 +45,7 @@ public enum PlatformPathSanitizer: Sendable {
         var isAbsolute = false
         var working = path
         
-        // 1. UNC 网络路径检测与保留 (\server\share)
+        // 1. UNC network paths (\\server\share)
         if working.hasPrefix("\\\\") || working.hasPrefix("//") {
             isUNC = true
             isAbsolute = true
@@ -49,7 +53,7 @@ public enum PlatformPathSanitizer: Sendable {
             isAbsolute = true
         }
         
-        // 2. Windows 盘符检测 (C:/ 或 C:\)
+        // 2. Windows drive letters (C:/ or C:\)
         if working.count >= 2 {
             let firstTwo = working.prefix(2)
             if let firstChar = firstTwo.first, firstChar.isLetter && firstTwo.suffix(1) == ":" {
@@ -57,21 +61,21 @@ public enum PlatformPathSanitizer: Sendable {
             }
         }
         
-        // 3. 将所有反斜杠标准化为正斜杠并进行 Unicode NFC 预组合正规化
+        // 3. Normalize slashes and apply Unicode NFC precomposed mapping
         working = working.replacingOccurrences(of: "\\", with: "/")
         working = working.precomposedStringWithCanonicalMapping
         
-        // 4. NTFS 备用数据流 (ADS) 冒号拦截与剥离 (例: filename.txt:evil.exe)
+        // 4. NTFS Alternate Data Stream (ADS) stripping (e.g., filename.txt:evil.exe)
         var strippedADS: String?
         if let colonIndex = working.firstIndex(of: ":") {
             let prefix = working[..<colonIndex]
-            if !(prefix.count == 1 && prefix.first?.isLetter == true) { // 排除 Windows 盘符 C:
+            if !(prefix.count == 1 && prefix.first?.isLetter == true) {
                 strippedADS = String(working[colonIndex...])
                 working = String(prefix)
             }
         }
         
-        // 5. 栈式分段清洗 (消除冗余斜杠、当前目录 . 与 Zip Slip 穿越 ..)
+        // 5. Stack-based segment sanitization (removes '.', redundant slashes, and Zip Slip '..')
         let rawSegments = working.split(separator: "/", omittingEmptySubsequences: true)
         var cleanSegments: [String] = []
         var containsReserved = false
@@ -89,7 +93,6 @@ public enum PlatformPathSanitizer: Sendable {
                 continue
             }
             
-            // Windows 保留名检查 (不区分大小写，且拦截 CON.txt 等伪装)
             let baseName = (segment as NSString).deletingPathExtension.uppercased()
             if windowsReservedNames.contains(baseName) || segment.uppercased().starts(with: "PHYSICALDRIVE") {
                 containsReserved = true
@@ -101,7 +104,7 @@ public enum PlatformPathSanitizer: Sendable {
         let normalized = cleanSegments.joined(separator: "/")
         let isLong = normalized.utf16.count > 260
         
-        // 6. Windows 格式化路径生成 (反斜杠、UNC 与超长路径前缀)
+        // 6. Format Win32 formatted path
         var win32Path = cleanSegments.joined(separator: "\\")
         if isUNC {
             win32Path = "\\\\?\\UNC\\" + win32Path

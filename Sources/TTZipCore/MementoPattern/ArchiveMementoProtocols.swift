@@ -1,38 +1,42 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档备忘录模式核心接口 (Memento Protocol)
+/// Core memento state snapshot protocol (Memento Pattern).
 public protocol ArchiveMementoProtocol: Sendable {
     var id: UUID { get }
     var timestamp: Date { get }
 }
 
-/// 归档发起人接口 (Originator Protocol)
+/// Originator protocol creating and restoring state snapshots.
 public protocol ArchiveOriginatorProtocol {
     associatedtype Memento: ArchiveMementoProtocol
     
-    /// 创建当前状态的快照备忘录
+    /// Creates a memento snapshot of current state.
     func createMemento() -> Memento
     
-    /// 从给定的备忘录快照中恢复状态
+    /// Restores internal state from a memento snapshot.
     func restoreMemento(_ memento: Memento)
 }
 
-/// 归档管理者接口 (Caretaker Protocol)
+/// Caretaker protocol managing undo/redo stacks of mementos.
 public protocol ArchiveCaretakerProtocol {
     associatedtype Memento: ArchiveMementoProtocol
     
-    /// 保存新的状态快照备忘录
+    /// Saves state snapshot.
     func saveMemento(_ memento: Memento)
     
-    /// 撤销并返回上一个快照备忘录
+    /// Reverts to preceding state snapshot.
     func undo() -> Memento?
     
-    /// 重做并返回下一个快照备忘录
+    /// Re-applies subsequent state snapshot.
     func redo() -> Memento?
     
-    /// 是否可撤销
     var canUndo: Bool { get }
-    
-    /// 是否可重做
     var canRedo: Bool { get }
 }

@@ -1,7 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import QuartzCore
 
+/// Metrics row representing a single benchmark permutation.
 public struct ExhaustiveBenchmarkRow: Sendable, Identifiable, Codable {
     public var id: String { "\(dimensionName)_\(format.rawValue)_\(level.rawValue)_\(isEncrypted)" }
     public let dimensionName: String
@@ -18,10 +26,11 @@ public struct ExhaustiveBenchmarkRow: Sendable, Identifiable, Codable {
     public let sha256Matched: Bool
 }
 
+/// Exhaustive matrix benchmark runner across formats, levels, encryption modes, and datasets.
 public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
     public init() {}
 
-    /// 执行全维度全组合 (Format x Level x Encryption x Payload) 的物理基准压测
+    /// Executes full matrix benchmark permutations (Format x Level x Encryption x Payload).
     public static func runExhaustiveMatrix(
         selectedFormats: [ArchiveCompressionFormat]? = nil,
         selectedLevels: [ArchiveCompressionLevel]? = nil,
@@ -32,7 +41,7 @@ public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
 
         var results: [ExhaustiveBenchmarkRow] = []
 
-        // 1. 准备物理测试 Payload 数据源（优先使用持久化 Cache，避免反复全量生成）
+        // 1. Prepare benchmark payload datasets
         let dim1Dir = cacheDir.appendingPathComponent("small_files")
         let dim2LogFile = cacheDir.appendingPathComponent("sample_log.log")
         let dim3EntropyFile = cacheDir.appendingPathComponent("high_entropy_100m.bin")
@@ -44,9 +53,9 @@ public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
                               FileManager.default.fileExists(atPath: dim4HugeFile.path)
 
         if isDatasetCached {
-            progressHandler?("⚡ [数据集缓存命中] 检测到本地已存在全维度物理测试数据集，免生成即刻启动...")
+            progressHandler?("[Cache Hit] Existing benchmark datasets detected, launching immediately...")
         } else {
-            progressHandler?("🛠 [首次准备] 正在生成全维度持久化物理测试数据集 (小文件/日志/高熵/5GB巨型文件)...")
+            progressHandler?("[Initial Setup] Generating exhaustive physical datasets...")
             
             try? FileManager.default.createDirectory(at: dim1Dir, withIntermediateDirectories: true)
             let sampleText = String(repeating: "Apple Silicon M-Series Ultra High Throughput Test Log Line...\n", count: 2000)
@@ -85,10 +94,10 @@ public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
         let levels: [ArchiveCompressionLevel] = selectedLevels ?? ArchiveCompressionLevel.allCases
 
         let payloads: [(name: String, path: String, bytes: Int64, sha: String?)] = [
-            ("海量小文件 (10MB/100文件)", dim1Dir.path, Self.getFolderBytes(dim1Dir.path), nil),
-            ("拟真日志文本 (10MB)", dim2LogFile.path, (try? FileManager.default.attributesOfItem(atPath: dim2LogFile.path)[.size] as? Int64) ?? 0, nil),
-            ("高熵物理Payload (100MB)", dim3EntropyFile.path, (try? FileManager.default.attributesOfItem(atPath: dim3EntropyFile.path)[.size] as? Int64) ?? 0, srcSha256),
-            ("5GB 巨型物理文件 (5GB)", dim4HugeFile.path, 5 * 1024 * 1024 * 1024, nil)
+            ("Small Files (10MB/100 files)", dim1Dir.path, Self.getFolderBytes(dim1Dir.path), nil),
+            ("Log Text (10MB)", dim2LogFile.path, (try? FileManager.default.attributesOfItem(atPath: dim2LogFile.path)[.size] as? Int64) ?? 0, nil),
+            ("High-Entropy Binary (100MB)", dim3EntropyFile.path, (try? FileManager.default.attributesOfItem(atPath: dim3EntropyFile.path)[.size] as? Int64) ?? 0, srcSha256),
+            ("Huge File (5GB)", dim4HugeFile.path, 5 * 1024 * 1024 * 1024, nil)
         ]
 
         let writer = ArchiveEngineFactory.makeWriter()
@@ -106,7 +115,7 @@ public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
         }
 
         var currentStep = 0
-        progressHandler?("⚡ [独占硬件串行测试] 开启全核 P-Core 独占基准测试... 总计 \(totalSteps) 项独立组合")
+        progressHandler?("[Benchmark Matrix] Starting dedicated benchmark run... Total: \(totalSteps) permutations")
 
         for payload in payloads {
             for fmt in formats {
@@ -126,12 +135,7 @@ public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
                             try? FileManager.default.removeItem(at: extractDest)
                         }
 
-                        progressHandler?("🔥 [\(currentStep)/\(totalSteps)] 正在独占测试 [\(payload.name)] - 格式: \(fmt.rawValue) | 级别: \(lvl.rawValue) | 加密: \(isEnc)")
-
-                        defer {
-                            try? FileManager.default.removeItem(at: outArc)
-                            try? FileManager.default.removeItem(at: extractDest)
-                        }
+                        progressHandler?("[\(currentStep)/\(totalSteps)] Testing [\(payload.name)] - Format: \(fmt.rawValue) | Level: \(lvl.rawValue) | Encrypted: \(isEnc)")
 
                         let t0 = CACurrentMediaTime()
                         do {
@@ -207,18 +211,18 @@ public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
 
                             let fmtStr = fmt.rawValue.uppercased()
                             let lvlStr = lvl.title
-                            let encStr = isEnc ? "AES-256" : "无"
+                            let encStr = isEnc ? "AES-256" : "None"
                             let compSpeed = String(format: "%.1f MB/s", compThroughput)
                             let decompSpeed = String(format: "%.1f MB/s", extractThroughput)
                             let timeStr = String(format: "%.3fs / %.3fs", compDuration, extractDuration)
                             let ratioStr = String(format: "%.1f %%", ratio)
-                            let shaStr = shaMatch ? "✅ 通过" : "❌ 不匹配"
+                            let shaStr = shaMatch ? "MATCH" : "MISMATCH"
 
                             let formattedLine = "\(payload.name.padding(toLength: 26, withPad: " ", startingAt: 0)) | \(fmtStr.padding(toLength: 6, withPad: " ", startingAt: 0)) | \(lvlStr.padding(toLength: 10, withPad: " ", startingAt: 0)) | \(encStr.padding(toLength: 6, withPad: " ", startingAt: 0)) | \(compSpeed.padding(toLength: 14, withPad: " ", startingAt: 0)) | \(decompSpeed.padding(toLength: 14, withPad: " ", startingAt: 0)) | \(timeStr.padding(toLength: 18, withPad: " ", startingAt: 0)) | \(ratioStr.padding(toLength: 10, withPad: " ", startingAt: 0)) | \(shaStr)"
 
                             progressHandler?("ROW:" + formattedLine)
                         } catch {
-                            progressHandler?("⚠️ [组合异常] \(payload.name) - \(fmt.rawValue) L\(lvl.rawValue): \(error.localizedDescription)")
+                            progressHandler?("Warning [Permutation failed] \(payload.name) - \(fmt.rawValue) L\(lvl.rawValue): \(error.localizedDescription)")
                             continue
                         }
                     }

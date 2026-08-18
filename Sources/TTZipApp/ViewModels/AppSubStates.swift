@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import SwiftUI
 import TTZipCore
 
-/// 1. 导航与页面路由状态
+/// 1. Navigation and routing state.
 @MainActor
 public final class NavigationState: ObservableObject {
     @Published public var activeTab: WorkspaceTab = .home
@@ -13,7 +20,7 @@ public final class NavigationState: ObservableObject {
     public init() {}
 }
 
-/// 2. 归档包内资源浏览与预览状态
+/// 2. Archive explorer and in-archive preview state.
 @MainActor
 public final class ArchiveExplorerState: ObservableObject {
     @Published public var currentArchivePath: String? = nil
@@ -25,7 +32,7 @@ public final class ArchiveExplorerState: ObservableObject {
     
     public init() {}
     
-    /// 运用【3.7 迭代器模式 (Iterator Pattern)】针对 currentEntries 提供迭代器与 Swift Sequence 支持
+    /// Sequence iterator for filtered entries.
     public var filteredEntriesIterator: ArrayArchiveIterator {
         let pattern = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         return ArrayArchiveIterator(
@@ -39,11 +46,11 @@ public final class ArchiveExplorerState: ObservableObject {
     }
 }
 
-/// 3. 后台压缩/解压任务执行与控制状态
+/// 3. Background task execution and lifecycle state.
 @MainActor
 public final class TaskExecutionState: ObservableObject {
     @Published public var isLoading: Bool = false
-    @Published public var statusMessage: String = "就绪"
+    @Published public var statusMessage: String = "Ready"
     @Published public var progressValue: Double = 0.0
     @Published public var activeTaskStateMachine: ArchiveTaskStateMachine? = nil
     @Published public var taskStateName: String = "Idle"
@@ -59,7 +66,7 @@ public final class TaskExecutionState: ObservableObject {
     public init() {}
 }
 
-/// 4. 弹窗 / Modal / Sheet 覆盖层状态
+/// 4. Modal, Sheet, and Popover presentation overlay state.
 @MainActor
 public final class OverlayState: ObservableObject {
     @Published public var showCompressModal: Bool = false

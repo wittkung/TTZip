@@ -1,13 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-//  UUDecoder.swift
-//  TTZipCore
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
 //
-//  Created for libarchive Golden Oracle Integration on 2026-08-16.
-//
+// TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 
-/// High-performance standalone UUEncode / UUDecode parser for Golden Oracle testing and corpus management.
+/// Standalone UUEncode / UUDecode parser for Golden Oracle testing and corpus management.
 /// Conforms to POSIX / BSD uudecode specifications matching `test_main.c:extract_reference_file()`.
 public enum UUDecoder: Sendable {
     
@@ -43,7 +43,6 @@ public enum UUDecoder: Sendable {
                 index += 1
             }
             let lineSlice = bytes[start..<index]
-            // Skip CRLF
             if index < totalLen && bytes[index] == 0x0D { index += 1 }
             if index < totalLen && bytes[index] == 0x0A { index += 1 }
             return lineSlice

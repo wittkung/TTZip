@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import Darwin
 
-/// 【Pattern 4.2 读写锁 / 线程安全缓存模式】POSIX 读写锁实现 (POSIX Read-Write Lock)
-/// 基于 C `pthread_rwlock_t` 的高性能底层读写锁封装
-/// 允许多个并发 Task/Thread 共享读锁，写锁则具备独占与互斥特性
+/// High-performance POSIX read-write lock wrapper around C `pthread_rwlock_t`.
+///
+/// Permits concurrent shared reader acquisitions while enforcing exclusive writer mutations.
 public final class POSIXReadWriteLock: ReadWriteLockProtocol, @unchecked Sendable {
     private var rwlock = pthread_rwlock_t()
     
@@ -16,14 +23,14 @@ public final class POSIXReadWriteLock: ReadWriteLockProtocol, @unchecked Sendabl
         pthread_rwlock_destroy(&rwlock)
     }
     
-    /// 读锁执行闭包 (Concurrent Shared Read)
+    /// Executes closure under shared read lock.
     public func withReadLock<T>(_ closure: () throws -> T) rethrows -> T {
         pthread_rwlock_rdlock(&rwlock)
         defer { pthread_rwlock_unlock(&rwlock) }
         return try closure()
     }
     
-    /// 写锁执行闭包 (Exclusive Write)
+    /// Executes closure under exclusive write lock.
     public func withWriteLock<T>(_ closure: () throws -> T) rethrows -> T {
         pthread_rwlock_wrlock(&rwlock)
         defer { pthread_rwlock_unlock(&rwlock) }

@@ -1,14 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// Apple Silicon 芯片硬件拓扑感知 - 原生精致版
+/// Apple Silicon hardware topology awareness banner.
 public struct BenchmarkHardwareBannerView: View {
     public init() {}
     
     public var body: some View {
         let tuner = AppleSiliconTuner.shared
         return HStack(spacing: 16) {
-            // 左侧：芯片图标与核心拓扑
             HStack(spacing: 14) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -30,7 +36,7 @@ public struct BenchmarkHardwareBannerView: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(.primary)
                         
-                        Text("Apple Silicon 就绪")
+                        Text("Apple Silicon Ready")
                             .font(.system(size: 9.5, weight: .semibold))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2.5)
@@ -39,7 +45,7 @@ public struct BenchmarkHardwareBannerView: View {
                             .clipShape(Capsule())
                     }
                     
-                    Text("\(tuner.topology.totalCores) 核心 (\(tuner.topology.performanceCores)P + \(tuner.topology.efficiencyCores)E) · \(String(format: "%.0f", tuner.topology.unifiedMemoryGB)) GB 统一内存")
+                    Text("\(tuner.topology.totalCores) Cores (\(tuner.topology.performanceCores)P + \(tuner.topology.efficiencyCores)E) · \(String(format: "%.0f", tuner.topology.unifiedMemoryGB)) GB Unified Memory")
                         .font(.system(size: 11.5))
                         .foregroundStyle(.secondary)
                 }
@@ -47,13 +53,12 @@ public struct BenchmarkHardwareBannerView: View {
             
             Spacer()
             
-            // 右侧：算力评分与硬件加速 Tag
             HStack(spacing: 10) {
                 hardwareTag(icon: "bolt.fill", label: "NEON/AES")
                 hardwareTag(icon: "memorychip", label: "\(tuner.topology.pageSizeBytes / 1024)K L2")
                 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("算力评分")
+                    Text("Score")
                         .font(.system(size: 9.5, weight: .semibold))
                         .foregroundStyle(.secondary)
                     Text("98/100")

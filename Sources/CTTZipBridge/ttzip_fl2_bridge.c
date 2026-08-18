@@ -1,5 +1,14 @@
-// ttzip_fl2_bridge.c
-// TTZip Fast-LZMA2 Multi-Threaded Engine Bridge & Hybrid Dispatcher
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_fl2_bridge.c
+ * @brief Fast-LZMA2 multi-threaded engine bridge and hybrid compression dispatcher.
+ */
 
 #include "include/ttzip_fl2_lzma2.h"
 #include "include/ttzip_lzma2_fast_encoder.h"
@@ -34,7 +43,6 @@ bool ttzip_fl2_is_supported(void) {
     return true;
 }
 
-// 线程局部缓存单线程 FL2_CCtx 上下文，避免在并发循环中频繁 malloc/free 与销毁结构体
 static TTZIP_THREAD_LOCAL FL2_CCtx* s_tls_fl2_cctx = NULL;
 
 int ttzip_fl2_compress_block(
@@ -55,7 +63,7 @@ int ttzip_fl2_compress_block(
         return 0;
     }
 
-    // 1. 稀疏零块极速旁路 (NEON 向量加速)
+    // 1. Sparse zero block fast path (NEON accelerated)
     if (is_zero_block) {
         return ttzip_lzma2_compress_block_tuned(
             src, src_len, dst, dst_capacity,
@@ -63,7 +71,7 @@ int ttzip_fl2_compress_block(
         );
     }
 
-    // 2. Level 1 混合自研 NEON Fast-Path (保护 3,200+ MB/s 极限吞吐门禁)
+    // 2. Level 1 hybrid NEON fast path (protects 3,200+ MB/s peak floor)
     if (level <= 1) {
         return ttzip_lzma2_compress_block_tuned(
             src, src_len, dst, dst_capacity,
@@ -71,7 +79,7 @@ int ttzip_fl2_compress_block(
         );
     }
 
-    // 3. Level 2 ~ 6 极速 HC4 Fast-Path (保护 530+ MB/s 高吞吐)
+    // 3. Level 2..6 fast HC4 path (protects 530+ MB/s throughput)
     if (level <= 6 && thread_count <= 1) {
         return ttzip_lzma2_compress_block_tuned(
             src, src_len, dst, dst_capacity,
@@ -79,7 +87,7 @@ int ttzip_fl2_compress_block(
         );
     }
 
-    // 4. Level 6 ~ Level 9 高/极限压缩等级 Fast-LZMA2 多核 Radix 引擎
+    // 4. Level 6..9 high compression levels via multi-threaded Radix engine
     uint32_t dict_size = 16 * 1024 * 1024;
     if (level <= 5) {
         dict_size = 8 * 1024 * 1024;
@@ -123,9 +131,9 @@ int ttzip_fl2_compress_block(
 
     FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, (unsigned)level);
     FL2_CCtx_setParameter(cctx, FL2_p_dictionarySize, dict_size);
-    FL2_CCtx_setParameter(cctx, FL2_p_omitProperties, 1); // 7Z 原生 raw LZMA2 chunk 格式
+    FL2_CCtx_setParameter(cctx, FL2_p_omitProperties, 1); // 7Z native raw LZMA2 chunk format
 #ifndef NO_XXHASH
-    FL2_CCtx_setParameter(cctx, FL2_p_doXXHash, 0);       // 禁止尾随 xxhash 破坏 7Z pack 流
+    FL2_CCtx_setParameter(cctx, FL2_p_doXXHash, 0);
 #endif
 
     size_t compressed_res = FL2_compressCCtx(

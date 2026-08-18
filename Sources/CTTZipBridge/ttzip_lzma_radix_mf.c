@@ -1,5 +1,14 @@
-// ttzip_lzma_radix_mf.c
-// TTZip 7Z Fast LZMA2 Radix 匹配查找器与 Level 1 快速跳表 (基于 ARM64 NEON 向量匹配)
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_lzma_radix_mf.c
+ * @brief 7Z Fast LZMA2 Radix match finder and Level 1 fast skip table (ARM64 NEON).
+ */
 
 #include "include/ttzip_lzma_radix_mf.h"
 #include <stdlib.h>
@@ -11,12 +20,11 @@
 
 int ttzip_radix_mf_init(ttzip_radix_mf_t* mf, uint32_t dict_size) {
     if (!mf) return -1;
-    if (dict_size == 0) dict_size = 1 << 20; // 默认 1MB
+    if (dict_size == 0) dict_size = 1 << 20; // Default 1MB
     
     mf->dict_size = dict_size;
     mf->mask = dict_size - 1;
     
-    // 分配 64K head 数组与 dict_size 大小的 prev 数组
     mf->head = (uint32_t*)malloc(65536 * sizeof(uint32_t));
     mf->prev = (uint32_t*)malloc(dict_size * sizeof(uint32_t));
     
@@ -48,19 +56,16 @@ ttzip_match_pair_t ttzip_radix_mf_find_fast(
     uint16_t prefix = (uint16_t)src[cur_pos] | ((uint16_t)src[cur_pos + 1] << 8);
     uint32_t match_pos = mf->head[prefix];
     
-    // 更新当前位置进 Radix 表
     uint32_t ring_idx = (uint32_t)(cur_pos & mf->mask);
     mf->prev[ring_idx] = match_pos;
     mf->head[prefix] = (uint32_t)cur_pos;
     
-    // Level 1 限制最大跳步深度为 2
     int depth = 0;
     while (match_pos != 0xFFFFFFFF && depth < 2) {
         if (cur_pos <= match_pos) break;
         uint32_t dist = (uint32_t)(cur_pos - match_pos);
         if (dist > mf->dict_size) break;
         
-        // 比对匹配长度
         const uint8_t* p1 = src + cur_pos;
         const uint8_t* p2 = src + match_pos;
         size_t len = 0;
@@ -71,7 +76,6 @@ ttzip_match_pair_t ttzip_radix_mf_find_fast(
             uint8x16_t v2 = vld1q_u8(p2 + len);
             uint8x16_t diff = veorq_u8(v1, v2);
             if (vmaxvq_u8(diff) != 0) {
-                // 找到第一个不同字节
                 while (len < max_len - cur_pos && p1[len] == p2[len]) len++;
                 break;
             }
@@ -85,7 +89,7 @@ ttzip_match_pair_t ttzip_radix_mf_find_fast(
         if (len > best.len && len >= 3) {
             best.len = (uint32_t)len;
             best.dist = dist;
-            if (len >= 32) break; // 提前退出
+            if (len >= 32) break;
         }
         
         uint32_t prev_ring_idx = match_pos & mf->mask;

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import AppKit
 
@@ -5,27 +12,27 @@ public final class FinderFavoritesReader {
     public static func fetchFavorites() -> [FinderFavoriteItem] {
         var results: [FinderFavoriteItem] = []
         let home = NSHomeDirectory()
+        let fm = FileManager.default
         
-        let standardDefaults: [(String, String, String)] = [
-            ("下载", (home as NSString).appendingPathComponent("Downloads"), "arrow.down.circle.fill"),
-            ("文稿", (home as NSString).appendingPathComponent("Documents"), "doc.text.fill"),
-            ("桌面", (home as NSString).appendingPathComponent("Desktop"), "desktopcomputer"),
-            ("个人主页", home, "house.fill"),
-            ("图片", (home as NSString).appendingPathComponent("Pictures"), "photo.fill"),
-            ("影片", (home as NSString).appendingPathComponent("Movies"), "film.fill"),
-            ("音乐", (home as NSString).appendingPathComponent("Music"), "music.note")
+        let standardPaths: [(String, String)] = [
+            ((home as NSString).appendingPathComponent("Downloads"), "arrow.down.circle.fill"),
+            ((home as NSString).appendingPathComponent("Documents"), "doc.text.fill"),
+            ((home as NSString).appendingPathComponent("Desktop"), "desktopcomputer"),
+            (home, "house.fill"),
+            ((home as NSString).appendingPathComponent("Pictures"), "photo.fill"),
+            ((home as NSString).appendingPathComponent("Movies"), "film.fill"),
+            ((home as NSString).appendingPathComponent("Music"), "music.note")
         ]
         
-        for (name, path, icon) in standardDefaults {
-            if FileManager.default.fileExists(atPath: path) {
-                results.append(FinderFavoriteItem(name: name, path: path, systemImage: icon))
+        for (path, icon) in standardPaths {
+            if fm.fileExists(atPath: path) {
+                let displayName = fm.displayName(atPath: path)
+                results.append(FinderFavoriteItem(name: displayName, path: path, systemImage: icon))
             }
         }
         
-        // Add mounted volumes (e.g. external hard drives, USBs)
-        if let mountedVolumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: [.volumeIsInternalKey, .volumeLocalizedNameKey], options: .skipHiddenVolumes) {
+        if let mountedVolumes = fm.mountedVolumeURLs(includingResourceValuesForKeys: [.volumeIsInternalKey, .volumeLocalizedNameKey], options: .skipHiddenVolumes) {
             for volumeURL in mountedVolumes {
-                // Skip root volume and System Data volume
                 if volumeURL.path == "/" || volumeURL.path == "/System/Volumes/Data" {
                     continue
                 }

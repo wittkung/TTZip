@@ -1,8 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import os
 
-/// 线程安全的高性能 O(1) 泛型 LRU (Least Recently Used) 内存缓存容器
-/// 基于双向链表 (Doubly Linked List) + 哈希表 + os_unfair_lock 底层锁实现极速纳秒级存取
+/// Thread-safe generic LRU (Least Recently Used) cache container.
+///
+/// Implemented via a doubly-linked list with a hash map guarded by `os_unfair_lock` for nanosecond access.
 public final class ExplorerLRUCache<Key: Hashable & Sendable, Value: Sendable>: @unchecked Sendable {
     public let capacity: Int
     
@@ -82,7 +90,7 @@ public final class ExplorerLRUCache<Key: Hashable & Sendable, Value: Sendable>: 
         tail = nil
     }
     
-    // MARK: - Private Doubly-Linked List Helpers (Must be called under lock)
+    // MARK: - Private Doubly-Linked List Operations (Under Lock)
     
     private func addToHead(_ node: Node) {
         node.prev = nil

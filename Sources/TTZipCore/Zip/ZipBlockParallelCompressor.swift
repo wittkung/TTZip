@@ -1,23 +1,30 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 超大单文件块级并行 (Block-Level Parallelism) 极速 Deflate 压缩引擎
+/// Block-level parallel Deflate compression engine for large in-memory buffers and large single files.
 public final class ZipBlockParallelCompressor: @unchecked Sendable {
     public static let shared = ZipBlockParallelCompressor()
     
     private init() {}
     
-    public static let blockSize: Int = 512 * 1024 // 512 KB Block 分块
+    public static let blockSize: Int = 512 * 1024 // 512 KB block partition
     
     public struct ParallelBlockResult: Sendable {
         public let compressedData: Data
         public let rawSize: Int
     }
     
-    /// 将单个超大内存 Buffer/文件划分为 512KB 分块并跨 CPU 全核并行压缩
+    /// Partitions an in-memory buffer into 512KB chunks and compresses them concurrently across CPU cores.
     public func compressBlocksConcurrently(data: Data, level: Int32 = 6) -> Data {
         guard data.count > ZipBlockParallelCompressor.blockSize else {
-            // 小文件直接单块压缩
+            // Small data fallback to single-block compression
             var outBuf = Data(count: data.count + 512)
             let outCap = outBuf.count
             let compSize = data.withUnsafeBytes { inPtr -> size_t in

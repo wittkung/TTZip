@@ -1,18 +1,24 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 针对 PCIe 4.0 NVMe SSD 直写 (Direct I/O & F_NOCACHE) 极速落盘引擎
+/// High-throughput direct I/O writer with APFS pre-allocation and page alignment.
 public final class ZipDirectIOWriter: @unchecked Sendable {
     public static let shared = ZipDirectIOWriter()
     
     private init() {}
     
-    /// 使用页对齐 Buffer + F_NOCACHE 物理直写磁盘，突破 OS VFS Page Cache 延迟
+    /// Writes data buffer directly to disk using page alignment and preallocated extents.
     public func writeDirect(filePath: String, data: Data, expectedSize: Int64) -> Bool {
         let fd = open(filePath, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0o644)
         if fd < 0 { return false }
         defer { close(fd) }
         
-        // 结合系统 Page Cache 与 APFS 预分配物理块打满落盘性能
         ZipAPFSPreallocator.shared.preallocateFileExtent(fd: fd, targetSize: expectedSize)
         
         if data.isEmpty { return true }
@@ -25,7 +31,7 @@ public final class ZipDirectIOWriter: @unchecked Sendable {
         return true
     }
     
-    /// 4096 字节物理页对齐裸指针直写 (自动 64MB 分块，解决 macOS 2GB write 系统调用限制)
+    /// Writes raw buffer in 64MB chunks to prevent macOS 2GB write system call limits.
     public func writeBuffer(fd: Int32, buffer: UnsafePointer<UInt8>, count: Int) {
         if count <= 0 { return }
         var bytesWritten = 0

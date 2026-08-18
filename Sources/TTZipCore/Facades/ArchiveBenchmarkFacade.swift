@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 性能基准测试门面接口
+/// Performance benchmark facade interface protocol.
 public protocol ArchiveBenchmarkFacading: Sendable {
     func runQuickBenchmark(size: BenchmarkDataSize, profile: BenchmarkDatasetProfile) async throws -> BenchmarkResult
     func runAllPresetsSuite(size: BenchmarkDataSize) async throws -> [BenchmarkResult]
@@ -22,9 +29,7 @@ extension ArchiveBenchmarkFacading {
     }
 }
 
-
-/// 【2.5 外观模式 (Facade Pattern)】性能基准测试门面 (`ArchiveBenchmarkFacade`)
-/// 屏蔽硬件基准测试、多数据集生成、竞品压测对比与硬件调控编排
+/// Unified benchmark facade encapsulating dataset generation, throughput benchmarking, and hardware calibration.
 public final class ArchiveBenchmarkFacade: ArchiveBenchmarkFacading, @unchecked Sendable {
     public static let shared = ArchiveBenchmarkFacade()
     

@@ -1,23 +1,28 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 【4.5 依赖注入模式 (Dependency Injection Pattern)】领域层依赖注入扩展与协议适配
-
-/// 依赖注入引导与测试隔离适配器
+/// Dependency injection test bootstrapping and mock registration adapter.
 public struct DependencyInjectionConformances {
     
-    /// 在单元测试或应用启动前重置并预热核心依赖容器
+    /// Bootstraps core services into the shared dependency container.
     public static func bootstrapCoreServices() {
         TTZipServiceRegistrar.registerAllServices(container: DependencyContainer.shared)
     }
     
-    /// 为指定测试用例注入 Mock 服务实例
+    /// Injects a mock service implementation for test isolation.
     public static func registerMock<Service: Sendable>(_ serviceType: Service.Type, mockInstance: Service) {
         DependencyContainer.shared.register(serviceType, lifetime: .singleton) { _ in
             mockInstance
         }
     }
     
-    /// 恢复指定服务为默认生产环境实现
+    /// Restores default production service registrations.
     public static func restoreDefaultService<Service>(_ serviceType: Service.Type) {
         TTZipServiceRegistrar.registerAllServices(container: DependencyContainer.shared)
     }

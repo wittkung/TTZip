@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// RFC 8878 Zstandard (.zst) 帧头部结构体
+/// RFC 8878 Zstandard (.zst) frame header structure.
 public struct ZstdFrameDescriptor: Sendable {
     public let magicNumber: UInt32
     public let isSkippableFrame: Bool
@@ -10,7 +17,7 @@ public struct ZstdFrameDescriptor: Sendable {
     public let dictionaryID: UInt32?
 }
 
-/// RFC 8878 Zstandard (.zst) 帧结构与数据块元数据解析器
+/// RFC 8878 Zstandard frame parser and metadata extractor.
 public final class ZstdHeaderReader: @unchecked Sendable {
     public static let shared = ZstdHeaderReader()
     
@@ -18,7 +25,7 @@ public final class ZstdHeaderReader: @unchecked Sendable {
     
     private init() {}
     
-    /// 从文件路径解析 Zstandard 帧描述符
+    /// Parses Zstandard frame descriptor from file.
     public func readFrameDescriptor(filePath: String) -> ZstdFrameDescriptor? {
         guard let handle = FileHandle(forReadingAtPath: filePath) else { return nil }
         defer { try? handle.close() }
@@ -30,7 +37,7 @@ public final class ZstdHeaderReader: @unchecked Sendable {
         }
     }
     
-    /// 从指针读取 RFC 8878 Zstd 帧描述符
+    /// Parses RFC 8878 Zstd frame descriptor from raw memory buffer.
     public func readFrameDescriptor(from buffer: UnsafePointer<UInt8>, length: Int) -> ZstdFrameDescriptor? {
         if length < 4 { return nil }
         
@@ -38,7 +45,7 @@ public final class ZstdHeaderReader: @unchecked Sendable {
         memcpy(&magic, buffer, 4)
         let magicLE = UInt32(littleEndian: magic)
         
-        // 1. 可跳过帧 (Skippable Frames: 0x184D2A50 ... 0x184D2A5F)
+        // 1. Skippable Frames (0x184D2A50 ... 0x184D2A5F)
         if magicLE >= 0x184D2A50 && magicLE <= 0x184D2A5F {
             var skippableSize: UInt32 = 0
             if length >= 8 {
@@ -55,7 +62,7 @@ public final class ZstdHeaderReader: @unchecked Sendable {
             )
         }
         
-        // 2. 标准 Zstd 帧魔数校验
+        // 2. Standard Zstandard frame magic
         guard magicLE == Self.zstdMagicNumber else { return nil }
         if length < 5 { return nil }
         

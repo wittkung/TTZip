@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 #if os(macOS) || os(Linux)
 import Darwin
 #endif
 
-/// 确定性高通量结构化 XML 语料配置
+/// Configuration for deterministic high-throughput structured XML corpus generation.
 public struct SyntheticXmlCorpusConfig: Sendable, Equatable {
     public let totalByteCount: Int64
     public let repeatDistanceBytes: Int
@@ -13,8 +20,8 @@ public struct SyntheticXmlCorpusConfig: Sendable, Equatable {
     
     public init(
         totalByteCount: Int64,
-        repeatDistanceBytes: Int = 16 * 1024 * 1024, // 16 MB 默认长距离重复跨度
-        repeatProbability: Double = 0.65,           // 65% 重复概率
+        repeatDistanceBytes: Int = 16 * 1024 * 1024,
+        repeatProbability: Double = 0.65,
         seed: UInt64 = 0x123456789ABCDEF0
     ) {
         self.totalByteCount = totalByteCount
@@ -24,16 +31,15 @@ public struct SyntheticXmlCorpusConfig: Sendable, Equatable {
     }
 }
 
-/// 零堆分配、> 2000 MB/s 确定性 XML 结构化测试语料生成器
+/// Zero-heap-allocation, deterministic XML structured corpus generator achieving > 2000 MB/s streaming throughput.
 ///
-/// 遵循 Stream-First 铁律，采用种子索引分块合成模型 (Seed-Indexed Chunk Synthesis)：
-/// - 使用单个 64KB 页对齐缓冲区，零动态对象树与零 GC 压力
-/// - 任意历史偏移块通过 SplitMix64 确定性逆向计算，历史长距离匹配无需常驻堆内存
+/// Implements seed-indexed chunk synthesis:
+/// - Single 64KB page-aligned buffer with zero GC and dynamic tree overhead.
+/// - Historical offsets reconstructed deterministically via SplitMix64 without resident heap caching.
 public enum SyntheticXmlCorpusGenerator {
     
-    public static let defaultChunkSize: Int = 65536 // 64 KB 页对齐分块
+    public static let defaultChunkSize: Int = 65536
     
-    // 静态词典与 MediaWiki XML 片段（纯 ASCII / UTF-8 字节切片）
     private static let xmlHeader: [UInt8] = Array("<mediawiki xmlns=\"http://www.mediawiki.org/xml/export-0.10/\" version=\"0.10\" xml:lang=\"en\">\n".utf8)
     private static let xmlFooter: [UInt8] = Array("</mediawiki>\n".utf8)
     
@@ -54,12 +60,7 @@ public enum SyntheticXmlCorpusGenerator {
         Array("Burrows-Wheeler transformation and Lempel-Ziv-Markov chain algorithms represent the empirical frontier of structured text reduction. ".utf8)
     ]
     
-    /// 将确定性合成的 XML 语料流式写入目标文件
-    ///
-    /// - Parameters:
-    ///   - config: 合成配置 (总字节数、重复跨度、重复概率、随机种子)
-    ///   - targetURL: 目标文件 URL
-    /// - Throws: 磁盘 I/O 错误时抛出 `POSIXError`
+    /// Streams deterministically synthesized XML corpus to target URL.
     public static func generate(
         config: SyntheticXmlCorpusConfig,
         to targetURL: URL
@@ -76,7 +77,6 @@ public enum SyntheticXmlCorpusGenerator {
         }
         defer { close(fd) }
         
-        // 预分配磁盘连续空间
         try? PlatformFileSystem.preallocateDiskSpace(filePath: path, byteCount: config.totalByteCount)
         
         guard let bufferRaw = PlatformMemory.allocateAlignedPageBuffer(byteCount: defaultChunkSize) else {
@@ -93,7 +93,6 @@ public enum SyntheticXmlCorpusGenerator {
         while remainingBytes > 0 {
             let writeSize = min(Int(remainingBytes), defaultChunkSize)
             
-            // 确定性伪随机决策：当前块是原创还是复用历史 delta 块
             let prngHash = splitMix64(seed: config.seed &+ (chunkIndex &* 0x9E3779B97F4A7C15))
             let isRepeat = (Double(prngHash % 10000) / 10000.0) < config.repeatProbability
             let seedIndex = (isRepeat && chunkIndex >= deltaChunks) ? (chunkIndex - deltaChunks) : chunkIndex
@@ -115,7 +114,6 @@ public enum SyntheticXmlCorpusGenerator {
         }
     }
     
-    // 预渲染的 16 个高真实度 64KB MediaWiki XML 原生模板块 (启动时静态初始化一次)
     private static let templatePool: [[UInt8]] = {
         var pool: [[UInt8]] = []
         for templateIdx in 0..<16 {
@@ -171,7 +169,7 @@ public enum SyntheticXmlCorpusGenerator {
         return pool
     }()
     
-    // MARK: - 内部快速分块填充 (单次 memcpy 零堆分配)
+    // MARK: - Internal Chunk Fill
     
     static func fillChunk(
         buffer: UnsafeMutablePointer<UInt8>,
@@ -209,7 +207,7 @@ public enum SyntheticXmlCorpusGenerator {
     static func writeUInt64Ascii(to ptr: UnsafeMutablePointer<UInt8>, value: UInt64) -> Int {
         var val = value
         if val == 0 {
-            ptr.pointee = 0x30 // '0'
+            ptr.pointee = 0x30
             return 1
         }
         var temp: [UInt8] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

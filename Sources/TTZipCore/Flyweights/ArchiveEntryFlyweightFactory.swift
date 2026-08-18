@@ -18,13 +18,11 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
     
     private var unfairLock = os_unfair_lock_s()
     
-    // 享元内部状态共享池
     private var pathPool: [String: String] = [:]
     private var extensionPool: [String: String] = [:]
     private var mimeTypePool: [String: String] = [:]
     private var directoryPrefixPool: [String: String] = [:]
     
-    // 内置常见 MIME 类型映射表 (常用文件扩展名享元)
     private static let predefinedMimeTypes: [String: String] = [
         "swift": "text/x-swift",
         "js": "application/javascript",
@@ -56,11 +54,9 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         "mov": "video/quicktime"
     ]
     
-    // 容量管制阈值 (防止海量不可复用路径导致无上限内存扩张)
     public var maxPathPoolCapacity: Int = 50_000
 
     private init() {
-        // 预热常用 MIME 享元池
         for (ext, mime) in Self.predefinedMimeTypes {
             extensionPool[ext] = ext
             mimeTypePool[mime] = mime
@@ -88,9 +84,9 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         #endif
     }
     
-    // MARK: - Interning API (字符串驻留享元)
+    // MARK: - Interning API
     
-    /// 驻留共享路径字符串
+    /// Interns shared path string.
     public func internPath(_ path: String) -> String {
         guard !path.isEmpty else { return "" }
         os_unfair_lock_lock(&unfairLock)
@@ -105,7 +101,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         return path
     }
     
-    /// 驻留共享文件扩展名
+    /// Interns shared file extension string.
     public func internExtension(_ ext: String) -> String {
         let lowerExt = ext.lowercased()
         guard !lowerExt.isEmpty else { return "" }
@@ -118,7 +114,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         return lowerExt
     }
     
-    /// 驻留共享 MIME 类型
+    /// Interns shared MIME type string.
     public func internMimeType(_ mime: String) -> String {
         guard !mime.isEmpty else { return "application/octet-stream" }
         os_unfair_lock_lock(&unfairLock)
@@ -130,7 +126,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         return mime
     }
     
-    /// 驻留共享目录前缀
+    /// Interns shared directory prefix string.
     public func internDirectoryPrefix(_ prefix: String) -> String {
         guard !prefix.isEmpty else { return "" }
         os_unfair_lock_lock(&unfairLock)
@@ -142,7 +138,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         return prefix
     }
     
-    /// 根据路径或扩展名推导并驻留 MIME 类型
+    /// Detects and interns MIME type from file path.
     public func detectMimeType(forPath path: String) -> String {
         let ext = (path as NSString).pathExtension.lowercased()
         if let mime = Self.predefinedMimeTypes[ext] {
@@ -151,7 +147,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         return internMimeType("application/octet-stream")
     }
     
-    /// 从文件相对路径提取并驻留目录前缀 (例如 "node_modules/lodash/index.js" -> "node_modules/lodash/")
+    /// Extracts and interns directory prefix from path.
     public func extractAndInternDirectoryPrefix(fromPath path: String) -> String {
         let nsPath = path as NSString
         let dir = nsPath.deletingLastPathComponent
@@ -162,12 +158,10 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
     
     // MARK: - Pool Management & Statistics
     
-    /// 统一内存释放接口 (遵从享元池统一 clearPool 规范)
     public func clearPool() {
         clearPools()
     }
 
-    /// 清空享元池（主要用于单元测试与内存释放）
     public func clearPools() {
         os_unfair_lock_lock(&unfairLock)
         defer { os_unfair_lock_unlock(&unfairLock) }
@@ -176,33 +170,30 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         mimeTypePool.removeAll(keepingCapacity: false)
         directoryPrefixPool.removeAll(keepingCapacity: false)
         
-        // 重新填充默认映射
         for (ext, mime) in Self.predefinedMimeTypes {
             extensionPool[ext] = ext
             mimeTypePool[mime] = mime
         }
     }
     
-    /// 当前享元池内部状态节点总数统计
     public var poolCounts: (paths: Int, extensions: Int, mimeTypes: Int, prefixes: Int) {
         os_unfair_lock_lock(&unfairLock)
         defer { os_unfair_lock_unlock(&unfairLock) }
         return (pathPool.count, extensionPool.count, mimeTypePool.count, directoryPrefixPool.count)
     }
     
-    /// 评估海量对象下使用享元模式相比独立创建的内存节省比例
     public func estimatedMemorySavingsRatio(totalEntriesProcessed: Int) -> Double {
         guard totalEntriesProcessed > 0 else { return 0.0 }
         let counts = poolCounts
         let totalUniqueFlyweights = counts.paths + counts.extensions + counts.mimeTypes + counts.prefixes
-        let totalRawAllocations = totalEntriesProcessed * 4 // 每个 entry 包含 path, ext, mime, prefix
+        let totalRawAllocations = totalEntriesProcessed * 4
         if totalRawAllocations <= totalUniqueFlyweights { return 0.0 }
         let saved = Double(totalRawAllocations - totalUniqueFlyweights) / Double(totalRawAllocations)
         return min(0.95, max(0.0, saved))
     }
 }
 
-/// 享元共享对象 (Flyweight Shared Intrinsic State Representation)
+/// Flyweight shared intrinsic state representation.
 public struct ArchiveEntryFlyweightState: Sendable, Equatable {
     public let path: String
     public let extensionName: String

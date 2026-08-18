@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AVKit
 import PDFKit
@@ -5,12 +12,12 @@ import QuickLookUI
 import WebKit
 import TTZipCore
 
-/// 全格式原生媒体预览核心调度路由组件
+/// Media preview router and container view for native formats.
 public struct MediaPreviewView: View {
     let fileURL: URL?
     let fileName: String
     
-    @State private var previewType: MediaPreviewType = .unsupported("加载中...")
+    @State private var previewType: MediaPreviewType = .unsupported("Loading...")
     @State private var isExtractingTemp = false
     @State private var isFullScreenActive = false
     
@@ -59,7 +66,7 @@ public struct MediaPreviewView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.system(size: 11, weight: .bold))
-                        Text("全屏")
+                        Text("Full Screen")
                             .font(.system(size: 11, weight: .bold))
                     }
                     .foregroundStyle(.white)
@@ -71,11 +78,11 @@ public struct MediaPreviewView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(12)
-                .help("切换真全屏沉浸预览 (或双击画面)")
+                .help("Toggle fullscreen preview (or double-click canvas)")
             }
         }
         .task(id: fileURL) {
-            previewType = .unsupported("正在加载媒体画板...")
+            previewType = .unsupported("Loading preview canvas...")
             loadPreview()
         }
         .onChange(of: fileURL) { _, _ in
@@ -124,7 +131,7 @@ public struct MediaPreviewView: View {
                         HStack(spacing: 5) {
                             Image(systemName: "xmark")
                                 .font(.system(size: 12, weight: .bold))
-                            Text("退出全屏 (Esc)")
+                            Text("Exit Full Screen (Esc)")
                                 .font(.system(size: 12, weight: .bold))
                         }
                         .foregroundStyle(.white)
@@ -151,7 +158,7 @@ public struct MediaPreviewView: View {
     
     private func loadPreview() {
         guard let url = fileURL else {
-            previewType = .unsupported("请从列表中选择文件以进行实时媒体预览")
+            previewType = .unsupported("Select a file from the explorer to preview")
             return
         }
         

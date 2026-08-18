@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 高性能流式归档解压引擎
+/// High-performance stream-based archive extraction engine.
 public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
     internal let hardwareTuner: HardwareTunerProtocol
     public let targetFormat: ArchiveCompressionFormat?
@@ -11,7 +18,7 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         self.targetFormat = targetFormat
     }
 
-    /// 同步将归档文件解压缩至指定目标文件夹 (零 Swift Task 分发开销)
+    /// Synchronously extracts an archive to the destination directory (zero Task queue overhead).
     @inline(__always)
     public func extractSync(
         archivePath: String,
@@ -32,7 +39,7 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         _ = try template.performWorkflow(context: context)
     }
 
-    /// 异步将归档文件解压缩至指定目标文件夹
+    /// Asynchronously extracts an archive with password candidate traversal and fast-path dispatch.
     public func extract(
         archivePath: String,
         destinationDir: String,
@@ -50,7 +57,7 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         let pathLower = archivePath.lowercased()
         let passCandidates = password != nil ? [password!] : PasswordVaultManager.shared.candidatePasswordsForAutoUnlock()
         
-        // 针对分卷 7z 压缩包直通处理
+        // Handle split multi-volume 7z archives (.001 / .7z.001)
         if pathLower.hasSuffix(".001") || pathLower.contains(".7z.") {
             let activePwd = password ?? passCandidates.first
             let pwd = (activePwd != nil && !activePwd!.isEmpty) ? activePwd : nil
@@ -85,7 +92,7 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
             return
         }
         
-        // 针对 7z / DMG / ISO 格式极速原生 C 语言并发解压引擎
+        // Fast-path for 7z / DMG / ISO containers
         if pathLower.contains(".7z") || pathLower.contains("sevenzip") || pathLower.hasSuffix(".cb7") || pathLower.hasSuffix(".dmg") || pathLower.hasSuffix(".iso") {
             let candidates: [String?] = passCandidates.isEmpty ? [password] : passCandidates.map { Optional($0) }
             for cand in candidates {
@@ -97,7 +104,7 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
             }
         }
         
-        // 针对 ZIP 格式原生 C 极速 GCD 16 核并发解压引擎 (含 WinZip AES-256 解密)
+        // Native parallel GCD C engine fast-path for ZIP archives (including WinZip AES-256)
         if pathLower.hasSuffix(".zip") || pathLower.contains(".zip") {
             let activePwd = password ?? passCandidates.first
             if ttzip_extract_zip_c_parallel(archivePath, destinationDir, options.skipMacJunk, activePwd) == 0 {
@@ -148,7 +155,7 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         }.value
     }
     
-    /// 从归档文件中精确提解单个指定文件 (100% 进程内纯原生 C / 系统引擎)
+    /// Extracts a single entry from an archive directly.
     public func extractSingleFile(
         archivePath: String,
         entryPath: String,
@@ -188,7 +195,7 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         Self.cleanupQuarantineAttributes(at: destinationDir)
     }
 
-    // MARK: - 辅助方法
+    // MARK: - Helpers
     
     internal static func cleanupQuarantineAttributes(at dirPath: String) {
         dirPath.withCString { pathPtr in
@@ -236,7 +243,7 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         }
     }
 
-    /// 【3.6 模板方法模式 (Template Method Pattern)】使用算法骨架进行流式解压
+    /// Template Method Pattern execution of streaming archive extraction.
     public func extractViaTemplate(
         archivePath: String,
         destinationDir: String,

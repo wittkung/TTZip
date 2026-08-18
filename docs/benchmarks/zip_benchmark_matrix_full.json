@@ -1,0 +1,2842 @@
+[
+  {
+    "pk_idx": 1,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 0,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1478.8,
+      "ext_speed_mbs": 1333.6
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 207.5,
+        "ext_speed_mbs": 209.7
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1428.7,
+        "ext_speed_mbs": 783.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1457.2,
+        "ext_speed_mbs": 978.8
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1424.5,
+        "ext_speed_mbs": 863.0
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 319.0,
+        "ext_speed_mbs": 226.0
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 231.5,
+        "ext_speed_mbs": 941.0
+      }
+    ]
+  },
+  {
+    "pk_idx": 2,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 0,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 732.8,
+      "ext_speed_mbs": 95.8
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 547.0,
+        "ext_speed_mbs": 328.8
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 537.3,
+        "ext_speed_mbs": 315.0
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 538.8,
+        "ext_speed_mbs": 327.6
+      }
+    ]
+  },
+  {
+    "pk_idx": 3,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 1,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1235.6,
+      "ext_speed_mbs": 3.3
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 227.2,
+        "ext_speed_mbs": 228.6
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 580.2,
+        "ext_speed_mbs": 660.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 491.4,
+        "ext_speed_mbs": 581.0
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 454.7,
+        "ext_speed_mbs": 637.4
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 380.4,
+        "ext_speed_mbs": 335.5
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 234.3,
+        "ext_speed_mbs": 928.1
+      }
+    ]
+  },
+  {
+    "pk_idx": 4,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 1,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 916.9,
+      "ext_speed_mbs": 115.6
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 499.8,
+        "ext_speed_mbs": 324.0
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 531.7,
+        "ext_speed_mbs": 294.9
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 520.1,
+        "ext_speed_mbs": 315.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 5,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 2,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1315.7,
+      "ext_speed_mbs": 156.6
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 232.2,
+        "ext_speed_mbs": 208.8
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 561.0,
+        "ext_speed_mbs": 610.2
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 549.6,
+        "ext_speed_mbs": 622.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 562.8,
+        "ext_speed_mbs": 634.1
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 379.4,
+        "ext_speed_mbs": 329.4
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 242.8,
+        "ext_speed_mbs": 861.4
+      }
+    ]
+  },
+  {
+    "pk_idx": 6,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 2,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 969.4,
+      "ext_speed_mbs": 110.0
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 522.8,
+        "ext_speed_mbs": 310.1
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 521.0,
+        "ext_speed_mbs": 295.5
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 519.3,
+        "ext_speed_mbs": 323.1
+      }
+    ]
+  },
+  {
+    "pk_idx": 7,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 3,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1091.4,
+      "ext_speed_mbs": 146.3
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 229.0,
+        "ext_speed_mbs": 203.4
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 562.1,
+        "ext_speed_mbs": 646.4
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 562.5,
+        "ext_speed_mbs": 704.4
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 553.8,
+        "ext_speed_mbs": 614.3
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 385.6,
+        "ext_speed_mbs": 331.6
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 231.0,
+        "ext_speed_mbs": 858.4
+      }
+    ]
+  },
+  {
+    "pk_idx": 8,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 3,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 960.4,
+      "ext_speed_mbs": 109.1
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 529.4,
+        "ext_speed_mbs": 320.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 500.8,
+        "ext_speed_mbs": 318.8
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 524.4,
+        "ext_speed_mbs": 326.4
+      }
+    ]
+  },
+  {
+    "pk_idx": 9,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 4,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1256.4,
+      "ext_speed_mbs": 141.7
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 234.1,
+        "ext_speed_mbs": 209.3
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 566.6,
+        "ext_speed_mbs": 644.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 557.9,
+        "ext_speed_mbs": 696.6
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 458.7,
+        "ext_speed_mbs": 540.7
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 285.3,
+        "ext_speed_mbs": 255.9
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 230.6,
+        "ext_speed_mbs": 896.3
+      }
+    ]
+  },
+  {
+    "pk_idx": 10,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 4,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 911.3,
+      "ext_speed_mbs": 103.6
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 528.4,
+        "ext_speed_mbs": 308.3
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 527.7,
+        "ext_speed_mbs": 302.7
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 525.9,
+        "ext_speed_mbs": 310.5
+      }
+    ]
+  },
+  {
+    "pk_idx": 11,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 5,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1516.0,
+      "ext_speed_mbs": 152.3
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 219.9,
+        "ext_speed_mbs": 190.0
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 398.3,
+        "ext_speed_mbs": 622.1
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 425.7,
+        "ext_speed_mbs": 334.7
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 429.2,
+        "ext_speed_mbs": 613.1
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 299.2,
+        "ext_speed_mbs": 260.4
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 225.1,
+        "ext_speed_mbs": 876.3
+      }
+    ]
+  },
+  {
+    "pk_idx": 12,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 5,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 973.1,
+      "ext_speed_mbs": 111.0
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 372.5,
+        "ext_speed_mbs": 313.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 377.2,
+        "ext_speed_mbs": 306.9
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 400.7,
+        "ext_speed_mbs": 312.8
+      }
+    ]
+  },
+  {
+    "pk_idx": 13,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 6,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1359.5,
+      "ext_speed_mbs": 142.8
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 215.6,
+        "ext_speed_mbs": 164.9
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 399.7,
+        "ext_speed_mbs": 599.3
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 401.8,
+        "ext_speed_mbs": 688.7
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 413.5,
+        "ext_speed_mbs": 633.4
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 310.3,
+        "ext_speed_mbs": 197.2
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 216.0,
+        "ext_speed_mbs": 860.0
+      }
+    ]
+  },
+  {
+    "pk_idx": 14,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 6,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 829.4,
+      "ext_speed_mbs": 106.4
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 365.5,
+        "ext_speed_mbs": 186.0
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 371.6,
+        "ext_speed_mbs": 201.8
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 378.2,
+        "ext_speed_mbs": 321.5
+      }
+    ]
+  },
+  {
+    "pk_idx": 15,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 7,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1491.4,
+      "ext_speed_mbs": 103.3
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 251.3,
+        "ext_speed_mbs": 209.3
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 334.4,
+        "ext_speed_mbs": 567.1
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 339.6,
+        "ext_speed_mbs": 665.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 333.3,
+        "ext_speed_mbs": 629.6
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 316.3,
+        "ext_speed_mbs": 295.4
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 237.4,
+        "ext_speed_mbs": 953.5
+      }
+    ]
+  },
+  {
+    "pk_idx": 16,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 7,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 819.4,
+      "ext_speed_mbs": 107.4
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 321.7,
+        "ext_speed_mbs": 297.1
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 309.2,
+        "ext_speed_mbs": 249.8
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 310.5,
+        "ext_speed_mbs": 317.6
+      }
+    ]
+  },
+  {
+    "pk_idx": 17,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 8,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1274.0,
+      "ext_speed_mbs": 142.9
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 232.0,
+        "ext_speed_mbs": 190.6
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 318.2,
+        "ext_speed_mbs": 595.0
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 332.9,
+        "ext_speed_mbs": 700.0
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 332.8,
+        "ext_speed_mbs": 613.3
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 316.3,
+        "ext_speed_mbs": 296.9
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 229.7,
+        "ext_speed_mbs": 775.4
+      }
+    ]
+  },
+  {
+    "pk_idx": 18,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 8,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 924.5,
+      "ext_speed_mbs": 112.4
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 339.1,
+        "ext_speed_mbs": 301.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 337.3,
+        "ext_speed_mbs": 284.1
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 319.7,
+        "ext_speed_mbs": 322.8
+      }
+    ]
+  },
+  {
+    "pk_idx": 19,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 9,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1262.7,
+      "ext_speed_mbs": 135.6
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 215.9,
+        "ext_speed_mbs": 198.3
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 219.5,
+        "ext_speed_mbs": 575.1
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 210.8,
+        "ext_speed_mbs": 693.0
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 222.4,
+        "ext_speed_mbs": 596.5
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 311.3,
+        "ext_speed_mbs": 272.9
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 136.0,
+        "ext_speed_mbs": 884.9
+      }
+    ]
+  },
+  {
+    "pk_idx": 20,
+    "payload": "海量小文件 (10MB/100文件)",
+    "format": "ZIP",
+    "level": 9,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 976.2,
+      "ext_speed_mbs": 109.2
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 208.6,
+        "ext_speed_mbs": 297.3
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 209.4,
+        "ext_speed_mbs": 309.8
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 229.6,
+        "ext_speed_mbs": 324.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 21,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 0,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 5332.8,
+      "ext_speed_mbs": 5222.8
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 477.1,
+        "ext_speed_mbs": 1854.3
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1730.0,
+        "ext_speed_mbs": 1936.7
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1603.8,
+        "ext_speed_mbs": 1822.8
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1655.8,
+        "ext_speed_mbs": 1879.1
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 386.8,
+        "ext_speed_mbs": 315.5
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 459.2,
+        "ext_speed_mbs": 1937.8
+      }
+    ]
+  },
+  {
+    "pk_idx": 22,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 0,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1281.0,
+      "ext_speed_mbs": 341.2
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 908.8,
+        "ext_speed_mbs": 1160.3
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 925.7,
+        "ext_speed_mbs": 1200.5
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 923.6,
+        "ext_speed_mbs": 1196.4
+      }
+    ]
+  },
+  {
+    "pk_idx": 23,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 1,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1590.2,
+      "ext_speed_mbs": 296.6
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 472.6,
+        "ext_speed_mbs": 1922.4
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 705.6,
+        "ext_speed_mbs": 994.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 733.2,
+        "ext_speed_mbs": 1065.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 727.7,
+        "ext_speed_mbs": 1002.9
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 410.1,
+        "ext_speed_mbs": 439.4
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 464.4,
+        "ext_speed_mbs": 2092.4
+      }
+    ]
+  },
+  {
+    "pk_idx": 24,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 1,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1402.1,
+      "ext_speed_mbs": 707.2
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 703.6,
+        "ext_speed_mbs": 1001.2
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 684.8,
+        "ext_speed_mbs": 1069.7
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 715.8,
+        "ext_speed_mbs": 1153.0
+      }
+    ]
+  },
+  {
+    "pk_idx": 25,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 2,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1203.4,
+      "ext_speed_mbs": 307.3
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 477.8,
+        "ext_speed_mbs": 1707.2
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 738.3,
+        "ext_speed_mbs": 1045.1
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 720.0,
+        "ext_speed_mbs": 1043.7
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 727.6,
+        "ext_speed_mbs": 1043.4
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 399.5,
+        "ext_speed_mbs": 431.9
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 449.1,
+        "ext_speed_mbs": 1853.4
+      }
+    ]
+  },
+  {
+    "pk_idx": 26,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 2,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1069.8,
+      "ext_speed_mbs": 711.6
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 691.3,
+        "ext_speed_mbs": 1066.8
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 699.4,
+        "ext_speed_mbs": 1156.2
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 711.3,
+        "ext_speed_mbs": 1145.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 27,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 3,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1208.5,
+      "ext_speed_mbs": 293.0
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 319.0,
+        "ext_speed_mbs": 1738.0
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 675.9,
+        "ext_speed_mbs": 1046.2
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 720.1,
+        "ext_speed_mbs": 1084.5
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 726.6,
+        "ext_speed_mbs": 1110.7
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 401.4,
+        "ext_speed_mbs": 432.0
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 449.3,
+        "ext_speed_mbs": 1910.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 28,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 3,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1069.7,
+      "ext_speed_mbs": 736.1
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 693.8,
+        "ext_speed_mbs": 1134.2
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 703.0,
+        "ext_speed_mbs": 1131.5
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 714.7,
+        "ext_speed_mbs": 1175.2
+      }
+    ]
+  },
+  {
+    "pk_idx": 29,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 4,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1119.2,
+      "ext_speed_mbs": 317.1
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 467.7,
+        "ext_speed_mbs": 1845.6
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 673.8,
+        "ext_speed_mbs": 1093.7
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 733.8,
+        "ext_speed_mbs": 1031.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 746.2,
+        "ext_speed_mbs": 1052.2
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 335.3,
+        "ext_speed_mbs": 372.7
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 448.2,
+        "ext_speed_mbs": 1910.6
+      }
+    ]
+  },
+  {
+    "pk_idx": 30,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 4,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1116.8,
+      "ext_speed_mbs": 713.1
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 703.6,
+        "ext_speed_mbs": 1071.8
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 680.4,
+        "ext_speed_mbs": 1111.1
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 714.6,
+        "ext_speed_mbs": 1113.3
+      }
+    ]
+  },
+  {
+    "pk_idx": 31,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 5,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1197.7,
+      "ext_speed_mbs": 303.9
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 467.2,
+        "ext_speed_mbs": 1942.6
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 82.0,
+        "ext_speed_mbs": 539.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 79.2,
+        "ext_speed_mbs": 578.9
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 80.8,
+        "ext_speed_mbs": 537.5
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 297.4,
+        "ext_speed_mbs": 148.3
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 456.2,
+        "ext_speed_mbs": 1918.6
+      }
+    ]
+  },
+  {
+    "pk_idx": 32,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 5,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1086.8,
+      "ext_speed_mbs": 712.2
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 80.9,
+        "ext_speed_mbs": 1112.2
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 82.0,
+        "ext_speed_mbs": 1136.2
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 80.6,
+        "ext_speed_mbs": 1113.5
+      }
+    ]
+  },
+  {
+    "pk_idx": 33,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 6,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1192.7,
+      "ext_speed_mbs": 309.2
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 472.0,
+        "ext_speed_mbs": 1760.3
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 81.1,
+        "ext_speed_mbs": 1024.4
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 81.9,
+        "ext_speed_mbs": 1019.0
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 76.4,
+        "ext_speed_mbs": 884.5
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 320.8,
+        "ext_speed_mbs": 360.1
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 433.1,
+        "ext_speed_mbs": 1786.2
+      }
+    ]
+  },
+  {
+    "pk_idx": 34,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 6,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1106.4,
+      "ext_speed_mbs": 713.4
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 81.6,
+        "ext_speed_mbs": 1068.3
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 81.9,
+        "ext_speed_mbs": 1123.6
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 80.7,
+        "ext_speed_mbs": 1137.9
+      }
+    ]
+  },
+  {
+    "pk_idx": 35,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 7,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1124.9,
+      "ext_speed_mbs": 299.4
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 462.7,
+        "ext_speed_mbs": 1779.1
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 48.0,
+        "ext_speed_mbs": 1029.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 48.2,
+        "ext_speed_mbs": 943.8
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 49.2,
+        "ext_speed_mbs": 952.2
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 336.3,
+        "ext_speed_mbs": 367.9
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 448.5,
+        "ext_speed_mbs": 1780.5
+      }
+    ]
+  },
+  {
+    "pk_idx": 36,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 7,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1117.8,
+      "ext_speed_mbs": 658.8
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 49.0,
+        "ext_speed_mbs": 1203.9
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 48.2,
+        "ext_speed_mbs": 1073.6
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 45.2,
+        "ext_speed_mbs": 1159.9
+      }
+    ]
+  },
+  {
+    "pk_idx": 37,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 8,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1172.2,
+      "ext_speed_mbs": 263.3
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 467.4,
+        "ext_speed_mbs": 1868.6
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 48.7,
+        "ext_speed_mbs": 1115.1
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 48.6,
+        "ext_speed_mbs": 1109.8
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 48.2,
+        "ext_speed_mbs": 1103.1
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 336.2,
+        "ext_speed_mbs": 381.1
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 451.5,
+        "ext_speed_mbs": 1952.2
+      }
+    ]
+  },
+  {
+    "pk_idx": 38,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 8,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1103.2,
+      "ext_speed_mbs": 782.6
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 46.8,
+        "ext_speed_mbs": 1207.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 44.6,
+        "ext_speed_mbs": 1198.4
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 47.6,
+        "ext_speed_mbs": 1169.0
+      }
+    ]
+  },
+  {
+    "pk_idx": 39,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 9,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1110.8,
+      "ext_speed_mbs": 323.5
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 475.0,
+        "ext_speed_mbs": 1813.9
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 22.6,
+        "ext_speed_mbs": 1098.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 23.0,
+        "ext_speed_mbs": 1076.7
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 23.1,
+        "ext_speed_mbs": 980.7
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 317.1,
+        "ext_speed_mbs": 372.0
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 468.4,
+        "ext_speed_mbs": 1995.4
+      }
+    ]
+  },
+  {
+    "pk_idx": 40,
+    "payload": "拟真日志文本 (10MB)",
+    "format": "ZIP",
+    "level": 9,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1032.4,
+      "ext_speed_mbs": 792.3
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 22.9,
+        "ext_speed_mbs": 1183.7
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 22.4,
+        "ext_speed_mbs": 1199.4
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 23.1,
+        "ext_speed_mbs": 1147.8
+      }
+    ]
+  },
+  {
+    "pk_idx": 41,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 0,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 9465.3,
+      "ext_speed_mbs": 6620.1
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 77.9,
+        "ext_speed_mbs": 5593.5
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 3975.6,
+        "ext_speed_mbs": 4247.4
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 4046.7,
+        "ext_speed_mbs": 4258.7
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 4019.3,
+        "ext_speed_mbs": 4327.7
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 435.7,
+        "ext_speed_mbs": 346.6
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 77.3,
+        "ext_speed_mbs": 1886.5
+      }
+    ]
+  },
+  {
+    "pk_idx": 42,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 0,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1480.7,
+      "ext_speed_mbs": 434.3
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1385.7,
+        "ext_speed_mbs": 1754.7
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1495.2,
+        "ext_speed_mbs": 1933.8
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1519.8,
+        "ext_speed_mbs": 1951.3
+      }
+    ]
+  },
+  {
+    "pk_idx": 43,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 1,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 6613.2,
+      "ext_speed_mbs": 956.1
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 79.5,
+        "ext_speed_mbs": 5715.4
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 88.6,
+        "ext_speed_mbs": 4340.8
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 88.0,
+        "ext_speed_mbs": 4352.1
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 87.9,
+        "ext_speed_mbs": 4319.7
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 75.7,
+        "ext_speed_mbs": 323.2
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 77.3,
+        "ext_speed_mbs": 1983.2
+      }
+    ]
+  },
+  {
+    "pk_idx": 44,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 1,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1781.7,
+      "ext_speed_mbs": 415.6
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 80.6,
+        "ext_speed_mbs": 1938.4
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 79.7,
+        "ext_speed_mbs": 1905.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 82.8,
+        "ext_speed_mbs": 1918.9
+      }
+    ]
+  },
+  {
+    "pk_idx": 45,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 2,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 6576.9,
+      "ext_speed_mbs": 971.1
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 79.3,
+        "ext_speed_mbs": 6090.9
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 87.7,
+        "ext_speed_mbs": 4395.9
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 87.4,
+        "ext_speed_mbs": 4341.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 88.6,
+        "ext_speed_mbs": 4338.5
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 76.3,
+        "ext_speed_mbs": 324.3
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 77.8,
+        "ext_speed_mbs": 2000.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 46,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 2,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1846.3,
+      "ext_speed_mbs": 412.0
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 82.4,
+        "ext_speed_mbs": 1906.4
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 82.7,
+        "ext_speed_mbs": 1915.6
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 80.6,
+        "ext_speed_mbs": 1833.9
+      }
+    ]
+  },
+  {
+    "pk_idx": 47,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 3,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 6488.5,
+      "ext_speed_mbs": 941.0
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 79.2,
+        "ext_speed_mbs": 5166.4
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 86.3,
+        "ext_speed_mbs": 4053.4
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 89.6,
+        "ext_speed_mbs": 3991.1
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 88.6,
+        "ext_speed_mbs": 4044.0
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 75.2,
+        "ext_speed_mbs": 295.3
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 75.8,
+        "ext_speed_mbs": 1891.1
+      }
+    ]
+  },
+  {
+    "pk_idx": 48,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 3,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1734.0,
+      "ext_speed_mbs": 424.0
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 81.5,
+        "ext_speed_mbs": 1877.1
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 82.9,
+        "ext_speed_mbs": 1845.7
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 81.5,
+        "ext_speed_mbs": 1680.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 49,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 4,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 6182.3,
+      "ext_speed_mbs": 861.8
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 79.8,
+        "ext_speed_mbs": 5716.8
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 89.9,
+        "ext_speed_mbs": 4346.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 88.0,
+        "ext_speed_mbs": 4351.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 88.4,
+        "ext_speed_mbs": 4185.8
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 74.3,
+        "ext_speed_mbs": 337.2
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 78.4,
+        "ext_speed_mbs": 1945.8
+      }
+    ]
+  },
+  {
+    "pk_idx": 50,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 4,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1971.5,
+      "ext_speed_mbs": 413.8
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 82.4,
+        "ext_speed_mbs": 1898.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 81.7,
+        "ext_speed_mbs": 1938.8
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 78.9,
+        "ext_speed_mbs": 1950.5
+      }
+    ]
+  },
+  {
+    "pk_idx": 51,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 5,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 6561.1,
+      "ext_speed_mbs": 944.9
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 78.2,
+        "ext_speed_mbs": 5634.5
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 74.4,
+        "ext_speed_mbs": 4350.7
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 74.2,
+        "ext_speed_mbs": 4262.5
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 74.7,
+        "ext_speed_mbs": 4359.7
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 74.4,
+        "ext_speed_mbs": 340.1
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 75.5,
+        "ext_speed_mbs": 1985.3
+      }
+    ]
+  },
+  {
+    "pk_idx": 52,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 5,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1879.5,
+      "ext_speed_mbs": 399.7
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 70.8,
+        "ext_speed_mbs": 1937.2
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 71.1,
+        "ext_speed_mbs": 1948.7
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 70.6,
+        "ext_speed_mbs": 1935.2
+      }
+    ]
+  },
+  {
+    "pk_idx": 53,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 6,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 6682.6,
+      "ext_speed_mbs": 903.2
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 80.4,
+        "ext_speed_mbs": 5400.0
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 75.3,
+        "ext_speed_mbs": 4303.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 74.0,
+        "ext_speed_mbs": 1822.6
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 74.3,
+        "ext_speed_mbs": 4218.4
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 75.4,
+        "ext_speed_mbs": 337.2
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 76.4,
+        "ext_speed_mbs": 1966.6
+      }
+    ]
+  },
+  {
+    "pk_idx": 54,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 6,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1951.1,
+      "ext_speed_mbs": 422.1
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 70.2,
+        "ext_speed_mbs": 1867.8
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 69.7,
+        "ext_speed_mbs": 1895.0
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 70.2,
+        "ext_speed_mbs": 1964.1
+      }
+    ]
+  },
+  {
+    "pk_idx": 55,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 7,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 6578.2,
+      "ext_speed_mbs": 947.6
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 79.6,
+        "ext_speed_mbs": 5764.5
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 27.6,
+        "ext_speed_mbs": 4256.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 27.4,
+        "ext_speed_mbs": 4150.4
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 27.6,
+        "ext_speed_mbs": 3976.4
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 75.0,
+        "ext_speed_mbs": 325.4
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 76.0,
+        "ext_speed_mbs": 1853.9
+      }
+    ]
+  },
+  {
+    "pk_idx": 56,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 7,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1860.8,
+      "ext_speed_mbs": 415.1
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 26.9,
+        "ext_speed_mbs": 1915.9
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 27.0,
+        "ext_speed_mbs": 1877.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 26.7,
+        "ext_speed_mbs": 1900.9
+      }
+    ]
+  },
+  {
+    "pk_idx": 57,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 8,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 6482.5,
+      "ext_speed_mbs": 933.9
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 80.1,
+        "ext_speed_mbs": 5352.8
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 27.4,
+        "ext_speed_mbs": 4207.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 27.7,
+        "ext_speed_mbs": 4193.6
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 27.6,
+        "ext_speed_mbs": 4313.9
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 74.6,
+        "ext_speed_mbs": 339.6
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 78.7,
+        "ext_speed_mbs": 1947.3
+      }
+    ]
+  },
+  {
+    "pk_idx": 58,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 8,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1809.3,
+      "ext_speed_mbs": 414.5
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 26.9,
+        "ext_speed_mbs": 1887.9
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 26.9,
+        "ext_speed_mbs": 1889.0
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 27.0,
+        "ext_speed_mbs": 1883.0
+      }
+    ]
+  },
+  {
+    "pk_idx": 59,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 9,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 6592.1,
+      "ext_speed_mbs": 921.1
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 79.8,
+        "ext_speed_mbs": 5394.8
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 4.9,
+        "ext_speed_mbs": 4134.1
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 4.8,
+        "ext_speed_mbs": 4231.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 4.9,
+        "ext_speed_mbs": 4304.2
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 74.7,
+        "ext_speed_mbs": 340.1
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 78.5,
+        "ext_speed_mbs": 1973.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 60,
+    "payload": "高熵物理Payload (100MB)",
+    "format": "ZIP",
+    "level": 9,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1787.3,
+      "ext_speed_mbs": 414.5
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 4.8,
+        "ext_speed_mbs": 1877.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 4.7,
+        "ext_speed_mbs": 1892.1
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 4.8,
+        "ext_speed_mbs": 1887.0
+      }
+    ]
+  },
+  {
+    "pk_idx": 61,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 0,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 8757.8,
+      "ext_speed_mbs": 8016.8
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 595.2,
+        "ext_speed_mbs": 4118.4
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 3787.7,
+        "ext_speed_mbs": 5017.8
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 3898.6,
+        "ext_speed_mbs": 5020.0
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 4468.2,
+        "ext_speed_mbs": 4686.4
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 458.1,
+        "ext_speed_mbs": 385.6
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 594.0,
+        "ext_speed_mbs": 3862.2
+      }
+    ]
+  },
+  {
+    "pk_idx": 62,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 0,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1589.2,
+      "ext_speed_mbs": 452.8
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1540.0,
+        "ext_speed_mbs": 2091.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1660.5,
+        "ext_speed_mbs": 2045.9
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1610.2,
+        "ext_speed_mbs": 2100.5
+      }
+    ]
+  },
+  {
+    "pk_idx": 63,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 1,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1797.0,
+      "ext_speed_mbs": 506.3
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 591.1,
+        "ext_speed_mbs": 3764.0
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1019.1,
+        "ext_speed_mbs": 1689.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1028.5,
+        "ext_speed_mbs": 1809.2
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1022.0,
+        "ext_speed_mbs": 1754.6
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 468.3,
+        "ext_speed_mbs": 520.2
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 591.4,
+        "ext_speed_mbs": 4001.6
+      }
+    ]
+  },
+  {
+    "pk_idx": 64,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 1,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1817.0,
+      "ext_speed_mbs": 1205.9
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1015.6,
+        "ext_speed_mbs": 1987.2
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1023.9,
+        "ext_speed_mbs": 2100.0
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1032.5,
+        "ext_speed_mbs": 2121.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 65,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 2,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1234.1,
+      "ext_speed_mbs": 508.8
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 594.1,
+        "ext_speed_mbs": 4271.0
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1003.4,
+        "ext_speed_mbs": 1802.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1018.2,
+        "ext_speed_mbs": 1783.2
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1024.7,
+        "ext_speed_mbs": 1786.5
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 462.5,
+        "ext_speed_mbs": 521.3
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 580.7,
+        "ext_speed_mbs": 4003.9
+      }
+    ]
+  },
+  {
+    "pk_idx": 66,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 2,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1247.4,
+      "ext_speed_mbs": 1204.0
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1017.6,
+        "ext_speed_mbs": 2068.9
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1013.9,
+        "ext_speed_mbs": 2066.1
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1011.6,
+        "ext_speed_mbs": 1956.5
+      }
+    ]
+  },
+  {
+    "pk_idx": 67,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 3,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1216.0,
+      "ext_speed_mbs": 521.3
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 596.5,
+        "ext_speed_mbs": 4276.5
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1022.1,
+        "ext_speed_mbs": 1703.5
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1001.3,
+        "ext_speed_mbs": 1469.9
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1009.6,
+        "ext_speed_mbs": 1719.1
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 455.3,
+        "ext_speed_mbs": 505.7
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 583.3,
+        "ext_speed_mbs": 3920.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 68,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 3,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1245.1,
+      "ext_speed_mbs": 1210.6
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1013.9,
+        "ext_speed_mbs": 2058.2
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1021.7,
+        "ext_speed_mbs": 2034.1
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1020.8,
+        "ext_speed_mbs": 2044.8
+      }
+    ]
+  },
+  {
+    "pk_idx": 69,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 4,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1251.8,
+      "ext_speed_mbs": 471.8
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 590.0,
+        "ext_speed_mbs": 4172.0
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1012.3,
+        "ext_speed_mbs": 1730.9
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1000.8,
+        "ext_speed_mbs": 1674.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1020.8,
+        "ext_speed_mbs": 1740.6
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 364.4,
+        "ext_speed_mbs": 435.9
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 586.9,
+        "ext_speed_mbs": 3945.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 70,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 4,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1210.6,
+      "ext_speed_mbs": 1155.7
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 1016.1,
+        "ext_speed_mbs": 1924.4
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 1018.4,
+        "ext_speed_mbs": 1840.9
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 1011.6,
+        "ext_speed_mbs": 1997.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 71,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 5,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1229.0,
+      "ext_speed_mbs": 485.2
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 588.3,
+        "ext_speed_mbs": 3365.6
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 93.1,
+        "ext_speed_mbs": 1706.6
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 93.6,
+        "ext_speed_mbs": 1518.9
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 93.7,
+        "ext_speed_mbs": 1693.7
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 367.1,
+        "ext_speed_mbs": 446.8
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 588.4,
+        "ext_speed_mbs": 3957.2
+      }
+    ]
+  },
+  {
+    "pk_idx": 72,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 5,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1231.7,
+      "ext_speed_mbs": 1149.4
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 94.1,
+        "ext_speed_mbs": 1934.3
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 93.0,
+        "ext_speed_mbs": 2061.2
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 93.4,
+        "ext_speed_mbs": 2037.2
+      }
+    ]
+  },
+  {
+    "pk_idx": 73,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 6,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1231.2,
+      "ext_speed_mbs": 450.0
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 592.1,
+        "ext_speed_mbs": 4206.1
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 94.2,
+        "ext_speed_mbs": 1761.7
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 94.4,
+        "ext_speed_mbs": 1751.2
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 94.7,
+        "ext_speed_mbs": 1756.6
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 379.5,
+        "ext_speed_mbs": 457.4
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 590.1,
+        "ext_speed_mbs": 3832.3
+      }
+    ]
+  },
+  {
+    "pk_idx": 74,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 6,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1238.4,
+      "ext_speed_mbs": 1189.8
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 95.7,
+        "ext_speed_mbs": 2082.9
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 94.3,
+        "ext_speed_mbs": 2147.0
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 93.4,
+        "ext_speed_mbs": 2068.2
+      }
+    ]
+  },
+  {
+    "pk_idx": 75,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 7,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1235.8,
+      "ext_speed_mbs": 451.3
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 590.2,
+        "ext_speed_mbs": 4109.6
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 52.4,
+        "ext_speed_mbs": 1718.7
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 53.0,
+        "ext_speed_mbs": 1767.1
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 53.0,
+        "ext_speed_mbs": 1483.0
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 377.9,
+        "ext_speed_mbs": 459.2
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 589.0,
+        "ext_speed_mbs": 4006.7
+      }
+    ]
+  },
+  {
+    "pk_idx": 76,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 7,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1205.1,
+      "ext_speed_mbs": 1049.1
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 52.3,
+        "ext_speed_mbs": 1991.7
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 52.3,
+        "ext_speed_mbs": 1943.4
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 52.4,
+        "ext_speed_mbs": 2105.8
+      }
+    ]
+  },
+  {
+    "pk_idx": 77,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 8,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1226.6,
+      "ext_speed_mbs": 492.9
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 592.8,
+        "ext_speed_mbs": 3922.8
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 52.4,
+        "ext_speed_mbs": 1744.8
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 53.0,
+        "ext_speed_mbs": 1492.9
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 53.7,
+        "ext_speed_mbs": 1740.6
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 380.9,
+        "ext_speed_mbs": 444.9
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 591.5,
+        "ext_speed_mbs": 3612.8
+      }
+    ]
+  },
+  {
+    "pk_idx": 78,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 8,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1203.0,
+      "ext_speed_mbs": 1200.1
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 53.2,
+        "ext_speed_mbs": 2099.4
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 53.4,
+        "ext_speed_mbs": 2110.9
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 52.3,
+        "ext_speed_mbs": 2072.1
+      }
+    ]
+  },
+  {
+    "pk_idx": 79,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 9,
+    "encryption": "无",
+    "ttzip": {
+      "comp_speed_mbs": 1230.0,
+      "ext_speed_mbs": 490.3
+    },
+    "competitors": [
+      {
+        "name": "Apple ditto (Native)",
+        "comp_speed_mbs": 592.3,
+        "ext_speed_mbs": 4157.6
+      },
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 25.4,
+        "ext_speed_mbs": 1776.7
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 26.0,
+        "ext_speed_mbs": 1777.9
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 26.2,
+        "ext_speed_mbs": 1809.1
+      },
+      {
+        "name": "Info-ZIP (System)",
+        "comp_speed_mbs": 385.4,
+        "ext_speed_mbs": 457.8
+      },
+      {
+        "name": "BSD tar (zip)",
+        "comp_speed_mbs": 596.1,
+        "ext_speed_mbs": 3990.4
+      }
+    ]
+  },
+  {
+    "pk_idx": 80,
+    "payload": "500MB 大文件数据块 (500MB)",
+    "format": "ZIP",
+    "level": 9,
+    "encryption": "AES-256",
+    "ttzip": {
+      "comp_speed_mbs": 1212.9,
+      "ext_speed_mbs": 1202.0
+    },
+    "competitors": [
+      {
+        "name": "7-Zip 7zz (Max Multithre",
+        "comp_speed_mbs": 26.4,
+        "ext_speed_mbs": 2141.0
+      },
+      {
+        "name": "Keka (7zz Core)",
+        "comp_speed_mbs": 26.4,
+        "ext_speed_mbs": 1986.3
+      },
+      {
+        "name": "BetterZip (7za Core)",
+        "comp_speed_mbs": 26.3,
+        "ext_speed_mbs": 2135.3
+      }
+    ]
+  }
+]

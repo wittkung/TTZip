@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file CTTZipBridge_APFS.h
+ * @brief APFS file system primitives (preallocation, clonefile, stat, fast unlink).
+ */
+
 #ifndef CTTZipBridge_APFS_h
 #define CTTZipBridge_APFS_h
 

@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 责任链调度门面与装配器 (ArchiveValidationPipeline)
+/// Pipeline assembler and orchestrator for archive pre-flight validation rules.
 public final class ArchiveValidationPipeline: @unchecked Sendable {
     private var handlers: [ArchiveValidationHandlerProtocol]
     private let lock = NSLock()
@@ -9,7 +16,7 @@ public final class ArchiveValidationPipeline: @unchecked Sendable {
         self.handlers = handlers
     }
     
-    /// 动态添加处理者（自动防护重复实例注册）
+    /// Dynamically appends a validation handler to the pipeline.
     @discardableResult
     public func addHandler(_ handler: ArchiveValidationHandlerProtocol) -> ArchiveValidationPipeline {
         lock.lock()
@@ -20,21 +27,21 @@ public final class ArchiveValidationPipeline: @unchecked Sendable {
         return self
     }
     
-    /// 清空所有处理者
+    /// Removes all configured handlers.
     public func clearHandlers() {
         lock.lock()
         defer { lock.unlock() }
         handlers.removeAll()
     }
     
-    /// 获取已装配的处理者数量
+    /// Returns the number of configured handlers in the pipeline.
     public var count: Int {
         lock.lock()
         defer { lock.unlock() }
         return handlers.count
     }
     
-    /// 责任链按顺序递归校验执行
+    /// Executes all handlers sequentially against the provided context.
     public func validate(context: ArchiveValidationContext) throws -> ArchiveValidationResult {
         lock.lock()
         let pipelineHandlers = self.handlers
@@ -54,7 +61,7 @@ public final class ArchiveValidationPipeline: @unchecked Sendable {
         return .success
     }
     
-    /// 执行校验，遇到拦截错误直接抛出 ArchiveValidationError 异常
+    /// Validates context and throws `ArchiveValidationError` upon failure.
     public func validateOrThrow(context: ArchiveValidationContext) throws {
         let result = try validate(context: context)
         if case .failure(let error) = result {
@@ -62,7 +69,7 @@ public final class ArchiveValidationPipeline: @unchecked Sendable {
         }
     }
     
-    // MARK: - 静态标准责任链工厂构建器 (Pipeline Builders)
+    // MARK: - Pre-configured Pipeline Builders
     
     private static let _cachedCompressPipeline = ArchiveValidationPipeline(handlers: [
         FileExistenceHandler(),
@@ -93,25 +100,25 @@ public final class ArchiveValidationPipeline: @unchecked Sendable {
         LicenseGatekeeperHandler()
     ])
     
-    /// 构建默认打包压缩前置校验管道
+    /// Builds default pre-flight validation pipeline for compression operations.
     @inline(__always)
     public static func buildDefaultCompressPipeline() -> ArchiveValidationPipeline {
         return _cachedCompressPipeline
     }
     
-    /// 构建默认解压提取前置校验管道
+    /// Builds default pre-flight validation pipeline for extraction operations.
     @inline(__always)
     public static func buildDefaultExtractPipeline() -> ArchiveValidationPipeline {
         return _cachedExtractPipeline
     }
     
-    /// 构建默认归档探索检测前置校验管道
+    /// Builds default pre-flight validation pipeline for inspection operations.
     @inline(__always)
     public static func buildDefaultInspectPipeline() -> ArchiveValidationPipeline {
         return _cachedInspectPipeline
     }
     
-    /// 构建默认归档修复恢复前置校验管道
+    /// Builds default pre-flight validation pipeline for repair operations.
     @inline(__always)
     public static func buildDefaultRepairPipeline() -> ArchiveValidationPipeline {
         return _cachedRepairPipeline

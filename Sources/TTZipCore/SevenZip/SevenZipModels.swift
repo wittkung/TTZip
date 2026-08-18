@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 7z 签名头部 (Signature Header 32 字节物理固定结构)
+/// 7z Signature Header (32-byte fixed structure).
 public struct SevenZipSignatureHeader: Sendable {
     public static let signature: [UInt8] = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C]
     public let majorVersion: UInt8
@@ -11,7 +18,7 @@ public struct SevenZipSignatureHeader: Sendable {
     public let nextHeaderCRC: UInt32
 }
 
-/// 7z 核心 Property ID 常量
+/// 7z Property ID constants.
 public enum SevenZipPropertyID: UInt8 {
     case kEnd = 0x00
     case kHeader = 0x01
@@ -41,7 +48,7 @@ public enum SevenZipPropertyID: UInt8 {
     case kDummy = 0x19
 }
 
-/// 7z 模块化 Coder 算法标识
+/// 7z Coder algorithm identifier.
 public enum SevenZipCoderMethod: Sendable {
     case copy
     case lzma
@@ -54,7 +61,7 @@ public enum SevenZipCoderMethod: Sendable {
     case unknown([UInt8])
 }
 
-/// 7z 归档单文件物理描述符
+/// 7z entry physical descriptor.
 public struct SevenZipEntryDescriptor: Sendable {
     public let path: String
     public let isDirectory: Bool

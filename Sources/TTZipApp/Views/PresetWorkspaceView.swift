@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 旗舰级社论美学 - 预设方案配置中央工作区 (圆角双浮岛版)
+/// Preset workspace central configuration view.
 public struct PresetWorkspaceView: View {
     @StateObject private var viewModel: PresetWorkspaceViewModel
     
@@ -11,7 +18,6 @@ public struct PresetWorkspaceView: View {
     
     public var body: some View {
         HStack(spacing: 16) {
-            // MARK: - 1. 左侧预设方案清单 (Master List Floating Island)
             PresetMasterListView(
                 presets: viewModel.presets,
                 selectedPresetID: $viewModel.selectedPresetID,
@@ -21,17 +27,15 @@ public struct PresetWorkspaceView: View {
                 onResetToDefaults: { viewModel.resetToDefaults() }
             )
             
-            // MARK: - 2. 右侧配置编辑工作区 (Editor Studio Floating Island)
             if let _ = viewModel.presets.first(where: { $0.id == viewModel.selectedPresetID }) {
                 VStack(alignment: .leading, spacing: 0) {
-                    // 报头 - 顶部对齐高度 52pt
                     HStack {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("PRO CONFIGURATION")
                                 .font(.system(size: 9, weight: .bold, design: .serif))
                                 .tracking(2)
                                 .foregroundStyle(TTZipTheme.kintsugiGold)
-                            Text("编辑: \(viewModel.editorName)")
+                            Text("Edit: \(viewModel.editorName)")
                                 .font(.system(size: 16, weight: .bold, design: .serif))
                                 .foregroundStyle(.primary)
                         }
@@ -41,7 +45,7 @@ public struct PresetWorkspaceView: View {
                             Button(action: { viewModel.undoDraft() }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "arrow.uturn.backward.circle")
-                                    Text("撤销草稿 (⌘Z)")
+                                    Text("Undo (⌘Z)")
                                 }
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(viewModel.canUndoDraft ? TTZipTheme.kintsugiGold : Color.gray)
@@ -56,7 +60,7 @@ public struct PresetWorkspaceView: View {
                             Button(action: { viewModel.redoDraft() }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "arrow.uturn.forward.circle")
-                                    Text("重做草稿 (⇧⌘Z)")
+                                    Text("Redo (⇧⌘Z)")
                                 }
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(viewModel.canRedoDraft ? TTZipTheme.kintsugiGold : Color.gray)
@@ -71,7 +75,7 @@ public struct PresetWorkspaceView: View {
                             Button(action: { viewModel.discardDraft() }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "xmark.circle")
-                                    Text("放弃修改")
+                                    Text("Discard")
                                 }
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(TTZipTheme.cinnabarRed)
@@ -87,7 +91,6 @@ public struct PresetWorkspaceView: View {
                     .padding(.top, 16)
                     .frame(height: 52)
                     
-                    // 统一置顶分割线 (金缮金强调线)
                     Rectangle()
                         .fill(TTZipTheme.kintsugiGold)
                         .frame(height: 1.5)
@@ -95,10 +98,10 @@ public struct PresetWorkspaceView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("方案名称")
+                                Text("Preset Name")
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(.secondary)
-                                TextField("输入预设名称", text: $viewModel.editorName)
+                                TextField("Enter preset name", text: $viewModel.editorName)
                                     .textFieldStyle(.plain)
                                     .font(.system(size: 13, weight: .medium))
                                     .padding(.horizontal, 10)
@@ -116,10 +119,10 @@ public struct PresetWorkspaceView: View {
                             )
                             
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("默认解压/打包密码 (可选)")
+                                Text("Default Password (Optional)")
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(.secondary)
-                                TTSecureTextField("留空则不设置默认密码", text: $viewModel.editorDefaultPassword)
+                                TTSecureTextField("Leave empty for no default password", text: $viewModel.editorDefaultPassword)
                                     .font(.system(size: 12.5))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
@@ -132,12 +135,11 @@ public struct PresetWorkspaceView: View {
                     
                     Divider()
                     
-                    // 底部 Save, Duplicate & Delete 操作栏
                     HStack(spacing: 10) {
                         Button(action: { viewModel.deleteSelectedPreset() }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "trash.fill")
-                                Text("删除此预设")
+                                Text("Delete")
                             }
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(TTZipTheme.cinnabarRed)
@@ -151,7 +153,7 @@ public struct PresetWorkspaceView: View {
                         Button(action: { viewModel.duplicateSelectedPreset() }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "doc.on.doc.fill")
-                                Text("衍生此预设")
+                                Text("Duplicate")
                             }
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(TTZipTheme.kintsugiGold)
@@ -161,7 +163,6 @@ public struct PresetWorkspaceView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
                         .buttonStyle(.plain)
-
                         
                         Spacer()
                         
@@ -176,7 +177,7 @@ public struct PresetWorkspaceView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 12, weight: .bold))
-                                Text("保存预设配置")
+                                Text("Save Configuration")
                                     .font(.system(size: 12, weight: .bold))
                             }
                             .foregroundStyle(.white)

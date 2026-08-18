@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// TTZip 支持的 7 大主流语言枚举 (BCP-47 规范)
+/// Supported primary languages (BCP-47 specifications).
 public enum AppLanguage: String, CaseIterable, Identifiable, Sendable, Codable {
     case en = "en"
     case zhHans = "zh-Hans"
@@ -36,7 +43,7 @@ public enum AppLanguage: String, CaseIterable, Identifiable, Sendable, Codable {
         }
     }
     
-    /// 从 POSIX 环境变量 (LC_ALL / LANG) 或 CLI 参数解析语言
+    /// Parses language from POSIX environment variables (LC_ALL / LANG) or CLI arguments.
     public static func from(identifier: String) -> AppLanguage? {
         let clean = identifier.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if clean.starts(with: "zh-hant") || clean.starts(with: "zh_tw") || clean.starts(with: "zh_hk") {

@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// Swift 6 线程安全 Sync 包装 Task 结果承载器
+/// Thread-safe result container bridging async Task results to synchronous callers.
 public final class SyncResultBox: @unchecked Sendable {
     public var result: WorkflowResult?
     public var error: Error?
     public init() {}
 }
 
-/// 归档处理工作流执行结果
+/// Archive processing workflow execution result.
 public struct WorkflowResult: Sendable, Equatable {
     public var isSuccess: Bool
     public var outputPath: String
@@ -56,7 +63,7 @@ public struct WorkflowResult: Sendable, Equatable {
     }
 }
 
-/// 模板方法模式归档工作流统一上下文
+/// Unified context passed across archive template method workflow execution stages.
 public final class ArchiveTemplateContext: @unchecked Sendable {
     public let operation: ArchiveOperationType
     public let archivePath: String
@@ -129,7 +136,7 @@ public final class ArchiveTemplateContext: @unchecked Sendable {
 
 // MARK: - Fluent Builder Extension for ArchiveTemplateContext
 
-/// ArchiveTemplateContext 链式建造者 (Fluent Builder Pattern)
+/// Fluent builder for constructing `ArchiveTemplateContext` instances (Builder Pattern).
 public struct ArchiveTemplateContextBuilder: Sendable {
     public var operation: ArchiveOperationType
     public var archivePath: String = ""

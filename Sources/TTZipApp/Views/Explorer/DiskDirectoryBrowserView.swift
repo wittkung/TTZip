@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 import AppKit
 
-/// 原生级 macOS 磁盘文件浏览与 Miller Columns 分栏器
+/// Native macOS disk directory browser with Miller Columns navigation.
 public struct DiskDirectoryBrowserView: View {
     let rootDirectory: URL
     let onSelectArchive: (String) -> Void
@@ -72,7 +79,7 @@ public struct DiskDirectoryBrowserView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "plus")
                                     .font(.system(size: 9.5, weight: .bold))
-                                Text("添加快捷")
+                                Text("Add Shortcut")
                                     .font(.system(size: 10.5, weight: .bold))
                             }
                             .padding(.horizontal, 9)
@@ -85,7 +92,7 @@ public struct DiskDirectoryBrowserView: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .help("添加 Mac 上的任意自定义文件夹钉住至快捷栏")
+                        .help("Add any custom folder on Mac to shortcuts")
                     }
                     .padding(.vertical, 2)
                 }
@@ -105,7 +112,7 @@ public struct DiskDirectoryBrowserView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 10, weight: .bold))
-                        Text("刷新")
+                        Text("Refresh")
                             .font(.system(size: 10.5, weight: .medium))
                     }
                     .foregroundStyle(TTZipTheme.bambooGreen)
@@ -118,7 +125,7 @@ public struct DiskDirectoryBrowserView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .help("刷新整个文件浏览器内容")
+                .help("Refresh browser contents")
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
@@ -171,11 +178,11 @@ public struct DiskDirectoryBrowserView: View {
         .buttonStyle(.plain)
         .contextMenu {
             if isCustom {
-                Button("取消钉住此快捷路径") {
+                Button("Unpin shortcut path") {
                     removeCustomPinnedFolder(path: targetURL.path)
                 }
             }
-            Button("在 Finder 中显示") {
+            Button("Reveal in Finder") {
                 NSWorkspace.shared.selectFile(targetURL.path, inFileViewerRootedAtPath: "")
             }
         }
@@ -203,8 +210,8 @@ public struct DiskDirectoryBrowserView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
-        panel.prompt = "钉住快捷文件夹"
-        panel.message = "选择要钉住在顶部快捷栏的文件夹："
+        panel.prompt = "Pin Shortcut"
+        panel.message = "Choose folders to pin to top shortcut bar:"
         
         if panel.runModal() == .OK {
             var current = customPinnedPaths

@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 7z 格式全能核心编解码与调度引擎 (统一收敛 7z 打包、解压、零拷贝 Store 及多核 LZMA2 流处理)
+/// High-performance native 7z archiving, extraction, and split-volume management engine.
 public final class SevenZipEngine: @unchecked Sendable {
     public static let shared = SevenZipEngine()
     
@@ -12,7 +19,7 @@ public final class SevenZipEngine: @unchecked Sendable {
     
     // MARK: - Compression Entry
     
-    /// 执行 7z 归档文件创建与打包
+    /// Creates and compresses a 7z archive.
     @inline(__always)
     public func createArchive(
         outputPath: String,
@@ -32,7 +39,7 @@ public final class SevenZipEngine: @unchecked Sendable {
     
     // MARK: - Extraction Entry
     
-    /// 解压 7z 归档文件（100% 自研原生 C 引擎）
+    /// Extracts a 7z archive using the in-process C static binding engine.
     public func extract(
         archivePath: String,
         destinationDir: String,
@@ -41,7 +48,7 @@ public final class SevenZipEngine: @unchecked Sendable {
         let pwd = (password != nil && !password!.isEmpty) ? password : nil
 
         if archivePath.hasSuffix(".001") || archivePath.contains(".7z.") {
-            TTLogger.info("[SevenZipEngine] 分卷归档解压: \(archivePath)")
+            TTLogger.info("[SevenZipEngine] Extracting split volume archive: \(archivePath)")
             let joinedTemp = FileManager.default.temporaryDirectory.appendingPathComponent("joined_\(UUID().uuidString).7z").path
             defer { try? FileManager.default.removeItem(atPath: joinedTemp) }
             if ArchiveExtractor().joinSplitVolumes(firstVolumePath: archivePath, outputPath: joinedTemp) {
@@ -49,21 +56,21 @@ public final class SevenZipEngine: @unchecked Sendable {
             }
             let ok = try SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, skipMacJunk: true, password: pwd)
             if !ok {
-                TTLogger.debug("[SevenZipEngine] 分卷解压 C 层返回失败, archive=\(archivePath)")
+                TTLogger.debug("[SevenZipEngine] Split archive extraction failed: \(archivePath)")
             }
             return ok
         }
         
         let ok = try SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, skipMacJunk: true, password: pwd)
         if !ok {
-            TTLogger.debug("[SevenZipEngine] C 层解压返回失败, archive=\(archivePath)")
+            TTLogger.debug("[SevenZipEngine] Extraction failed: \(archivePath)")
             return false
         }
         
         let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
         TTLogger.debug("[SevenZipEngine] destinationDir: \(destinationDir), itemsCount: \(items.count), items: \(items)")
         if items.isEmpty {
-            TTLogger.warning("[SevenZipEngine] C 层返回成功但输出目录为空, dest=\(destinationDir)")
+            TTLogger.warning("[SevenZipEngine] Extraction succeeded but output directory is empty: \(destinationDir)")
             return false
         }
         

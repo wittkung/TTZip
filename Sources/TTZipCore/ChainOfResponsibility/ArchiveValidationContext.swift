@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档校验操作类型
+/// Archive operation type for validation dispatch.
 public enum ArchiveValidationOperation: String, Sendable, Codable, Equatable {
     case compress
     case extract
@@ -8,7 +15,7 @@ public enum ArchiveValidationOperation: String, Sendable, Codable, Equatable {
     case repair
 }
 
-/// 归档校验配置选项
+/// Archive validation options configuration.
 public struct ArchiveValidationOptions: Sendable, Equatable {
     public var isSplit: Bool
     public var splitVolumeSizeBytes: Int64?
@@ -34,7 +41,7 @@ public struct ArchiveValidationOptions: Sendable, Equatable {
     }
 }
 
-/// 归档校验请求上下文 (Chain of Responsibility Payload Context)
+/// Payload context passed across Chain of Responsibility validation handlers.
 public struct ArchiveValidationContext: Sendable {
     public let sourcePaths: [String]
     public let destinationPath: String?
@@ -72,7 +79,7 @@ public struct ArchiveValidationContext: Sendable {
         self.metadata = metadata
     }
     
-    /// 快捷构造器：打包压缩校验上下文
+    /// Factory for compression validation context.
     public static func forCompress(
         sourcePaths: [String],
         destinationPath: String,
@@ -99,7 +106,7 @@ public struct ArchiveValidationContext: Sendable {
         )
     }
     
-    /// 快捷构造器：解压提取校验上下文
+    /// Factory for extraction validation context.
     public static func forExtract(
         archivePath: String,
         destinationDir: String,
@@ -115,7 +122,7 @@ public struct ArchiveValidationContext: Sendable {
         )
     }
     
-    /// 快捷构造器：检测探索校验上下文
+    /// Factory for inspection validation context.
     public static func forInspect(
         archivePath: String,
         password: String? = nil
@@ -127,7 +134,7 @@ public struct ArchiveValidationContext: Sendable {
         )
     }
     
-    /// 快捷构造器：修复恢复校验上下文
+    /// Factory for repair validation context.
     public static func forRepair(
         damagedPath: String,
         outputPath: String

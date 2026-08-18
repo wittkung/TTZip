@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import Security
 
 // MARK: - 1. UserDefaultsPresetRepository
 
-/// 基于 UserDefaults + PresetDataMapper 的预设仓储具体实现
+/// Concrete repository managing compression presets via UserDefaults storage.
 public final class UserDefaultsPresetRepository: ArchivePresetRepositoryProtocol, @unchecked Sendable {
     public typealias DomainModel = CompressionPreset
     
@@ -27,7 +34,6 @@ public final class UserDefaultsPresetRepository: ArchivePresetRepositoryProtocol
     private func loadFromStorageLocked() {
         rwLock.withWriteLock {
             guard let data = userDefaults.data(forKey: storageKey) else {
-                // 初次加载或无缓存：使用默认预设转换为 DTO 存盘
                 let defaults = PresetManager.defaultBuiltInPresets.map { mapper.toStorage(domain: $0) }
                 self.cachedDTOs = defaults
                 saveToStorageLocked()
@@ -44,8 +50,6 @@ public final class UserDefaultsPresetRepository: ArchivePresetRepositoryProtocol
                     self.cachedDTOs = decoded
                 }
             } catch {
-                // Safe Fallback: 存储损坏容错降级
-                TTLogger.warning("⚠️ [UserDefaultsPresetRepository] 预设存储损坏，启用 Safe Fallback 恢复默认预设")
                 let defaults = PresetManager.defaultBuiltInPresets.map { mapper.toStorage(domain: $0) }
                 self.cachedDTOs = defaults
                 saveToStorageLocked()
@@ -119,7 +123,7 @@ public final class UserDefaultsPresetRepository: ArchivePresetRepositoryProtocol
                 return nil
             }
             let targetDomain = mapper.toDomain(storage: cachedDTOs[targetIndex])
-            let defaultName = newName ?? "\(targetDomain.name) 副本"
+            let defaultName = newName ?? "\(targetDomain.name) Copy"
             let clonedDomain = targetDomain.clone(newId: UUID(), newName: defaultName)
             
             let clonedDTO = mapper.toStorage(domain: clonedDomain)
@@ -133,7 +137,7 @@ public final class UserDefaultsPresetRepository: ArchivePresetRepositoryProtocol
 
 // MARK: - 2. KeychainPasswordRepository
 
-/// 基于 macOS Keychain C API + KeychainDataMapper 的密码库安全仓储具体实现
+/// Concrete repository managing encrypted credentials via macOS Keychain services.
 public final class KeychainPasswordRepository: PasswordVaultRepositoryProtocol, @unchecked Sendable {
     public typealias DomainModel = PasswordVaultEntry
     
@@ -220,7 +224,7 @@ public final class KeychainPasswordRepository: PasswordVaultRepositoryProtocol, 
 
 // MARK: - 3. JSONFileArchiveHistoryRepository
 
-/// 基于 ~/Library/Caches/TTZip/History/history.json + ArchiveHistoryDataMapper 的归档历史记录仓储
+/// Concrete repository managing execution history records via atomic JSON files.
 public final class JSONFileArchiveHistoryRepository: ArchiveHistoryRepositoryProtocol, @unchecked Sendable {
     public typealias DomainModel = ArchiveTaskRecord
     
@@ -257,8 +261,6 @@ public final class JSONFileArchiveHistoryRepository: ArchiveHistoryRepositoryPro
                 let decoded = try JSONDecoder().decode([HistoryJSONDTO].self, from: data)
                 self.memoryCacheDTOs = decoded
             } catch {
-                // Safe Fallback: 历史记录文件损坏容错处理
-                TTLogger.warning("⚠️ [JSONFileArchiveHistoryRepository] 历史记录文件损坏，启动 Safe Fallback 保护并归零内存缓存")
                 self.memoryCacheDTOs = []
             }
         }
@@ -273,7 +275,7 @@ public final class JSONFileArchiveHistoryRepository: ArchiveHistoryRepositoryPro
             let data = try encoder.encode(memoryCacheDTOs)
             try data.write(to: historyFileURL, options: .atomic)
         } catch {
-            TTLogger.error("❌ [JSONFileArchiveHistoryRepository] 保存历史记录到磁盘失败: \(error.localizedDescription)")
+            // Best effort persistence write
         }
     }
     

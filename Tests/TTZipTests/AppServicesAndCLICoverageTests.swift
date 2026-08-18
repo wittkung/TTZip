@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -20,19 +27,19 @@ final class AppServicesAndCLICoverageTests: XCTestCase {
         try super.tearDownWithError()
     }
     
-    // 1. 测试 DeepFileMetadataReader 读取 POSIX 属性与 Inode 属性
+    // 1. Test DeepFileMetadataReader POSIX permissions and APFS Inode inspection
     func testDeepFileMetadataReader() async throws {
         let sampleFile = tempDirURL.appendingPathComponent("metadata_sample.txt")
         try "Metadata Reader Test Data 2026".write(to: sampleFile, atomically: true, encoding: .utf8)
         
         let metadata = await DeepFileMetadataReader.readMetadata(for: sampleFile)
         XCTAssertFalse(metadata.isEmpty)
-        XCTAssertNotNil(metadata["POSIX 权限码"])
-        XCTAssertNotNil(metadata["所有者 : 用户组"])
-        XCTAssertNotNil(metadata["APFS Inode 编号"])
+        XCTAssertNotNil(metadata["POSIX Permissions"])
+        XCTAssertNotNil(metadata["Owner : Group"])
+        XCTAssertNotNil(metadata["APFS Inode"])
     }
     
-    // 2. 测试 FolderStatsCalculator 统计尺寸与分类分布
+    // 2. Test FolderStatsCalculator directory sizing and distribution
     func testFolderStatsCalculator() async throws {
         let subDir = tempDirURL.appendingPathComponent("subfolder")
         try FileManager.default.createDirectory(at: subDir, withIntermediateDirectories: true)
@@ -50,7 +57,7 @@ final class AppServicesAndCLICoverageTests: XCTestCase {
         XCTAssertFalse(stats.dist.isEmpty)
     }
     
-    // 3. 测试 FileClipboardStore 复制 / 剪切 / 重名避让
+    // 3. Test FileClipboardStore copy / cut / paste operations
     @MainActor
     func testFileClipboardStore() throws {
         let store = FileClipboardStore.shared
@@ -69,7 +76,7 @@ final class AppServicesAndCLICoverageTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: pastedFile.path))
     }
     
-    // 4. 测试 DateFormatterCache 与 ByteCountFormatterCache 高效格式化缓存
+    // 4. Test DateFormatterCache and ByteCountFormatterCache thread-safe formatting
     func testFormattersCache() {
         let sizeString = ByteCountFormatterCache.string(fromByteCount: 1024 * 1024 * 50)
         XCTAssertFalse(sizeString.isEmpty)

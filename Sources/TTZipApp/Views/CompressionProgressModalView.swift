@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
@@ -29,27 +36,26 @@ public struct CompressionProgressModalView: View {
     
     private var estimatedRemainingSeconds: String {
         guard progress.throughputMBs > 0, progress.totalBytes > progress.bytesProcessed else {
-            return "计算中..."
+            return "Calculating..."
         }
         let remainingBytes = Double(progress.totalBytes - progress.bytesProcessed)
         let remainingMB = remainingBytes / (1024 * 1024)
         let seconds = remainingMB / progress.throughputMBs
-        if seconds < 1 { return "即将完成" }
-        if seconds < 60 { return "约 \(Int(seconds)) 秒" }
+        if seconds < 1 { return "Almost done" }
+        if seconds < 60 { return "About \(Int(seconds))s" }
         let mins = Int(seconds) / 60
         let secs = Int(seconds) % 60
-        return "约 \(mins) 分 \(secs) 秒"
+        return "About \(mins)m \(secs)s"
     }
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header 栏 - 顶部对齐高度 52pt
             HStack(spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "shippingbox.fill")
                         .font(.system(size: 14))
                         .foregroundStyle(TTZipTheme.kintsugiGold)
-                    Text("正在极速打包...")
+                    Text("Compressing...")
                         .font(.system(size: 16, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                 }
@@ -73,16 +79,14 @@ public struct CompressionProgressModalView: View {
             .padding(.horizontal, 20)
             .frame(height: 52)
             
-            // 统一置顶分割线 (金缮金强调线对齐)
             Rectangle()
                 .fill(TTZipTheme.kintsugiGold)
                 .frame(height: 1.5)
             
             VStack(alignment: .leading, spacing: 20) {
-                // 环形与条形百分比进度
                 VStack(spacing: 10) {
                     HStack(alignment: .lastTextBaseline) {
-                        Text("总体打包进度")
+                        Text("Progress")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -99,10 +103,9 @@ public struct CompressionProgressModalView: View {
                         .scaleEffect(x: 1, y: 1.5, anchor: .center)
                 }
                 
-                // 详细处理指标卡片 (超薄 Material 材质)
                 VStack(spacing: 12) {
                     HStack {
-                        Label("当前处理文件:", systemImage: "doc.fill")
+                        Label("Current File:", systemImage: "doc.fill")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                         Text(progress.currentFileName.isEmpty ? outputFileName : progress.currentFileName)
@@ -117,7 +120,7 @@ public struct CompressionProgressModalView: View {
                     
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("已处理体积")
+                            Text("Processed")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                             Text("\(formattedBytesProcessed) / \(formattedTotalBytes)")
@@ -128,7 +131,7 @@ public struct CompressionProgressModalView: View {
                         Spacer()
                         
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("实时传输速率")
+                            Text("Speed")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                             Text(String(format: "%.1f MB/s", progress.throughputMBs))
@@ -140,7 +143,7 @@ public struct CompressionProgressModalView: View {
                         Spacer()
                         
                         VStack(alignment: .trailing, spacing: 3) {
-                            Text("预计剩余时间")
+                            Text("Remaining")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                             Text(estimatedRemainingSeconds)
@@ -157,10 +160,9 @@ public struct CompressionProgressModalView: View {
                         .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
                 )
                 
-                // 底部控制按钮 (后台运行 vs 取消)
                 HStack(spacing: 12) {
                     Button(action: onMinimize) {
-                        Text("后台静默运行")
+                        Text("Run in Background")
                             .font(.system(size: 12, weight: .medium))
                             .padding(.horizontal, 16)
                             .padding(.vertical, 7)
@@ -171,7 +173,7 @@ public struct CompressionProgressModalView: View {
                     .clipShape(Capsule())
                     
                     Button(role: .destructive, action: onCancel) {
-                        Text("取消任务")
+                        Text("Cancel Task")
                             .font(.system(size: 12, weight: .bold))
                             .padding(.horizontal, 16)
                             .padding(.vertical, 7)

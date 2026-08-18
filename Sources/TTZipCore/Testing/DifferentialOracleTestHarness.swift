@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import CTTZipBridge
 
 // MARK: - Manifest Entry Types
 
-/// 文件系统条目类型
+/// File system entry type for manifest modeling.
 public enum EntryType: String, Sendable, Equatable, Codable {
     case regularFile = "regular"
     case directory = "directory"
@@ -12,16 +19,16 @@ public enum EntryType: String, Sendable, Equatable, Codable {
     case hardLink = "hardlink"
 }
 
-/// 文件树清单单个条目记录
+/// Single record in a file tree manifest.
 public struct ManifestEntry: Sendable, Equatable, Codable {
     public typealias EntryType = TTZipCore.EntryType
 
-    public let relativePath: String                // APFS 规范化相对路径
+    public let relativePath: String
     public let entryType: EntryType
     public let byteSize: Int64
-    public let sha256Checksum: String              // 十六进制小写 SHA-256 哈希（目录和符号链接为空）
-    public let posixMode: UInt16                   // 低 9 位 POSIX 权限位 (st_mode & 0o777)
-    public let symlinkTarget: String?              // 符号链接目标路径
+    public let sha256Checksum: String
+    public let posixMode: UInt16
+    public let symlinkTarget: String?
 
     public init(
         relativePath: String,
@@ -42,10 +49,10 @@ public struct ManifestEntry: Sendable, Equatable, Codable {
 
 // MARK: - File Tree Manifest
 
-/// 解压后文件系统树清单 (用于跨预言机 1:1 双向差分比对)
+/// Complete manifest snapshot of an extracted directory tree for 1:1 bidirectional differential verification.
 public struct FileTreeManifest: Sendable, Equatable, Codable {
     public let rootDirectory: String
-    public let entries: [String: ManifestEntry]    // 以 APFS 规范化相对路径为键
+    public let entries: [String: ManifestEntry]
     public let totalByteSize: Int64
     public let totalFileCount: Int
     public let totalDirectoryCount: Int
@@ -70,15 +77,15 @@ public struct FileTreeManifest: Sendable, Equatable, Codable {
 
 // MARK: - Differential Test Report
 
-/// 双向差分测试结果报告模型
+/// Bidirectional differential test execution report.
 public struct DifferentialTestReport: Sendable, Equatable, Codable {
     public let format: ArchiveCompressionFormat
-    public let targetOracle: String                // 如 "/usr/bin/tar", "bsdtar", "7zz"
+    public let targetOracle: String
     public let isPassed: Bool
     public let ttzipManifest: FileTreeManifest
     public let oracleManifest: FileTreeManifest
-    public let divergenceErrors: [String]          // 分歧详细描述
-    public let hexDiffOutput: String?              // 二进制分歧时的 HexDiff 窗口输出
+    public let divergenceErrors: [String]
+    public let hexDiffOutput: String?
 
     public init(
         format: ArchiveCompressionFormat,
@@ -101,13 +108,10 @@ public struct DifferentialTestReport: Sendable, Equatable, Codable {
 
 // MARK: - Differential Manifest Scanner
 
-/// 文件系统树递归扫描与不可变清单生成器
+/// Recursive directory scanner generating normalized `FileTreeManifest` instances.
 public enum DifferentialManifestScanner: Sendable {
     
-    /// 递归扫描指定目录并构建 `FileTreeManifest`
-    ///
-    /// - Parameter path: 待扫描的根目录路径
-    /// - Returns: 不可变的标准化 `FileTreeManifest`
+    /// Recursively scans directory and builds normalized `FileTreeManifest`.
     public static func scanDirectory(atPath path: String) throws -> FileTreeManifest {
         let rootURL = URL(fileURLWithPath: path).standardized
         let rootPath = rootURL.path
@@ -237,17 +241,10 @@ public enum DifferentialManifestScanner: Sendable {
 
 // MARK: - Differential Manifest Verifier
 
-/// 5 维度双向清单比对与分歧检测验证器
+/// 5-dimension manifest differential verifier.
 public enum DifferentialManifestVerifier: Sendable {
     
-    /// 比对 TTZip 与参考预言机输出清单
-    ///
-    /// - Parameters:
-    ///   - ttzip: TTZip 生成的文件树清单
-    ///   - oracle: 官方参考预言机生成的文件树清单
-    ///   - format: 测试归档格式
-    ///   - oracleName: 参考预言机名称或路径
-    /// - Returns: 包含分歧与 HexDiff 的完整差分测试报告
+    /// Compares TTZip output manifest with reference oracle output manifest.
     public static func compare(
         ttzip: FileTreeManifest,
         oracle: FileTreeManifest,
@@ -260,33 +257,33 @@ public enum DifferentialManifestVerifier: Sendable {
         let ttzipKeys = Set(ttzip.entries.keys)
         let oracleKeys = Set(oracle.entries.keys)
         
-        // 1. 检测缺失条目 (在预言机中存在但 TTZip 遗漏)
+        // 1. Missing entries
         let missingKeys = oracleKeys.subtracting(ttzipKeys).sorted()
         for key in missingKeys {
             let oracleEntry = oracle.entries[key]!
             divergenceErrors.append("Missing entry in TTZip output: '\(key)' (oracle type: \(oracleEntry.entryType.rawValue), size: \(oracleEntry.byteSize)B)")
         }
         
-        // 2. 检测多余条目 (TTZip 意外生成但预言机中不存在)
+        // 2. Extra entries
         let extraKeys = ttzipKeys.subtracting(oracleKeys).sorted()
         for key in extraKeys {
             let ttzipEntry = ttzip.entries[key]!
             divergenceErrors.append("Unexpected extra entry in TTZip output: '\(key)' (ttzip type: \(ttzipEntry.entryType.rawValue), size: \(ttzipEntry.byteSize)B)")
         }
         
-        // 3. 5 维度逐条目比对 (公共条目)
+        // 3. 5-dimension comparison across common entries
         let commonKeys = ttzipKeys.intersection(oracleKeys).sorted()
         for key in commonKeys {
             let ttzipEntry = ttzip.entries[key]!
             let oracleEntry = oracle.entries[key]!
             
-            // 维度 1: 条目类型
+            // Dimension 1: Entry type
             if ttzipEntry.entryType != oracleEntry.entryType {
                 divergenceErrors.append("Entry '\(key)' type mismatch: TTZip is \(ttzipEntry.entryType.rawValue), Oracle is \(oracleEntry.entryType.rawValue)")
                 continue
             }
             
-            // 维度 2: 文件大小与 SHA-256 校验和 (针对常规文件)
+            // Dimension 2: File size & SHA-256
             if ttzipEntry.entryType == .regularFile {
                 if ttzipEntry.byteSize != oracleEntry.byteSize {
                     divergenceErrors.append("Entry '\(key)' byte size mismatch: TTZip=\(ttzipEntry.byteSize)B, Oracle=\(oracleEntry.byteSize)B")
@@ -295,7 +292,6 @@ public enum DifferentialManifestVerifier: Sendable {
                 if ttzipEntry.sha256Checksum != oracleEntry.sha256Checksum {
                     divergenceErrors.append("Entry '\(key)' SHA-256 checksum mismatch: TTZip=\(ttzipEntry.sha256Checksum), Oracle=\(oracleEntry.sha256Checksum)")
                     
-                    // 提取首个不匹配文件的 16 字节对齐 HexDiff
                     if hexDiffOutput == nil {
                         let ttzipFilePath = (ttzip.rootDirectory as NSString).appendingPathComponent(key)
                         let oracleFilePath = (oracle.rootDirectory as NSString).appendingPathComponent(key)
@@ -307,14 +303,14 @@ public enum DifferentialManifestVerifier: Sendable {
                 }
             }
             
-            // 维度 3: 符号链接目标
+            // Dimension 3: Symlink target
             if ttzipEntry.entryType == .symbolicLink {
                 if ttzipEntry.symlinkTarget != oracleEntry.symlinkTarget {
                     divergenceErrors.append("Entry '\(key)' symlink target mismatch: TTZip target='\(ttzipEntry.symlinkTarget ?? "nil")', Oracle target='\(oracleEntry.symlinkTarget ?? "nil")'")
                 }
             }
             
-            // 维度 4: POSIX 权限位
+            // Dimension 4: POSIX permissions
             if ttzipEntry.posixMode != oracleEntry.posixMode {
                 divergenceErrors.append("Entry '\(key)' POSIX permission mismatch: TTZip=0o\(String(ttzipEntry.posixMode, radix: 8)), Oracle=0o\(String(oracleEntry.posixMode, radix: 8))")
             }
@@ -335,10 +331,9 @@ public enum DifferentialManifestVerifier: Sendable {
 
 // MARK: - Oracle Binary Resolver
 
-/// 预言机二进制可执行文件动态发现与路径解析器
+/// Dynamic discovery and path resolver for system oracle binaries.
 public struct OracleBinaryResolver: Sendable {
     
-    /// 标准预言机候选搜索目录清单
     public static let standardSearchDirectories: [String] = [
         "/opt/homebrew/bin",
         "/usr/local/bin",
@@ -346,14 +341,10 @@ public struct OracleBinaryResolver: Sendable {
         "/bin"
     ]
     
-    /// 解析二进制可执行文件绝对路径
-    ///
-    /// - Parameter binaryName: 二进制名称（如 "tar", "7zz", "unzip"）或绝对路径
-    /// - Returns: 可执行文件的有效绝对路径；若未发现则返回 nil
+    /// Resolves executable binary path.
     public static func resolve(binaryName: String) -> String? {
         let fm = FileManager.default
         
-        // 1. 如果本身是绝对路径且可执行
         if binaryName.hasPrefix("/") {
             if fm.isExecutableFile(atPath: binaryName) {
                 return binaryName
@@ -363,7 +354,6 @@ public struct OracleBinaryResolver: Sendable {
             }
         }
         
-        // 2. 遍历标准安装目录
         for dir in standardSearchDirectories {
             let candidate = (dir as NSString).appendingPathComponent(binaryName)
             if fm.isExecutableFile(atPath: candidate) {
@@ -371,7 +361,6 @@ public struct OracleBinaryResolver: Sendable {
             }
         }
         
-        // 3. 通过系统 /usr/bin/which 探测
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
         proc.arguments = [binaryName]
@@ -393,7 +382,7 @@ public struct OracleBinaryResolver: Sendable {
         return nil
     }
     
-    /// 获取已解析二进制工具的版本字符串 (如可用)
+    /// Resolves oracle version string.
     public static func resolveVersion(for binaryPath: String) async -> String? {
         guard FileManager.default.isExecutableFile(atPath: binaryPath) else { return nil }
         let binaryName = (binaryPath as NSString).lastPathComponent.lowercased()
@@ -419,14 +408,12 @@ public struct OracleBinaryResolver: Sendable {
 
 // MARK: - Differential Oracle Registry
 
-/// 跨平台与本地系统参考预言机注册表
+/// Registry of system reference oracles.
 public struct DifferentialOracleRegistry: @unchecked Sendable {
     public static let shared = DifferentialOracleRegistry()
     
-    /// 核心强制要求的原生系统预言机 (必须在 macOS 上就绪)
     public static let mandatoryOracleNames: [String] = ["tar", "unzip"]
     
-    /// 全量已知参考预言机名称集合
     public static let knownOracleNames: [String] = [
         "tar",
         "bsdtar",
@@ -451,7 +438,6 @@ public struct DifferentialOracleRegistry: @unchecked Sendable {
         self.storage.oracleMap = discoverOracles()
     }
     
-    /// 动态发现并扫描系统中全部可用的预言机二进制路径
     public func discoverOracles() -> [String: String] {
         var discovered: [String: String] = [:]
         for name in Self.knownOracleNames {
@@ -460,7 +446,6 @@ public struct DifferentialOracleRegistry: @unchecked Sendable {
             }
         }
         
-        // 核心默认兜底硬编码路径保证
         if discovered["tar"] == nil && FileManager.default.isExecutableFile(atPath: "/usr/bin/tar") {
             discovered["tar"] = "/usr/bin/tar"
         }
@@ -480,7 +465,6 @@ public struct DifferentialOracleRegistry: @unchecked Sendable {
         return discovered
     }
     
-    /// 查询指定预言机名称或路径的实际可执行路径
     public func oraclePath(for name: String) -> String? {
         storage.lock.lock()
         defer { storage.lock.unlock() }
@@ -502,19 +486,16 @@ public struct DifferentialOracleRegistry: @unchecked Sendable {
         return nil
     }
     
-    /// 获取当前系统中所有可用预言机的名称列表
     public func availableOracles() -> [String] {
         storage.lock.lock()
         defer { storage.lock.unlock() }
         return Array(storage.oracleMap.keys).sorted()
     }
     
-    /// 判定指定预言机在当前运行环境中是否可用
     public func isAvailable(oracle: String) -> Bool {
         return oraclePath(for: oracle) != nil
     }
     
-    /// 判定全部核心强制预言机（/usr/bin/tar, /usr/bin/unzip）是否就绪
     public func mandatoryOraclesAvailable() -> Bool {
         for name in Self.mandatoryOracleNames {
             if oraclePath(for: name) == nil {
@@ -524,7 +505,6 @@ public struct DifferentialOracleRegistry: @unchecked Sendable {
         return true
     }
     
-    /// 针对特定归档压缩格式返回推荐的首选预言机路径
     public func defaultOracle(for format: ArchiveCompressionFormat) -> String? {
         switch format {
         case .tar:
@@ -549,17 +529,10 @@ public struct DifferentialOracleRegistry: @unchecked Sendable {
 
 // MARK: - Differential Oracle Test Harness
 
-/// 双向 3 维度预言机比对测试执行引擎 (TTZip 压缩 ➔ 预言机解压；预言机压缩 ➔ TTZip 解压)
+/// Differential oracle test runner executing bidirectional roundtrip comparisons.
 public enum DifferentialOracleTestHarness: Sendable {
     
-    /// 执行 3 维度双向差分往返验证
-    ///
-    /// - Parameters:
-    ///   - format: 待验证归档格式
-    ///   - sourceDir: 测试原始源文件目录
-    ///   - oracle: 目标预言机名称或路径 (如 "/usr/bin/tar", "bsdtar", "/usr/bin/unzip", "7zz")
-    ///   - tempSandbox: 隔离测试临时沙盒目录路径
-    /// - Returns: 包含 5 维度对比结果与 HexDiff 的完整差分报告
+    /// Executes bidirectional roundtrip verification between TTZip and reference oracles.
     public static func executeRoundtrip(
         format: ArchiveCompressionFormat,
         sourceDir: String,
@@ -581,7 +554,7 @@ public enum DifferentialOracleTestHarness: Sendable {
         }
         try fm.createDirectory(at: sandboxURL, withIntermediateDirectories: true)
         
-        // 1. 基线扫描
+        // 1. Baseline scan
         let baselineManifest = try DifferentialManifestScanner.scanDirectory(atPath: sourceURL.path)
         let childItems = try fm.contentsOfDirectory(atPath: sourceURL.path).sorted()
         guard !childItems.isEmpty else {
@@ -592,7 +565,7 @@ public enum DifferentialOracleTestHarness: Sendable {
         var divergenceErrors: [String] = []
         var capturedHexDiff: String? = nil
         
-        // 2. Pass 1: TTZip 压缩 ➔ 预言机解压
+        // 2. Pass 1: TTZip compress -> Oracle extract
         let ttzipArchiveURL = sandboxURL.appendingPathComponent("ttzip_out_\(UUID().uuidString)\(format.fileExtension)")
         let oracleExtractURL = sandboxURL.appendingPathComponent("oracle_extracted_\(UUID().uuidString)")
         try fm.createDirectory(at: oracleExtractURL, withIntermediateDirectories: true)
@@ -627,7 +600,7 @@ public enum DifferentialOracleTestHarness: Sendable {
             capturedHexDiff = pass1Report.hexDiffOutput
         }
         
-        // 3. Pass 2: 预言机压缩 ➔ TTZip 解压 (如果预言机具备对应格式压缩能力)
+        // 3. Pass 2: Oracle compress -> TTZip extract (if oracle supports creation)
         var ttzipExtractedManifest: FileTreeManifest? = nil
         if canOracleCompress(oracle: resolvedOraclePath, format: format) {
             let oracleArchiveURL = sandboxURL.appendingPathComponent("oracle_out_\(UUID().uuidString)\(format.fileExtension)")
@@ -664,7 +637,6 @@ public enum DifferentialOracleTestHarness: Sendable {
                     capturedHexDiff = pass2Report.hexDiffOutput
                 }
                 
-                // 3-way 交叉比对: TTZip 解压产物 vs 预言机解压产物
                 let crossReport = DifferentialManifestVerifier.compare(
                     ttzip: ttzipManifest,
                     oracle: oracleExtractedManifest,
@@ -678,7 +650,6 @@ public enum DifferentialOracleTestHarness: Sendable {
             }
         }
         
-        // 去重错误分歧记录
         var seenErrors = Set<String>()
         var uniqueErrors: [String] = []
         for err in divergenceErrors {
@@ -702,7 +673,6 @@ public enum DifferentialOracleTestHarness: Sendable {
     
     // MARK: - Oracle Subprocess Execution Helpers
     
-    /// 判定目标预言机工具是否支持指定格式的压缩打包
     public static func canOracleCompress(oracle: String, format: ArchiveCompressionFormat) -> Bool {
         let name = (oracle as NSString).lastPathComponent.lowercased()
         if name.contains("tar") {
@@ -729,7 +699,6 @@ public enum DifferentialOracleTestHarness: Sendable {
         return false
     }
     
-    /// 使用预言机解压归档文件
     public static func extractWithOracle(
         oraclePath: String,
         format: ArchiveCompressionFormat,
@@ -759,7 +728,6 @@ public enum DifferentialOracleTestHarness: Sendable {
         }
     }
     
-    /// 使用预言机压缩打包测试目录
     public static func compressWithOracle(
         oraclePath: String,
         format: ArchiveCompressionFormat,
@@ -804,4 +772,3 @@ public enum DifferentialOracleTestHarness: Sendable {
         }
     }
 }
-

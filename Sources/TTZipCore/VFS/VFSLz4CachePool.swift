@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// VFS 临时解压缓存池条目元数据
+/// Metadata record for a cached chunk in the VFS decompression cache pool.
 public struct VFSCacheBlockMeta: Sendable {
     public let chunkIndex: Int
     public let rawSize: Int
@@ -10,7 +17,7 @@ public struct VFSCacheBlockMeta: Sendable {
     public let accessTimestamp: UInt64
 }
 
-/// 基于 LZ4 微秒级编解码的两级（RAM-LZ4 + Disk-LZ4 Spill）VFS 临时解压缓存池
+/// High-throughput two-tier (RAM-LZ4 + Disk-LZ4 Spill) VFS decompression cache pool leveraging microsecond LZ4 codec.
 public final class VFSLz4CachePool: @unchecked Sendable {
     public static let shared = VFSLz4CachePool()
     
@@ -19,19 +26,19 @@ public final class VFSLz4CachePool: @unchecked Sendable {
     private let maxRamBytes: Int
     private var currentRamBytes: Int = 0
     
-    /// 内存缓存字典：key 为 "sessionId:chunkIndex" -> 压缩数据 Data
+    /// Memory cache: "sessionId:chunkIndex" -> LZ4 compressed Data
     private var ramCache: [String: Data] = [:]
-    /// 磁盘溢出缓存：key -> 临时文件路径
+    /// Disk spill cache: "sessionId:chunkIndex" -> local temp URL
     private var diskSpillCache: [String: URL] = [:]
-    /// 访问历史（LRU 维护）：key -> 上次访问时钟
+    /// LRU access timestamps: "sessionId:chunkIndex" -> timestamp
     private var lruAccessTimes: [String: UInt64] = [:]
-    /// 块大小记录：key -> 原始未压缩尺寸
+    /// Uncompressed raw block sizes: "sessionId:chunkIndex" -> byte size
     private var rawSizeRecord: [String: Int] = [:]
     
-    /// 临时缓存根目录
+    /// Root directory for disk spill cache
     private let spillDirectory: URL
     
-    public init(maxRamBytes: Int = 128 * 1024 * 1024) { // 默认 128MB RAM 配额
+    public init(maxRamBytes: Int = 128 * 1024 * 1024) {
         self.maxRamBytes = maxRamBytes
         let tempBase = FileManager.default.temporaryDirectory
         self.spillDirectory = tempBase.appendingPathComponent("TTZip_VFS_LZ4_\(UUID().uuidString)")
@@ -42,7 +49,7 @@ public final class VFSLz4CachePool: @unchecked Sendable {
         try? FileManager.default.removeItem(at: self.spillDirectory)
     }
     
-    /// 存入解压块：经由 LZ4 极速压缩后存入 RAM 缓存（若超配则 LRU 溢出至磁盘）
+    /// Stores decompressed chunk: compresses via LZ4 and places in RAM cache (spills to disk via LRU on budget overflow).
     public func put(sessionId: String, chunkIndex: Int, rawData: Data, acceleration: Int = 1) {
         guard !rawData.isEmpty else { return }
         let compressed = lz4Engine.compressWithTLS(data: rawData, acceleration: acceleration)
@@ -52,11 +59,9 @@ public final class VFSLz4CachePool: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         
-        // 记录原始尺寸与访问时间
         rawSizeRecord[key] = rawData.count
         lruAccessTimes[key] = now
         
-        // 检查 RAM 配额并进行 LRU 溢出淘汰
         if currentRamBytes + compressed.count > maxRamBytes {
             evictRamToDiskSpill(requiredSpace: compressed.count)
         }
@@ -65,12 +70,11 @@ public final class VFSLz4CachePool: @unchecked Sendable {
             ramCache[key] = compressed
             currentRamBytes += compressed.count
         } else {
-            // 直接溢出至磁盘
             writeToSpillDisk(key: key, data: compressed)
         }
     }
     
-    /// 读取解压块：优先从 RAM 命中，未命中则从磁盘拉取，经由 LZ4 瞬时（4~8 GB/s）解压还原
+    /// Retrieves decompressed chunk: returns from RAM if present, otherwise reads from disk spill and decompresses via LZ4.
     public func get(sessionId: String, chunkIndex: Int) -> Data? {
         let key = "\(sessionId):\(chunkIndex)"
         let now = DispatchTime.now().uptimeNanoseconds
@@ -94,7 +98,7 @@ public final class VFSLz4CachePool: @unchecked Sendable {
         return nil
     }
     
-    /// 清理指定会话的全部缓存
+    /// Clears all cached chunks associated with a specific session ID.
     public func clearSession(sessionId: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -119,7 +123,7 @@ public final class VFSLz4CachePool: @unchecked Sendable {
         }
     }
     
-    /// 统计信息
+    /// Returns pool allocation and occupancy metrics.
     public func getStats() -> (ramCount: Int, diskCount: Int, ramBytes: Int) {
         lock.lock()
         defer { lock.unlock() }
@@ -129,7 +133,6 @@ public final class VFSLz4CachePool: @unchecked Sendable {
     // MARK: - Private Eviction & Spill
     
     private func evictRamToDiskSpill(requiredSpace: Int) {
-        // 按最后访问时间升序排序（最冷排最前）
         let sortedRamKeys = ramCache.keys.sorted { (k1, k2) -> Bool in
             let t1 = lruAccessTimes[k1] ?? 0
             let t2 = lruAccessTimes[k2] ?? 0

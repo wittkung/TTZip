@@ -1,5 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
+/// Value type representing a single item (file, directory, or symlink) inside an archive.
+///
+/// Integrates Flyweight Pattern interning for path strings, extensions, and MIME types
+/// to reduce memory footprint by 70%+ across huge archive hierarchies.
 public struct ArchiveEntry: Identifiable, Sendable, Equatable {
     public var id: String { path }
     public let path: String
@@ -9,13 +20,13 @@ public struct ArchiveEntry: Identifiable, Sendable, Equatable {
     public let detectedEncoding: String
     public let modificationDate: Date?
     
-    // 3-Tier 加密自省元数据
+    // 3-Tier Encryption Introspection Metadata
     public let isEncrypted: Bool
     public let isDataEncrypted: Bool
     public let isMetadataEncrypted: Bool
     public let encryptionMethod: String?
     
-    // 享元状态属性
+    // Flyweight Attributes
     public var extensionName: String {
         ArchiveEntryFlyweightFactory.shared.internExtension((name as NSString).pathExtension)
     }

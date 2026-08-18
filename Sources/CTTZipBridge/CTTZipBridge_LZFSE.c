@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipBridge_LZFSE.h"
 #include "include/CTTZipCommon.h"
 #include "include/CTTZipBridge_APFS.h"
@@ -125,7 +132,7 @@ int ttzip_lzfse_decompress_file_stream(const char* src_path, const char* dst_pat
     close(fd_in);
     if (mapped == MAP_FAILED) return TTZIP_ERR_MMAP_FAILED;
     
-    size_t out_cap = (size_t)st.st_size * 8 + 65536; // Initial 8x buffer estimate
+    size_t out_cap = (size_t)st.st_size * 8 + 65536;
     uint8_t *out_buf = malloc(out_cap);
     if (!out_buf) {
         munmap(mapped, (size_t)st.st_size);

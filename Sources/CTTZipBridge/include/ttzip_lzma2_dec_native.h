@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_lzma2_dec_native.h
+ * @brief Native ARM64 vectorized LZMA1 and LZMA2 block decompression engines.
+ */
+
 #ifndef TTZIP_LZMA2_DEC_NATIVE_H
 #define TTZIP_LZMA2_DEC_NATIVE_H
 
@@ -9,7 +21,6 @@
 extern "C" {
 #endif
 
-// 自研 Native Range Coder 解码状态机 (Thread-Local 栈内存对齐)
 #define TTZIP_LZMA2_PROBS_COUNT 16384
 
 typedef struct {
@@ -20,7 +31,6 @@ typedef struct {
     uint32_t rep[4];
 } ttzip_lzma2_dec_state_t;
 
-// 自研 NEON 向量化 LZMA2 块解码主入口
 int ttzip_lzma2_decode_block_native(
     const uint8_t* src,
     size_t src_len,
@@ -29,7 +39,6 @@ int ttzip_lzma2_decode_block_native(
     size_t* out_decompressed_len
 );
 
-// 原生 LZMA1 块解码主入口 (支持 5 字节属性解析)
 int ttzip_lzma1_decode_block_native(
     const uint8_t* src,
     size_t src_len,

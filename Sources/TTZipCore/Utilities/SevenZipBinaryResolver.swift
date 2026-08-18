@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 7-Zip 原生可执行二进制文件解析器 (支持 Bundle 包内嵌入解析与系统路径降级)
+/// 7-Zip native executable binary resolver supporting embedded bundle extraction and PATH fallback.
 public final class SevenZipBinaryResolver: @unchecked Sendable {
     public static let shared = SevenZipBinaryResolver()
 

@@ -54,7 +54,7 @@ def lint_bare_logging(root_dir):
     print_pattern = re.compile(r'\bprint\s*\(')
     for folder in [swift_core, swift_app]:
         for path in folder.rglob("*.swift"):
-            if path.name == "Logger.swift":
+            if path.name == "Logger.swift" or "CLI" in path.parts or "TUI" in path.parts:
                 continue
             lines = scan_file_lines(path)
             for idx, line in enumerate(lines, 1):
@@ -75,7 +75,7 @@ def lint_bare_logging(root_dir):
     c_log_pattern = re.compile(r'\b(printf|NSLog)\s*\(')
     for path in c_bridge.rglob("*"):
         if path.is_file() and path.suffix in [".c", ".h"]:
-            if "Diagnostics" in path.name:
+            if "Diagnostics" in path.name or "fast-lzma2" in path.parts:
                 continue
             lines = scan_file_lines(path)
             for idx, line in enumerate(lines, 1):

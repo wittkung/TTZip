@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import XCTest
 import CTTZipBridge
 
-/// 单项格式测试配置定义
+/// Single format test configuration.
 public struct FormatDiagnosticConfig: Sendable {
     public let format: ArchiveCompressionFormat
     public let levelsToTest: [ArchiveCompressionLevel]
@@ -28,13 +35,13 @@ public struct FormatDiagnosticConfig: Sendable {
     }
 }
 
-/// 全格式通用单项诊断测试运行引擎 (统一封装 数据集生成、打包、解压与 100% 精准 CRC32 校验)
+/// Generic format diagnostic test runner encapsulating dataset generation, compression, extraction, and CRC32 verification.
 public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
     public static let shared = FormatDiagnosticSuiteRunner()
     
     private init() {}
     
-    /// 运行指定格式的单项物理打包解压诊断测试
+    /// Runs format diagnostic suite for target configuration.
     @discardableResult
     public func runDiagnosticSuite(config: FormatDiagnosticConfig) throws -> Bool {
         let fmt = config.format
@@ -46,7 +53,7 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
         let sourceFolder = tempDir.appendingPathComponent("small_files")
         try fm.createDirectory(at: sourceFolder, withIntermediateDirectories: true)
         
-        // 1. 统一生成标准测试数据集
+        // 1. Generate test dataset
         let line = "Apple Silicon TTZip High-Precision \(fmt.rawValue.uppercased()) Diagnostic Benchmark Line...\n"
         let sampleContent = String(repeating: line, count: config.lineRepeatCount)
         let sampleData = sampleContent.data(using: .utf8)!
@@ -64,16 +71,16 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
             password: config.testPasswordEncryption ? config.passwordToTest : nil,
             sandboxPath: tempDir.path
         )
-        TTLogger.info("  - 数据集就绪: 路径 \(sourceFolder.path) | 总计 \(config.sampleFileCount) 个文件 | 期望字节数: \(expectedTotalBytes)")
+        TTLogger.info("  - Dataset ready: \(sourceFolder.path) | \(config.sampleFileCount) files | Expected bytes: \(expectedTotalBytes)")
         
         let writer = ArchiveEngineFactory.makeWriter(for: fmt)
         let extractor = ArchiveEngineFactory.makeExtractor(for: fmt)
         let checker = ArchiveEngineFactory.makeIntegrityChecker()
         var allPassed = true
         
-        // 2. 遍历测试选定的压缩级别
+        // 2. Iterate compression levels
         for level in config.levelsToTest {
-            TTLogger.info("\n🔍 [\(fmt.rawValue.uppercased()) 诊断测试] 尝试 \(level.title) (Level \(level.rawValue)) 打包与解压...")
+            TTLogger.info("\n🔍 [\(fmt.rawValue.uppercased()) Diagnostic] Testing \(level.title) (Level \(level.rawValue))...")
             let archiveName = "archive_\(level.rawValue)\(fmt.fileExtension)"
             let archivePath = tempDir.appendingPathComponent(archiveName).path
             
@@ -91,7 +98,7 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
                     format: fmt,
                     level: level,
                     error: error,
-                    errorMessage: "压缩打包阶段捕获异常",
+                    errorMessage: "Compression failed with exception",
                     archivePath: archivePath,
                     sandboxPath: tempDir.path
                 )
@@ -106,7 +113,7 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
                     stage: .archiveValidation,
                     format: fmt,
                     level: level,
-                    errorMessage: "生成的归档压缩包大小为 0 字节",
+                    errorMessage: "Generated archive size is 0 bytes",
                     archivePath: archivePath,
                     sandboxPath: tempDir.path
                 )
@@ -115,7 +122,7 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
             }
             
             let compressMBs = (Double(expectedTotalBytes) / (1024 * 1024)) / compressDuration
-            TTLogger.info("  - \(fmt.rawValue.uppercased()) \(level.title) 打包成功, 压缩包大小: \(archiveSize) 字节 | 耗时: \(String(format: "%.3f", compressDuration))s (\(String(format: "%.1f", compressMBs)) MB/s)")
+            TTLogger.info("  - \(fmt.rawValue.uppercased()) \(level.title) compressed, size: \(archiveSize) bytes | Duration: \(String(format: "%.3f", compressDuration))s (\(String(format: "%.1f", compressMBs)) MB/s)")
             
             let outDir = tempDir.appendingPathComponent("out_\(level.rawValue)").path
             try fm.createDirectory(atPath: outDir, withIntermediateDirectories: true)
@@ -132,7 +139,7 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
                     format: fmt,
                     level: level,
                     error: error,
-                    errorMessage: "解压缩提解阶段捕获异常",
+                    errorMessage: "Extraction failed with exception",
                     archivePath: archivePath,
                     destinationDir: outDir,
                     sandboxPath: tempDir.path
@@ -142,7 +149,7 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
             }
             let extractDuration = max(0.001, Date().timeIntervalSince(startExtract))
             let extractMBs = (Double(expectedTotalBytes) / (1024 * 1024)) / extractDuration
-            TTLogger.info("  - 解压完成, 提解耗时: \(String(format: "%.3f", extractDuration))s (\(String(format: "%.1f", extractMBs)) MB/s)")
+            TTLogger.info("  - Extraction complete: \(String(format: "%.3f", extractDuration))s (\(String(format: "%.1f", extractMBs)) MB/s)")
             
             let res = checker.verifyExtractedDirectory(
                 directoryPath: outDir,
@@ -155,10 +162,10 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
             }
         }
         
-        // 3. 若支持密码加密，测试密码加密打包与解压
+        // 3. Password encryption roundtrip
         if config.testPasswordEncryption {
             let encLevel: ArchiveCompressionLevel = config.levelsToTest.contains(.level1) ? .level1 : (config.levelsToTest.first ?? .store)
-            TTLogger.info("\n🔍 [\(fmt.rawValue.uppercased()) 诊断测试] 尝试 AES-256 加密 \(encLevel.title) 打包与解压...")
+            TTLogger.info("\n🔍 [\(fmt.rawValue.uppercased()) Diagnostic] Testing AES-256 \(encLevel.title)...")
             let encArchiveName = "archive_enc\(fmt.fileExtension)"
             let encArchivePath = tempDir.appendingPathComponent(encArchiveName).path
             
@@ -177,7 +184,7 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
                     level: encLevel,
                     password: config.passwordToTest,
                     error: error,
-                    errorMessage: "加密打包阶段捕获异常",
+                    errorMessage: "Encrypted compression failed with exception",
                     archivePath: encArchivePath,
                     sandboxPath: tempDir.path
                 )
@@ -200,7 +207,7 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
                     level: encLevel,
                     password: config.passwordToTest,
                     error: error,
-                    errorMessage: "加密解压阶段捕获异常",
+                    errorMessage: "Encrypted extraction failed with exception",
                     archivePath: encArchivePath,
                     destinationDir: encOutDir,
                     sandboxPath: tempDir.path
@@ -212,7 +219,7 @@ public final class FormatDiagnosticSuiteRunner: @unchecked Sendable {
                 directoryPath: encOutDir,
                 expectedOriginalBytes: expectedTotalBytes,
                 sourceFilePath: sourceFolder.path,
-                label: "\(fmt.rawValue.uppercased()) AES-256 加密"
+                label: "\(fmt.rawValue.uppercased()) AES-256"
             )
             if !encRes.isValid {
                 allPassed = false

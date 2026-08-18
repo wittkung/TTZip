@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档数据块结构体 (用于生产者与消费者之间高效传递与处理 Data Chunk)
+/// Archive chunk model passed across producer-consumer streaming pipelines.
 public struct ArchiveDataChunk: Sendable, Equatable, Identifiable {
     public var id: Int64 { chunkID }
     public let chunkID: Int64
@@ -26,7 +33,7 @@ public struct ArchiveDataChunk: Sendable, Equatable, Identifiable {
         self.metadata = metadata
     }
 
-    /// 产生代表流终结 (End-Of-File) 的 EOF Chunk
+    /// Factory generating an EOF terminal chunk.
     public static func eof(chunkID: Int64 = -1) -> ArchiveDataChunk {
         return ArchiveDataChunk(
             chunkID: chunkID,
@@ -37,14 +44,14 @@ public struct ArchiveDataChunk: Sendable, Equatable, Identifiable {
     }
 }
 
-/// 异步生产者接口 (Async Producer Protocol)
+/// Asynchronous producer interface protocol.
 public protocol AsyncProducerProtocol: Sendable {
-    /// 生产下一个 ArchiveDataChunk 数据块 (若数据流结束返回 nil 或 isEOF 为 true 的 chunk)
+    /// Generates next chunk in data stream, returning nil or EOF chunk when done.
     func produce() async throws -> ArchiveDataChunk?
 }
 
-/// 异步消费者接口 (Async Consumer Protocol)
+/// Asynchronous consumer interface protocol.
 public protocol AsyncConsumerProtocol: Sendable {
-    /// 消费处理指定的 ArchiveDataChunk 数据块
+    /// Consumes and processes a chunk from data stream.
     func consume(_ chunk: ArchiveDataChunk) async throws
 }

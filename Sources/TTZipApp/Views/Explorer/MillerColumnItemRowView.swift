@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AppKit
 import TTZipCore
@@ -203,7 +210,7 @@ public struct MillerColumnItemContextMenu: View {
         Button {
             onSelectItem(item, columnIndex, false, false, dirURL)
         } label: {
-            Text("选中: \(item.name)")
+            Text("Selected: \(item.name)")
         }
         .disabled(true)
         
@@ -214,14 +221,14 @@ public struct MillerColumnItemContextMenu: View {
                 let targets = Array(multiSelectedPaths).map { URL(fileURLWithPath: $0) }
                 FileClipboardStore.shared.copy(urls: targets)
             } label: {
-                Label("复制已选 \(multiSelectedPaths.count) 项", systemImage: "doc.on.doc")
+                Label("Copy \(multiSelectedPaths.count) items", systemImage: "doc.on.doc")
             }
             
             Button {
                 let targets = Array(multiSelectedPaths).map { URL(fileURLWithPath: $0) }
                 FileClipboardStore.shared.cut(urls: targets)
             } label: {
-                Label("剪切已选 \(multiSelectedPaths.count) 项", systemImage: "scissors")
+                Label("Cut \(multiSelectedPaths.count) items", systemImage: "scissors")
             }
             
             Divider()
@@ -229,7 +236,7 @@ public struct MillerColumnItemContextMenu: View {
             Button {
                 onCompressPath(Array(multiSelectedPaths).joined(separator: "\n"))
             } label: {
-                Label("TTZip: 快捷新建压缩包 (已选 \(multiSelectedPaths.count) 项)...", systemImage: "archivebox.fill")
+                Label("TTZip: New Archive (\(multiSelectedPaths.count) items)...", systemImage: "archivebox.fill")
             }
             
             Button {
@@ -239,7 +246,7 @@ public struct MillerColumnItemContextMenu: View {
                 }
                 NotificationCenter.default.post(name: NSNotification.Name("TTZipArchiveUnlockedRefresh"), object: nil)
             } label: {
-                Label("移到废纸篓 (已选 \(multiSelectedPaths.count) 项)", systemImage: "trash")
+                Label("Move to Trash (\(multiSelectedPaths.count) items)", systemImage: "trash")
             }
         } else if item.path.contains("?subpath=") {
             Button {
@@ -252,7 +259,7 @@ public struct MillerColumnItemContextMenu: View {
                     NSWorkspace.shared.selectFile((destDir as NSString).appendingPathComponent(item.name), inFileViewerRootedAtPath: "")
                 }
             } label: {
-                Label("TTZip: 提取此项到当前目录", systemImage: "arrow.down.doc.fill")
+                Label("TTZip: Extract to current folder", systemImage: "arrow.down.doc.fill")
             }
             
             Button {
@@ -269,7 +276,7 @@ public struct MillerColumnItemContextMenu: View {
                     }
                 }
             } label: {
-                Label("TTZip: 提取此项到指定位置...", systemImage: "folder.badge.plus")
+                Label("TTZip: Extract to specified path...", systemImage: "folder.badge.plus")
             }
             
             Divider()
@@ -279,21 +286,21 @@ public struct MillerColumnItemContextMenu: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(subpath, forType: .string)
             } label: {
-                Label("拷贝包内相对路径", systemImage: "doc.on.doc")
+                Label("Copy archive relative path", systemImage: "doc.on.doc")
             }
         } else {
             Button {
                 onSelectItem(item, columnIndex, false, false, dirURL)
                 FileClipboardStore.shared.copy(urls: [URL(fileURLWithPath: item.path)])
             } label: {
-                Label("复制", systemImage: "doc.on.doc")
+                Label("Copy", systemImage: "doc.on.doc")
             }
             
             Button {
                 onSelectItem(item, columnIndex, false, false, dirURL)
                 FileClipboardStore.shared.cut(urls: [URL(fileURLWithPath: item.path)])
             } label: {
-                Label("剪切", systemImage: "scissors")
+                Label("Cut", systemImage: "scissors")
             }
             
             if item.isDirectory {
@@ -301,7 +308,7 @@ public struct MillerColumnItemContextMenu: View {
                     onSelectItem(item, columnIndex, false, false, dirURL)
                     FileClipboardStore.shared.paste(to: URL(fileURLWithPath: item.path))
                 } label: {
-                    Label("粘贴到此文件夹", systemImage: "doc.on.clipboard")
+                    Label("Paste into this folder", systemImage: "doc.on.clipboard")
                 }
                 .disabled(!FileClipboardStore.shared.canPaste)
             }
@@ -313,7 +320,7 @@ public struct MillerColumnItemContextMenu: View {
                 let u = URL(fileURLWithPath: item.path)
                 NSWorkspace.shared.open(u)
             } label: {
-                Label("打开", systemImage: "arrow.up.forward.app")
+                Label("Open", systemImage: "arrow.up.forward.app")
             }
             
             Button {
@@ -321,7 +328,7 @@ public struct MillerColumnItemContextMenu: View {
                 let u = URL(fileURLWithPath: item.path)
                 NSWorkspace.shared.activateFileViewerSelecting([u])
             } label: {
-                Label("快速查看 (Quick Look)", systemImage: "eye")
+                Label("Quick Look", systemImage: "eye")
             }
             
             Button {
@@ -332,28 +339,28 @@ public struct MillerColumnItemContextMenu: View {
                     appleScript.executeAndReturnError(&error)
                 }
             } label: {
-                Label("显示简介", systemImage: "info.circle")
+                Label("Get Info", systemImage: "info.circle")
             }
             
             Button {
                 onSelectItem(item, columnIndex, false, false, dirURL)
                 NSWorkspace.shared.selectFile(item.path, inFileViewerRootedAtPath: "")
             } label: {
-                Label("在 Finder 中显示", systemImage: "folder")
+                Label("Reveal in Finder", systemImage: "folder")
             }
             
             Button {
                 onSelectItem(item, columnIndex, false, false, dirURL)
                 onTriggerNewFolder(item.isDirectory ? URL(fileURLWithPath: item.path) : dirURL)
             } label: {
-                Label("新建文件夹...", systemImage: "folder.badge.plus")
+                Label("New Folder...", systemImage: "folder.badge.plus")
             }
             
             Button {
                 onSelectItem(item, columnIndex, false, false, dirURL)
                 onTriggerNewFile(item.isDirectory ? URL(fileURLWithPath: item.path) : dirURL)
             } label: {
-                Label("新建空白文件...", systemImage: "doc.badge.plus")
+                Label("New Empty File...", systemImage: "doc.badge.plus")
             }
             
             Divider()
@@ -363,35 +370,35 @@ public struct MillerColumnItemContextMenu: View {
                     onSelectItem(item, columnIndex, false, false, dirURL)
                     onSelectArchive(item.path)
                 } label: {
-                    Label("TTZip: 展开为目录下钻", systemImage: "sidebar.right")
+                    Label("TTZip: Expand and Browse", systemImage: "sidebar.right")
                 }
                 
                 Button {
                     onSelectItem(item, columnIndex, false, false, dirURL)
                     NotificationCenter.default.post(name: NSNotification.Name("TTZipQuickExtractArchive"), object: item.path)
                 } label: {
-                    Label("TTZip: 一键解压到同名文件夹", systemImage: "arrow.down.circle.fill")
+                    Label("TTZip: Quick Extract", systemImage: "arrow.down.circle.fill")
                 }
                 
                 Button {
                     onSelectItem(item, columnIndex, false, false, dirURL)
                     NotificationCenter.default.post(name: NSNotification.Name("TTZipOpenArchiveInspector"), object: item.path)
                 } label: {
-                    Label("TTZip: 归档标准与合规诊断...", systemImage: "doc.badge.gearshape")
+                    Label("TTZip: Compliance & Diagnostics...", systemImage: "doc.badge.gearshape")
                 }
                 
                 Button {
                     onSelectItem(item, columnIndex, false, false, dirURL)
                     NotificationCenter.default.post(name: NSNotification.Name("TTZipEncryptedArchivePromptRequired"), object: item.path)
                 } label: {
-                    Label("TTZip: 输入/验证解压口令", systemImage: "key.fill")
+                    Label("TTZip: Verify Password...", systemImage: "key.fill")
                 }
             } else {
                 Button {
                     onSelectItem(item, columnIndex, false, false, dirURL)
                     onCompressPath(item.path)
                 } label: {
-                    Label("TTZip: 快捷新建压缩包...", systemImage: "archivebox.fill")
+                    Label("TTZip: New Archive...", systemImage: "archivebox.fill")
                 }
             }
             
@@ -402,7 +409,7 @@ public struct MillerColumnItemContextMenu: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(item.path, forType: .string)
             } label: {
-                Label("拷贝绝对路径", systemImage: "doc.on.doc")
+                Label("Copy Absolute Path", systemImage: "doc.on.doc")
             }
             
             Divider()
@@ -413,7 +420,7 @@ public struct MillerColumnItemContextMenu: View {
                 try? FileManager.default.trashItem(at: u, resultingItemURL: nil)
                 NotificationCenter.default.post(name: NSNotification.Name("TTZipArchiveUnlockedRefresh"), object: nil)
             } label: {
-                Label("移到废纸篓", systemImage: "trash")
+                Label("Move to Trash", systemImage: "trash")
             }
         }
     }

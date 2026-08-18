@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 /**
  * @file CTTZipBridge_ZipChunkedStream.c
- * @brief TTZip 大文件 1MB 分块流式多线程 DEFLATE 压缩器实现
- * @details 严格遵循 PKWARE ZIP Method 8 与 RFC 1951 字节对齐同步标准，
- *          通过 32 槽位有界环形缓冲将进程常驻内存严格约束在 <= 64MB。
+ * @brief TTZip large file 1MB chunked multithreaded DEFLATE stream compressor.
+ * @details Strictly conforms to PKWARE ZIP Method 8 and RFC 1951 byte alignment,
+ *          bounding resident memory consumption within <= 64MB via a 32-slot ring buffer.
  */
 
 #include "include/CTTZipBridge_ZipChunkedStream.h"
@@ -54,7 +61,6 @@ struct ttzip_zip_chunked_stream {
 #endif
 };
 
-/* 辅助函数：将已完成的槽位按顺序写入目标文件描述符 */
 static void flush_ready_slots_locked(ttzip_zip_chunked_stream_t* s) {
     while (s->next_seq_to_write < s->next_seq_to_dispatch) {
         size_t slot_idx = (size_t)(s->next_seq_to_write % TTZIP_CHUNK_MAX_IN_FLIGHT);
@@ -94,7 +100,6 @@ static void flush_ready_slots_locked(ttzip_zip_chunked_stream_t* s) {
     }
 }
 
-/* 异步分块压缩任务 */
 static void compress_chunk_worker(ttzip_zip_chunked_stream_t* s, uint64_t seq, uint8_t* uncompressed_data, size_t uncompressed_len, bool is_final) {
     int z_level = s->level > 0 ? (s->level > 12 ? 12 : s->level) : 6;
     struct libdeflate_compressor* compressor = ttzip_get_tls_compressor(z_level);
@@ -107,17 +112,17 @@ static void compress_chunk_worker(ttzip_zip_chunked_stream_t* s, uint64_t seq, u
         size_t comp_size = libdeflate_deflate_compress(compressor, uncompressed_data, uncompressed_len, out_buf, max_out);
         if (comp_size > 0) {
             if (!is_final) {
-                /* 1. 将首字节 BFINAL 置 0 (标记为非终止块) */
+                // 1. Clear BFINAL bit on first byte (marks non-final block)
                 out_buf[0] &= 0xFE;
                 
-                /* 2. 注入 RFC 1951 字节对齐空存储块 (0x00, 0x00, 0xFF, 0xFF) */
+                // 2. Inject RFC 1951 byte-aligned sync marker (0x00, 0x00, 0xFF, 0xFF)
                 out_buf[comp_size]     = 0x00;
                 out_buf[comp_size + 1] = 0x00;
                 out_buf[comp_size + 2] = 0xFF;
                 out_buf[comp_size + 3] = 0xFF;
                 final_size = comp_size + 4;
             } else {
-                /* 末尾块：保持 libdeflate 默认生成的 BFINAL = 1 终结状态 */
+                // Final block: retains libdeflate generated BFINAL = 1 state
                 final_size = comp_size;
             }
         }
@@ -136,13 +141,12 @@ static void compress_chunk_worker(ttzip_zip_chunked_stream_t* s, uint64_t seq, u
     pthread_mutex_unlock(&s->mutex);
 }
 
-/* 派发当前缓冲区 */
 static int dispatch_current_buffer_locked(ttzip_zip_chunked_stream_t* s, bool is_final) {
     if (s->current_in_len == 0 && !is_final) {
         return 0;
     }
     
-    /* 背压控制：当在途槽位数达到上限时阻塞等待 */
+    // Backpressure: wait if in-flight slots reach maximum limit
     while ((s->next_seq_to_dispatch - s->next_seq_to_write) >= TTZIP_CHUNK_MAX_IN_FLIGHT && !s->has_error) {
         pthread_cond_wait(&s->cond, &s->mutex);
     }
@@ -160,7 +164,6 @@ static int dispatch_current_buffer_locked(ttzip_zip_chunked_stream_t* s, bool is
     
     if (s->current_in_len > 0) {
         memcpy(chunk_copy, s->current_in_buffer, s->current_in_len);
-        /* 增量计算 CRC-32 */
         s->running_crc32 = libdeflate_crc32(s->running_crc32, s->current_in_buffer, s->current_in_len);
         s->total_uncompressed_bytes += s->current_in_len;
     }
@@ -173,7 +176,6 @@ static int dispatch_current_buffer_locked(ttzip_zip_chunked_stream_t* s, bool is
         compress_chunk_worker(s, seq, chunk_copy, len_to_compress, is_final);
     });
 #else
-    /* 非 Apple 平台同步执行或由线程池处理 */
     compress_chunk_worker(s, seq, chunk_copy, len_to_compress, is_final);
 #endif
     
@@ -233,10 +235,8 @@ int ttzip_zip_chunked_stream_finish(ttzip_zip_chunked_stream_t* s, uint64_t* out
     if (!s) return -1;
     
     pthread_mutex_lock(&s->mutex);
-    /* 派发剩余末尾数据块，标记 is_final = true */
     dispatch_current_buffer_locked(s, true);
     
-    /* 等待所有在途分块全部完成落盘 */
     while (s->next_seq_to_write < s->next_seq_to_dispatch && !s->has_error) {
         flush_ready_slots_locked(s);
         if (s->next_seq_to_write < s->next_seq_to_dispatch) {

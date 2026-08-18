@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
 private final class AtomicProgressCounter: @unchecked Sendable {
@@ -12,8 +19,7 @@ private final class AtomicProgressCounter: @unchecked Sendable {
     }
 }
 
-/// 批量归档并发处理引擎 (Batch Archive Engine)
-/// 接入 ArchiveWorkerPool 执行批量压缩/解压调度
+/// Batch archive execution engine dispatching batch tasks to `ArchiveWorkerPool`.
 public final class BatchArchiveEngine: @unchecked Sendable {
     public static let shared = BatchArchiveEngine()
     private let workerPool: ArchiveWorkerPool
@@ -31,7 +37,7 @@ public final class BatchArchiveEngine: @unchecked Sendable {
         self.engineFacade = engineFacade
     }
 
-    /// 使用 ArchiveWorkerPool 执行批量压缩调度
+    /// Dispatches batch compression tasks across worker pool threads.
     public func executeBatchCompress(
         tasks: [BatchCompressTask],
         priority: TaskPriorityLevel = .userInitiated,
@@ -123,7 +129,7 @@ public final class BatchArchiveEngine: @unchecked Sendable {
         return results
     }
 
-    /// 使用 ArchiveWorkerPool 执行批量解压调度
+    /// Dispatches batch extraction tasks across worker pool threads.
     public func executeBatchExtract(
         tasks: [BatchExtractTask],
         priority: TaskPriorityLevel = .userInitiated,
@@ -215,7 +221,7 @@ public final class BatchArchiveEngine: @unchecked Sendable {
     }
 }
 
-// MARK: - PasswordRecoveryEngine 接入 WorkerPool 重构扩展
+// MARK: - PasswordRecoveryEngine WorkerPool Extension
 
 private final class PasswordRecoveryAccumulator: @unchecked Sendable {
     private var foundPwd: String? = nil
@@ -246,7 +252,7 @@ private final class PasswordRecoveryAccumulator: @unchecked Sendable {
 }
 
 extension PasswordRecoveryEngine {
-    /// 使用 ArchiveWorkerPool 执行多字典 / 分块并发密码破解恢复
+    /// Executes parallel dictionary-based password recovery via worker pool.
     public func recoverPasswordParallel(
         archivePath: String,
         dictionary: [String],
@@ -301,7 +307,7 @@ extension PasswordRecoveryEngine {
     }
 }
 
-// MARK: - FormatDiagnosticSuiteRunner 接入 WorkerPool 重构扩展
+// MARK: - FormatDiagnosticSuiteRunner WorkerPool Extension
 
 private final class DiagnosticResultsAccumulator: @unchecked Sendable {
     private var results: [ArchiveCompressionFormat: Bool] = [:]
@@ -321,7 +327,7 @@ private final class DiagnosticResultsAccumulator: @unchecked Sendable {
 }
 
 extension FormatDiagnosticSuiteRunner {
-    /// 使用 ArchiveWorkerPool 并发调度执行多格式诊断测试集跑分
+    /// Runs format diagnostic test suites concurrently using `ArchiveWorkerPool`.
     public func runDiagnosticSuitesParallel(
         configs: [FormatDiagnosticConfig],
         workerPool: ArchiveWorkerPool = .shared,

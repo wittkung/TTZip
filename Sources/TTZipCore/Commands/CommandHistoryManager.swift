@@ -1,11 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 命令历史记录管理器与 Invoker (Command History Manager & Invoker)
-/// 提供命令执行、Undo/Redo 历史双栈管理、容量上限 (LRU 丢弃)、并发线程安全及仓储持久化 (Pattern 4.4 Repository Pattern)
+/// Command history manager and invoker maintaining dual Undo/Redo stacks and repository persistence.
 public final class CommandHistoryManager: @unchecked Sendable {
     public static let shared = CommandHistoryManager()
     
-    /// 历史栈容量上限（默认 50 条）
     public let maxHistoryCapacity: Int
     public var historyRepository: any ArchiveHistoryRepositoryProtocol
     
@@ -26,7 +31,6 @@ public final class CommandHistoryManager: @unchecked Sendable {
         self.historyRepository = historyRepository
     }
     
-    /// 统一串行化异步操作执行管线（通过同步 helper 函数进行锁隔离与 Task 链接）
     private func chainTask<T: Sendable>(_ block: @escaping @Sendable () async throws -> T) -> Task<T, Error> {
         lock.lock()
         defer { lock.unlock() }
@@ -49,61 +53,51 @@ public final class CommandHistoryManager: @unchecked Sendable {
         return try await task.value
     }
     
-    /// 当前是否可以进行撤销操作
     public var canUndo: Bool {
         lock.lock()
         defer { lock.unlock() }
         return !undoStack.isEmpty
     }
     
-    /// 当前是否可以进行重做操作
     public var canRedo: Bool {
         lock.lock()
         defer { lock.unlock() }
         return !redoStack.isEmpty
     }
     
-    /// 撤销栈中的命令数量
     public var undoStackCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return undoStack.count
     }
     
-    /// 重做栈中的命令数量
     public var redoStackCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return redoStack.count
     }
     
-    /// 获取可撤销历史命令描述列表（最近命令排在最后）
     public var undoHistoryDescriptions: [String] {
         lock.lock()
         defer { lock.unlock() }
         return undoStack.map { $0.description }
     }
     
-    /// 获取可重做历史命令描述列表
     public var redoHistoryDescriptions: [String] {
         lock.lock()
         defer { lock.unlock() }
         return redoStack.map { $0.description }
     }
     
-    /// 获取仓储持有的持久化归档任务历史记录
     public func getHistoryRecords() throws -> [ArchiveTaskRecord] {
         return try historyRepository.fetchAll()
     }
     
-    /// 获取最近的前 N 条持久化归档任务历史记录
     public func getRecentHistoryRecords(limit: Int) throws -> [ArchiveTaskRecord] {
         return try historyRepository.fetchRecent(limit: limit)
     }
     
-    /// 统一执行命令，并在成功后自动压入撤销栈（若支持 Undo），同时 100% 清空重做栈分支与写入仓储
-    /// - Parameter command: 符合 ArchiveCommandProtocol 的原子/宏命令
-    /// - Returns: 执行产物状态
+    /// Executes command and pushes to undo stack if supported, clearing redo branch.
     public func execute(command: ArchiveCommandProtocol) async throws -> CommandResult {
         try await runSerialized {
             let result = try await command.execute()
@@ -113,7 +107,6 @@ public final class CommandHistoryManager: @unchecked Sendable {
                 self.pushUndo(command)
             }
             
-            // 写入仓储持久化记录
             let record = ArchiveTaskRecord(
                 id: UUID(),
                 commandName: command.description,
@@ -129,8 +122,7 @@ public final class CommandHistoryManager: @unchecked Sendable {
         }
     }
     
-    /// 撤销上一次执行的命令 (Undo)
-    /// - Returns: 撤销结果描述，若栈空则返回 nil
+    /// Reverts the most recently executed command.
     @discardableResult
     public func undo() async throws -> CommandResult? {
         try await runSerialized {
@@ -145,18 +137,16 @@ public final class CommandHistoryManager: @unchecked Sendable {
                 return CommandResult(
                     commandId: command.commandId,
                     success: true,
-                    message: "成功撤销: [\(command.description)]"
+                    message: "Successfully reverted: [\(command.description)]"
                 )
             } catch {
-                // 如果 Undo 过程失败，重新压回 undoStack 维持一致性
                 self.restoreUndoOnFailure(command)
                 throw error
             }
         }
     }
     
-    /// 重做上一次撤销的命令 (Redo)
-    /// - Returns: 重做执行产物状态，若栈空则返回 nil
+    /// Re-executes the most recently reverted command.
     @discardableResult
     public func redo() async throws -> CommandResult? {
         try await runSerialized {
@@ -169,14 +159,13 @@ public final class CommandHistoryManager: @unchecked Sendable {
                 self.pushUndo(command)
                 return result
             } catch {
-                // 如果 Redo 失败，重新压回 redoStack
                 self.restoreRedoOnFailure(command)
                 throw error
             }
         }
     }
     
-    /// 清空所有 Undo 与 Redo 历史记录，并自动清理丢弃命令持有的磁盘备份资源
+    /// Clears undo/redo stacks and purges associated disk backup resources.
     public func clearHistory() {
         var discarded: [ArchiveCommandProtocol] = []
         lock.lock()
@@ -191,7 +180,7 @@ public final class CommandHistoryManager: @unchecked Sendable {
         }
     }
     
-    // MARK: - 内部同步锁辅助方法
+    // MARK: - Internal Synchronization Helpers
     
     private func pushUndo(_ command: ArchiveCommandProtocol) {
         var discarded: [ArchiveCommandProtocol] = []

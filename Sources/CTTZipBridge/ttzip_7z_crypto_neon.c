@@ -1,20 +1,28 @@
-// ttzip_7z_crypto_neon.c
-// TTZip 7Z ARM64 硬件指令加解密引擎 (基于 ARMv8 Crypto Extensions AES + SHA-256)
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_7z_crypto_neon.c
+ * @brief TTZip 7Z ARM64 hardware accelerated crypto engine (ARMv8 AES + SHA-256).
+ */
 
 #include "include/ttzip_7z_crypto_neon.h"
 #include <string.h>
 #include <stdlib.h>
 #include <CommonCrypto/CommonCrypto.h>
+#include <dispatch/dispatch.h>
 
 #if defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(__aarch64__)
 #include <arm_neon.h>
 #endif
 
 #include "include/CTTZipBridge_Crypto.h"
-
 #include "include/ttzip_7z_kdf_arm64.h"
 
-// 7z UTF-16LE 密码与 Salt 密钥派生
 int ttzip_7z_kdf_sha256_neon(
     const char* password,
     const uint8_t* salt,
@@ -25,9 +33,6 @@ int ttzip_7z_kdf_sha256_neon(
     return ttzip_7z_kdf_sha256_armv8(password, salt, salt_len, num_cycles_power, out_key);
 }
 
-#include <dispatch/dispatch.h>
-
-// 7z AES-256-CBC 硬件向量化解密 (支持多核并行分块 CBC 解密)
 int ttzip_7z_aes256_cbc_decrypt_neon(
     const uint8_t* key,
     const uint8_t* iv,
@@ -60,7 +65,7 @@ int ttzip_7z_aes256_cbc_decrypt_neon(
         return status == kCCSuccess ? 0 : -2;
     }
 
-    // 并行 CBC 向量化解密 (每块 512KB，16 字节对齐)
+    // Parallel CBC decryption (512KB chunks, 16-byte aligned)
     size_t chunk_size = 512 * 1024;
     size_t num_chunks = (size + chunk_size - 1) / chunk_size;
     __block bool has_error = false;

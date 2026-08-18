@@ -1,12 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 纯内存微基准测试引擎 (对标 powturbo/TurboBench 与 inikep/lzbench)
-/// 核心特性：
-/// 1. 全程 16KB 页对齐内存操作，彻底排除磁盘 I/O、杀毒软件（Windows Defender）与文件系统锁干扰；
-/// 2. 单调硬件纳秒计时器 (`PlatformMonotonicTimer`)，零系统调用上下文切换；
-/// 3. 自适应 500ms 时间夹紧与预热轮次，彻底消除快速编解码器的计时器量化误差；
-/// 4. 逐字节内存校验 (`memcmp`)，确保算法输出绝对保真。
+/// In-memory microbenchmark execution engine conforming to TurboBench and lzbench standards.
+///
+/// Features:
+/// 1. Page-aligned contiguous memory operation eliminating disk I/O and file system locks.
+/// 2. Monotonic hardware timer (`PlatformMonotonicTimer`) eliminating syscall context switch overhead.
+/// 3. Adaptive 500ms time clamping with warmup passes eliminating timer quantization noise.
+/// 4. Byte-level verification (`memcmp`) asserting codec output integrity.
 public final class InMemoryBenchmarkEngine: Sendable {
     public static let shared = InMemoryBenchmarkEngine()
 
@@ -14,7 +22,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
         PlatformMonotonicTimer.initialize()
     }
 
-    /// 运行纯内存全格式/指定格式矩阵压测
+    /// Runs in-memory benchmark across configured format and compression level matrices.
     public func runInMemoryBenchmark(
         config: InMemoryBenchmarkConfig,
         progressCallback: (@Sendable (String) -> Void)? = nil
@@ -23,9 +31,9 @@ public final class InMemoryBenchmarkEngine: Sendable {
         let calibration = PlatformMonotonicTimer.calibrationInfo()
         var results: [AlgorithmBenchmarkResult] = []
 
-        progressCallback?("🚀 初始化纯内存基准测试引擎 [内存规模: \(config.bufferSizeBytes / (1024 * 1024)) MB, 预热: \(config.warmupPasses) 轮, 最短窗口: \(config.minDurationMs) ms]...")
+        progressCallback?("🚀 Initializing in-memory benchmark engine [Buffer: \(config.bufferSizeBytes / (1024 * 1024)) MB, Warmup: \(config.warmupPasses) passes, Window: \(config.minDurationMs) ms]...")
 
-        // 1. 生成可复现的高保真内存测试语料 (16KB 页对齐)
+        // 1. Generate deterministic page-aligned test corpus
         var sampleSize = Int(config.bufferSizeBytes)
         var fileData: Data? = nil
         if let customPath = config.customInputPath, let data = try? Data(contentsOf: URL(fileURLWithPath: customPath)), !data.isEmpty {
@@ -51,7 +59,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
             generateBenchmarkCorpus(into: srcBuffer, size: sampleSize)
         }
 
-        // 2. 遍历算法与级别组合
+        // 2. Iterate algorithm and level matrix
         let formats = config.selectedFormats
         let levels = config.selectedLevels
 
@@ -87,7 +95,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
         return report
     }
 
-    // MARK: - 单个算法的纯内存压测与自适应夹紧
+    // MARK: - Benchmark Algorithm Execution
 
     private func benchmarkAlgorithm(
         format: String,
@@ -162,7 +170,6 @@ public final class InMemoryBenchmarkEngine: Sendable {
             }
 
         default:
-            // 通用 Fast-Path fallback
             algoName = format.uppercased()
             compFunc = { s, sLen, d, dCap, lvl in
                 return ttzip_libdeflate_compress(s, sLen, d, dCap, Int32(lvl))
@@ -172,7 +179,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
             }
         }
 
-        // 1. 预热轮次 (Warmup Passes) — 消除 OS 缺页中断、指令缓存未命中与 DVFS 升频延迟
+        // 1. Warmup passes
         var compressedSize: Int = 0
         for _ in 0..<config.warmupPasses {
             compressedSize = compFunc(src, srcSize, compBuffer, maxCompCap, level)
@@ -181,7 +188,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
             guard decompSize == srcSize else { return nil }
         }
 
-        // 2. 压缩测时循环 (自适应夹紧至 >= minDurationMs)
+        // 2. Compression benchmark loop
         let targetDurationNanos = UInt64(config.minDurationMs) * 1_000_000
         var totalCompNanos: UInt64 = 0
         var compIterations: Int = 0
@@ -204,7 +211,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
 
         let bestCompNanos = (compIterations > 0) ? (totalCompNanos / UInt64(compIterations)) : 1
 
-        // 3. 解压测时循环 (自适应夹紧至 >= minDurationMs)
+        // 3. Decompression benchmark loop
         var totalDecompNanos: UInt64 = 0
         var decompIterations: Int = 0
         batchSize = 1
@@ -226,7 +233,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
 
         let bestDecompNanos = (decompIterations > 0) ? (totalDecompNanos / UInt64(decompIterations)) : 1
 
-        // 4. 内存逐字节校验 (memcmp)
+        // 4. Memory verification
         let isVerified = (memcmp(src, decompBuffer, srcSize) == 0)
 
         let result = AlgorithmBenchmarkResult(
@@ -249,7 +256,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
         return result
     }
 
-    // MARK: - 输出格式化与报告序列化
+    // MARK: - Output Formatting & Report Serialization
 
     public func formatRowOutput(result: AlgorithmBenchmarkResult, turboBenchFormat: Bool) -> String {
         let verifyStr = result.integrityVerified ? "PASSED (OK)" : "FAILED (ERR)"
@@ -258,7 +265,6 @@ public final class InMemoryBenchmarkEngine: Sendable {
         let cSizePadded = cSizeStr.padding(toLength: 11, withPad: " ", startingAt: 0)
 
         if turboBenchFormat {
-            // TurboBench 紧凑对齐格式: Algorithm | Lvl | CSize | Ratio | Space % | C.Speed | D.Speed | Iters | Integrity
             return String(format: "%@ | %2d | %@ | %6.2fx | %5.1f%% | %11.1f MB/s | %11.1f MB/s | %5d | %@",
                           algoPadded,
                           result.level,
@@ -286,7 +292,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
     public func generateTurboBenchTable(report: BenchmarkSuiteReport) -> String {
         var out = ""
         out += "========================================================================================================================\n"
-        out += "📊 TurboBench / lzbench 对齐纯内存极限性能基准测试结果 (Apple Silicon / RAM Contiguous)\n"
+        out += "📊 In-Memory Benchmark Results (TurboBench / lzbench Model / Apple Silicon RAM)\n"
         out += "========================================================================================================================\n"
         out += "Algorithm        | Lvl| CSize (B)   |  Ratio | Space % |    Comp (MB/s) |   Decomp (MB/s) | Iters | Integrity\n"
         out += "------------------------------------------------------------------------------------------------------------------------\n"
@@ -294,7 +300,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
             out += formatRowOutput(result: r, turboBenchFormat: true) + "\n"
         }
         out += "========================================================================================================================\n"
-        out += String(format: "⏱️ 总测时耗时: %.2f ms | 累计处理吞吐: %.1f MB | 硬件时钟: %@ (%llu Hz) | 精度: %.1f ns\n",
+        out += String(format: "⏱️ Wall Duration: %.2f ms | Processed Throughput: %.1f MB | Clock: %@ (%llu Hz) | Resolution: %.1f ns\n",
                       report.totalWallDurationMs,
                       Double(report.totalInputBytes) / (1024.0 * 1024.0),
                       report.timerCalibration.timerBackend as NSString,
@@ -310,10 +316,9 @@ public final class InMemoryBenchmarkEngine: Sendable {
         try data.write(to: URL(fileURLWithPath: path))
     }
 
-    // MARK: - 确定性测试语料生成器
+    // MARK: - Deterministic Test Corpus Generator
 
     private func generateBenchmarkCorpus(into buffer: UnsafeMutablePointer<UInt8>, size: Int) {
-        // 生成模拟真实世界混合熵（JSON、结构化文本与伪随机字块）的 16KB 页对齐语料
         var seed: UInt64 = 0x123456789ABCDEF0
         func nextRand() -> UInt32 {
             seed = seed &* 6364136223846793005 &+ 1442695040888963407
@@ -338,7 +343,6 @@ public final class InMemoryBenchmarkEngine: Sendable {
             }
             offset += copyLen
 
-            // 穿插少量高熵伪随机字节模拟部分不可压缩数据块
             let randCount = min(16, size - offset)
             for i in 0..<randCount {
                 buffer[offset + i] = UInt8(nextRand() & 0xFF)

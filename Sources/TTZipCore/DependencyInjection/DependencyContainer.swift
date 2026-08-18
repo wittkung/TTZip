@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 作用域容器 (Dependency Container Scope)
+// MARK: - Dependency Container Scope
 
-/// 隔离作用域模型 (Scope Token)，用于 `.scoped` 生命周期管理
+/// Isolated scope token managing `.scoped` service lifetimes.
 public final class DependencyContainerScope: @unchecked Sendable {
     public let scopeID = UUID()
     private weak var container: DependencyContainer?
@@ -20,7 +27,7 @@ public final class DependencyContainerScope: @unchecked Sendable {
     
     public func resolveRequired<Service>(_ type: Service.Type = Service.self) -> Service {
         guard let container = container else {
-            fatalError("⚠️ [DependencyContainerScope] 容器已释放，无法解析必选服务 \(Service.self)")
+            fatalError("[DependencyContainerScope] Container deallocated, unable to resolve required service: \(Service.self)")
         }
         return container.resolveRequired(type, scope: self)
     }
@@ -44,7 +51,7 @@ public final class DependencyContainerScope: @unchecked Sendable {
     }
 }
 
-// MARK: - 注册服务映射内部数据结构
+// MARK: - Service Registration Box
 
 private final class ServiceRegistrationBox: @unchecked Sendable {
     let lifetime: ServiceLifetime
@@ -75,12 +82,12 @@ private final class ServiceRegistrationBox: @unchecked Sendable {
     }
 }
 
-// MARK: - 线程安全高性能依赖注入容器 (DependencyContainer)
+// MARK: - High-Performance Thread-Safe Dependency Container
 
-/// 基于 POSIXReadWriteLock 的高并发安全依赖注入容器
+/// Thread-safe dependency injection container built upon `POSIXReadWriteLock`.
 public final class DependencyContainer: DependencyContainerProtocol, @unchecked Sendable {
     
-    /// 全局默认共享依赖容器
+    /// Global shared dependency container instance.
     public static let shared: DependencyContainer = {
         let container = DependencyContainer()
         TTZipServiceRegistrar.registerAllServices(container: container)
@@ -92,9 +99,9 @@ public final class DependencyContainer: DependencyContainerProtocol, @unchecked 
     
     public init() {}
     
-    // MARK: - DependencyContainerProtocol 协议实现
+    // MARK: - DependencyContainerProtocol Implementation
     
-    /// 注册服务工厂
+    /// Registers a service factory and lifetime specification.
     public func register<Service>(
         _ type: Service.Type,
         lifetime: ServiceLifetime = .singleton,
@@ -107,12 +114,12 @@ public final class DependencyContainer: DependencyContainerProtocol, @unchecked 
         }
     }
     
-    /// 解析可选服务
+    /// Resolves an optional service instance.
     public func resolve<Service>(_ type: Service.Type) -> Service? {
         return resolve(type, scope: nil)
     }
     
-    /// 支持 Scope 作用域解析可选服务
+    /// Resolves an optional service instance within an optional container scope.
     public func resolve<Service>(_ type: Service.Type, scope: DependencyContainerScope?) -> Service? {
         let key = ObjectIdentifier(type)
         guard let box = (rwLock.withReadLock { registrations[key] }) else {
@@ -137,26 +144,25 @@ public final class DependencyContainer: DependencyContainerProtocol, @unchecked 
                 }
                 return created as? Service
             } else {
-                // 若未显式传入 Scope，回退为单次解析创建
                 return box.factory(self) as? Service
             }
         }
     }
     
-    /// 解析强类型必选服务
+    /// Resolves a required service instance or throws a fatal assertion.
     public func resolveRequired<Service>(_ type: Service.Type) -> Service {
         return resolveRequired(type, scope: nil)
     }
     
-    /// 支持 Scope 作用域解析必选服务
+    /// Resolves a required service instance within an optional container scope.
     public func resolveRequired<Service>(_ type: Service.Type, scope: DependencyContainerScope?) -> Service {
         if let service: Service = resolve(type, scope: scope) {
             return service
         }
-        fatalError("⚠️ [DependencyContainer] 关键服务类型 \(type) 未在依赖注入容器中注册！")
+        fatalError("[DependencyContainer] Required service \(type) is not registered in dependency container.")
     }
     
-    /// 注销服务
+    /// Unregisters a previously registered service type.
     public func unregister<Service>(_ type: Service.Type) {
         let key = ObjectIdentifier(type)
         rwLock.withWriteLock {
@@ -164,7 +170,7 @@ public final class DependencyContainer: DependencyContainerProtocol, @unchecked 
         }
     }
     
-    /// 重置容器状态（清除所有注册与缓存实例）
+    /// Resets container registrations and cached instances.
     public func reset() {
         rwLock.withWriteLock {
             for box in registrations.values {
@@ -174,16 +180,15 @@ public final class DependencyContainer: DependencyContainerProtocol, @unchecked 
         }
     }
     
-    /// 创建全新的隔离作用域 (DependencyContainerScope)
+    /// Creates an isolated execution scope.
     public func createScope() -> DependencyContainerScope {
         return DependencyContainerScope(container: self)
     }
 }
 
-// MARK: - 属性包装器 (Property Wrappers for Zero-Boilerplate Injection)
+// MARK: - Property Wrappers
 
-/// 自动属性注入包装器 (@Injected)
-/// 零侵入自动从指定 DependencyContainer 解析必选服务
+/// Property wrapper providing zero-boilerplate service injection.
 @propertyWrapper
 public struct Injected<Service>: Sendable {
     private let containerProvider: @Sendable () -> DependencyContainerProtocol
@@ -202,8 +207,7 @@ public struct Injected<Service>: Sendable {
     }
 }
 
-/// 自动可选属性注入包装器 (@InjectedOptional)
-/// 零侵入自动从指定 DependencyContainer 解析可选服务，未注册时返回 nil
+/// Property wrapper providing zero-boilerplate optional service injection.
 @propertyWrapper
 public struct InjectedOptional<Service>: Sendable {
     private let containerProvider: @Sendable () -> DependencyContainerProtocol

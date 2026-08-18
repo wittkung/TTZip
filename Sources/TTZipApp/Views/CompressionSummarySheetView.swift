@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 全算法特性与区别性能对比弹窗 Sheet
+/// Algorithm characteristics and performance comparison matrix sheet.
 public struct AlgorithmMatrixSheetView: View {
     @Binding public var isPresented: Bool
     
@@ -20,11 +27,11 @@ public struct AlgorithmMatrixSheetView: View {
     }
     
     public let rows: [AlgoRow] = [
-        AlgoRow(name: "仅存储 (Store)", speed: "8,450 MB/s (极速)", ratio: "0% (无压缩)", compatibility: "100%", recommendedFor: "已压缩的视频/图片/20G大分卷备份", color: .green),
-        AlgoRow(name: "Zstd (Zstandard)", speed: "4,450 MB/s (高速)", ratio: "高 (~85%)", compatibility: "95% (现代全平台)", recommendedFor: "日常高效打包、代码工程库、数据库备份", color: .orange),
-        AlgoRow(name: "LZMA2 (7-Zip 推荐)", speed: "320 ~ 1,600 MB/s", ratio: "极大 (~92%)", compatibility: "98% (通用)", recommendedFor: "文本、代码文档、二进制文件极限空间节省", color: .blue),
-        AlgoRow(name: "Deflate (ZIP 经典)", speed: "85 ~ 600 MB/s", ratio: "中等 (~70%)", compatibility: "100% (全平台默认)", recommendedFor: "跨平台发送邮件附件、兼容老旧设备", color: .purple),
-        AlgoRow(name: "Bzip2", speed: "40 ~ 120 MB/s", ratio: "高 (~88%)", compatibility: "90%", recommendedFor: "巨型日志、高重复冗余数据与科学计算集", color: .indigo)
+        AlgoRow(name: "Store (No Compression)", speed: "8,450 MB/s", ratio: "0% (Store)", compatibility: "100%", recommendedFor: "Pre-compressed media, large archive packaging", color: .green),
+        AlgoRow(name: "Zstd (Zstandard)", speed: "4,450 MB/s", ratio: "High (~85%)", compatibility: "95% (Modern platforms)", recommendedFor: "Daily backups, source code repos, databases", color: .orange),
+        AlgoRow(name: "LZMA2 (7-Zip Default)", speed: "320 ~ 1,600 MB/s", ratio: "Maximum (~92%)", compatibility: "98% (Universal)", recommendedFor: "Documents, software binaries, maximum space savings", color: .blue),
+        AlgoRow(name: "Deflate (ZIP Standard)", speed: "85 ~ 600 MB/s", ratio: "Standard (~70%)", compatibility: "100% (Universal default)", recommendedFor: "Cross-platform email attachments, legacy devices", color: .purple),
+        AlgoRow(name: "Bzip2", speed: "40 ~ 120 MB/s", ratio: "High (~88%)", compatibility: "90%", recommendedFor: "Large repetitive logs, scientific datasets", color: .indigo)
     ]
     
     public var body: some View {
@@ -33,11 +40,11 @@ public struct AlgorithmMatrixSheetView: View {
                 Image(systemName: "chart.bar.doc.horizontal.fill")
                     .font(.title2)
                     .foregroundStyle(.blue)
-                Text("TTZip 核心压缩算法区别与特性对比表")
+                Text("TTZip Compression Algorithm Matrix")
                     .font(.title3)
                     .fontWeight(.bold)
                 Spacer()
-                Button("关闭") { isPresented = false }
+                Button("Close") { isPresented = false }
                     .buttonStyle(.borderedProminent)
             }
             
@@ -57,7 +64,7 @@ public struct AlgorithmMatrixSheetView: View {
                                     .font(.headline)
                                     .foregroundStyle(row.color)
                                 Spacer()
-                                Text("实测吞吐: \(row.speed)")
+                                Text("Throughput: \(row.speed)")
                                     .font(.caption)
                                     .fontWeight(.semibold)
                                     .padding(.horizontal, 6)
@@ -67,15 +74,15 @@ public struct AlgorithmMatrixSheetView: View {
                             }
                             
                             HStack(spacing: 16) {
-                                Text("压缩率: \(row.ratio)")
+                                Text("Ratio: \(row.ratio)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text("兼容性: \(row.compatibility)")
+                                Text("Compatibility: \(row.compatibility)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             
-                            Text("最佳适用场景: \(row.recommendedFor)")
+                            Text("Best For: \(row.recommendedFor)")
                                 .font(.caption2)
                                 .foregroundStyle(.primary)
                         }
@@ -93,7 +100,7 @@ public struct AlgorithmMatrixSheetView: View {
     }
 }
 
-/// 解耦的算法指导卡片独立子视图组件
+/// Algorithm guidance card subview.
 public struct AlgorithmGuidanceCardView: View {
     public let algoInfo: (icon: String, color: Color, title: String, desc: String)
     public let onShowMatrix: () -> Void
@@ -120,7 +127,7 @@ public struct AlgorithmGuidanceCardView: View {
                 
                 Button(action: onShowMatrix) {
                     HStack(spacing: 4) {
-                        Text("查看全算法详细性能对比表")
+                        Text("View Algorithm Comparison Matrix")
                             .font(.caption2)
                             .fontWeight(.medium)
                         Image(systemName: "chevron.right")
@@ -138,7 +145,7 @@ public struct AlgorithmGuidanceCardView: View {
     }
 }
 
-/// 压缩完成结算统计面板 Sheet
+/// Compression summary statistics sheet view.
 public struct CompressionSummarySheetView: View {
     public let archivePath: String
     public let originalSizeBytes: Int64
@@ -177,7 +184,7 @@ public struct CompressionSummarySheetView: View {
                     .foregroundStyle(TTZipTheme.bambooGreen)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("压缩打包完成")
+                    Text("Compression Completed")
                         .font(.title3).fontWeight(.bold)
                     Text((archivePath as NSString).lastPathComponent)
                         .font(.caption)
@@ -192,7 +199,7 @@ public struct CompressionSummarySheetView: View {
             
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("压缩速率")
+                    Text("Throughput")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(String(format: "%.1f MB/s", throughputMBs))
@@ -206,7 +213,7 @@ public struct CompressionSummarySheetView: View {
                 
                 let ratio = originalSizeBytes > 0 ? (1.0 - Double(compressedSizeBytes) / Double(originalSizeBytes)) * 100.0 : 0.0
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("空间节省率")
+                    Text("Space Savings")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(String(format: "-%.1f%%", max(0, ratio)))
@@ -219,7 +226,7 @@ public struct CompressionSummarySheetView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("文件体积变化")
+                    Text("Size Delta")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("\(ByteCountFormatterFlyweight.shared.string(fromByteCount: originalSizeBytes)) ➔ \(ByteCountFormatterFlyweight.shared.string(fromByteCount: compressedSizeBytes))")
@@ -232,10 +239,10 @@ public struct CompressionSummarySheetView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("打包耗时 / 加密")
+                    Text("Elapsed / Encryption")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(String(format: "%.2fs · %@", elapsedSeconds, isEncrypted ? "AES-256" : "未加密"))
+                    Text(String(format: "%.2fs · %@", elapsedSeconds, isEncrypted ? "AES-256" : "None"))
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(isEncrypted ? .orange : .primary)
                 }
@@ -250,7 +257,7 @@ public struct CompressionSummarySheetView: View {
             Button(action: onCloseAndExplore) {
                 HStack {
                     Image(systemName: "folder.badge.gearshape")
-                    Text("完成并进入主页目录探索")
+                    Text("Done and Explore Archive")
                         .fontWeight(.bold)
                 }
                 .font(.system(size: 13))

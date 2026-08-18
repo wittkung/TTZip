@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_lzma2_enc_native.h
+ * @brief Native in-process LZMA2 compression and 7Z container creation interface.
+ */
+
 #ifndef TTZIP_LZMA2_ENC_NATIVE_H
 #define TTZIP_LZMA2_ENC_NATIVE_H
 
@@ -8,12 +20,6 @@
 extern "C" {
 #endif
 
-/// 原生进程内 LZMA2 压缩 + 7z 容器组装 (替代 ttzip_spawn_7zz_compress)
-/// @param output_path   输出 .7z 文件路径
-/// @param input_paths   输入文件/目录路径数组
-/// @param input_count   输入路径数量
-/// @param level         压缩级别 1-9
-/// @return              0=成功, 非0=错误码
 int ttzip_create_7z_lzma2_native_c(
     const char* output_path,
     const char* const* input_paths,

@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 #if canImport(AppKit)
 import AppKit
 #endif
 
-/// 竞品软件与工具链基本信息
+/// Value type representing detected third-party archive applications and CLI tools.
 public struct CompetitorTool: Identifiable, Sendable {
     public var id: String { toolId }
     public let toolId: String
@@ -36,7 +43,7 @@ public struct CompetitorTool: Identifiable, Sendable {
     }
 }
 
-/// 真实检测测算数据模型
+/// Measured performance score against detected toolchains.
 public struct CompetitorRealScore: Identifiable, Sendable {
     public var id: String { tool.id }
     public let tool: CompetitorTool
@@ -57,26 +64,26 @@ public struct CompetitorRealScore: Identifiable, Sendable {
     }
 }
 
-/// 真实已安装压缩软件与工具链感知服务
+/// Detection service identifying installed archiving applications and CLI binaries across macOS.
 public enum CompetitorDetector {
-    /// 探测当前 macOS 系统中所有真实安装的压缩软件与 CLI 工具链 (全动态环境推断，无硬编码路径依赖)
+    /// Detects all supported third-party archiving tools and CLI engines installed on host system.
     public static func detectAllCompetitors() -> [CompetitorTool] {
         var tools: [CompetitorTool] = []
         
-        // 1. macOS 系统原生 (ditto)
+        // 1. macOS System Native (ditto)
         let dittoPath = findExecutable(names: ["ditto"], extraPaths: ["/usr/bin/ditto"])
         tools.append(CompetitorTool(
             toolId: "native_ditto",
-            name: "macOS 系统原生 (ditto)",
+            name: "macOS Native (ditto)",
             bundleIdentifier: "com.apple.archiveutility",
             isInstalled: dittoPath != nil,
             appPath: checkAppInstalled(bundleId: "com.apple.archiveutility", defaultPath: "/System/Library/CoreServices/Applications/Archive Utility.app").path,
             cliExecutablePath: dittoPath,
             iconSystemName: "applelogo",
-            description: "macOS 默认 Finder 右键压缩引擎"
+            description: "macOS default Archive Utility and ditto compression tool"
         ))
         
-        // 2. 7-Zip CLI 工具链
+        // 2. 7-Zip CLI toolchain
         let sevenZipCli = findExecutable(names: ["7zz", "7z"])
         tools.append(CompetitorTool(
             toolId: "7zip_cli",
@@ -86,7 +93,7 @@ public enum CompetitorDetector {
             appPath: nil,
             cliExecutablePath: sevenZipCli,
             iconSystemName: "terminal.fill",
-            description: "官方 7-Zip ARM64 高性能多线程 CLI 引擎"
+            description: "Official 7-Zip ARM64 multi-threaded CLI engine"
         ))
 
         // 3. Keka
@@ -107,7 +114,7 @@ public enum CompetitorDetector {
             appPath: kekaInstalled.path,
             cliExecutablePath: kekaCli,
             iconSystemName: "archivebox.circle.fill",
-            description: "macOS 开源知名归档工具 (基于 p7zip 多核内核)"
+            description: "macOS open-source archiver powered by p7zip"
         ))
 
         // 4. BetterZip
@@ -127,7 +134,7 @@ public enum CompetitorDetector {
             appPath: bzInstalled.path,
             cliExecutablePath: bzCli ?? sevenZipCli,
             iconSystemName: "slider.horizontal.3",
-            description: "macOS 经典归档管理软件"
+            description: "macOS archive manager"
         ))
 
         // 5. MacZip (eZip)
@@ -140,7 +147,7 @@ public enum CompetitorDetector {
             appPath: mzInstalled.path,
             cliExecutablePath: findExecutable(names: ["MacZip"], extraPaths: [(mzInstalled.path ?? "/Applications/MacZip.app") + "/Contents/MacOS/MacZip"]),
             iconSystemName: "folder.badge.gearshape",
-            description: "macOS 简洁压缩解压工具"
+            description: "macOS archiver utility"
         ))
 
         // 6. Parallel pigz
@@ -153,7 +160,7 @@ public enum CompetitorDetector {
             appPath: nil,
             cliExecutablePath: pigzCli,
             iconSystemName: "cpu.fill",
-            description: "全核多线程并行 GZIP 引擎"
+            description: "Parallel multi-threaded GZIP implementation"
         ))
 
         // 7. Zstandard zstd
@@ -166,7 +173,7 @@ public enum CompetitorDetector {
             appPath: nil,
             cliExecutablePath: zstdCli,
             iconSystemName: "bolt.fill",
-            description: "Meta 多线程 Zstd 高速压缩解压引擎"
+            description: "Meta Zstandard real-time compression algorithm CLI"
         ))
         
         // 8. libdeflate-gzip
@@ -179,7 +186,7 @@ public enum CompetitorDetector {
             appPath: nil,
             cliExecutablePath: libdeflateCli,
             iconSystemName: "flame.fill",
-            description: "极致吞吐率 Deflate / Gzip 编解码引擎"
+            description: "High-throughput libdeflate GZIP implementation"
         ))
 
         // 9. ZPAQ Franz
@@ -192,7 +199,7 @@ public enum CompetitorDetector {
             appPath: nil,
             cliExecutablePath: zpaqfranzCli,
             iconSystemName: "diamond.fill",
-            description: "极限上下文预测 (Context Mixing) 极致备份归档引擎"
+            description: "Context-mixing archiving and backup engine"
         ))
 
         // 10. Apple LZFSE CLI
@@ -205,7 +212,7 @@ public enum CompetitorDetector {
             appPath: nil,
             cliExecutablePath: lzfseCli,
             iconSystemName: "applelogo",
-            description: "Apple 底层 LZFSE 硬件优化编解码引擎"
+            description: "Apple LZFSE compression reference CLI"
         ))
 
         // 11. The Unarchiver CLI (unar)
@@ -218,7 +225,7 @@ public enum CompetitorDetector {
             appPath: checkAppInstalled(bundleId: "com.macpaw.site.theunarchiver", defaultPath: "/Applications/The Unarchiver.app").path,
             cliExecutablePath: unarCli,
             iconSystemName: "doc.zipper",
-            description: "macOS 知名全格式解压引擎"
+            description: "Universal archive extraction CLI"
         ))
 
         // 12. Long Range ZIP (lrzip)
@@ -231,7 +238,7 @@ public enum CompetitorDetector {
             appPath: nil,
             cliExecutablePath: lrzipCli,
             iconSystemName: "square.stack.3d.down.right.fill",
-            description: "超大文件极长距离匹配归档引擎"
+            description: "Extended long-distance matching compression tool"
         ))
 
         // 13. powturbo TurboBench
@@ -244,7 +251,7 @@ public enum CompetitorDetector {
             appPath: nil,
             cliExecutablePath: turboBenchCli,
             iconSystemName: "gauge.with.needle.fill",
-            description: "工业级纯内存多算法极限基准测试引擎"
+            description: "In-memory compression benchmark suite"
         ))
 
         // 14. inikep lzbench
@@ -257,13 +264,13 @@ public enum CompetitorDetector {
             appPath: nil,
             cliExecutablePath: lzbenchCli,
             iconSystemName: "speedometer",
-            description: "开源实时数据压缩纯内存基准测试工具"
+            description: "In-memory real-time data compression benchmark tool"
         ))
         
         return tools
     }
     
-    /// 过滤出已被真实安装的第三方与系统工具
+    /// Filters detected tools returning only those present on host system.
     public static func detectOnlyInstalledCompetitors() -> [CompetitorTool] {
         return detectAllCompetitors().filter { $0.isInstalled }
     }

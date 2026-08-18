@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 协同组件弱引用封装容器 (防范循环引用)
+/// Weak reference container preventing retain cycles in mediator registries.
 public final class WeakMediatorComponentWrapper: @unchecked Sendable {
     public let componentId: String
     public weak var component: ArchiveMediatorComponentProtocol?
@@ -11,9 +18,8 @@ public final class WeakMediatorComponentWrapper: @unchecked Sendable {
     }
 }
 
-/// 【3.8 中介者模式 (Mediator Pattern)】GUI 应用集中化中介者 (UI App Mediator)
+/// Centralized GUI application mediator coordinating UI interactions and event broadcasting.
 public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Sendable {
-    /// 全局共享单例
     public static let shared = ArchiveAppMediator()
     
     private let lock = NSLock()
@@ -21,12 +27,10 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
     
     private init() {}
     
-    /// 注册组件
     public func register(component: ArchiveMediatorComponentProtocol) {
         lock.lock()
         defer { lock.unlock() }
         
-        // 自动清理已被释放的无用弱引用条目
         registry = registry.filter { $0.value.component != nil }
         
         let wrapper = WeakMediatorComponentWrapper(component: component)
@@ -34,7 +38,6 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
         component.mediator = self
     }
     
-    /// 注销组件
     public func unregister(component: ArchiveMediatorComponentProtocol) {
         lock.lock()
         defer { lock.unlock() }
@@ -46,7 +49,6 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
         }
     }
     
-    /// 注销指定 ID 的组件
     public func unregister(componentId: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -57,16 +59,13 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
         }
     }
     
-    /// 统一广播并定向分发 GUI 应用交互事件
     public func send(event: AppMediatorEvent, from sender: ArchiveMediatorComponentProtocol? = nil) {
         lock.lock()
-        // 定时清理已释放条目并快照当前活跃组件
         registry = registry.filter { $0.value.component != nil }
         let activeComponents = registry.values.compactMap { $0.component }
         lock.unlock()
         
         for component in activeComponents {
-            // 默认广播至除发送者以外的所有有效订阅组件 (若 sender 为 nil 则通知全员)
             if let sender = sender, component === sender {
                 continue
             }
@@ -81,7 +80,6 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
         }
     }
     
-    /// 统一广播 Core 引擎服务协同事件
     public func send(event: CoreEngineMediatorEvent, from sender: ArchiveMediatorComponentProtocol? = nil) {
         lock.lock()
         registry = registry.filter { $0.value.component != nil }
@@ -103,7 +101,6 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
         }
     }
     
-    /// 定向发送事件给特定 ID 的组件
     public func sendTargeted(event: AppMediatorEvent, targetComponentId: String) {
         lock.lock()
         let targetComponent = registry[targetComponentId]?.component
@@ -120,7 +117,6 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
         }
     }
     
-    /// 获取当前注册的活跃组件数量 (自动排查失效弱引用)
     public var registeredComponentCount: Int {
         lock.lock()
         defer { lock.unlock() }
@@ -128,14 +124,12 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
         return registry.count
     }
     
-    /// 检查特定组件 ID 是否被成功注册
     public func isRegistered(componentId: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         return registry[componentId]?.component != nil
     }
     
-    /// 清空所有已注册组件句柄 (用于测试重置)
     public func reset() {
         lock.lock()
         defer { lock.unlock() }

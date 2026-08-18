@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 仓储模式贯穿与适配器层 (Repository Pattern Conformances & Adaptations)
+// MARK: - Repository Pattern Conformances & Adaptations
 
-/// PasswordVaultManager 对 PasswordVaultRepositoryProtocol 协议的直接遵从适配
+/// PasswordVaultManager conformance to `PasswordVaultRepositoryProtocol`.
 extension PasswordVaultManager: PasswordVaultRepositoryProtocol {
     public typealias DomainModel = PasswordVaultEntry
     
@@ -42,7 +49,7 @@ extension PasswordVaultManager: PasswordVaultRepositoryProtocol {
     }
 }
 
-/// PresetManager 对 ArchivePresetRepositoryProtocol 协议的直接遵从适配
+/// PresetManager conformance to `ArchivePresetRepositoryProtocol`.
 extension PresetManager: ArchivePresetRepositoryProtocol {
     public typealias DomainModel = CompressionPreset
     
@@ -79,9 +86,10 @@ extension PresetManager: ArchivePresetRepositoryProtocol {
     }
 }
 
-/// 为 CommandHistoryManager 扩展仓储模式与历史持久化支撑
+// MARK: - CommandHistoryManager Repository Extensions
+
 extension CommandHistoryManager {
-    /// 便捷生成 ArchiveTaskRecord
+    /// Constructs `ArchiveTaskRecord` from command execution.
     public func makeRecord(for command: ArchiveCommandProtocol, isSuccess: Bool) -> ArchiveTaskRecord {
         return ArchiveTaskRecord(
             id: UUID(),

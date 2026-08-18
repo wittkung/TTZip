@@ -1,29 +1,37 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 统一底层归档解耦实现者接口 (Implementor in Bridge Pattern)
-/// 将高层归档业务逻辑与底层各格式的具体算法执行彻底分离。
+/// Unified low-level archive engine implementor protocol (Implementor in Bridge Pattern).
+///
+/// Decouples high-level archiving orchestration from concrete algorithm implementations.
 public protocol ArchiveEngineImplementorProtocol: Sendable {
-    /// 该实现者所支持的基础归档格式
+    /// Supported compression format.
     var supportedFormat: ArchiveCompressionFormat { get }
 
-    /// 流式归档打包压缩方法
+    /// Stream-compresses input paths into an archive file.
     /// - Parameters:
-    ///   - inputPaths: 要打包的目标文件或目录路径列表
-    ///   - outputPath: 目标输出归档文件路径
-    ///   - options: 全局高级配置选项
-    /// - Returns: 生成归档文件的总字节数 (Int64)
+    ///   - inputPaths: List of target input files or directories.
+    ///   - outputPath: Target output archive path.
+    ///   - options: Advanced archive options.
+    /// - Returns: Total written bytes (Int64).
     func compressStream(
         inputPaths: [String],
         outputPath: String,
         options: ArchiveAdvancedOptions
     ) async throws -> Int64
 
-    /// 流式归档解压提取方法
+    /// Stream-extracts archive contents into destination directory.
     /// - Parameters:
-    ///   - archivePath: 待解压的源归档文件路径
-    ///   - destinationDir: 目标解压提取目录路径
-    ///   - options: 全局高级配置选项
-    /// - Returns: 解压提取出的解压数据总字节数 (Int64)
+    ///   - archivePath: Source archive path.
+    ///   - destinationDir: Target extraction directory path.
+    ///   - options: Advanced archive options.
+    /// - Returns: Total extracted uncompressed bytes (Int64).
     func extractStream(
         archivePath: String,
         destinationDir: String,
@@ -31,9 +39,9 @@ public protocol ArchiveEngineImplementorProtocol: Sendable {
     ) async throws -> Int64
 }
 
-// MARK: - 具体格式桥接实现者 (Concrete Implementors)
+// MARK: - Concrete Implementors
 
-/// ZIP 归档格式桥接适配实现者
+/// Bridge implementor for ZIP archives.
 public final class ZipEngineBridgeImplementor: ArchiveEngineImplementorProtocol, @unchecked Sendable {
     public let supportedFormat: ArchiveCompressionFormat = .zip
     public let zipEngine: ZipEngineProtocol
@@ -76,7 +84,7 @@ public final class ZipEngineBridgeImplementor: ArchiveEngineImplementorProtocol,
     }
 }
 
-/// 7z 归档格式桥接适配实现者
+/// Bridge implementor for 7z archives.
 public final class SevenZipEngineBridgeImplementor: ArchiveEngineImplementorProtocol, @unchecked Sendable {
     public let supportedFormat: ArchiveCompressionFormat = .sevenZip
     public let sevenZipEngine: SevenZipEngineProtocol
@@ -119,7 +127,7 @@ public final class SevenZipEngineBridgeImplementor: ArchiveEngineImplementorProt
     }
 }
 
-/// Zstandard (zst) 归档格式桥接适配实现者
+/// Bridge implementor for Zstandard (.zst) archives.
 public final class ZstdEngineBridgeImplementor: ArchiveEngineImplementorProtocol, @unchecked Sendable {
     public let supportedFormat: ArchiveCompressionFormat = .zst
     public let zstdEngine: ZstdEngineProtocol
@@ -162,7 +170,7 @@ public final class ZstdEngineBridgeImplementor: ArchiveEngineImplementorProtocol
     }
 }
 
-/// POSIX Tar 归档格式桥接适配实现者
+/// Bridge implementor for POSIX TAR archives.
 public final class TarEngineBridgeImplementor: ArchiveEngineImplementorProtocol, @unchecked Sendable {
     public let supportedFormat: ArchiveCompressionFormat = .tar
     public let tarEngine: POSIXTarEngineProtocol
@@ -211,18 +219,16 @@ public final class TarEngineBridgeImplementor: ArchiveEngineImplementorProtocol,
     }
 }
 
-// MARK: - 辅助计算函数
+// MARK: - Helper Functions
 
 internal func calculateDirectorySize(at path: String) -> Int64 {
     let component = ArchiveComponentTreeBuilder.buildTree(fromDiskPath: path)
     return component.sizeBytes
 }
 
-// MARK: - 高层抽象基类 (Abstraction in Bridge Pattern)
+// MARK: - Abstraction in Bridge Pattern
 
-/// 高层归档业务抽象基类
-/// 持有一个 `ArchiveEngineImplementorProtocol` 实例，使业务逻辑（如指标统计、参数处理、转换等）
-/// 与底层具体的算法格式引擎解耦，两者可独立演进。
+/// High-level archiving abstraction base class holding an `ArchiveEngineImplementorProtocol`.
 open class ArchiveOperationAbstraction: @unchecked Sendable {
     private let lock = NSLock()
     private var _implementor: ArchiveEngineImplementorProtocol
@@ -244,7 +250,7 @@ open class ArchiveOperationAbstraction: @unchecked Sendable {
         self._implementor = implementor
     }
 
-    /// 动态切换底层实现者 (Bridge Pattern 核心特性: 动态解耦)
+    /// Dynamically switches the underlying implementor.
     @discardableResult
     public func setImplementor(_ newImplementor: ArchiveEngineImplementorProtocol) -> Self {
         lock.lock()
@@ -253,7 +259,7 @@ open class ArchiveOperationAbstraction: @unchecked Sendable {
         return self
     }
 
-    /// 统一高层压缩业务逻辑
+    /// High-level unified compression orchestration.
     open func compress(
         inputPaths: [String],
         outputPath: String,
@@ -267,7 +273,7 @@ open class ArchiveOperationAbstraction: @unchecked Sendable {
         )
     }
 
-    /// 统一高层解压业务逻辑
+    /// High-level unified extraction orchestration.
     open func extract(
         archivePath: String,
         destinationDir: String,
@@ -282,10 +288,9 @@ open class ArchiveOperationAbstraction: @unchecked Sendable {
     }
 }
 
-/// 精化归档操作管道抽象 (Refined Abstraction in Bridge Pattern)
-/// 在基础抽象的基础上扩展吞吐率测量与双向流式验证能力
+/// Refined archiving pipeline abstraction measuring performance metrics.
 open class AdvancedArchiveOperationPipelineAbstraction: ArchiveOperationAbstraction, @unchecked Sendable {
-    /// 执行压缩并测量详细性能指标
+    /// Executes compression and captures detailed throughput metrics.
     open func compressWithMetrics(
         inputPaths: [String],
         outputPath: String,
@@ -298,7 +303,7 @@ open class AdvancedArchiveOperationPipelineAbstraction: ArchiveOperationAbstract
         return (bytesWritten: bytes, durationSeconds: elapsed, throughputMBs: throughput)
     }
 
-    /// 执行解压并测量详细性能指标
+    /// Executes extraction and captures detailed throughput metrics.
     open func extractWithMetrics(
         archivePath: String,
         destinationDir: String,

@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import AppKit
 
-/// 智能 LRU 预览缓存管理器 (在应用生命周期内提供配额控制的极速预览复用)
+/// Smart LRU preview cache manager providing quota-controlled preview recycling.
 public final class PreviewLRUCacheManager: @unchecked Sendable {
     public static let shared = PreviewLRUCacheManager()
     
     private static let quotaDefaultsKey = "PreviewCacheQuotaGB"
     
-    /// 动态 LRU 缓存上限 (单位：GB)，默认 10.0 GB，支持用户在设置中自定义调节
+    /// Dynamic LRU cache limit (GB), defaulting to 10.0 GB.
     public var maxCacheSizeGB: Double {
         get {
             let saved = UserDefaults.standard.double(forKey: Self.quotaDefaultsKey)
@@ -52,7 +59,7 @@ public final class PreviewLRUCacheManager: @unchecked Sendable {
         )
     }
     
-    /// 获取已缓存的预览 URL (若存在并有效则更新访问时间)
+    /// Retrieves cached preview URL if valid.
     public func cachedURL(forKey key: String) -> URL? {
         cacheLock.lock()
         defer { cacheLock.unlock() }
@@ -68,7 +75,7 @@ public final class PreviewLRUCacheManager: @unchecked Sendable {
         return item.fileURL
     }
     
-    /// 注册新的预览文件，并触发 LRU 容量超限自动清理
+    /// Registers newly generated preview file and triggers LRU eviction.
     public func register(key: String, fileURL: URL) {
         cacheLock.lock()
         defer { cacheLock.unlock() }
@@ -80,14 +87,14 @@ public final class PreviewLRUCacheManager: @unchecked Sendable {
         evictIfNecessary()
     }
     
-    /// 生成标准可复用的缓存文件 URL 目标路径
+    /// Generates standard reusable cache file URL path.
     public func targetURL(forKey key: String, filename: String) -> URL {
         let hashDir = cacheDir.appendingPathComponent(key, isDirectory: true)
         try? fileManager.createDirectory(at: hashDir, withIntermediateDirectories: true)
         return hashDir.appendingPathComponent(filename)
     }
     
-    /// 超出 maxCacheSizeBytes 时按 LRU 顺序淘汰旧文件
+    /// Evicts oldest files according to LRU order when total size exceeds limit.
     private func evictIfNecessary() {
         var currentTotalSize = items.values.reduce(0) { $0 + $1.sizeBytes }
         guard currentTotalSize > maxCacheSizeBytes else { return }
@@ -103,7 +110,7 @@ public final class PreviewLRUCacheManager: @unchecked Sendable {
         }
     }
     
-    /// 应用退出或手动调用时清空全部临时预览缓存
+    /// Purges all temporary preview cache files.
     @objc public func purgeAll() {
         cacheLock.lock()
         defer { cacheLock.unlock() }

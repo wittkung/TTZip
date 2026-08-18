@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// TTZip 统一控制台、系统日志与单测内存缓冲与诊断服务 (TTLogger)
+/// Unified console, system diagnostics, and in-memory test log buffering service (`TTLogger`).
 public final class TTLogger: @unchecked Sendable {
     public enum Level: Int, Comparable, Sendable {
         case debug = 0
@@ -56,14 +63,12 @@ public final class TTLogger: @unchecked Sendable {
             default: self._level = .info
             }
         } else if env["XCTestConfigurationFilePath"] != nil || NSClassFromString("XCTestCase") != nil {
-            // 单测模式下开启内存缓冲捕获，默认输出级别设为 quiet (零控制台打扰，只有失败时才集中 Dump)
             self._level = .quiet
             self.isCapturingForTest = true
         } else {
             self._level = .info
         }
         
-        // 自动注册 C 语言桥接层日志回调
         ttzip_set_log_callback { level, msg in
             guard let msg = msg else { return }
             let str = String(cString: msg)
@@ -124,7 +129,7 @@ public final class TTLogger: @unchecked Sendable {
         
         guard !instance.logBuffer.isEmpty else { return }
         print("\n==========================================================================================")
-        print("🚨 [TTLogger Log Dump on Failure] 用例 '\(testName)' 失败链路日志 Dump (共 \(instance.logBuffer.count) 条记录)")
+        print("🚨 [TTLogger Log Dump on Failure] Test '\(testName)' execution trace (\(instance.logBuffer.count) entries)")
         print("==========================================================================================")
         for entry in instance.logBuffer {
             let lvlStr: String

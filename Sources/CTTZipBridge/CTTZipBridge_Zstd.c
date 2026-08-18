@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipBridge_Zstd.h"
 #include "include/CTTZipBridge.h"
 #include "include/CTTZipCommon.h"
@@ -82,7 +89,6 @@ int ttzip_zstd_compress_file_stream(
     
     int error = TTZIP_OK;
     int fd_in = -1;
-    FILE* fout = NULL;
     ZSTD_CCtx* cctx = NULL;
     ZSTD_CDict* cdict = NULL;
     void* mapped_in = MAP_FAILED;

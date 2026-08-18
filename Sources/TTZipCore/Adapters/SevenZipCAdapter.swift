@@ -1,14 +1,32 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 7z 原生 C 引擎适配器 (Adapter Pattern)
-/// 将 C 语言 ttzip_7z_extract_native_parallel_c 和 ttzip_create_7z_native_c 适配为符合 Swift 并发规范的 SevenZipEngineProtocol
+/// Adapter Pattern: Native C 7z archiving and Fast-LZMA2 engine adapter.
+///
+/// Wraps native C routines (`ttzip_7z_extract_native_parallel_c`, `ttzip_create_7z_native_c`,
+/// and `ttzip_fl2_compress_block`) into Swift concurrency-compliant `SevenZipEngineProtocol`.
 public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
     public static let shared = SevenZipCAdapter()
     
     private init() {}
     
-    /// 执行 7z 归档文件打包创建
+    /// Creates a 7z archive using native C static library bindings.
+    /// - Parameters:
+    ///   - outputPath: Target output `.7z` file path.
+    ///   - inputPaths: Array of source file and directory paths.
+    ///   - level: Compression level.
+    ///   - password: Optional encryption passphrase.
+    ///   - useZstd: Whether to utilize Zstandard codec within 7z container.
+    ///   - solidBlockSizeMb: Size of solid stream block in MB.
+    ///   - progressHandler: Optional progress callback.
+    /// - Returns: `true` if archive creation succeeded, otherwise `false`.
     @inline(__always)
     public func createArchive(
         outputPath: String,
@@ -37,7 +55,7 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
                     if status == 0 {
                         progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: 100, totalBytes: 100, currentFileName: ""))
                     } else {
-                        TTLogger.error("[SevenZipCAdapter] C 层压缩失败 code=\(status), output=\(outputPath)")
+                        TTLogger.error("[SevenZipCAdapter] C layer compression failed with status=\(status), output=\(outputPath)")
                     }
                     return status == 0
                 }
@@ -45,7 +63,13 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
         }
     }
     
-    /// 解压 7z 归档文件（封装 C 语言 ttzip_extract_archive_advanced 桥接细节）
+    /// Extracts a 7z archive using native C static library bindings.
+    /// - Parameters:
+    ///   - archivePath: Path to input `.7z` archive file.
+    ///   - destinationDir: Target extraction directory path.
+    ///   - skipMacJunk: Whether to filter AppleDouble and Resource Fork artifacts.
+    ///   - password: Optional decryption passphrase.
+    /// - Returns: `true` if extraction succeeded, otherwise `false`.
     @inline(__always)
     public func extractArchive(
         archivePath: String,
@@ -64,7 +88,7 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
                         cPassword
                     )
                     if status != 0 {
-                        TTLogger.debug("[SevenZipCAdapter] C 层解压 code=\(status), archive=\(archivePath), dest=\(destinationDir)")
+                        TTLogger.debug("[SevenZipCAdapter] C layer extraction returned status=\(status), archive=\(archivePath), dest=\(destinationDir)")
                     }
                     return status == 0
                 }
@@ -72,7 +96,16 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
         }
     }
 
-    /// 直接调用 Fast-LZMA2 混合分块压缩接口 (Hybrid Fast-Path)
+    /// Compresses a buffer block directly using Fast-LZMA2 hybrid routines.
+    /// - Parameters:
+    ///   - src: Pointer to source uncompressed byte buffer.
+    ///   - srcLength: Uncompressed byte count.
+    ///   - dst: Pointer to destination output buffer.
+    ///   - dstCapacity: Allocated capacity of destination buffer.
+    ///   - level: LZMA2 compression level.
+    ///   - isZeroBlock: Optimization flag for zero-filled buffers.
+    ///   - threadCount: Number of worker threads for parallel LZMA2 chunking.
+    /// - Returns: Tuple of status code, output compressed size, and dictionary size.
     @inline(__always)
     public func compressBlockFL2(
         src: UnsafePointer<UInt8>,

@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 报刊社论风格 - 新建归档压缩包 Header 顶栏子组件
+/// Editorial style compression modal header component.
 public struct CompressModalHeaderView: View {
     @Binding public var selectedPresetID: UUID?
     public let onOpenGuide: () -> Void
@@ -27,7 +34,7 @@ public struct CompressModalHeaderView: View {
                         .foregroundStyle(TTZipTheme.kintsugiGold)
                     
                     HStack(spacing: 8) {
-                        Text("新建归档压缩包")
+                        Text("New Archive")
                             .font(.system(size: 16, weight: .bold, design: .serif))
                             .foregroundStyle(.primary)
                         
@@ -35,7 +42,7 @@ public struct CompressModalHeaderView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "book.pages.fill")
                                     .font(.system(size: 10, weight: .bold))
-                                Text("📖 算法与格式百科说明")
+                                Text("📖 Format Guide")
                                     .font(.system(size: 11, weight: .bold))
                             }
                             .foregroundStyle(TTZipTheme.kintsugiGold)
@@ -45,15 +52,15 @@ public struct CompressModalHeaderView: View {
                             .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
-                        .help("点击打开全格式算法、封装规则与高级参数百科指南")
+                        .help("Open algorithm and format guide")
                     }
                 }
                 
                 Spacer()
                 
                 HStack(spacing: 12) {
-                    Picker("快捷预设", selection: $selectedPresetID) {
-                        Text("自定义常用预设").tag(UUID?.none)
+                    Picker("Preset", selection: $selectedPresetID) {
+                        Text("Custom Preset").tag(UUID?.none)
                         ForEach(PresetManager.shared.presets) { preset in
                             Text("\(preset.name) (\(preset.splitVolumeDescription))").tag(UUID?.some(preset.id))
                         }

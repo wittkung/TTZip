@@ -1,14 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 【3.6 模板方法模式 (Template Method Pattern)】TAR 格式特化模板
-/// 实现 512 字节 Block 对齐校验、pax header 解析、Gz/Bz2/Zstd 管道挂接
+/// Specialized POSIX TAR and compound format workflow template (Template Method Pattern).
+/// Handles 512-byte block alignment validation, pax header parsing, and streaming filter pipelines (Gz/Bz2/Zstd/Xz/Lz4/Brotli).
 public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @unchecked Sendable {
     public override init() {
         super.init()
     }
 
-    // MARK: - Step 1: Hook 钩子 (前置校验)
+    // MARK: - Step 1: Pre-execution Validation Hook
     public override func preExecutionCheck(context: ArchiveTemplateContext) throws {
         try super.preExecutionCheck(context: context)
         if context.operation == .extract || context.operation == .inspect {
@@ -20,8 +27,7 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
         }
     }
 
-    // MARK: - Step 3: 原语步骤 (执行核心 TAR/Pax 算法)
-    // MARK: - Step 3: 原语步骤 (执行核心 TAR/Pax 算法)
+    // MARK: - Step 3: Core Algorithm Primitive
     public override func executeCoreAlgorithm(context: ArchiveTemplateContext) throws -> WorkflowResult {
         switch context.operation {
         case .compress:
@@ -234,7 +240,7 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
         }
     }
 
-    // MARK: - Step 4: Hook 钩子 (校验 TAR 512 字节 Block 对齐与 Pax Header/Gz/Bz2/Zstd 挂接)
+    // MARK: - Step 4: Output Integrity Hook (Validates TAR 512-byte block alignment)
     public override func verifyOutputIntegrity(context: ArchiveTemplateContext, result: inout WorkflowResult) throws {
         try super.verifyOutputIntegrity(context: context, result: &result)
 
@@ -243,7 +249,6 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
             if lower.hasSuffix(".tar") {
                 if let attr = try? FileManager.default.attributesOfItem(atPath: result.outputPath),
                    let size = attr[.size] as? Int64 {
-                    // RAW TAR 必须满足 512 字节对齐
                     guard size % 512 == 0 else {
                         throw ArchiveError.readFailed(code: -506)
                     }

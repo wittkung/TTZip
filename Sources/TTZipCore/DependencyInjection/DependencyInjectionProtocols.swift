@@ -1,43 +1,46 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 【4.5 依赖注入模式 (Dependency Injection Pattern)】服务生命周期枚举
-
-/// 定义服务在依赖容器中的生命周期
+/// Service lifecycle definitions within dependency containers.
 public enum ServiceLifetime: Sendable, Equatable {
-    /// 全局单例：在首次解析时实例化，后续解析复用同一实例
+    /// Global singleton: instantiated upon first resolution and reused across subsequent requests.
     case singleton
-    /// 瞬态：每次解析均通过 Factory 重新创建全新实例
+    /// Transient: instantiated anew via factory upon every resolution.
     case transient
-    /// 作用域隔离：在同一 Scope 作用域中复用同一实例，不同 Scope 隔离开
+    /// Scoped: reused within the same `DependencyContainerScope`, isolated across different scopes.
     case scoped
 }
 
-// MARK: - 依赖注入容器接口协议 (Dependency Container Protocol)
-
-/// 规范依赖注入容器的注册、解析、注销与重置能力
+/// Dependency injection container protocol defining registration, resolution, and reset semantics.
 public protocol DependencyContainerProtocol: AnyObject, Sendable {
-    /// 注册服务工厂
+    /// Registers a service factory.
     func register<Service>(
         _ type: Service.Type,
         lifetime: ServiceLifetime,
         factory: @escaping @Sendable (DependencyContainerProtocol) -> Service
     )
     
-    /// 解析可选服务实例
+    /// Resolves an optional service instance.
     func resolve<Service>(_ type: Service.Type) -> Service?
     
-    /// 解析强类型必选服务
+    /// Resolves a required service instance.
     func resolveRequired<Service>(_ type: Service.Type) -> Service
     
-    /// 注销指定类型的服务
+    /// Unregisters a registered service type.
     func unregister<Service>(_ type: Service.Type)
     
-    /// 清空容器所有注册条目与缓存实例
+    /// Resets container registrations and cached instances.
     func reset()
 }
 
 extension DependencyContainerProtocol {
-    /// 便捷注册默认类型
+    /// Convenience registration helper using default generic type.
     public func register<Service>(
         _ type: Service.Type = Service.self,
         lifetime: ServiceLifetime = .singleton,
@@ -46,12 +49,12 @@ extension DependencyContainerProtocol {
         register(type, lifetime: lifetime, factory: factory)
     }
     
-    /// 便捷解析泛型推导服务
+    /// Convenience resolution helper with inferred return type.
     public func resolve<Service>() -> Service? {
         return resolve(Service.self)
     }
     
-    /// 便捷解析强类型必选泛型推导服务
+    /// Convenience required resolution helper with inferred return type.
     public func resolveRequired<Service>() -> Service {
         return resolveRequired(Service.self)
     }

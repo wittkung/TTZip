@@ -1,48 +1,55 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 统一组合组件协议 (Composite Component Protocol)
+// MARK: - Composite Pattern Component Protocol
 
-/// 组合模式核心接口：统一“单一文件 (Leaf)”与“文件夹容器 (Composite)”的操作接口
+/// Composite Pattern Core Interface: Unifies leaf files and composite directory containers.
 public protocol ArchiveComponentProtocol: Sendable {
-    /// 节点名称 (例如: "document.txt" 或 "Photos")
+    /// Item name (e.g. "document.txt" or "Photos").
     var name: String { get }
     
-    /// 节点相对或绝对路径 (例如: "Photos/document.txt")
+    /// Item relative or absolute filesystem path.
     var path: String { get }
     
-    /// 是否为目录
+    /// Whether this component represents a directory container.
     var isDirectory: Bool { get }
     
-    /// 节点（含其所有子节点）的总字节大小 (Composite 模式透明计算)
+    /// Total aggregate uncompressed byte size of component and all nested children.
     var sizeBytes: Int64 { get }
     
-    /// 获取直接子节点列表 (Leaf 返回空数组，Composite 返回子节点集合)
+    /// Obtains direct child components (empty array for leaf files).
     func getChildren() -> [ArchiveComponentProtocol]
     
-    /// 接受闭包访问者 (Accept Closure Visitor)
+    /// Accepts a closure-based visitor (`ArchiveComponentVisitor`).
     func accept<R>(visitor: ArchiveComponentVisitor<R>) -> R
     
-    /// 接受强类型访问者 (Accept Typed Visitor)
+    /// Accepts a strongly-typed visitor protocol (`ArchiveComponentVisitorProtocol`).
     func accept<V: ArchiveComponentVisitorProtocol>(visitor: V) -> V.Result
 }
 
-// MARK: - 通用默认扩展 (Default Protocol Extensions)
+// MARK: - Default Protocol Extensions
 
 extension ArchiveComponentProtocol {
-    /// 递归计算整棵树中所有的文件 (Leaf) 数量
+    /// Recursively counts all leaf files in the hierarchy.
     public func totalFileCount() -> Int {
         if !isDirectory { return 1 }
         return getChildren().reduce(0) { $0 + $1.totalFileCount() }
     }
     
-    /// 递归计算整棵树中所有的子文件夹 (Composite) 数量 (不含根节点自身)
+    /// Recursively counts all composite directory containers (excluding root itself).
     public func totalDirectoryCount() -> Int {
         if !isDirectory { return 0 }
         let childrenDirs = getChildren().filter { $0.isDirectory }
         return childrenDirs.count + childrenDirs.reduce(0) { $0 + $1.totalDirectoryCount() }
     }
     
-    /// 提取整棵树下所有的叶子节点文件
+    /// Flattens all nested leaf files into a sequential array.
     public func flattenLeaves() -> [ArchiveLeafFile] {
         if let leaf = self as? ArchiveLeafFile {
             return [leaf]
@@ -50,7 +57,7 @@ extension ArchiveComponentProtocol {
         return getChildren().flatMap { $0.flattenLeaves() }
     }
     
-    /// 流式采样提取树下叶子节点扩展名分布（避免超大目录 50,000+ 节点时构建海量数组与 50,000 次 localizedStandardCompare 带来的开销）
+    /// Samples leaf file extensions to detect pre-compressed workloads without sorting huge trees.
     public func sampleLeafExtensions(
         maxSamples: Int = 2000,
         preCompressedSet: Set<String>
@@ -79,7 +86,7 @@ extension ArchiveComponentProtocol {
         return (total, preCompressed)
     }
     
-    /// 递归过滤搜索树节点
+    /// Recursively filters tree nodes matching a given predicate.
     public func search(filter: (ArchiveComponentProtocol) -> Bool) -> [ArchiveComponentProtocol] {
         var results: [ArchiveComponentProtocol] = []
         if filter(self) {
@@ -91,7 +98,7 @@ extension ArchiveComponentProtocol {
         return results
     }
 
-    /// 渲染 Component 树形 ASCII 视图字符串 (用于 CLI 层级展示)
+    /// Renders an ASCII Unicode hierarchical tree representation of this component.
     public func renderTree(prefix: String = "", isLast: Bool = true) -> String {
         var result = ""
         let displayName = name.isEmpty ? "." : name
@@ -114,32 +121,33 @@ extension ArchiveComponentProtocol {
     }
 }
 
-// MARK: - ArchiveComponentProtocol 集合扩展 (Collection Extensions)
+// MARK: - Sequence Collections Extension
 
 extension Sequence where Element == ArchiveComponentProtocol {
-    /// 动态透明计算集合中所有 Component 的字节总和
+    /// Sums total byte size across all components in collection.
     public var totalSizeBytes: Int64 {
         return reduce(0) { $0 + $1.sizeBytes }
     }
     
-    /// 动态计算集合中所有文件 (Leaf) 的总数量
+    /// Counts total leaf files across all components in collection.
     public var totalFileCount: Int {
         return reduce(0) { $0 + $1.totalFileCount() }
     }
     
-    /// 动态计算集合中所有目录 (Composite) 的总数量
+    /// Counts total directories across all components in collection.
     public var totalDirectoryCount: Int {
         return reduce(0) { $0 + $1.totalDirectoryCount() }
     }
     
-    /// 提取集合中所有叶子节点文件
+    /// Flattens all leaves across collection.
     public func flattenLeaves() -> [ArchiveLeafFile] {
         return flatMap { $0.flattenLeaves() }
     }
 }
 
-// MARK: - 叶子节点 (Leaf Node: Single File)
+// MARK: - Leaf Node: Single File
 
+/// Represents a single file entry in the composite tree structure.
 public final class ArchiveLeafFile: ArchiveComponentProtocol, Identifiable, Equatable, @unchecked Sendable {
     public var id: String { path }
     public let name: String
@@ -187,8 +195,9 @@ public final class ArchiveLeafFile: ArchiveComponentProtocol, Identifiable, Equa
     }
 }
 
-// MARK: - 组合容器节点 (Composite Container Node: Directory)
+// MARK: - Composite Container Node: Directory
 
+/// Represents a directory container holding child files and subdirectories.
 public final class ArchiveCompositeDirectory: ArchiveComponentProtocol, Identifiable, Equatable, @unchecked Sendable {
     public var id: String { path }
     public let name: String
@@ -217,21 +226,21 @@ public final class ArchiveCompositeDirectory: ArchiveComponentProtocol, Identifi
         }
     }
     
-    /// Composite 核心：动态透明递归计算所有子节点的总字节大小
+    /// Aggregate byte size computed recursively across all children.
     public var sizeBytes: Int64 {
         lock.lock()
         defer { lock.unlock() }
         return childrenMap.values.reduce(0) { $0 + $1.sizeBytes }
     }
     
-    /// 获取未排序子节点（O(1) 拷贝无 50,000 次 localizedStandardCompare 排序开销，供流式采样与快速遍历使用）
+    /// Obtains unsorted child items in O(1) time (bypasses locale sorting for sampling).
     public func getChildrenUnsorted() -> [ArchiveComponentProtocol] {
         lock.lock()
         defer { lock.unlock() }
         return Array(childrenMap.values)
     }
     
-    /// 获取子节点（并按文件夹优先、名称字母升序排序）
+    /// Obtains child items sorted with directories first and alphabetical name order.
     public func getChildren() -> [ArchiveComponentProtocol] {
         lock.lock()
         let items = Array(childrenMap.values)
@@ -245,38 +254,38 @@ public final class ArchiveCompositeDirectory: ArchiveComponentProtocol, Identifi
         }
     }
     
-    /// 内部非加锁直接添加子节点（仅供树初始化单线程阶段使用）
+    /// Internal direct child insertion without locking (used during single-threaded initialization).
     internal func addDirect(component: ArchiveComponentProtocol) {
         childrenMap[component.name] = component
     }
 
-    /// 内部非加锁直接查找子节点（仅供树初始化单线程阶段使用）
+    /// Internal direct child lookup without locking (used during single-threaded initialization).
     internal func findChildDirect(named name: String) -> ArchiveComponentProtocol? {
         return childrenMap[name]
     }
 
-    /// 动态添加子节点
+    /// Thread-safely adds a child component.
     public func add(component: ArchiveComponentProtocol) {
         lock.lock()
         defer { lock.unlock() }
         childrenMap[component.name] = component
     }
     
-    /// 移除指定名称的子节点
+    /// Thread-safely removes a child component by name.
     public func remove(componentNamed name: String) {
         lock.lock()
         defer { lock.unlock() }
         childrenMap.removeValue(forKey: name)
     }
     
-    /// 清空所有子节点
+    /// Thread-safely clears all child components.
     public func removeAll() {
         lock.lock()
         defer { lock.unlock() }
         childrenMap.removeAll()
     }
     
-    /// 查找直接子节点
+    /// Thread-safely finds a direct child component by name.
     public func findChild(named name: String) -> ArchiveComponentProtocol? {
         lock.lock()
         defer { lock.unlock() }
@@ -296,11 +305,12 @@ public final class ArchiveCompositeDirectory: ArchiveComponentProtocol, Identifi
     }
 }
 
-// MARK: - 组合树构建器 (ArchiveComponentTreeBuilder)
+// MARK: - Tree Builders
 
+/// Factory constructing composite directory trees from flat `ArchiveEntry` sequences or disk paths.
 public final class ArchiveComponentTreeBuilder: @unchecked Sendable {
     
-    /// 从 ArchiveEntry 扁平条目列表构造组合 Component 目录树
+    /// Builds a composite directory tree from flat `ArchiveEntry` items.
     public static func buildTree(from entries: [ArchiveEntry]) -> ArchiveCompositeDirectory {
         let root = ArchiveCompositeDirectory(name: "", path: "")
         
@@ -346,7 +356,7 @@ public final class ArchiveComponentTreeBuilder: @unchecked Sendable {
         return root
     }
     
-    /// 从磁盘路径扫描构造组合 Component 节点（单文件返回 Leaf，目录返回 Composite 树，并支持防死循环符号链接去重）
+    /// Scans a physical disk path and builds a composite component tree with symlink cycle detection.
     public static func buildTree(fromDiskPath path: String, visited: Set<String> = []) -> ArchiveComponentProtocol {
         var visitedSet = visited
         return buildTreeInternal(fromDiskPath: path, visited: &visitedSet)
@@ -388,4 +398,3 @@ public final class ArchiveComponentTreeBuilder: @unchecked Sendable {
         }
     }
 }
-

@@ -1,27 +1,34 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 竞品全维度性能对比测试数据行
+/// Competitor benchmark data row representing single test scenario comparisons.
 public struct CompetitorBenchmarkRow: Sendable, Identifiable, Codable {
     public var id: String { "\(toolName)_\(dimensionName)_\(format.rawValue)_\(level.rawValue)_\(isEncrypted)" }
-    public let toolName: String                   // 竞品工具名称 (如 "Apple ditto", "7-Zip 7zz CLI", "System tar+zstd")
-    public let dimensionName: String              // 数据集名称
-    public let format: ArchiveCompressionFormat   // 归档格式
-    public let level: ArchiveCompressionLevel     // 压缩等级
-    public let isEncrypted: Bool                  // 是否加密
-    public let datasetSizeBytes: Int64            // 原始数据集体积
-    public let archiveSizeBytes: Int64            // 压缩包体积
-    public let compressDurationSeconds: Double    // 竞品打包耗时
-    public let compressThroughputMBs: Double       // 竞品打包吞吐 (MB/s)
-    public let extractDurationSeconds: Double     // 竞品解压耗时
-    public let extractThroughputMBs: Double        // 竞品解压吞吐 (MB/s)
-    public let compressionRatioPercent: Double     // 竞品压缩体积占比 (%)
-    public let ttzipArchiveSizeBytes: Int64       // TTZip 压缩包体积
-    public let ttzipCompressionRatioPercent: Double// TTZip 压缩体积占比 (%)
-    public let ttzipCompressMBs: Double           // 同场景 TTZip 打包吞吐
-    public let ttzipExtractMBs: Double            // 同场景 TTZip 解压吞吐
-    public let compressSpeedupVsCompetitor: Double // TTZip 打包超越倍数 (TTZip MBs / Competitor MBs)
-    public let extractSpeedupVsCompetitor: Double  // TTZip 解压超越倍数 (TTZip MBs / Competitor MBs)
-    public let topAopStage: String                 // AOP 切片瓶颈阶段名称与占比
+    public let toolName: String                   // Competitor tool name (e.g. "Apple ditto", "7-Zip 7zz CLI", "System tar+zstd")
+    public let dimensionName: String              // Dataset name
+    public let format: ArchiveCompressionFormat   // Archive format
+    public let level: ArchiveCompressionLevel     // Compression level
+    public let isEncrypted: Bool                  // Encryption flag
+    public let datasetSizeBytes: Int64            // Original dataset size
+    public let archiveSizeBytes: Int64            // Competitor archive size
+    public let compressDurationSeconds: Double    // Competitor compression duration
+    public let compressThroughputMBs: Double       // Competitor compression throughput (MB/s)
+    public let extractDurationSeconds: Double     // Competitor extraction duration
+    public let extractThroughputMBs: Double        // Competitor extraction throughput (MB/s)
+    public let compressionRatioPercent: Double     // Competitor compression ratio (%)
+    public let ttzipArchiveSizeBytes: Int64       // TTZip archive size
+    public let ttzipCompressionRatioPercent: Double// TTZip compression ratio (%)
+    public let ttzipCompressMBs: Double           // TTZip compression throughput (MB/s)
+    public let ttzipExtractMBs: Double            // TTZip extraction throughput (MB/s)
+    public let compressSpeedupVsCompetitor: Double // TTZip compression speedup multiplier (TTZip MBs / Competitor MBs)
+    public let extractSpeedupVsCompetitor: Double  // TTZip extraction speedup multiplier (TTZip MBs / Competitor MBs)
+    public let topAopStage: String                 // AOP profiling bottleneck stage description
 
     public init(
         toolName: String,
@@ -66,7 +73,7 @@ public struct CompetitorBenchmarkRow: Sendable, Identifiable, Codable {
     }
 }
 
-/// 历史最高实测速度记录结构体 (Peak Performance Matrix Record)
+/// Peak performance historical benchmark matrix record.
 public struct PeakPerformanceRecord: Codable, Sendable {
     public let formatRaw: String
     public let levelRaw: Int
@@ -94,4 +101,3 @@ public struct PeakPerformanceRecord: Codable, Sendable {
         self.lastUpdated = lastUpdated
     }
 }
-

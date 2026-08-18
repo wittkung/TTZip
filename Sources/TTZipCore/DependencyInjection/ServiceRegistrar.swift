@@ -1,14 +1,19 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 全库服务统一注册入口 (TTZipServiceRegistrar)
-
-/// 负责全库 20+ 核心服务、仓储、代理、中介者与并发调度器的引导注册
+/// Unified service registrar configuring core engines, facades, repositories, and handlers.
 public enum TTZipServiceRegistrar {
     
-    /// 统一注册全库所有服务与接口映射
+    /// Registers all standard library services and protocol bindings into the given container.
     public static func registerAllServices(container: DependencyContainerProtocol = DependencyContainer.shared) {
         
-        // MARK: - 1. 外观门面与引擎 (Facades & Engine)
+        // MARK: - 1. Facades & Engines
         container.register(TTZipEngineFacading.self, lifetime: .singleton) { _ in
             TTZipEngineFacade.shared
         }
@@ -19,7 +24,7 @@ public enum TTZipServiceRegistrar {
             ArchiveBatchFacade.shared
         }
         
-        // MARK: - 2. 仓储层 (Repositories)
+        // MARK: - 2. Repositories
         container.register((any ArchivePresetRepositoryProtocol).self, lifetime: .singleton) { _ in
             UserDefaultsPresetRepository()
         }
@@ -36,7 +41,7 @@ public enum TTZipServiceRegistrar {
             JSONFileArchiveHistoryRepository()
         }
         
-        // MARK: - 3. 中介者与观察者中心 (Mediator & Event Center)
+        // MARK: - 3. Mediator & Event Center
         container.register(ArchiveMediatorProtocol.self, lifetime: .singleton) { _ in
             ArchiveAppMediator.shared
         }
@@ -50,7 +55,7 @@ public enum TTZipServiceRegistrar {
             ArchiveEventCenter.shared
         }
         
-        // MARK: - 4. 并发与任务调度器 (Concurrency & Task Dispatcher)
+        // MARK: - 4. Concurrency & Task Dispatcher
         container.register(ArchiveWorkerPool.self, lifetime: .singleton) { _ in
             ArchiveWorkerPool.shared
         }
@@ -58,7 +63,7 @@ public enum TTZipServiceRegistrar {
             ArchiveTaskDispatcher()
         }
         
-        // MARK: - 5. 代理层 (Proxies)
+        // MARK: - 5. Proxies
         container.register(ArchiveInspectionCacheProxy.self, lifetime: .singleton) { _ in
             ArchiveInspectionCacheProxy.shared
         }
@@ -69,12 +74,12 @@ public enum TTZipServiceRegistrar {
             SmartLoggingProxy.shared
         }
         
-        // MARK: - 6. 策略上下文 (Strategy Contexts)
+        // MARK: - 6. Strategy Contexts
         container.register(CharsetDetectionStrategyContext.self, lifetime: .singleton) { _ in
             CharsetDetectionStrategyContext.shared
         }
         
-        // MARK: - 7. 状态机与备忘录管理者 (State Machine & Caretakers)
+        // MARK: - 7. State Machine & Caretakers
         container.register(ArchiveTaskStateMachine.self, lifetime: .transient) { _ in
             ArchiveTaskStateMachine()
         }
@@ -88,7 +93,7 @@ public enum TTZipServiceRegistrar {
             TaskCheckpointCaretaker()
         }
         
-        // MARK: - 8. 基础设施与管理器 (Managers & Security)
+        // MARK: - 8. Managers & Security
         container.register(PresetManager.self, lifetime: .singleton) { _ in
             PresetManager.shared
         }

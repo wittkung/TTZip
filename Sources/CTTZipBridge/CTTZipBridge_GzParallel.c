@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipGzParallel.h"
 #include "include/CTTZipBridge.h"
 #include "include/CTTZipCommon.h"
@@ -49,8 +56,6 @@ struct parallel_gz_ctx {
     bool has_error;
     dispatch_queue_t compress_queue;
 };
-
-
 
 parallel_gz_ctx* init_parallel_gz(const char* path, int level) {
     parallel_gz_ctx *ctx = calloc(1, sizeof(parallel_gz_ctx));
@@ -221,7 +226,6 @@ static void compress_chunk_async(parallel_gz_ctx *ctx, uint64_t seq, uint8_t *un
         pthread_mutex_unlock(&ctx->mutex);
     });
 }
-
 
 static void dispatch_current_buffer(parallel_gz_ctx *ctx) {
     if (ctx->current_len == 0) return;

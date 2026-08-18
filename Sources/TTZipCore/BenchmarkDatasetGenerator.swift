@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import QuartzCore
 
-/// 专业基准测试合成数据集生成器与竞品测试工具
+/// Synthetic benchmark dataset generator and competitor toolchain performance measurement harness.
 public final class BenchmarkDatasetGenerator: @unchecked Sendable {
     public static let shared = BenchmarkDatasetGenerator()
     
@@ -12,6 +19,7 @@ public final class BenchmarkDatasetGenerator: @unchecked Sendable {
         return component.sizeBytes
     }
     
+    /// Generates synthetic dataset files on disk for deterministic benchmarking.
     public func generateSyntheticDataset(at path: String, targetBytes: Int64, profile: BenchmarkDatasetProfile) throws {
         FileManager.default.createFile(atPath: path, contents: nil)
         guard let handle = FileHandle(forWritingAtPath: path) else {
@@ -70,6 +78,7 @@ public final class BenchmarkDatasetGenerator: @unchecked Sendable {
         }
     }
     
+    /// Measures system ditto baseline throughput in MB/s.
     public func measureNativeSystemZipThroughput(samplePath: String, targetMB: Double) -> Double {
         let fm = FileManager.default
         let tempZip = samplePath + ".native_ditto_bench.zip"
@@ -89,11 +98,12 @@ public final class BenchmarkDatasetGenerator: @unchecked Sendable {
                 return max(15.0, measuredSpeed)
             }
         } catch {
-            // 采样异常兜底
+            // Sampling fallback
         }
         return 55.0
     }
     
+    /// Measures actual installed competitor toolchains against target payload.
     public func measureRealCompetitorScores(samplePath: String, targetMB: Double, nativeSpeedMBs: Double) -> [CompetitorRealScore] {
         var scores: [CompetitorRealScore] = []
         let installedTools = CompetitorDetector.detectOnlyInstalledCompetitors()
@@ -134,7 +144,7 @@ public final class BenchmarkDatasetGenerator: @unchecked Sendable {
                     ))
                 }
             } catch {
-                // 命令行执行失败跳过该工具对比
+                // Command line failure fallback
             }
         }
         

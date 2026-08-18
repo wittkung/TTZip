@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
@@ -116,14 +123,12 @@ public enum MalformedStreamFuzzEngine {
 
         switch op {
         case .corruptMagic:
-            // Corrupt file header magic by flipping first 4 bytes (or up to data.count)
             let flipLen = min(4, mutated.count)
             for i in 0..<flipLen {
                 mutated[i] ^= 0xFF
             }
 
         case .truncateStream:
-            // Truncate stream at a deterministic random offset between 10% and 90%
             if mutated.count <= 2 {
                 return Data()
             }
@@ -133,7 +138,6 @@ public enum MalformedStreamFuzzEngine {
             return mutated.prefix(cutPoint)
 
         case .corruptCRC:
-            // Corrupt CRC-32 / checksum field (ZIP local header offset 14..18 or middle bytes)
             if mutated.count >= 18 {
                 for i in 14..<18 {
                     mutated[i] ^= 0xFF
@@ -147,42 +151,33 @@ public enum MalformedStreamFuzzEngine {
             }
 
         case .bitFlip:
-            // Flip a single random bit within the stream
             let byteIndex = Int.random(in: 0..<mutated.count, using: &prng)
             let bitPosition = Int.random(in: 0..<8, using: &prng)
             mutated[byteIndex] ^= (1 << bitPosition)
 
         case .byteReplace:
-            // Replace a random byte with 0x00 or 0xFF
             let byteIndex = Int.random(in: 0..<mutated.count, using: &prng)
             let replacement: UInt8 = (prng.next() % 2 == 0) ? 0x00 : 0xFF
             mutated[byteIndex] = replacement
 
         case .injectZipSlipPath:
-            // Injects malicious directory traversal string into entry filename headers
             let evilPath = "../../../../../../etc/passwd\0"
             let evilBytes = Array(evilPath.utf8)
 
-            // Search for standard ZIP local header signature 0x04034B50 ("PK\x03\x04")
             let pkHeader: [UInt8] = [0x50, 0x4B, 0x03, 0x04]
             if let headerOffset = findSignature(in: mutated, signature: pkHeader),
                headerOffset + 30 <= mutated.count {
-                // Offset 26..27: filename length (UInt16 LE)
                 let nameLenOffset = headerOffset + 26
                 let nameLen = Int(mutated[nameLenOffset]) | (Int(mutated[nameLenOffset + 1]) << 8)
                 
                 var newBuffer = Data()
                 newBuffer.append(mutated.prefix(headerOffset + 26))
                 
-                // Write new evil path length
                 let newLen = UInt16(evilBytes.count)
                 newBuffer.append(UInt8(newLen & 0xFF))
                 newBuffer.append(UInt8((newLen >> 8) & 0xFF))
                 
-                // Keep extra field length (offsets 28..29)
                 newBuffer.append(mutated[(headerOffset + 28)..<(headerOffset + 30)])
-                
-                // Replace filename with evil path
                 newBuffer.append(contentsOf: evilBytes)
                 
                 let remainingOffset = headerOffset + 30 + nameLen
@@ -191,7 +186,6 @@ public enum MalformedStreamFuzzEngine {
                 }
                 return newBuffer
             } else {
-                // For non-ZIP formats (e.g. TAR 512-byte header with name at offset 0), overwrite header name field
                 let overwriteLen = min(evilBytes.count, mutated.count)
                 for i in 0..<overwriteLen {
                     mutated[i] = evilBytes[i]
@@ -199,17 +193,13 @@ public enum MalformedStreamFuzzEngine {
             }
 
         case .oversizeHeader:
-            // Inject 0xFFFFFFFF into length fields
             let pkHeader: [UInt8] = [0x50, 0x4B, 0x03, 0x04]
             if let headerOffset = findSignature(in: mutated, signature: pkHeader),
                headerOffset + 26 <= mutated.count {
-                // Offset 18..21: Compressed size -> 0xFFFFFFFF
-                // Offset 22..25: Uncompressed size -> 0xFFFFFFFF
                 for i in 18..<26 {
                     mutated[headerOffset + i] = 0xFF
                 }
             } else if mutated.count >= 512 {
-                // TAR format: offset 124..135 is octal size field -> write max octal "77777777777\0"
                 let octalMax = Array("77777777777\0".utf8)
                 for i in 0..<min(octalMax.count, 12) {
                     mutated[124 + i] = octalMax[i]
@@ -222,7 +212,6 @@ public enum MalformedStreamFuzzEngine {
             }
 
         case .invalidDictSize:
-            // Corrupt compression dictionary size / property byte with 0xFF
             let sevenZipHeader: [UInt8] = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C]
             let xzHeader: [UInt8] = [0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00]
             let zstdHeader: [UInt8] = [0x28, 0xB5, 0x2F, 0xFD]

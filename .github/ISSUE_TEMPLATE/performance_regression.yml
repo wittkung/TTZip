@@ -1,0 +1,141 @@
+name: "Performance Regression"
+description: "Report a measurable throughput drop, latency increase, or benchmark gate regression in TTZip"
+title: "[Perf]: "
+labels: ["performance", "regression", "triage"]
+body:
+  - type: markdown
+    attributes:
+      label: "Performance Invariant Guidelines"
+      value: |
+        TTZip enforces strict historical peak throughput floors across all 16 supported formats.
+        Any drop exceeding 3.0% against historical peak baselines constitutes a regression.
+        Please provide reproducible benchmark numbers and system specifications below.
+
+  - type: dropdown
+    id: affected-format
+    attributes:
+      label: "Affected Archive Format or Subsystem"
+      description: "Select the specific archive format or subsystem exhibiting performance regression."
+      options:
+        - "ZIP (.zip)"
+        - "7Z (.7z - LZMA2 / Fast LZMA2 / Store)"
+        - "TAR (.tar - POSIX ustar / pax)"
+        - "TAR.ZST (.tar.zst - Zstandard Level 1-19)"
+        - "TAR.GZ (.tar.gz - Libdeflate / Zlib-NG)"
+        - "TAR.BZ2 (.tar.bz2 - Bzip2)"
+        - "TAR.XZ (.tar.xz - Multi-threaded Liblzma)"
+        - "LZIP (.lzip - Lzlib)"
+        - "LZ4 (.lz4 - In-memory / Framing)"
+        - "BROTLI (.br / .tar.br)"
+        - "LRZIP (.lrz - Long Range ZIP)"
+        - "AAR (.aar - Apple Archive)"
+        - "SNAPPY (.sz - Snappy Framing)"
+        - "WIM (.wim - Windows Imaging Format)"
+        - "DMG (.dmg - HFS+ / APFS Disk Image)"
+        - "ISO (.iso - ISO-9660 Joliet / RockRidge)"
+        - "Frontend UI (NSOutlineView / 50k-node tree loading)"
+        - "CLI Streaming Pipeline (ttzip-cli pipe stdin/stdout)"
+        - "Crypto Subsystem (AES-256 SIMD / Key Derivation)"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operation-mode
+    attributes:
+      label: "Operation Mode & Compression Level"
+      description: "Select the operation mode and compression intensity."
+      options:
+        - "Compression - Level 1 (Fast / Realtime)"
+        - "Compression - Level 5/6 (Balanced / Default)"
+        - "Compression - Level 9 (Ultra / Maximum)"
+        - "Decompression / Extraction (Direct I/O)"
+        - "Decompression / Extraction (In-Memory Fast-Path)"
+        - "Directory Tree Build (10,000+ nodes)"
+        - "Directory Search & Filtering (20,000+ items)"
+        - "LRU Cache Access Throughput"
+        - "SIMD AES-256 Block Decryption"
+        - "Other"
+    validations:
+      required: true
+
+  - type: input
+    id: hardware-profile
+    attributes:
+      label: "System Hardware Profile"
+      description: "Specify your Mac processor, core count, memory capacity, and storage type."
+      placeholder: "e.g. Apple M3 Max (16-core CPU, 64GB Unified RAM, APFS Internal SSD)"
+    validations:
+      required: true
+
+  - type: input
+    id: baseline-measurement
+    attributes:
+      label: "Baseline Commit & Throughput (MB/s)"
+      description: "State the reference git commit SHA and its measured baseline throughput."
+      placeholder: "e.g. Commit 604d44d: 8,381.5 MB/s"
+    validations:
+      required: true
+
+  - type: input
+    id: regressed-measurement
+    attributes:
+      label: "Observed Regressed Commit & Throughput (MB/s and Delta %)"
+      description: "State the regressed git commit SHA, measured throughput, and percentage drop."
+      placeholder: "e.g. Commit abc1234: 6,200.0 MB/s (Delta: -26.0%)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: test-corpus
+    attributes:
+      label: "Test Corpus & Benchmark Profile"
+      description: "Select the test dataset used during the benchmark measurement."
+      options:
+        - "Silesia Compression Corpus (211.9 MB multi-type)"
+        - "enwik8 / enwik9 (Wikipedia text corpus)"
+        - "10MB In-Memory Uniform Synthetic Buffer"
+        - "50MB Direct I/O Single File"
+        - "500 Small Files Batch Corpus (10MB total)"
+        - "50,000 Nodes Hierarchical Directory Tree"
+        - "Custom User Corpus (details in command output)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-command
+    attributes:
+      label: "Reproduction Command"
+      description: "Provide the exact command used to measure the regression."
+      render: "shell"
+      placeholder: |
+        swift run ttzip-cli bench -f zip -i 10
+        # or
+        swift test --filter XCTestPerformanceMeasureTests
+    validations:
+      required: true
+
+  - type: textarea
+    id: benchmark-output
+    attributes:
+      label: "Benchmark Output & Metrics Log"
+      description: "Paste complete console output from the benchmark run."
+      render: "shell"
+      placeholder: "Paste console benchmark table or XCTest measurement summary here..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: measurement-assertions
+    attributes:
+      label: "Measurement Assertions & Environment Gate"
+      description: "Confirm the following rigor checks were applied during benchmarking."
+      options:
+        - label: "Benchmark was executed in Release mode (-c release / -O3) or via standard XCTest harness."
+          required: true
+        - label: "Measurements were repeated across at least 5 consecutive runs with stable standard deviation (< 2%)."
+          required: true
+        - label: "Target Mac was operating under normal thermal conditions with no heavy background process contention."
+          required: true
+        - label: "Throughput drop was cross-referenced with the Historical Peak Floor Matrix in GEMINI.md (§IV.3.1)."
+          required: true

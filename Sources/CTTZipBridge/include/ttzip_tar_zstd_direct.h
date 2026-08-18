@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_tar_zstd_direct.h
+ * @brief 100% in-process native Direct mmap TAR.ZST compressor and streaming extractor.
+ */
+
 #ifndef TTZIP_TAR_ZSTD_DIRECT_H
 #define TTZIP_TAR_ZSTD_DIRECT_H
 
@@ -8,8 +20,6 @@
 extern "C" {
 #endif
 
-// 100% In-Process Native Direct mmap TAR.ZST 压缩写入器
-// 彻底绕过 libarchive，直接以零拷贝方式向 ZSTD_compressStream2 注入 mmap 数据
 int ttzip_create_tar_zstd_direct_c(
     const char* output_path,
     const char* const* input_paths,
@@ -18,7 +28,6 @@ int ttzip_create_tar_zstd_direct_c(
     bool skip_mac_junk
 );
 
-// 100% In-Process Native Direct TAR.ZST 极速流式解压器
 int ttzip_extract_tar_zstd_direct_c(
     const char* archive_path,
     const char* dest_dir,

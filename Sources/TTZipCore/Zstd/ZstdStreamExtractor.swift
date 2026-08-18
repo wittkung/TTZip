@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 独立专有的 全核硬件感知 Zstandard (.zst) 极速解压与校验器
+/// High-throughput streaming decompressor for Zstandard (.zst) format.
 public final class ZstdStreamExtractor: @unchecked Sendable {
     public static let shared = ZstdStreamExtractor()
     
     private init() {}
     
-    /// 执行 Zstandard (.zst) 物理解压
+    /// Decompresses a Zstandard archive container from source path to destination path.
     public func decompress(
         srcPath: String,
         dstPath: String,
@@ -45,7 +52,7 @@ public final class ZstdStreamExtractor: @unchecked Sendable {
             ))
             return true
         } else {
-            TTLogger.error("❌ TTZip C API returned error code: \(result)")
+            TTLogger.error("Zstandard C decompression error code: \(result)")
         }
         
         return false

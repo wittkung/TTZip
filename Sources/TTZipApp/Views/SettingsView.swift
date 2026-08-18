@@ -56,7 +56,6 @@ public struct SettingsView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Top Tab Switcher
             HStack(spacing: 4) {
                 ForEach(SettingsTab.allCases) { tab in
                     Button(action: { selectedTab = tab }) {
@@ -104,8 +103,6 @@ public struct SettingsView: View {
         }
     }
     
-    // MARK: - 1. General Section
-    
     @ViewBuilder
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: TTZipTheme.Spacing.md) {
@@ -132,8 +129,6 @@ public struct SettingsView: View {
             .toggleStyle(.switch)
         }
     }
-    
-    // MARK: - 2. Localization Section
     
     @ViewBuilder
     private var localizationSection: some View {
@@ -168,8 +163,6 @@ public struct SettingsView: View {
             }
         }
     }
-    
-    // MARK: - 3. Presets Section
     
     @ViewBuilder
     private var presetsSection: some View {
@@ -210,8 +203,6 @@ public struct SettingsView: View {
         }
     }
     
-    // MARK: - 4. Vault Section
-    
     @ViewBuilder
     private var vaultSection: some View {
         VStack(alignment: .leading, spacing: TTZipTheme.Spacing.md) {
@@ -234,8 +225,6 @@ public struct SettingsView: View {
             .foregroundStyle(.secondary)
         }
     }
-    
-    // MARK: - 5. License & Hardware Section
     
     @ViewBuilder
     private var licenseAndHardwareSection: some View {

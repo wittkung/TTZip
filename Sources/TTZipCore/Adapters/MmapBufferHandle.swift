@@ -1,31 +1,47 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 基于 ARC / RAII 的只读虚拟内存映射句柄 (Swift 6 严格 Sendable 零拷贝)
+/// ARC / RAII-managed read-only virtual memory mapping handle.
+///
+/// Implements zero-copy kernel page mapping (`mmap`) with Swift 6 strict concurrency
+/// (`Sendable`), deterministic unmapping in `deinit`, and OS page cache prefetching (`madvise`).
 public final class MmapBufferHandle: @unchecked Sendable {
     
-    /// 底层只读内存基地址
+    /// Base address of mapped read-only memory region.
     public let baseAddress: UnsafeRawPointer
     
-    /// 映射区域总字节大小
+    /// Total mapped byte size.
     public let count: Int
     
-    /// 底层文件描述符 (若持有 ownership 则在 deinit 中由 RAII 关闭)
+    /// Underlying file descriptor.
     public let fileDescriptor: Int32
+    
+    /// Whether this handle owns and should close the file descriptor on deinitialization.
     public let ownsFileDescriptor: Bool
     
-    /// 快速获取强类型连续字节只读缓冲区 (零堆分配)
+    /// Zero-copy strongly-typed continuous byte buffer.
     @inline(__always)
     public var bytes: UnsafeBufferPointer<UInt8> {
         UnsafeBufferPointer(start: baseAddress.assumingMemoryBound(to: UInt8.self), count: count)
     }
     
-    /// 快速获取原始字节只读缓冲区
+    /// Raw un-typed byte buffer view.
     @inline(__always)
     public var rawBuffer: UnsafeRawBufferPointer {
         UnsafeRawBufferPointer(start: baseAddress, count: count)
     }
     
-    /// 安全子区域视图提取 (带边界防御，零拷贝返回指针)
+    /// Extracts a bounds-checked zero-copy slice of mapped memory.
+    /// - Parameters:
+    ///   - offset: Starting byte offset.
+    ///   - length: Sliced byte count.
+    /// - Returns: Pointer buffer view, or `nil` if bounds are exceeded.
     @inline(__always)
     public func slice(offset: Int, length: Int) -> UnsafeBufferPointer<UInt8>? {
         guard offset >= 0, length >= 0, offset + length <= count else { return nil }
@@ -33,7 +49,8 @@ public final class MmapBufferHandle: @unchecked Sendable {
         return UnsafeBufferPointer(start: base.advanced(by: offset), count: length)
     }
 
-    /// 硬件级页缓存建议 (madvise)
+    /// Advises kernel on expected memory access patterns (`posix_madvise`).
+    /// - Parameter advice: POSIX memory advice flag (e.g. `POSIX_MADV_SEQUENTIAL`).
     @inline(__always)
     public func advise(_ advice: Int32) {
         if count > 0 {
@@ -41,7 +58,12 @@ public final class MmapBufferHandle: @unchecked Sendable {
         }
     }
 
-    /// 工厂方法：打开并以只读方式映射文件路径
+    /// Maps a filesystem path into virtual memory as a read-only buffer.
+    /// - Parameters:
+    ///   - path: Absolute or relative filesystem path.
+    ///   - advice: Kernel page access advice.
+    /// - Returns: RAII-managed `MmapBufferHandle`.
+    /// - Throws: `POSIXError` on open, stat, or mmap failure.
     public static func mapReadOnly(
         path: String,
         advice: Int32 = POSIX_MADV_SEQUENTIAL
@@ -84,7 +106,14 @@ public final class MmapBufferHandle: @unchecked Sendable {
         return handle
     }
 
-    /// 工厂方法：基于已有文件描述符映射只读区域
+    /// Maps an existing open file descriptor into virtual memory.
+    /// - Parameters:
+    ///   - fd: Open file descriptor.
+    ///   - size: Byte size to map.
+    ///   - advice: Kernel page access advice.
+    ///   - ownsFileDescriptor: Whether this handle should close the fd upon deinit.
+    /// - Returns: RAII-managed `MmapBufferHandle`.
+    /// - Throws: `POSIXError` on mmap failure.
     public static func mapReadOnly(
         fd: Int32,
         size: Int,
@@ -120,7 +149,7 @@ public final class MmapBufferHandle: @unchecked Sendable {
         self.ownsFileDescriptor = ownsFileDescriptor
     }
     
-    /// RAII 确定性物理内存解映射与句柄释放
+    /// Deterministic memory unmapping and descriptor closure.
     deinit {
         if count > 0 {
             munmap(UnsafeMutableRawPointer(mutating: baseAddress), count)

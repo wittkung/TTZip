@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 1. IdleState (初始空闲准备状态)
+// MARK: - 1. IdleState (Initial idle preparation state)
 public struct IdleState: ArchiveTaskStateProtocol {
     public let stateName = "Idle"
     public let canPause = false
@@ -32,7 +39,7 @@ public struct IdleState: ArchiveTaskStateProtocol {
     }
 }
 
-// MARK: - 2. PreparingState (前置校验与资源分配状态)
+// MARK: - 2. PreparingState (Validation and resource allocation state)
 public struct PreparingState: ArchiveTaskStateProtocol {
     public let stateName = "Preparing"
     public let canPause = false
@@ -54,7 +61,7 @@ public struct PreparingState: ArchiveTaskStateProtocol {
             throw ArchiveError.invalidState
         }
         context.cleanupTempFiles()
-        let cancelError = CommandError.executionFailed(reason: "任务在准备阶段被取消")
+        let cancelError = CommandError.executionFailed(reason: "Task cancelled in preparation stage.")
         context.setLastError(cancelError)
         context.transitionTo(FailedState(error: cancelError))
     }
@@ -70,7 +77,7 @@ public struct PreparingState: ArchiveTaskStateProtocol {
     }
 }
 
-// MARK: - 3. RunningState (流式压缩/解压运行中状态)
+// MARK: - 3. RunningState (Streaming compression/decompression active state)
 public struct RunningState: ArchiveTaskStateProtocol {
     public let stateName = "Running"
     public let canPause = true
@@ -95,7 +102,7 @@ public struct RunningState: ArchiveTaskStateProtocol {
             throw ArchiveError.invalidState
         }
         context.cleanupTempFiles()
-        let cancelError = CommandError.executionFailed(reason: "任务运行中被取消")
+        let cancelError = CommandError.executionFailed(reason: "Task cancelled while running.")
         context.setLastError(cancelError)
         context.transitionTo(FailedState(error: cancelError))
     }
@@ -112,7 +119,7 @@ public struct RunningState: ArchiveTaskStateProtocol {
     }
 }
 
-// MARK: - 4. PausedState (暂停挂起状态: 冻结 I/O 流，保存 Checkpoint 断点)
+// MARK: - 4. PausedState (Paused and suspended state)
 public struct PausedState: ArchiveTaskStateProtocol {
     public let stateName = "Paused"
     public let canPause = false
@@ -126,7 +133,6 @@ public struct PausedState: ArchiveTaskStateProtocol {
     }
     
     public func resume(context: ArchiveTaskContext) throws {
-        // 从 context.checkpointOffset 恢复运行
         context.updateProgress(processedBytes: context.checkpointOffset)
         guard context.transitionTo(RunningState()) else {
             throw ArchiveError.invalidState
@@ -138,7 +144,7 @@ public struct PausedState: ArchiveTaskStateProtocol {
             throw ArchiveError.invalidState
         }
         context.cleanupTempFiles()
-        let cancelError = CommandError.executionFailed(reason: "暂停状态下的任务被取消")
+        let cancelError = CommandError.executionFailed(reason: "Task cancelled while paused.")
         context.setLastError(cancelError)
         context.transitionTo(FailedState(error: cancelError))
     }
@@ -154,7 +160,7 @@ public struct PausedState: ArchiveTaskStateProtocol {
     }
 }
 
-// MARK: - 5. CancellingState (正在取消善后状态: 终止 Task/子进程，彻底清除半成品)
+// MARK: - 5. CancellingState (Cancelling and cleanup in progress state)
 public struct CancellingState: ArchiveTaskStateProtocol {
     public let stateName = "Cancelling"
     public let canPause = false
@@ -186,7 +192,7 @@ public struct CancellingState: ArchiveTaskStateProtocol {
     }
 }
 
-// MARK: - 6. CompletedState (终态成功完成)
+// MARK: - 6. CompletedState (Terminal successful completion state)
 public struct CompletedState: ArchiveTaskStateProtocol {
     public let stateName = "Completed"
     public let canPause = false
@@ -216,7 +222,7 @@ public struct CompletedState: ArchiveTaskStateProtocol {
     }
 }
 
-// MARK: - 7. FailedState (终态失败: 记录异常信息)
+// MARK: - 7. FailedState (Terminal failure state)
 public struct FailedState: ArchiveTaskStateProtocol {
     public let stateName = "Failed"
     public let canPause = false

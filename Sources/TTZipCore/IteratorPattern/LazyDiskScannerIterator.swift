@@ -1,7 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 磁盘延迟流式迭代器 (Lazy Disk Scanner Iterator)
-/// 封装 `FileManager.DirectoryEnumerator`，实现无需全量载入内存的流式文件扫描与谓词拦截
+/// Streaming lazy disk scanner iterator encapsulating `FileManager.DirectoryEnumerator` for zero upfront memory overhead.
 public final class LazyDiskScannerIterator: ArchiveIteratorProtocol, @unchecked Sendable {
     public typealias Element = ArchiveEntry
     
@@ -57,7 +63,7 @@ public final class LazyDiskScannerIterator: ArchiveIteratorProtocol, @unchecked 
         lock.unlock()
     }
     
-    /// 显式关闭并释放底层 DirectoryEnumerator 资源句柄 (供 for-in 循环中途 break 提前中断时手动销毁句柄)
+    /// Explicitly closes the underlying directory enumerator handle.
     public func close() {
         lock.lock()
         defer { lock.unlock() }
@@ -106,7 +112,6 @@ public final class LazyDiskScannerIterator: ArchiveIteratorProtocol, @unchecked 
             return entry
         }
         
-        // 自然迭代结束：立刻彻底释放 DirectoryEnumerator 句柄与描述符
         self.enumerator = nil
         return nil
     }
@@ -181,4 +186,3 @@ public final class LazyDiskScannerIterator: ArchiveIteratorProtocol, @unchecked 
         return skipped
     }
 }
-

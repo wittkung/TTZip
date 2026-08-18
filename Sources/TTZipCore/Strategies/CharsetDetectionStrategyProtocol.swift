@@ -1,18 +1,25 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 【3.1 策略模式 - 自主寻猎扩展】字符集编码识别与乱码修复策略接口
+/// Character set detection and encoding normalization strategy interface (Strategy Pattern).
 public protocol CharsetDetectionStrategyProtocol: Sendable {
     var charsetStrategyName: String { get }
     func canHandle(bytes: Data) -> Bool
     func sanitize(bytes: Data) -> String?
 }
 
-// MARK: - 具体字符集策略实现 (Concrete Charset Strategies)
+// MARK: - Concrete Charset Strategies
 
-/// 1. SIMD ASCII 极速直通策略 (`ASCIIFastPathCharsetStrategy`)
+/// 1. SIMD ASCII fast-path detection strategy (`ASCIIFastPathCharsetStrategy`).
 public final class ASCIIFastPathCharsetStrategy: CharsetDetectionStrategyProtocol {
-    public let charsetStrategyName: String = "ASCII SIMD 极速直通策略"
+    public let charsetStrategyName: String = "ASCII SIMD Fast-Path Strategy"
     
     public init() {}
     
@@ -27,9 +34,9 @@ public final class ASCIIFastPathCharsetStrategy: CharsetDetectionStrategyProtoco
     }
 }
 
-/// 2. 标准 UTF-8 编码修复策略 (`UTF8CharsetStrategy`)
+/// 2. UTF-8 standard decoding strategy (`UTF8CharsetStrategy`).
 public final class UTF8CharsetStrategy: CharsetDetectionStrategyProtocol {
-    public let charsetStrategyName: String = "UTF-8 标准解码策略"
+    public let charsetStrategyName: String = "UTF-8 Standard Strategy"
     
     public init() {}
     
@@ -45,14 +52,14 @@ public final class UTF8CharsetStrategy: CharsetDetectionStrategyProtocol {
     }
 }
 
-/// 3. 东亚 CJK (GB18030 / BIG5 / Shift-JIS) 历史遗留编码转换策略 (`CJKLegacyCharsetStrategy`)
+/// 3. CJK legacy encoding conversion strategy (`CJKLegacyCharsetStrategy`).
 public final class CJKLegacyCharsetStrategy: CharsetDetectionStrategyProtocol {
-    public let charsetStrategyName: String = "CJK (GB18030/BIG5/Shift-JIS) 历史编码转换策略"
+    public let charsetStrategyName: String = "CJK (GB18030/BIG5/Shift-JIS) Legacy Conversion Strategy"
     
     public init() {}
     
     public func canHandle(bytes: Data) -> Bool {
-        return true // 作为兜底逻辑
+        return true
     }
     
     public func sanitize(bytes: Data) -> String? {
@@ -153,4 +160,3 @@ public final class CharsetDetectionStrategyContext: @unchecked Sendable {
         sanitizeCache.removeAll()
     }
 }
-

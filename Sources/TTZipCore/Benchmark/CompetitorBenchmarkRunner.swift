@@ -1,12 +1,19 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import QuartzCore
 import CTTZipBridge
 
-/// 竞品基准压测对比引擎 (复用物理测试矩阵，全开竞品性能参数进行横向 PK)
+/// Competitor benchmark matrix execution engine comparing TTZip against all installed third-party utilities.
 public final class CompetitorBenchmarkRunner: @unchecked Sendable {
     public init() {}
 
-    /// 执行全矩阵竞品性能对比压测（针对每一项场景，跑分 TTZip 并并行拉出所有竞品进行全量横向 PK）
+    /// Executes full matrix competitor benchmark comparison across formats and levels.
     public static func runCompetitorMatrix(
         selectedFormats: [ArchiveCompressionFormat]? = nil,
         selectedLevels: [ArchiveCompressionLevel]? = nil,
@@ -43,7 +50,7 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
 
         let loadedFilter: TargetedBenchmarkFilter? = filterConfigPath != nil ? TargetedBenchmarkFilter.load(from: filterConfigPath!) : nil
         if loadedFilter != nil {
-            progressHandler?("🎯 [已激活针对性测试筛选器] 已从配置文件过滤出特定追平/落后测试场景...")
+            progressHandler?("🎯 [Targeted Benchmark Filter Active] Loaded scenario filter from config...")
         }
 
         var itemsToRun: [(payload: (name: String, path: String, bytes: Int64), fmt: ArchiveCompressionFormat, lvl: ArchiveCompressionLevel, isEnc: Bool)] = []
@@ -56,7 +63,7 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
                     let encOpts: [Bool] = (supportsEncryption && payload.bytes < 1024 * 1024 * 1024) ? [false, true] : [false]
                     for isEnc in encOpts {
                         rawIdx += 1
-                        let encStr = isEnc ? "AES-256" : "无"
+                        let encStr = isEnc ? "AES-256" : "None"
                         let fmtStr = fmt.rawValue.uppercased()
                         if let filter = loadedFilter {
                             if filter.matches(pkIdx: rawIdx, payload: payload.name, format: fmtStr, level: lvl.rawValue, encryption: encStr) {
@@ -71,7 +78,7 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
         }
 
         let totalItems = itemsToRun.count
-        progressHandler?("⚔️ [全竞品多核 PK 启动] 共计 \(totalItems) 项组合场景，针对每一项：跑出 TTZip 与所有已安装竞品软件速度，即刻打出对比表格...")
+        progressHandler?("⚔️ [Multi-Core Competitor Matrix Started] \(totalItems) scenarios scheduled for benchmark comparison...")
 
         var allReportRows: [CompetitorBenchmarkRow] = []
         var stepCount = 0
@@ -85,7 +92,7 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
             let passwordStr = isEnc ? "P@ssw0rd2026!" : nil
 
             let payloadMB = String(format: "%.0f", Double(payload.bytes) / (1024.0 * 1024.0))
-            progressHandler?("📌 [场景 \(stepCount)/\(totalItems)] 开始: \(payload.name) | \(fmt.rawValue.uppercased()) | L\(lvl.rawValue) | 加密: \(isEnc ? "AES-256" : "无") | \(payloadMB) MB")
+            progressHandler?("📌 [Scenario \(stepCount)/\(totalItems)] \(payload.name) | \(fmt.rawValue.uppercased()) | L\(lvl.rawValue) | Encryption: \(isEnc ? "AES-256" : "None") | \(payloadMB) MB")
 
             let ttArcPath = cacheDir.appendingPathComponent("tt_archive_\(UUID().uuidString).\(fmt.rawValue)").path
             let ttExtractDestPath = cacheDir.appendingPathComponent("tt_out_\(UUID().uuidString)").path
@@ -116,7 +123,7 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
                 let runArcPath = cacheDir.appendingPathComponent("tt_run_\(UUID().uuidString).\(fmt.rawValue)").path
                 defer { try? FileManager.default.removeItem(atPath: runArcPath) }
                 
-                progressHandler?("   ⏳ TTZip 打包中 (Pass \(pass + 1)/\(passCount))...")
+                progressHandler?("   ⏳ TTZip compressing (Pass \(pass + 1)/\(passCount))...")
                 AppleSiliconTuner.shared.boostCurrentThreadPriority()
                 ttzip_slice_reset()
                 let tt0 = CACurrentMediaTime()
@@ -141,9 +148,9 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
                     }
                     bestCompDur = min(bestCompDur, max(1e-6, tt1 - tt0))
                     let compMBs = (Double(payload.bytes) / (1024.0 * 1024.0)) / max(1e-6, tt1 - tt0)
-                    progressHandler?("   ✅ TTZip 打包完成: \(String(format: "%.1f", compMBs)) MB/s (\(String(format: "%.3f", tt1 - tt0))s)")
+                    progressHandler?("   ✅ TTZip compression complete: \(String(format: "%.1f", compMBs)) MB/s (\(String(format: "%.3f", tt1 - tt0))s)")
                 } catch {
-                    TTLogger.error("\n❌ [TTZip 打包失败]: failed with error: \(error)")
+                    TTLogger.error("\n❌ [TTZip compression failed]: \(error)")
                     if stopOnLagOrError { exit(1) }
                 }
 
@@ -153,7 +160,7 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
                     let passExtractDir = (ttExtractDestPath as NSString).appendingPathComponent("pass_\(pass)")
                     try? FileManager.default.removeItem(atPath: passExtractDir)
                     try? FileManager.default.createDirectory(atPath: passExtractDir, withIntermediateDirectories: true)
-                    progressHandler?("   ⏳ TTZip 解压中...")
+                    progressHandler?("   ⏳ TTZip extracting...")
                     AppleSiliconTuner.shared.boostCurrentThreadPriority()
                     let tt2 = CACurrentMediaTime()
                     do {
@@ -174,7 +181,7 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
                             validExtractDir = passExtractDir
                         }
                     } catch {
-                        TTLogger.warning("⚠️ [CompetitorBenchmarkRunner extractSync Error]: \(error)")
+                        TTLogger.warning("⚠️ [CompetitorBenchmarkRunner extractSync Warning]: \(error)")
                     }
                 }
             }
@@ -187,9 +194,9 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
             )
             if !result.isValid {
                 let files = (try? FileManager.default.contentsOfDirectory(atPath: validExtractDir)) ?? []
-                TTLogger.error("❌ [TTZip 解压失败]: dir \(validExtractDir) contains \(files). ARC PATH: \(ttArcPath)")
+                TTLogger.error("❌ [TTZip extraction failed]: directory \(validExtractDir) contains \(files). Archive path: \(ttArcPath)")
                 if stopOnLagOrError {
-                    TTLogger.error("\n❌ [单项对比中断 / TTZip 解压核验未通过] TTZip 在场景 [\(payload.name) | 级别: L\(lvl.rawValue)] 下解压产物核验失败！按协议立即强行中止压测！\n")
+                    TTLogger.error("\n❌ [Aborted / Verification Failed] TTZip verification failed for scenario [\(payload.name) | Level: L\(lvl.rawValue)]. Stopping.\n")
                     exit(1)
                 }
             }
@@ -234,7 +241,7 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
             let ttRatio        = payload.bytes > 0 ? (Double(ttArcSize) / Double(payload.bytes)) * 100.0 : 100.0
             let ttSizeStr      = String(format: "%.2f MB (%.1f%%)", ttSizeMb, ttRatio).padding(toLength: 22, withPad: " ", startingAt: 0)
             let ttTimeStr      = String(format: "%.3fs / %.3fs", ttCompDur, ttExtractDur).padding(toLength: 19, withPad: " ", startingAt: 0)
-            let ttMultStr      = "基准 (1.0x)".padding(toLength: 22, withPad: " ", startingAt: 0)
+            let ttMultStr      = "Baseline (1.0x)".padding(toLength: 22, withPad: " ", startingAt: 0)
 
             let fullTable = CompetitorReportWriter.formatPKTable(
                 stepCount: stepCount,
@@ -255,7 +262,6 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
 
             progressHandler?("ROW_PK:\n" + fullTable)
 
-            // 及时清理本项测试产生的中间包与解压临时目录，杜绝磁盘脏页堆积与 IO 节流
             for pass in 0..<passCount {
                 let passExtractDir = (ttExtractDestPath as NSString).appendingPathComponent("pass_\(pass)")
                 try? FileManager.default.removeItem(atPath: passExtractDir)

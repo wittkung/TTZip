@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
 extension CompetitorBenchmarkRunner {
@@ -16,10 +23,11 @@ extension CompetitorBenchmarkRunner {
         if megabytes >= 1024 {
             let giga = megabytes / 1024
             hugeSizeStr = "\(giga)g"
-            hugeSizeName = "\(giga)GB 巨型物理文件 (\(giga)GB)"
+            hugeSizeName = "\(giga)GB Huge Payload (\(giga)GB)"
         } else {
-            hugeSizeStr = "\(megabytes)m"
-            hugeSizeName = "\(megabytes)MB 大文件数据块 (\(megabytes)MB)"
+            let hugeMb = megabytes
+            hugeSizeStr = "\(hugeMb)m"
+            hugeSizeName = "\(hugeMb)MB Large Dataset (\(hugeMb)MB)"
         }
 
         let isDatasetCached = FileManager.default.fileExists(atPath: dim1Dir.path) &&
@@ -29,7 +37,7 @@ extension CompetitorBenchmarkRunner {
                               (try? FileManager.default.attributesOfItem(atPath: dim4HugeFile.path)[.size] as? Int64) == hugeSizeBytes
 
         if !isDatasetCached && (customFilePaths == nil || customFilePaths!.isEmpty) {
-            progressHandler?("🛠 [准备测试集中] 正在同步生成物理测试数据集 (大文件大小: \(hugeSizeStr))...")
+            progressHandler?("🛠 [Preparing Benchmark Datasets] Generating test datasets (huge payload size: \(hugeSizeStr))...")
             try? FileManager.default.createDirectory(at: dim1Dir, withIntermediateDirectories: true)
             let sampleText = String(repeating: "Apple Silicon M-Series Ultra High Throughput Test Log Line...\n", count: 2000)
             for i in 0..<100 {
@@ -68,9 +76,9 @@ extension CompetitorBenchmarkRunner {
             }
         } else {
             payloads = [
-                ("海量小文件 (10MB/100文件)", dim1Dir.path, (try? folderSize(dim1Dir.path)) ?? 0),
-                ("拟真日志文本 (10MB)", dim2LogFile.path, (try? FileManager.default.attributesOfItem(atPath: dim2LogFile.path)[.size] as? Int64) ?? 0),
-                ("高熵物理Payload (100MB)", dim3EntropyFile.path, (try? FileManager.default.attributesOfItem(atPath: dim3EntropyFile.path)[.size] as? Int64) ?? 0),
+                ("Small Files (10MB/100 files)", dim1Dir.path, (try? folderSize(dim1Dir.path)) ?? 0),
+                ("Log Text (10MB)", dim2LogFile.path, (try? FileManager.default.attributesOfItem(atPath: dim2LogFile.path)[.size] as? Int64) ?? 0),
+                ("High-Entropy Payload (100MB)", dim3EntropyFile.path, (try? FileManager.default.attributesOfItem(atPath: dim3EntropyFile.path)[.size] as? Int64) ?? 0),
                 (hugeSizeName, dim4HugeFile.path, hugeSizeBytes)
             ]
         }

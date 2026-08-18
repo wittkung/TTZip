@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
 public enum ToolchainError: Error, LocalizedError, Sendable {
@@ -7,20 +14,20 @@ public enum ToolchainError: Error, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .homebrewNotInstalledNeedConsent:
-            return "检测到当前系统尚未安装 Homebrew 包管理器，需要用户同意后进行安装。"
+            return "Homebrew package manager is not installed on this system and requires user consent to install."
         case .processFailed(let msg):
-            return "安装过程失败: \(msg)"
+            return "Toolchain deployment failed: \(msg)"
         }
     }
 }
 
-/// 7-Zip / Keka 同源高性能 CLI 工具链自动部署助手
+/// Helper and detection utility for optional external CLI benchmarking toolchains (7-Zip, pigz, zstd).
 public final class ToolchainInstaller: @unchecked Sendable {
     public static let shared = ToolchainInstaller()
     
     private init() {}
     
-    /// 检查系统中是否安装了 Homebrew 包管理器
+    /// Path to Homebrew executable if installed.
     public var homebrewExecutablePath: String? {
         #if MAS_BUILD
         return nil
@@ -39,7 +46,7 @@ public final class ToolchainInstaller: @unchecked Sendable {
         return homebrewExecutablePath != nil
     }
     
-    /// 检测 GitHub 官方源连通性 (带 2 秒超时)
+    /// Checks GitHub connectivity with 2-second timeout.
     public func testGitHubConnectivity() -> Bool {
         #if MAS_BUILD
         return false
@@ -58,21 +65,21 @@ public final class ToolchainInstaller: @unchecked Sendable {
         #endif
     }
     
-    /// 自动化安装 macOS Homebrew 包管理器 (支持国内网络镜像智能加速)
+    /// Installs Homebrew package manager.
     public func installHomebrew(statusHandler: @escaping @Sendable (String) -> Void) async throws -> Bool {
         #if MAS_BUILD
-        statusHandler("Mac App Store 沙盒版本不开放外部工具链安装")
+        statusHandler("External toolchain management is disabled in Mac App Store sandbox")
         return false
         #else
         if isHomebrewInstalled {
-            statusHandler("Homebrew 已存在于系统中")
+            statusHandler("Homebrew is already present on this system")
             return true
         }
         
         let hasDirectGitHub = testGitHubConnectivity()
         
         if hasDirectGitHub {
-            statusHandler("网络环境良好，正在连接 Homebrew 官方源下载安装脚本...")
+            statusHandler("Connecting to official Homebrew repository...")
             
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/bash")
@@ -86,18 +93,16 @@ public final class ToolchainInstaller: @unchecked Sendable {
             process.waitUntilExit()
             
             if process.terminationStatus == 0 && isHomebrewInstalled {
-                statusHandler("✅ Homebrew 包管理器安装成功！")
+                statusHandler("Homebrew package manager installed successfully")
                 return true
             }
         }
         
-        // 国内无代理/梯子环境: 自动切换为国内清华 TUNA / Gitee 极速镜像加速源
-        statusHandler("检测到国内无代理网络环境，自动切换为 [清华大学 TUNA / Gitee 极速镜像源] 部署...")
+        statusHandler("Switching to mirror deployment...")
         
         let mirrorProcess = Process()
         mirrorProcess.executableURL = URL(fileURLWithPath: "/bin/bash")
         
-        // 配置清华源与 Gitee 镜像加速安装脚本
         let mirrorCmd = """
         export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
         export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
@@ -114,48 +119,48 @@ public final class ToolchainInstaller: @unchecked Sendable {
             try mirrorProcess.run()
             mirrorProcess.waitUntilExit()
         } catch {
-            // 继续向下尝试内置兜底
+            // Fallback
         }
         
         if isHomebrewInstalled {
-            statusHandler("✅ 已通过国内镜像加速成功安装 Homebrew！")
+            statusHandler("Homebrew installed successfully via mirror")
             return true
         } else {
-            statusHandler("网络镜像连接受阻，尝试激活内置离线工具链...")
+            statusHandler("Network installation failed, using built-in engines")
             return false
         }
         #endif
     }
     
-    /// 一键部署 7-Zip (7zz) 工具链 (支持国内镜像加速与离线引擎双重保底)
+    /// Returns terminal installation command recommendations for benchmark tools.
     public func getInstallationGuide(for toolId: String) -> String {
         switch toolId {
         case "7zip_cli":
-            return "若需进行 7-Zip CLI 竞品对比测试，请在终端中手动运行：\n  brew install 7-zip"
+            return "To run 7-Zip CLI benchmark comparisons, install via terminal:\n  brew install 7-zip"
         case "pigz_cli":
-            return "若需进行 pigz 多线程竞品对比测试，请在终端中手动运行：\n  brew install pigz"
+            return "To run pigz benchmark comparisons, install via terminal:\n  brew install pigz"
         case "zstd_cli":
-            return "若需进行 zstd 竞品对比测试，请在终端中手动运行：\n  brew install zstd"
+            return "To run zstd benchmark comparisons, install via terminal:\n  brew install zstd"
         case "turbobench_cli":
-            return "若需进行 TurboBench 官方基准对齐测试，请运行：\n  ./scripts/bootstrap_turbobench.sh"
+            return "To run TurboBench benchmark comparisons, run:\n  ./scripts/bootstrap_turbobench.sh"
         case "lzbench_cli":
-            return "若需进行 lzbench 纯内存实时测试，请运行：\n  brew install lzbench (或从源码编译)"
+            return "To run lzbench in-memory tests, run:\n  brew install lzbench (or build from source)"
         default:
-            return "建议通过 Homebrew 手动安装该工具以参与 Benchmark 比对。"
+            return "Install this tool via Homebrew to participate in benchmark comparisons."
         }
     }
     
-    /// 7-Zip 工具链可状态感知部署查询（仅检测已安装状态，或提供安装指南）
+    /// Probes 7-Zip CLI installation state or returns guidance.
     public func installSevenZipToolchain(
         userConsentedHomebrew: Bool = false,
         statusHandler: @escaping @Sendable (String) -> Void
     ) async throws -> Bool {
         #if MAS_BUILD
-        statusHandler("Mac App Store 沙盒版本不开放外部工具链安装")
+        statusHandler("External toolchain management is disabled in Mac App Store sandbox")
         return false
         #else
         if let cli = CompetitorDetector.detectAllCompetitors().first(where: { $0.toolId == "7zip_cli" }), cli.isInstalled {
-            statusHandler("7-Zip 工具链已准备就绪: \(cli.cliExecutablePath ?? "")")
+            statusHandler("7-Zip toolchain ready: \(cli.cliExecutablePath ?? "")")
             return true
         }
         statusHandler(getInstallationGuide(for: "7zip_cli"))
@@ -163,17 +168,17 @@ public final class ToolchainInstaller: @unchecked Sendable {
         #endif
     }
     
-    /// 一键部署 pigz 多线程并行 GZIP 工具链 (支持国内镜像加速)
+    /// Probes pigz multi-threaded toolchain installation state.
     public func installPigzToolchain(
         userConsentedHomebrew: Bool = false,
         statusHandler: @escaping @Sendable (String) -> Void
     ) async throws -> Bool {
         #if MAS_BUILD
-        statusHandler("Mac App Store 沙盒版本不开放外部工具链安装")
+        statusHandler("External toolchain management is disabled in Mac App Store sandbox")
         return false
         #else
         if let cli = CompetitorDetector.detectAllCompetitors().first(where: { $0.toolId == "pigz_cli" }), cli.isInstalled {
-            statusHandler("pigz 多线程工具链已准备就绪: \(cli.cliExecutablePath ?? "")")
+            statusHandler("pigz toolchain ready: \(cli.cliExecutablePath ?? "")")
             return true
         }
         statusHandler(getInstallationGuide(for: "pigz_cli"))
@@ -181,13 +186,13 @@ public final class ToolchainInstaller: @unchecked Sendable {
         #endif
     }
     
-    /// 一键全量部署所有竞品工具链 (7-zip + pigz)
+    /// Probes all competitor toolchains.
     public func installAllCompetitorToolchains(
         userConsentedHomebrew: Bool = false,
         statusHandler: @escaping @Sendable (String) -> Void
     ) async throws -> Bool {
         #if MAS_BUILD
-        statusHandler("Mac App Store 沙盒版本不开放外部工具链安装")
+        statusHandler("External toolchain management is disabled in Mac App Store sandbox")
         return false
         #else
         let ok7z = (try? await installSevenZipToolchain(userConsentedHomebrew: userConsentedHomebrew, statusHandler: statusHandler)) ?? false
@@ -196,13 +201,13 @@ public final class ToolchainInstaller: @unchecked Sendable {
         #endif
     }
 
-    /// 一键卸载指定/可选择的竞品软件与工具链 (支持选择任意单项或全量卸载)
+    /// Uninstalls designated competitor toolchains.
     public func uninstallCompetitorToolchains(
         tools: [String],
         statusHandler: @escaping @Sendable (String) -> Void
     ) async -> [String: Bool] {
         #if MAS_BUILD
-        statusHandler("Mac App Store 沙盒版本不开放外部工具卸载操作")
+        statusHandler("External toolchain uninstall is disabled in Mac App Store sandbox")
         return [:]
         #else
         var results: [String: Bool] = [:]
@@ -214,7 +219,7 @@ public final class ToolchainInstaller: @unchecked Sendable {
         for tool in targetTools {
             let lower = tool.lowercased().trimmingCharacters(in: .whitespaces)
             if lower.isEmpty { continue }
-            statusHandler("🗑️ 正在尝试卸载竞品工具: \(lower)...")
+            statusHandler("Uninstalling: \(lower)...")
 
             var success = false
 
@@ -259,14 +264,14 @@ public final class ToolchainInstaller: @unchecked Sendable {
                 }
 
             default:
-                statusHandler("⚠️ 未知或不受支持的软件组件: \(lower)")
+                statusHandler("Unknown component: \(lower)")
             }
 
             results[lower] = success
             if success {
-                statusHandler("✅ 已完成 \(lower) 软件的清理卸载")
+                statusHandler("Completed removal of \(lower)")
             } else {
-                statusHandler("⚠️ \(lower) 清理可能需手动确认或未完全卸载")
+                statusHandler("\(lower) removal may require manual confirmation")
             }
         }
 

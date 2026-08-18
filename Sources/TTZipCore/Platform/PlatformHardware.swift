@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
@@ -5,15 +12,10 @@ import CTTZipBridge
 import Darwin
 #endif
 
-/// 跨平台 CPU 硬件拓扑与 SIMD 向量指令集探测中枢
-///
-/// 对标 libarchive 跨架构硬件加速探测，提供：
-/// - Apple Silicon ARM NEON / AES / SHA / CRC32 静态与运行时指令集鉴权
-/// - x86_64 AVX2 / AVX-512 / AES-NI 能力掩码识别
-/// - 线程 QoS 优先级实时提权 (`boostCurrentThreadPriority`)
+/// Cross-platform CPU hardware topology and SIMD instruction set detection subsystem.
 public enum PlatformHardware {
     
-    /// 缓存的只读硬件能力掩码实体 (进程级只读不可变，线程安全)
+    /// Cached immutable CPU capability mask.
     public static let capabilities: CPUFeatureSet = detectCapabilities()
     
     private static func detectCapabilities() -> CPUFeatureSet {
@@ -61,9 +63,7 @@ public enum PlatformHardware {
         )
     }
     
-    /// 提升当前线程调度优先级至最高用户交互级别 (macOS: `QOS_CLASS_USER_INTERACTIVE`)
-    ///
-    /// - Note: 在非 Darwin 平台安全静默跳过 (No-op)
+    /// Boosts current thread scheduling QoS priority to user interactive on Darwin.
     @inlinable
     public static func boostCurrentThreadPriority() {
         #if os(macOS)

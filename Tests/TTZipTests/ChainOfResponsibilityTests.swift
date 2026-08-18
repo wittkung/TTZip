@@ -260,7 +260,7 @@ final class ChainOfResponsibilityTests: XCTestCase {
         LicenseManager.simulateFreeTierInTests = true
         defer { LicenseManager.simulateFreeTierInTests = false }
         
-        // 1. 分卷切片拦截
+        // 1. Split-volume gating
         let splitCtx = ArchiveValidationContext.forCompress(
             sourcePaths: [tempTxtPath],
             destinationPath: tempZipPath,
@@ -269,10 +269,10 @@ final class ChainOfResponsibilityTests: XCTestCase {
         let splitRes = try handler.handle(context: splitCtx)
         XCTAssertFalse(splitRes.isSuccess)
         if case .failure(let err) = splitRes {
-            XCTAssertEqual(err, .licenseRequired(feature: "分卷切片压缩 (Volume Splitting)"))
+            XCTAssertEqual(err, .licenseRequired(feature: "Volume Splitting"))
         }
         
-        // 2. 口令加密拦截
+        // 2. Encryption gating
         let pwdCtx = ArchiveValidationContext.forCompress(
             sourcePaths: [tempTxtPath],
             destinationPath: tempZipPath,
@@ -281,10 +281,10 @@ final class ChainOfResponsibilityTests: XCTestCase {
         let pwdRes = try handler.handle(context: pwdCtx)
         XCTAssertFalse(pwdRes.isSuccess)
         if case .failure(let err) = pwdRes {
-            XCTAssertEqual(err, .licenseRequired(feature: "AES-256 高强度安全加密 (AES-256 Encryption)"))
+            XCTAssertEqual(err, .licenseRequired(feature: "AES-256 Encryption"))
         }
         
-        // 3. Ultra 极限压缩拦截
+        // 3. Ultra level gating
         let ultraCtx = ArchiveValidationContext.forCompress(
             sourcePaths: [tempTxtPath],
             destinationPath: tempZipPath,
@@ -293,7 +293,7 @@ final class ChainOfResponsibilityTests: XCTestCase {
         let ultraRes = try handler.handle(context: ultraCtx)
         XCTAssertFalse(ultraRes.isSuccess)
         if case .failure(let err) = ultraRes {
-            XCTAssertEqual(err, .licenseRequired(feature: "Ultra 极限压缩算法 (Ultra Compression Level)"))
+            XCTAssertEqual(err, .licenseRequired(feature: "Ultra Compression Level"))
         }
     }
     

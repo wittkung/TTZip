@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_lzma_hc4_neon.c
+ * @brief ARM64 NEON accelerated HC4 and Double-Fast match finders for LZMA2.
+ */
+
 #include "include/ttzip_lzma_hc4_neon.h"
 #include <stdlib.h>
 #include <string.h>
@@ -9,14 +21,12 @@
 #endif
 
 // Hybrid SWAR (Tier 0: 64-bit GPR) + NEON (Tier 1: 128-bit vector) match length computation
-// Tier 0: 64-bit GPR check eliminates vector-to-GPR cross-domain latency (10-12 cycles on Apple Silicon)
-// Tier 1: 128-bit NEON unrolling provides high throughput for extended matches (up to max_len, e.g. 258 or 273)
 uint32_t ttzip_hybrid_match_len_neon(const uint8_t* p1, const uint8_t* p2, uint32_t max_len) {
     if (!p1 || !p2 || max_len == 0) {
         return 0;
     }
     
-    // Tier 0: For short limits (< 8 bytes), use scalar loop to avoid reading past valid bounds
+    // Tier 0: For short limits (< 8 bytes), use scalar loop
     if (max_len < 8) {
         uint32_t len = 0;
         while (len < max_len && p1[len] == p2[len]) {
@@ -39,7 +49,6 @@ uint32_t ttzip_hybrid_match_len_neon(const uint8_t* p1, const uint8_t* p2, uint3
         return match < max_len ? match : max_len;
     }
     
-    // First 8 bytes matched completely
     uint32_t len = 8;
     
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
@@ -102,7 +111,6 @@ uint32_t ttzip_hybrid_match_len_neon(const uint8_t* p1, const uint8_t* p2, uint3
     }
 #endif
 
-    // Check remaining 8-byte block if available
     if (len + 8 <= max_len) {
         uint64_t v1_tail, v2_tail;
         memcpy(&v1_tail, p1 + len, 8);
@@ -118,7 +126,6 @@ uint32_t ttzip_hybrid_match_len_neon(const uint8_t* p1, const uint8_t* p2, uint3
         len += 8;
     }
 
-    // Scalar convergence for remaining < 8 bytes
     while (len < max_len && p1[len] == p2[len]) {
         len++;
     }
@@ -126,19 +133,16 @@ uint32_t ttzip_hybrid_match_len_neon(const uint8_t* p1, const uint8_t* p2, uint3
     return len;
 }
 
-// Fast 64-bit SWAR & NEON match length computation (delegates to ttzip_hybrid_match_len_neon)
 uint32_t ttzip_match_len_neon(const uint8_t* p1, const uint8_t* p2, uint32_t max_len) {
     return ttzip_hybrid_match_len_neon(p1, p2, max_len);
 }
 
-// 4-byte hash calculation using ARM CRC32 hardware instruction or fallback
 static inline uint32_t ttzip_hc4_hash_calc(const uint8_t* p, uint32_t mask) {
     uint32_t v;
     memcpy(&v, p, 4);
 #if TTZIP_HAS_ARM_CRC32
     return __crc32w(0, v) & mask;
 #else
-    // Fallback multiplicative hash
     return ((v * 0x9E3779B9U) >> 12) & mask;
 #endif
 }
@@ -156,7 +160,6 @@ int ttzip_hc4_init(ttzip_hc4_t* mf, const uint8_t* data, uint32_t data_size,
     mf->len_limit = 273;
     mf->pos = 0;
     
-    // Scale hash mask for cache locality (64K entries for Level 1 fits 100% in L1/L2 CPU cache)
     if (cut_value <= 4 || data_size <= 1024 * 1024) {
         mf->hash_mask = (1U << 16) - 1; // 64K entries = 256KB
     } else {
@@ -251,7 +254,6 @@ uint32_t ttzip_hc4_get_matches(ttzip_hc4_t* mf, ttzip_match_t* matches, uint32_t
     uint32_t hash_val = ttzip_hc4_hash_calc(cur, mf->hash_mask);
     uint32_t cur_match = mf->hash4[hash_val];
     
-    // Update hash and chain
     mf->hash4[hash_val] = mf->pos + 1; // 1-based index to treat 0 as empty
     uint32_t chain_idx = (mf->pos + 1) & (mf->dict_size - 1);
     mf->chain[chain_idx] = cur_match;
@@ -279,7 +281,6 @@ uint32_t ttzip_hc4_get_matches(ttzip_hc4_t* mf, ttzip_match_t* matches, uint32_t
             continue;
         }
         
-        // Compute match length with Hybrid SWAR/NEON
         uint32_t len = ttzip_hybrid_match_len_neon(cur, candidate, match_limit);
         
         if (len > max_len) {
@@ -333,7 +334,6 @@ void ttzip_hc4_skip(ttzip_hc4_t* mf, uint32_t count) {
     mf->pos += count;
 }
 
-// 8-byte hash calculation using ARM CRC32 hardware instruction or 64-bit prime multiplier
 static inline uint32_t ttzip_hash8_calc(const uint8_t* p, uint32_t mask) {
     uint64_t v;
     memcpy(&v, p, 8);
@@ -449,7 +449,7 @@ uint32_t ttzip_double_fast_get_matches(ttzip_double_fast_t* df, ttzip_match_t* m
         }
     }
     
-    // 3. Double-Fast 1-Step Lookahead (if short match found, check ip + 1 in long table)
+    // 3. Double-Fast 1-Step Lookahead
     if (best_len >= 4 && best_len < df->nice_len && df->pos + 9 <= df->buffer_size) {
         const uint8_t* next_cur = cur + 1;
         uint32_t h8_next = ttzip_hash8_calc(next_cur, df->mask_long);

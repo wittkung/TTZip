@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AppKit
 
@@ -9,7 +16,7 @@ final class FlippedContainerView: NSView {
     override var isFlipped: Bool { true }
 }
 
-/// 100% AppKit 原生自重载浮动隐形滚动视图，拦截 tile() 与 scrollWheel() 实现滑动淡入、静止强制隐藏
+/// AppKit native autohiding overlay scroll view.
 public struct AppKitMillerColumnScrollView<Content: View>: NSViewRepresentable {
     let content: Content
     
@@ -119,7 +126,7 @@ public final class AutoHidingOverlayScrollView: NSScrollView {
     }
 }
 
-/// 自动隐显 AppKit NSScrollView 智能遮罩，防止静止状态下常驻显现滚动条
+/// Smart autohiding AppKit NSScrollView configurator.
 public struct ConfigureNSScrollView: NSViewRepresentable {
     public init() {}
     

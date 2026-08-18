@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_lzma2_fast_encoder.c
+ * @brief Ultra-fast LZMA2 encoder implementation for Level 1 compression.
+ */
+
 #include "include/ttzip_lzma2_fast_encoder.h"
 #include "include/ttzip_lzma_hc4_neon.h"
 #include "include/ttzip_lzma_range_coder.h"
@@ -34,7 +46,6 @@ static inline uint32_t get_dist_slot(uint32_t dist) {
     return kDistSlotTable[dist >> 14] + 28;
 }
 
-// State structures for LZMA Encoder
 typedef struct {
     uint16_t is_match[LZMA_NUM_STATES][16];
     uint16_t is_rep[LZMA_NUM_STATES];
@@ -308,9 +319,7 @@ int ttzip_lzma2_fast_encode(
     ttzip_rc_flush(&rc);
     size_t packed_payload_size = ttzip_rc_get_processed_size(&rc);
     
-    // 💥 Strategy A: Uncompressed Sub-chunk Fallback
-    // If range coding output size >= src_len (incompressible text/binary log),
-    // emit raw LZMA2 uncompressed chunks (0x01 / 0x02) to achieve memcpy speed.
+    // Fallback: If compressed output >= src_len, emit raw uncompressed chunks (0x01 / 0x02)
     if (packed_payload_size >= src_len) {
         size_t out_idx = 0;
         size_t unp_rem = src_len;

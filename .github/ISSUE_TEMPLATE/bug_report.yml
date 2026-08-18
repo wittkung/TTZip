@@ -1,0 +1,157 @@
+name: "Bug Report"
+description: "File a reproducible defect, crash, data corruption, or unexpected behavior in TTZip"
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      label: "Bug Report Guidelines"
+      value: |
+        Thank you for reporting an issue in TTZip!
+        Please fill out this form with as much detail as possible to help us reproduce, diagnose, and resolve the defect swiftly.
+
+  - type: dropdown
+    id: format
+    attributes:
+      label: "Archive Format"
+      description: "Select the primary archive format involved in this issue."
+      options:
+        - "ZIP (.zip)"
+        - "7Z (.7z)"
+        - "TAR (.tar)"
+        - "TAR.ZST (.tar.zst / .tzst)"
+        - "TAR.GZ (.tar.gz / .tgz)"
+        - "TAR.BZ2 (.tar.bz2 / .tbz2)"
+        - "TAR.XZ (.tar.xz / .txz)"
+        - "LZIP (.lzip / .lz)"
+        - "LZ4 (.lz4)"
+        - "BROTLI (.br / .tar.br)"
+        - "LRZIP (.lrz)"
+        - "AAR (.aar)"
+        - "SNAPPY (.sz)"
+        - "WIM (.wim)"
+        - "DMG (.dmg)"
+        - "ISO (.iso)"
+        - "RAR / CBR (.rar / .cbr - Extract & Browse)"
+        - "ZipX (.zipx - Extract & Browse)"
+        - "CAB (.cab - Extract & Browse)"
+        - "Multi-volume Split (.001 / .7z.001 / .zip.001 / .rar.001)"
+        - "Format Agnostic / General UI / Core Engine"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operation
+    attributes:
+      label: "Operation Type"
+      description: "Select the operation being performed when the issue occurred."
+      options:
+        - "Extraction / Decompression"
+        - "Compression / Archiving"
+        - "Archive Content Listing / Browsing (NSOutlineView)"
+        - "In-Place File Preview / QuickLook"
+        - "Integrity Testing / Checksum Verification"
+        - "CLI Command Execution (ttzip-cli)"
+        - "Drag & Drop / Finder Context Menu Integration"
+        - "Encrypted Archive Handling (AES-256 / ZipCrypto)"
+        - "App Launch / Window Lifecycle / Settings"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: "Hardware Architecture"
+      description: "Select your Mac processor architecture."
+      options:
+        - "Apple Silicon (M1 / M2 / M3 / M4 - ARM64 / ARM64e)"
+        - "Intel (x86_64)"
+        - "Rosetta 2 Emulation"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: macos-version
+    attributes:
+      label: "macOS Version"
+      description: "Select the macOS version installed on the target machine."
+      options:
+        - "macOS 14 Sonoma (14.0 - 14.7 Baseline)"
+        - "macOS 15 Sequoia (15.0+)"
+        - "macOS 13 Ventura (Legacy / Unsupported)"
+        - "macOS 14/15 Beta or Developer Preview"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: distribution-channel
+    attributes:
+      label: "Distribution Channel"
+      description: "Specify how TTZip was installed or built."
+      options:
+        - "Direct Independent Distribution (Sparkle Auto-Update)"
+        - "Mac App Store (-DMAS_BUILD App Sandbox)"
+        - "CLI Standalone Binary (ttzip-cli / Homebrew)"
+        - "Self-compiled SwiftPM / Xcode (Debug Build)"
+        - "Self-compiled SwiftPM / Xcode (Release Build)"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "TTZip Version / Git Commit SHA"
+      description: "Provide the exact TTZip version (e.g. v1.2.0) or git commit hash (e.g. 604d44d)."
+      placeholder: "e.g. v1.2.0 or commit 604d44d"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: "Steps to Reproduce"
+      description: "Explain the exact steps to reproduce the behavior."
+      placeholder: |
+        1. Open TTZip (or execute `ttzip-cli ...`)
+        2. Drag and drop file 'sample.tar.zst'
+        3. Click 'Extract to...' and select destination
+        4. See error or unexpected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-observed-behavior
+    attributes:
+      label: "Expected vs Observed Behavior"
+      description: "Describe what you expected to happen versus what actually occurred."
+      placeholder: |
+        Expected: Archive extracts all files cleanly without checksum mismatch.
+        Observed: Extractor halted at 45% with error 'CRC32 verification failed'.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs-and-backtrace
+    attributes:
+      label: "Logs, Terminal Output, or Crash Backtrace"
+      description: "Paste relevant terminal logs, Console.app crash reports, or stack traces."
+      render: "shell"
+      placeholder: "Paste console output or crash report here..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: sanitization-checklist
+    attributes:
+      label: "Sanitization & Verification Checklist"
+      description: "Please confirm the following assertions before submitting this report."
+      options:
+        - label: "I have ensured that no proprietary, confidential, or personally identifiable information is present in the attached logs or file paths."
+          required: true
+        - label: "I have verified that this issue reproduces on the latest release or latest main branch commit."
+          required: true
+        - label: "I have searched existing open and closed issues and confirmed this is not a duplicate."
+          required: true

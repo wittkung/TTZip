@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 极速 mmap 零拷贝 ZIP 中央目录 (Central Directory) 安全对齐解析器
+/// High-throughput zero-copy ZIP Central Directory reader with ZIP64 and WinZip AES support.
 public final class ZipCentralDirectoryReader: @unchecked Sendable {
     public static let shared = ZipCentralDirectoryReader()
     

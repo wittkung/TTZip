@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 
-/// TTZip 统一 Kintsugi 金/竹绿风格的 TextField 修饰器
+/// Unified text field modifier for TTZip UI design system.
 public struct TTZipTextFieldModifier: ViewModifier {
     public let cornerRadius: CGFloat
 

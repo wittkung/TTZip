@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
@@ -36,11 +43,11 @@ public struct CompressFileListView: View {
                     Image(systemName: "folder.badge.plus")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(TTZipTheme.bambooGreen)
-                    Text("待压缩源文件清单")
+                    Text("Source File List")
                         .font(.system(size: 13, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                     
-                    Text("(\(itemsList.count) 个项目 · 共 \(formatBytes(totalSizeBytes)))")
+                    Text("(\(itemsList.count) items · \(formatBytes(totalSizeBytes)))")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
@@ -49,14 +56,14 @@ public struct CompressFileListView: View {
                 
                 HStack(spacing: 8) {
                     Button(action: onAddFiles) {
-                        Label("添加文件...", systemImage: "doc.badge.plus")
+                        Label("Add Files...", systemImage: "doc.badge.plus")
                             .font(.system(size: 11))
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     
                     Button(action: onAddFolder) {
-                        Label("添加文件夹...", systemImage: "folder.badge.plus")
+                        Label("Add Folder...", systemImage: "folder.badge.plus")
                             .font(.system(size: 11))
                     }
                     .buttonStyle(.bordered)
@@ -64,7 +71,7 @@ public struct CompressFileListView: View {
                     
                     if !selectedItemIDs.isEmpty {
                         Button(action: onRemoveSelected) {
-                            Label("移除选中 (\(selectedItemIDs.count))", systemImage: "minus.circle")
+                            Label("Remove (\(selectedItemIDs.count))", systemImage: "minus.circle")
                                 .font(.system(size: 11))
                                 .foregroundStyle(Color.red)
                         }
@@ -73,7 +80,7 @@ public struct CompressFileListView: View {
                     
                     if !itemsList.isEmpty {
                         Button(action: onClearAll) {
-                            Text("清空列表")
+                            Text("Clear")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
@@ -95,7 +102,7 @@ public struct CompressFileListView: View {
                         Image(systemName: "arrow.down.doc.fill")
                             .font(.system(size: 32))
                             .foregroundStyle(TTZipTheme.bambooGreen.opacity(0.6))
-                        Text("拖拽文件或文件夹至此区域以开始打包")
+                        Text("Drop files or folders here to archive")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.secondary)
                     }
@@ -128,7 +135,7 @@ public struct CompressFileListView: View {
                                     .foregroundStyle(.secondary.opacity(0.7))
                             }
                             .buttonStyle(.plain)
-                            .help("移除此项")
+                            .help("Remove")
                         }
                         .padding(.vertical, 2)
                     }

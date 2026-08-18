@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AppKit
 import TTZipCore
@@ -12,9 +19,9 @@ public struct FolderMediaArtboardView: View {
     @State private var isCalculating: Bool = true
     @State private var fileTypeDistribution: [(category: String, count: Int)] = []
     @State private var showCreateSubfolderAlert: Bool = false
-    @State private var newSubfolderName: String = "未命名文件夹"
+    @State private var newSubfolderName: String = "Untitled Folder"
     @State private var showCreateFileAlert: Bool = false
-    @State private var newSubfileName: String = "未命名文件.txt"
+    @State private var newSubfileName: String = "Untitled.txt"
     
     public init(item: DiskItemInfo, onCompressPath: @escaping (String) -> Void) {
         self.item = item
@@ -22,12 +29,12 @@ public struct FolderMediaArtboardView: View {
     }
     
     private var formattedFolderSize: String {
-        if isCalculating { return "解算中..." }
+        if isCalculating { return "Calculating..." }
         return ByteCountFormatterFlyweight.shared.string(fromByteCount: totalSizeBytes)
     }
     
     private var formattedDate: String {
-        guard let d = item.modificationDate else { return "未知" }
+        guard let d = item.modificationDate else { return "Unknown" }
         return DateFormatterCache.shared.string(fromShortDateTime: d)
     }
     
@@ -71,7 +78,7 @@ public struct FolderMediaArtboardView: View {
                                 if w >= 320 {
                                     HStack(spacing: 4) {
                                         Image(systemName: "folder").font(.system(size: 11))
-                                        Text("Finder 中显示")
+                                        Text("Reveal in Finder")
                                             .font(.system(size: 11, weight: .semibold))
                                             .lineLimit(1)
                                             .fixedSize(horizontal: true, vertical: false)
@@ -87,7 +94,7 @@ public struct FolderMediaArtboardView: View {
                                 }
                             }
                             .buttonStyle(.plain)
-                            .help("Finder 中显示")
+                            .help("Reveal in Finder")
                             
                             Button(action: {
                                 showCreateSubfolderAlert = true
@@ -95,7 +102,7 @@ public struct FolderMediaArtboardView: View {
                                 if w >= 320 {
                                     HStack(spacing: 4) {
                                         Image(systemName: "folder.badge.plus").font(.system(size: 11))
-                                        Text("新建子文件夹")
+                                        Text("New Folder")
                                             .font(.system(size: 11, weight: .medium))
                                             .lineLimit(1)
                                             .fixedSize(horizontal: true, vertical: false)
@@ -111,7 +118,7 @@ public struct FolderMediaArtboardView: View {
                                 }
                             }
                             .buttonStyle(.plain)
-                            .help("在此文件夹下新建子文件夹")
+                            .help("Create new subfolder")
                             
                             Button(action: {
                                 showCreateFileAlert = true
@@ -119,7 +126,7 @@ public struct FolderMediaArtboardView: View {
                                 if w >= 320 {
                                     HStack(spacing: 4) {
                                         Image(systemName: "doc.badge.plus").font(.system(size: 11))
-                                        Text("新建文件")
+                                        Text("New File")
                                             .font(.system(size: 11, weight: .medium))
                                             .lineLimit(1)
                                             .fixedSize(horizontal: true, vertical: false)
@@ -135,7 +142,7 @@ public struct FolderMediaArtboardView: View {
                                 }
                             }
                             .buttonStyle(.plain)
-                            .help("在此文件夹下新建空白文件")
+                            .help("Create new empty file")
                             
                             Button(action: {
                                 NSPasteboard.general.clearContents()
@@ -144,7 +151,7 @@ public struct FolderMediaArtboardView: View {
                                 if w >= 320 {
                                     HStack(spacing: 4) {
                                         Image(systemName: "doc.on.doc").font(.system(size: 11))
-                                        Text("复制路径")
+                                        Text("Copy Path")
                                             .font(.system(size: 11, weight: .medium))
                                             .lineLimit(1)
                                             .fixedSize(horizontal: true, vertical: false)
@@ -160,7 +167,7 @@ public struct FolderMediaArtboardView: View {
                                 }
                             }
                             .buttonStyle(.plain)
-                            .help("复制路径")
+                            .help("Copy Path")
                         }
                     }
                     .frame(height: 24)
@@ -169,17 +176,17 @@ public struct FolderMediaArtboardView: View {
                 Divider()
                 
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("概览与文件系统")
+                    Text("Overview & File System")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.primary)
                     
                     VStack(spacing: 10) {
-                        detailRow(label: "容量大小", value: formattedFolderSize, isHighlight: true)
-                        detailRow(label: "包含条目", value: isCalculating ? "解算中..." : "\(fileCount) 个文件 · \(subfolderCount) 个目录")
-                        detailRow(label: "修改时间", value: formattedDate)
-                        detailRow(label: "文件系统格式", value: "APFS (Apple File System)")
-                        detailRow(label: "POSIX 访问权限", value: "0755 (drwxr-xr-x)")
-                        detailRow(label: "所有者与用户组", value: "kevintung (501) / staff (20)")
+                        detailRow(label: "Size", value: formattedFolderSize, isHighlight: true)
+                        detailRow(label: "Items", value: isCalculating ? "Calculating..." : "\(fileCount) Files · \(subfolderCount) Directories")
+                        detailRow(label: "Modified", value: formattedDate)
+                        detailRow(label: "File System", value: "APFS (Apple File System)")
+                        detailRow(label: "POSIX Permissions", value: "0755 (drwxr-xr-x)")
+                        detailRow(label: "Owner / Group", value: "kevintung (501) / staff (20)")
                     }
                 }
                 
@@ -187,7 +194,7 @@ public struct FolderMediaArtboardView: View {
                     Divider()
                     
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("内容分布比例")
+                        Text("Content Breakdown")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.primary)
                         
@@ -217,7 +224,7 @@ public struct FolderMediaArtboardView: View {
                                         .font(.system(size: 11, weight: .medium))
                                         .foregroundStyle(.primary)
                                     Spacer()
-                                    Text("\(item.count) 项 (\(pct)%)")
+                                    Text("\(item.count) items (\(pct)%)")
                                         .font(.system(size: 11, design: .monospaced))
                                         .foregroundStyle(.secondary)
                                 }
@@ -233,7 +240,7 @@ public struct FolderMediaArtboardView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "archivebox.fill")
                                 .font(.system(size: 14, weight: .bold))
-                            Text("新建压缩包 (⌘N)")
+                            Text("New Archive (⌘N)")
                                 .font(.system(size: 13, weight: .bold))
                                 .lineLimit(1)
                         }
@@ -241,7 +248,7 @@ public struct FolderMediaArtboardView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "archivebox.fill")
                                 .font(.system(size: 13, weight: .bold))
-                            Text("新建压缩包")
+                            Text("New Archive")
                                 .font(.system(size: 12, weight: .bold))
                                 .lineLimit(1)
                         }
@@ -249,7 +256,7 @@ public struct FolderMediaArtboardView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "archivebox.fill")
                                 .font(.system(size: 12, weight: .bold))
-                            Text("压缩")
+                            Text("Compress")
                                 .font(.system(size: 12, weight: .bold))
                                 .lineLimit(1)
                         }
@@ -264,15 +271,15 @@ public struct FolderMediaArtboardView: View {
             }
             .padding(14)
         }
-        .alert("新建子文件夹", isPresented: $showCreateSubfolderAlert) {
-            TextField("文件夹名称", text: $newSubfolderName)
-            Button("取消", role: .cancel) {
-                newSubfolderName = "未命名文件夹"
+        .alert("New Folder", isPresented: $showCreateSubfolderAlert) {
+            TextField("Folder Name", text: $newSubfolderName)
+            Button("Cancel", role: .cancel) {
+                newSubfolderName = "Untitled Folder"
             }
-            Button("创建") {
+            Button("Create") {
                 let parentDir = URL(fileURLWithPath: item.path)
                 let trimmed = newSubfolderName.trimmingCharacters(in: .whitespacesAndNewlines)
-                let baseName = trimmed.isEmpty ? "未命名文件夹" : trimmed
+                let baseName = trimmed.isEmpty ? "Untitled Folder" : trimmed
                 var targetURL = parentDir.appendingPathComponent(baseName)
                 var counter = 2
                 while FileManager.default.fileExists(atPath: targetURL.path) {
@@ -280,21 +287,21 @@ public struct FolderMediaArtboardView: View {
                     counter += 1
                 }
                 try? FileManager.default.createDirectory(at: targetURL, withIntermediateDirectories: true, attributes: nil)
-                newSubfolderName = "未命名文件夹"
+                newSubfolderName = "Untitled Folder"
                 NotificationCenter.default.post(name: NSNotification.Name("TTZipArchiveUnlockedRefresh"), object: nil)
             }
         } message: {
-            Text("将在以下路径创建新文件夹：\n\(item.path)")
+            Text("Creating new folder in:\n\(item.path)")
         }
-        .alert("新建空白文件", isPresented: $showCreateFileAlert) {
-            TextField("文件名 (含扩展名, 如 .txt / .md)", text: $newSubfileName)
-            Button("取消", role: .cancel) {
-                newSubfileName = "未命名文件.txt"
+        .alert("New File", isPresented: $showCreateFileAlert) {
+            TextField("File Name (e.g. text.txt)", text: $newSubfileName)
+            Button("Cancel", role: .cancel) {
+                newSubfileName = "Untitled.txt"
             }
-            Button("创建") {
+            Button("Create") {
                 let parentDir = URL(fileURLWithPath: item.path)
                 let trimmed = newSubfileName.trimmingCharacters(in: .whitespacesAndNewlines)
-                let baseName = trimmed.isEmpty ? "未命名文件.txt" : trimmed
+                let baseName = trimmed.isEmpty ? "Untitled.txt" : trimmed
                 let pathExtension = (baseName as NSString).pathExtension
                 let nameWithoutExt = (baseName as NSString).deletingPathExtension
                 var targetURL = parentDir.appendingPathComponent(baseName)
@@ -305,11 +312,11 @@ public struct FolderMediaArtboardView: View {
                     counter += 1
                 }
                 FileManager.default.createFile(atPath: targetURL.path, contents: Data(), attributes: nil)
-                newSubfileName = "未命名文件.txt"
+                newSubfileName = "Untitled.txt"
                 NotificationCenter.default.post(name: NSNotification.Name("TTZipArchiveUnlockedRefresh"), object: nil)
             }
         } message: {
-            Text("将在以下路径创建新空文件：\n\(item.path)")
+            Text("Creating new empty file in:\n\(item.path)")
         }
         .task(id: item.path) {
             await calculateStats()
@@ -336,11 +343,11 @@ public struct FolderMediaArtboardView: View {
     
     private func categoryColor(_ cat: String) -> Color {
         switch cat {
-        case "视频": return .red
-        case "音频": return .purple
-        case "图片": return .blue
-        case "文档/代码/字幕": return TTZipTheme.bambooGreen
-        case "压缩包": return .orange
+        case "Video", "视频": return .red
+        case "Audio", "音频": return .purple
+        case "Image", "图片": return .blue
+        case "Document", "文档/代码/字幕": return TTZipTheme.bambooGreen
+        case "Archive", "压缩包": return .orange
         default: return .secondary
         }
     }

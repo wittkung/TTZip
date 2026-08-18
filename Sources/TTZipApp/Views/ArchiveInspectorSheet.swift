@@ -9,7 +9,7 @@ import SwiftUI
 import AppKit
 import TTZipCore
 
-/// 归档标准属性与安全体检弹窗 (Archive Standards & Health Diagnostics Sheet)
+/// Archive standards inspection and compliance diagnostics sheet.
 public struct ArchiveInspectorSheet: View {
     @ObservedObject var viewModel: ArchiveInspectorViewModel
     @Environment(\.dismiss) private var dismiss
@@ -17,10 +17,10 @@ public struct ArchiveInspectorSheet: View {
     @State private var selectedTab: InspectorTab = .standards
     
     public enum InspectorTab: String, CaseIterable, Identifiable {
-        case standards = "标准规范"
-        case magic = "幻数锚点"
-        case extraFields = "ZIP 扩展字段"
-        case compliance = "合规体检"
+        case standards = "Standards"
+        case magic = "Magic Anchors"
+        case extraFields = "ZIP Extra Fields"
+        case compliance = "Compliance"
         
         public var id: String { rawValue }
     }
@@ -31,13 +31,11 @@ public struct ArchiveInspectorSheet: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // Header Bar (WSJ Editorial 52pt)
             headerBar
             
             Divider()
                 .background(TTZipTheme.kintsugiGold.opacity(0.3))
             
-            // Tab Selector
             Picker("", selection: $selectedTab) {
                 ForEach(InspectorTab.allCases) { tab in
                     Text(tab.rawValue).tag(tab)
@@ -47,7 +45,6 @@ public struct ArchiveInspectorSheet: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             
-            // Tab Content Body
             Group {
                 if viewModel.state.isScanning {
                     loadingView
@@ -61,7 +58,6 @@ public struct ArchiveInspectorSheet: View {
             
             Divider()
             
-            // Footer Bar
             footerBar
         }
         .frame(width: 680, height: 520)
@@ -75,10 +71,10 @@ public struct ArchiveInspectorSheet: View {
                 .foregroundColor(TTZipTheme.archiveAmber)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text("归档标准与合规诊断")
+                Text("Archive Standards & Diagnostics")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.primary)
-                Text(viewModel.state.fileName.isEmpty ? "未选择归档文件" : viewModel.state.fileName)
+                Text(viewModel.state.fileName.isEmpty ? "No archive selected" : viewModel.state.fileName)
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -91,7 +87,7 @@ public struct ArchiveInspectorSheet: View {
                     Circle()
                         .fill(viewModel.state.complianceReport?.isCompliant == true ? TTZipTheme.bambooGreen : TTZipTheme.cinnabarRed)
                         .frame(width: 8, height: 8)
-                    Text(viewModel.state.complianceReport?.isCompliant == true ? "标准合规" : "存在偏离")
+                    Text(viewModel.state.complianceReport?.isCompliant == true ? "Compliant" : "Deviations Found")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(viewModel.state.complianceReport?.isCompliant == true ? TTZipTheme.bambooGreen : TTZipTheme.cinnabarRed)
                 }
@@ -108,7 +104,7 @@ public struct ArchiveInspectorSheet: View {
         VStack(spacing: 12) {
             ProgressView()
                 .scaleEffect(1.1)
-            Text("正在以零拷贝多锚点引擎扫描归档结构与标准...")
+            Text("Scanning archive structures and specifications...")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
         }
@@ -119,7 +115,7 @@ public struct ArchiveInspectorSheet: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 32))
                 .foregroundColor(TTZipTheme.cinnabarRed)
-            Text("归档解析异常")
+            Text("Parse Error")
                 .font(.system(size: 14, weight: .bold))
             Text(message)
                 .font(.system(size: 12))
@@ -150,14 +146,14 @@ public struct ArchiveInspectorSheet: View {
     
     private var standardsTabView: some View {
         VStack(alignment: .leading, spacing: 14) {
-            metadataRow(label: "识别格式", value: viewModel.state.detectedFormat?.displayName ?? "未知")
-            metadataRow(label: "标准名称", value: viewModel.state.standardSpec?.officialName ?? "N/A")
-            metadataRow(label: "MIME 类型", value: viewModel.state.standardSpec?.mimeType ?? "N/A")
+            metadataRow(label: "Format", value: viewModel.state.detectedFormat?.displayName ?? "Unknown")
+            metadataRow(label: "Specification", value: viewModel.state.standardSpec?.officialName ?? "N/A")
+            metadataRow(label: "MIME Type", value: viewModel.state.standardSpec?.mimeType ?? "N/A")
             metadataRow(label: "Apple UTI", value: viewModel.state.standardSpec?.appleUTI ?? "N/A")
             
             if let citations = viewModel.state.standardSpec?.standardCitations, !citations.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("权威国际标准引用 (RFC / ISO / POSIX)")
+                    Text("Standard Citations (RFC / ISO / POSIX)")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.secondary)
                     
@@ -184,12 +180,12 @@ public struct ArchiveInspectorSheet: View {
     
     private var magicTabView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("多锚点幻数签名匹配 (Multi-Anchor Signatures)")
+            Text("Multi-Anchor Signatures")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.secondary)
             
             if viewModel.state.signatureMatches.isEmpty {
-                Text("未发现或未匹配到已知标准签名。")
+                Text("No standard signatures matched.")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             } else {
@@ -199,13 +195,13 @@ public struct ArchiveInspectorSheet: View {
                             Text(sig.description)
                                 .font(.system(size: 12, weight: .bold))
                             Spacer()
-                            Text("已验证")
+                            Text("Verified")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(TTZipTheme.bambooGreen)
                         }
                         
                         let hexStr = sig.bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
-                        Text("签名字节: [ \(hexStr) ]")
+                        Text("Signature Bytes: [ \(hexStr) ]")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(.secondary)
                     }
@@ -218,28 +214,28 @@ public struct ArchiveInspectorSheet: View {
     
     private var extraFieldsTabView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("ZIP TLV 扩展字段解析 (Zero-Allocation TLV)")
+            Text("ZIP TLV Extra Fields (Zero-Allocation TLV)")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.secondary)
             
             if let extra = viewModel.state.parsedExtraFields {
                 if let ts = extra.extendedTimestamp {
-                    metadataRow(label: "扩展时间戳 (0x5455)", value: "\(ts)")
+                    metadataRow(label: "Extended Timestamp (0x5455)", value: "\(ts)")
                 }
                 if let u = extra.unicodePath {
-                    metadataRow(label: "Unicode 路径 (0x7075)", value: u)
+                    metadataRow(label: "Unicode Path (0x7075)", value: u)
                 }
                 if let p = extra.posixPermissions {
-                    metadataRow(label: "Info-ZIP 权限 (0x7875)", value: "UID: \(p.uid), GID: \(p.gid)")
+                    metadataRow(label: "Info-ZIP Permissions (0x7875)", value: "UID: \(p.uid), GID: \(p.gid)")
                 }
                 if let z64 = extra.zip64Info {
-                    metadataRow(label: "Zip64 扩展 (0x0001)", value: "解压尺寸: \(z64.uncompressedSize ?? 0) B, 压缩尺寸: \(z64.compressedSize ?? 0) B")
+                    metadataRow(label: "Zip64 Extensions (0x0001)", value: "Uncompressed: \(z64.uncompressedSize ?? 0) B, Compressed: \(z64.compressedSize ?? 0) B")
                 }
                 if let aes = extra.winZipAES {
-                    metadataRow(label: "WinZip AES (0x9901)", value: "加密强度: \(aes.strength) bit, 原始方法: \(aes.actualMethod)")
+                    metadataRow(label: "WinZip AES (0x9901)", value: "Strength: \(aes.strength) bit, Method: \(aes.actualMethod)")
                 }
             } else {
-                Text("该归档不包含额外扩展字段或非 ZIP 格式。")
+                Text("No extra fields found or format is non-ZIP.")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
@@ -252,13 +248,13 @@ public struct ArchiveInspectorSheet: View {
                 HStack(spacing: 8) {
                     Image(systemName: report.isCompliant ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                         .foregroundColor(report.isCompliant ? TTZipTheme.bambooGreen : TTZipTheme.cinnabarRed)
-                    Text(report.isCompliant ? "标准合规性验证通过 (100% 符合官方标准)" : "发现标准偏离或潜在不兼容项")
+                    Text(report.isCompliant ? "Specification Compliance: 100% Passed" : "Specification Deviations or Warnings Detected")
                         .font(.system(size: 13, weight: .bold))
                 }
                 
                 if !report.validatedHeaders.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("已验证结构:")
+                        Text("Validated Headers:")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.secondary)
                         ForEach(report.validatedHeaders, id: \.self) { hdr in
@@ -273,7 +269,7 @@ public struct ArchiveInspectorSheet: View {
                 
                 if !report.violations.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("违规/风险项:")
+                        Text("Deviations / Warnings:")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(TTZipTheme.cinnabarRed)
                         ForEach(report.violations, id: \.self) { v in
@@ -286,7 +282,7 @@ public struct ArchiveInspectorSheet: View {
                     .background(RoundedRectangle(cornerRadius: 6).fill(TTZipTheme.cinnabarRed.opacity(0.08)))
                 }
             } else {
-                Text("未获取到体检报告。")
+                Text("No report available.")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
@@ -308,13 +304,13 @@ public struct ArchiveInspectorSheet: View {
     
     private var footerBar: some View {
         HStack {
-            Text("诊断耗时: \(String(format: "%.2f", viewModel.state.scanDurationMs)) ms")
+            Text("Diagnostic Time: \(String(format: "%.2f", viewModel.state.scanDurationMs)) ms")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(.secondary)
             
             Spacer()
             
-            Button("完成") {
+            Button("Done") {
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
@@ -327,7 +323,6 @@ public struct ArchiveInspectorSheet: View {
     }
 }
 
-/// 自动装载与执行诊断的容器视图
 public struct ArchiveInspectorContainerView: View {
     let archivePath: String
     @StateObject private var viewModel = ArchiveInspectorViewModel()
@@ -343,4 +338,3 @@ public struct ArchiveInspectorContainerView: View {
             }
     }
 }
-

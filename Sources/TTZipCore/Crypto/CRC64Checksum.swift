@@ -1,14 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// ARM64 硬件 PMULL 加速与零拷贝 CRC64 (ECMA-182) 计算引擎
+/// ARM64 hardware PMULL accelerated zero-copy CRC-64 (ECMA-182) computation engine.
 @frozen
 public enum CRC64Checksum: Sendable {
-    /// 零拷贝计算 Data 的 CRC64 (ECMA-182)
+    /// Computes CRC-64 (ECMA-182) for a `Data` buffer.
     /// - Parameters:
-    ///   - data: 待计算的二进制数据
-    ///   - seed: 初始 CRC 种子（默认为 0）
-    /// - Returns: 计算后的 64 位校验码
+    ///   - data: Binary data payload.
+    ///   - seed: Initial CRC seed (defaults to 0).
+    /// - Returns: Computed 64-bit checksum.
     @inlinable
     public static func calculate(for data: Data, seed: UInt64 = 0) -> UInt64 {
         guard !data.isEmpty else { return seed }
@@ -20,11 +27,11 @@ public enum CRC64Checksum: Sendable {
         }
     }
 
-    /// 零拷贝计算 UnsafeRawBufferPointer 的 CRC64 (ECMA-182)
+    /// Computes CRC-64 (ECMA-182) for a raw buffer pointer.
     /// - Parameters:
-    ///   - buffer: 待计算的连续内存缓冲区
-    ///   - seed: 初始 CRC 种子（默认为 0）
-    /// - Returns: 计算后的 64 位校验码
+    ///   - buffer: Contiguous memory buffer.
+    ///   - seed: Initial CRC seed (defaults to 0).
+    /// - Returns: Computed 64-bit checksum.
     @inlinable
     public static func calculate(buffer: UnsafeRawBufferPointer, seed: UInt64 = 0) -> UInt64 {
         guard let base = buffer.baseAddress, buffer.count > 0 else { return seed }
@@ -32,11 +39,11 @@ public enum CRC64Checksum: Sendable {
         return ttzip_crc64(bytePtr, buffer.count, seed)
     }
 
-    /// 零拷贝计算 UnsafeBufferPointer<UInt8> 的 CRC64 (ECMA-182)
+    /// Computes CRC-64 (ECMA-182) for a typed byte buffer pointer.
     /// - Parameters:
-    ///   - buffer: 待计算的字节缓冲区
-    ///   - seed: 初始 CRC 种子（默认为 0）
-    /// - Returns: 计算后的 64 位校验码
+    ///   - buffer: Byte buffer pointer.
+    ///   - seed: Initial CRC seed (defaults to 0).
+    /// - Returns: Computed 64-bit checksum.
     @inlinable
     public static func calculate(buffer: UnsafeBufferPointer<UInt8>, seed: UInt64 = 0) -> UInt64 {
         guard let base = buffer.baseAddress, buffer.count > 0 else { return seed }

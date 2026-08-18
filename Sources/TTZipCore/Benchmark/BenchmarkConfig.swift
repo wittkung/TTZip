@@ -1,35 +1,42 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 强类型的基准测试与擂台赛配置结构体
+/// Benchmark execution and competitor matrix configuration model.
 public struct BenchmarkRunConfig: Sendable {
-    /// 目标压缩格式过滤列表 (nil 表示按默认执行)
+    /// Format filter list (nil executes all default formats).
     public var selectedFormats: [ArchiveCompressionFormat]?
     
-    /// 目标压缩等级过滤列表 (nil 表示按默认执行)
+    /// Compression level filter list (nil executes all default levels).
     public var selectedLevels: [ArchiveCompressionLevel]?
     
-    /// 竞品软件工具过滤列表
+    /// Target competitor tools filter list.
     public var selectedTools: [String]?
     
-    /// 大容量测试基准尺寸描述 (如 "500MB")
+    /// Large dataset filter descriptor (e.g. "500MB").
     public var hugeSizeFilter: String?
     
-    /// 自定义测试文件/目录路径
+    /// Custom benchmark input paths.
     public var customFilePaths: [String]?
     
-    /// 性能滞后或校验失败时是否立即强行中止
+    /// Aborts execution immediately on performance regression or verification error.
     public var stopOnLagOrError: Bool
     
-    /// 是否自动识别并调度物理性能最强的竞品
+    /// Automatically detects and schedules highest-performing system competitor.
     public var autoBestCompetitor: Bool
     
-    /// 大考霸榜模式 (要求 100% 碾压全量竞品)
+    /// Verification mode asserting dominance over all competitors.
     public var verifyAllDominance: Bool
     
-    /// 滞后过滤配置文件路径
+    /// Regression filter configuration file path.
     public var filterConfigPath: String?
     
-    /// 是否仅测试 500MB 巨型 Payload
+    /// Restricts execution exclusively to 500MB dataset payload.
     public var hugeOnly: Bool
     
     public init(

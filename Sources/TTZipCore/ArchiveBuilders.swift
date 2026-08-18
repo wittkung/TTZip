@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 针对归档高级配置参数的链式建造者 (Fluent Builder Pattern)
+/// Fluent Builder Pattern: Configures fine-grained compression and format parameters.
 public struct ArchiveOptionsBuilder: Sendable, Equatable {
     public var format: ArchiveCompressionFormat?
     public var level: ArchiveCompressionLevel?
@@ -61,10 +68,22 @@ public struct ArchiveOptionsBuilder: Sendable, Equatable {
     }
     
     @discardableResult
-    public func withZipEncryption(_ method: String) -> ArchiveOptionsBuilder {
+    public func withSolidBlockSizeMB(_ sizeMB: Int) -> ArchiveOptionsBuilder {
+        var copy = self
+        copy.sevenZipOptions.dictionarySizeMB = sizeMB
+        return copy
+    }
+    
+    @discardableResult
+    public func withZipEncryptionMethod(_ method: String) -> ArchiveOptionsBuilder {
         var copy = self
         copy.zipOptions.zipEncryptionMethod = method
         return copy
+    }
+
+    @discardableResult
+    public func withZipEncryption(_ method: String) -> ArchiveOptionsBuilder {
+        return withZipEncryptionMethod(method)
     }
     
     @discardableResult
@@ -214,7 +233,7 @@ public struct ArchiveOptionsBuilder: Sendable, Equatable {
     }
 }
 
-/// 针对归档流水线任务装配的链式建造者 (Fluent Pipeline Builder Pattern)
+/// Fluent Pipeline Builder Pattern: Assembles archiving workflows and pipelines.
 public struct ArchivePipelineBuilder: Sendable {
     public var writer: ArchiveWriting?
     public var extractor: ArchiveExtracting?
@@ -401,7 +420,7 @@ public struct ArchivePipelineBuilder: Sendable {
         }
     }
     
-    /// 使用装饰器链 (Decorator Chain) 构建全层解耦与能力动态叠加的归档执行引擎
+    /// Decorator Chain: Constructs fully decoupled execution implementors with dynamic decorators.
     public func buildDecoratedImplementor() -> ArchiveEngineImplementorProtocol {
         let finalFormat = optionsBuilder.format ?? format
         let finalPassword = password ?? optionsBuilder.password

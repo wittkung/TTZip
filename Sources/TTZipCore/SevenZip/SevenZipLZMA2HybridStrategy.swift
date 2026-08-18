@@ -1,20 +1,24 @@
-// Sources/TTZipCore/SevenZip/SevenZipLZMA2HybridStrategy.swift
-// TTZip 7Z/XZ LZMA2 混合双引擎路由策略 (Hybrid Dual-Engine Strategy)
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 import CTTZipBridge
 
-/// LZMA2 编码路由模式
+/// LZMA2 codec execution routing mode.
 public enum LZMA2RouteMode: String, Sendable, Codable {
-    /// Level 1 极速模式：直通自研 ARM64 NEON 向量化匹配查找器与无分支 Range Coder
+    /// Level 1 fast mode: Direct ARM64 NEON vectorized match finder and branchless range coder.
     case neonFastPath
-    /// Level 3~9 高压缩等级：直通 Fast-LZMA2 并行 Radix 匹配查找器与多线程流水线
+    /// Level 3-9 high compression: Parallel radix match finder with multi-threaded pipeline.
     case fastLZMA2Parallel
-    /// 稀疏零块快速封装旁路
+    /// Sparse zero-block fast bypass.
     case zeroBlockBypass
 }
 
-/// 7Z / LZMA2 混合压缩策略配置实体
+/// Hybrid dual-engine strategy configuration for 7z / LZMA2 workloads.
 public struct SevenZipLZMA2HybridStrategy: Sendable {
     public let level: Int
     public let dictionarySize: Int
@@ -36,7 +40,7 @@ public struct SevenZipLZMA2HybridStrategy: Sendable {
         self.routeMode = routeMode
     }
 
-    /// 根据压缩等级与零块提示自动判定最优路由策略
+    /// Resolves optimal LZMA2 execution route based on compression level and payload characteristics.
     public static func resolve(
         level: ArchiveCompressionLevel,
         isZeroBlock: Bool = false,
@@ -63,7 +67,7 @@ public struct SevenZipLZMA2HybridStrategy: Sendable {
             )
         }
 
-        // Level 3 ~ 9
+        // Level 3 - 9
         let dictSize: Int
         switch lvl {
         case 2, 3:

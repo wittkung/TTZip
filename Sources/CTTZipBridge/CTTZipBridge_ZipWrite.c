@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipBridge_ZipWrite.h"
 #include "include/CTTZipBridge.h"
 #include "include/CTTZipCommon.h"
@@ -28,7 +35,6 @@ static bool is_mac_junk_path_zip(const char* path) {
     base = base ? base + 1 : path;
     return (strcmp(base, ".DS_Store") == 0 || strncmp(base, "._", 2) == 0);
 }
-
 
 static void collect_c_items_recursive(const char* src_path, const char* rel_path, bool skip_mac_junk, ttzip_c_item_list_t* list) {
     if (!src_path || !rel_path) return;
@@ -147,7 +153,7 @@ int ttzip_create_zip_parallel_c(
 
     bool has_password = (password && strlen(password) > 0);
 
-    // 1. 计算总未压缩字节并构建输出 Arena 内存池（消除海量小文件的 per-file malloc/free 锁争用）
+    // 1. Calculate total uncompressed bytes and construct payload Arena memory pool
     uint64_t total_uncompressed_bytes = 0;
     size_t active_files_count = 0;
     for (size_t i = 0; i < list.count; i++) {
@@ -174,7 +180,7 @@ int ttzip_create_zip_parallel_c(
         }
     }
 
-    // 2. 全核并发零锁快速读取与压缩
+    // 2. Parallel zero-lock compression across all cores
     dispatch_apply(list.count, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t idx) {
         ttzip_c_item_t* item = &list.items[idx];
         if (item->is_directory || item->uncompressed_size == 0) {
@@ -400,4 +406,3 @@ int ttzip_create_zip_parallel_c(
     free(list.items);
     return res;
 }
-

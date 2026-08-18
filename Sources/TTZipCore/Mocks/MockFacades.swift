@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 自动化测试与外部模块依赖解耦的 Mock 安全门面
+/// Mock archive security facade for automated test decoupling.
 public final class MockArchiveSecurityFacade: ArchiveSecurityFacading, @unchecked Sendable {
     public var auditResult: SecurityReport?
     public var validatePathResult: Bool = true
@@ -35,7 +42,7 @@ public final class MockArchiveSecurityFacade: ArchiveSecurityFacading, @unchecke
     }
 }
 
-/// 自动化测试与外部模块依赖解耦的 Mock 批处理门面
+/// Mock batch operations facade for automated test decoupling.
 public final class MockArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable {
     public var batchCompressResults: [BatchTaskResult] = []
     public var batchExtractResults: [BatchTaskResult] = []
@@ -96,7 +103,7 @@ public final class MockArchiveBatchFacade: ArchiveBatchFacading, @unchecked Send
     }
 }
 
-/// 自动化测试与外部模块依赖解耦的 Mock 性能基准门面
+/// Mock benchmark facade for automated test decoupling.
 public final class MockArchiveBenchmarkFacade: ArchiveBenchmarkFacading, @unchecked Sendable {
     public var quickBenchmarkResult: BenchmarkResult?
     public var suiteResults: [BenchmarkResult] = []
@@ -132,7 +139,6 @@ public final class MockArchiveBenchmarkFacade: ArchiveBenchmarkFacading, @unchec
             efficiencyScore: 95,
             recommendationBadge: "RECOMMENDED"
         )
-
     }
     
     public func runAllPresetsSuite(size: BenchmarkDataSize) async throws -> [BenchmarkResult] {
@@ -144,7 +150,7 @@ public final class MockArchiveBenchmarkFacade: ArchiveBenchmarkFacading, @unchec
     }
 }
 
-/// 自动化测试与外部模块依赖解耦的 Mock 主引擎门面
+/// Mock TTZip core engine facade for automated test decoupling.
 public final class MockTTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
     public var historyManager: CommandHistoryManager = CommandHistoryManager()
     public var quickCompressResult: ArchiveOperationResult?
@@ -220,7 +226,6 @@ public final class MockTTZipEngineFacade: TTZipEngineFacading, @unchecked Sendab
         let root = ArchiveComponentTreeBuilder.buildTree(from: [])
         return ArchiveInspectionResult(archivePath: archivePath, entries: [], treeNode: root, securityReport: secReport, unlockedPassword: password)
     }
-
     
     public func verifyIntegrity(archivePath: String) async throws -> HashVerificationResult {
         if let err = shouldThrowError { throw err }
@@ -239,4 +244,3 @@ public final class MockTTZipEngineFacade: TTZipEngineFacading, @unchecked Sendab
         return PasswordRecoveryResult(foundPassword: nil, totalAttempts: Int64(dictionary.count), durationSeconds: 0.01)
     }
 }
-

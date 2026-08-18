@@ -1,12 +1,19 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 全局临时目录集中清理管理器
+/// Centralized temporary directory cleanup manager.
 public final class TempDirectoryCleanUpManager: Sendable {
     public static let shared = TempDirectoryCleanUpManager()
     
     private init() {}
     
-    /// 清理项目创建的全部临时目录 (ttzip_epub_*, ttzip_preview_*, pwd_test_*)
+    /// Cleans up transient temporary directories generated across operations (`ttzip_*`, `pwd_test_*`, `measure_*`).
     public func cleanupAllTemporaryDirectories() {
         let fileManager = FileManager.default
         let tempDir = fileManager.temporaryDirectory

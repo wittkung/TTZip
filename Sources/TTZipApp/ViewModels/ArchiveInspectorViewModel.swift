@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 import TTZipCore
 
-/// 归档诊断快照缓存 (Thread-Safe In-Memory Cache)
+/// Thread-safe in-memory cache for archive diagnostics snapshots.
 public final class ArchiveDiagnosticsCache: @unchecked Sendable {
     public static let shared = ArchiveDiagnosticsCache()
     
@@ -40,7 +40,7 @@ public final class ArchiveDiagnosticsCache: @unchecked Sendable {
     }
 }
 
-/// 归档属性检视与标准合规诊断 ViewModel (UI Thread Safe & Non-Blocking)
+/// Archive inspection and standards compliance diagnostic ViewModel.
 @MainActor
 public final class ArchiveInspectorViewModel: ObservableObject {
     @Published public var state: ArchiveInspectorState = ArchiveInspectorState(
@@ -61,7 +61,7 @@ public final class ArchiveInspectorViewModel: ObservableObject {
     
     public init() {}
     
-    /// 异步执行非阻塞归档属性与标准合规扫描
+    /// Asynchronously performs non-blocking archive attribute and standards compliance scan.
     public func inspectArchive(atPath path: String) {
         guard !path.isEmpty else { return }
         
@@ -123,13 +123,11 @@ public final class ArchiveInspectorViewModel: ObservableObject {
                 
                 report = try StandardsComplianceChecker.checkCompliance(fileURL: url, expectedFormat: detectedFormat)
                 
-                // If ZIP format, probe extra fields from file headers
                 if detectedFormat == .zip, let handle = try? FileHandle(forReadingFrom: url) {
                     defer { try? handle.close() }
                     let headerData = handle.readData(ofLength: 1024)
                     headerData.withUnsafeBytes { rawPtr in
                         if rawPtr.count > 30 {
-                            // Skip local file header fixed fields (30 bytes) to read extra field slice
                             let extraSlice = UnsafeRawBufferPointer(rebasing: rawPtr[30...])
                             extraFields = ZipExtraFieldParser.parse(extraData: extraSlice)
                         }

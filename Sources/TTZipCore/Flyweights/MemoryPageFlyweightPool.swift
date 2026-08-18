@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 内存页尺寸枚举 (4KB 标准系统页 / 16KB Apple Silicon 原生硬件页 / 64KB 高吞吐超级页)
+/// Memory page size enumeration (4KB standard, 16KB Apple Silicon hardware page, 64KB super-page).
 public enum MemoryPageSize: Int, Sendable, CaseIterable {
     case page4K = 4096
     case page16K = 16384
     case page64K = 65536
 }
 
-/// 享元页 Buffer 封装结构 (共享内部物理内存页)
+/// Flyweight buffer wrapping shared physical page memory.
 public final class MemoryPageBufferFlyweight: @unchecked Sendable {
     public let pointer: UnsafeMutableRawPointer
     public let capacity: Int
@@ -18,13 +25,11 @@ public final class MemoryPageBufferFlyweight: @unchecked Sendable {
         self.pageSize = pageSize
         self.capacity = pageSize.rawValue
         var rawPtr: UnsafeMutableRawPointer? = nil
-        // 使用 posix_memalign 分配 16KB+ 物理页对齐内存 (Zero Heap Allocation reuse)
         let alignment = max(16384, pageSize.rawValue)
         let result = posix_memalign(&rawPtr, alignment, capacity)
         guard result == 0, let validPtr = rawPtr else {
             return nil
         }
-        // 初始化置零
         memset(validPtr, 0, capacity)
         self.pointer = validPtr
     }
@@ -55,14 +60,15 @@ public final class MemoryPageBufferFlyweight: @unchecked Sendable {
         free(pointer)
     }
     
-    /// 清零 buffer 内容准备下次复用
+    /// Clears buffer memory for subsequent reuse.
     public func reset() {
         memset(pointer, 0, capacity)
     }
 }
 
-/// 享元模式 (Flyweight Pattern): 内存页 Buffer 借还享元复用池
-/// 为流式读写 (SevenZipStoreStreamWriter, ArchiveWriter) 及 mmap / 哈希计算 (HashCalculator) 提供零堆分配的 byte buffer 借还机制。
+/// Flyweight Pattern: Page-aligned memory buffer pooling and recycling mechanism.
+///
+/// Supplies zero-heap-allocation memory buffers for streaming I/O, hash calculation, and mmap.
 public final class MemoryPageFlyweightPool: @unchecked Sendable {
     public static let shared = MemoryPageFlyweightPool()
     
@@ -71,16 +77,13 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
     private var pool16K: [MemoryPageBufferFlyweight] = []
     private var pool64K: [MemoryPageBufferFlyweight] = []
     
-    // 单个尺寸池最大保留数量
     private let maxPoolCapacity = 64
     
-    // 统计指标
     private var totalBorrowed: Int = 0
     private var totalReturned: Int = 0
     private var totalAllocatedCount: Int = 0
     
     private init() {
-        // 预热 4 个 4KB 页、4 个 16KB 硬件页与 4 个 64KB 页 buffer 享元
         for _ in 0..<4 {
             if let b4 = MemoryPageBufferFlyweight(pageSize: .page4K) {
                 pool4K.append(b4)
@@ -120,7 +123,7 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
     
     // MARK: - Borrow & Return API
     
-    /// 从享元池中借出一个指定页尺寸的 Buffer (零堆分配复用)
+    /// Borrows a page-aligned buffer of the requested size from the pool.
     public func borrowBuffer(size: MemoryPageSize = .page64K) -> MemoryPageBufferFlyweight {
         lock.lock()
         totalBorrowed += 1
@@ -149,18 +152,16 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
         totalAllocatedCount += 1
         lock.unlock()
         
-        // 若池子暂无空闲，动态分配新的享元 Buffer
         if let newBuffer = MemoryPageBufferFlyweight(pageSize: size) {
             newBuffer.inUse = true
             return newBuffer
         }
-        // 极度罕见的分配失败防御：降级分配 16K/4K
         let fallback = MemoryPageBufferFlyweight(pageSize: .page16K) ?? MemoryPageBufferFlyweight(pageSize: .page4K)
         fallback?.inUse = true
         return fallback ?? MemoryPageBufferFlyweight.sharedEmergencyFallback
     }
     
-    /// 归还 Buffer 享元至复用池 (带重复归还防崩溃拦截)
+    /// Returns a borrowed buffer back to the pool.
     public func returnBuffer(_ buffer: MemoryPageBufferFlyweight) {
         lock.lock()
         defer { lock.unlock() }
@@ -184,7 +185,7 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
         }
     }
     
-    /// RAII / Scope 安全借还 Closure API
+    /// RAII scoped borrow and return closure API.
     public func withBuffer<T>(
         size: MemoryPageSize = .page64K,
         _ block: (UnsafeMutableRawPointer, Int) throws -> T
@@ -196,7 +197,6 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
     
     // MARK: - Pool Maintenance & Statistics
     
-    /// 清空享元池与计数指标
     public func clearPool() {
         lock.lock()
         defer { lock.unlock() }
@@ -208,7 +208,6 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
         totalAllocatedCount = 0
     }
     
-    /// 享元池实时运行指标
     public var poolStats: (
         idle4K: Int,
         idle16K: Int,

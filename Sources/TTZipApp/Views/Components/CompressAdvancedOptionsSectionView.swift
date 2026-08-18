@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 新建压缩工程 高级专业配置与硬件调度组件 (竹绿主题与高透卡片版)
+/// Advanced compression settings and hardware dispatch options view.
 public struct CompressAdvancedOptionsSectionView: View {
     @Binding public var cpuThreadsOption: String
     @Binding public var splitVolumeOption: Int64?
@@ -63,50 +70,47 @@ public struct CompressAdvancedOptionsSectionView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Label("Apple Silicon 硬件加速与高级引擎配置", systemImage: "cpu.fill")
+                Label("Apple Silicon Hardware Acceleration & Engine Settings", systemImage: "cpu.fill")
                     .font(.system(size: 13, weight: .bold, design: .serif))
                     .foregroundStyle(TTZipTheme.kintsugiGold)
                 Spacer()
             }
             
-            // 算法指导提示卡
             AlgorithmGuidanceCardView(
                 algoInfo: formatGuidanceInfo(selectedFormat),
                 onShowMatrix: onShowMatrix
             )
             
-            // CPU 线程调度 (支持竹绿 Tint)
             VStack(alignment: .leading, spacing: 6) {
-                Text("并行 CPU 线程分配")
+                Text("Parallel CPU Thread Allocation")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
                 
                 Picker("", selection: $cpuThreadsOption) {
-                    Text("全核满载 (\(cachedTotalCores) 线程 - 最佳速度)").tag("全核")
-                    Text("半核负载 (\(max(1, cachedTotalCores / 2)) 线程)").tag("半核")
-                    Text("单线程 (\(1) 线程 - 后台低热量)").tag("单核")
+                    Text("All Cores (\(cachedTotalCores) Threads)").tag("全核")
+                    Text("Half Load (\(max(1, cachedTotalCores / 2)) Threads)").tag("半核")
+                    Text("Single Thread (\(1) Thread)").tag("单核")
                 }
                 .pickerStyle(.segmented)
                 .tint(TTZipTheme.bambooGreen)
             }
             
-            // 分卷限制选择
             VStack(alignment: .leading, spacing: 6) {
-                Text("分卷大小限制 (Split Volume)")
+                Text("Split Volume Size Limit")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
                 
                 HStack(spacing: 8) {
-                    volumeOptionTile(size: nil, name: "不分卷")
+                    volumeOptionTile(size: nil, name: "No Split")
                     volumeOptionTile(size: 700 * 1024 * 1024, name: "CD (700MB)")
                     volumeOptionTile(size: 4700 * 1024 * 1024, name: "DVD (4.7GB)")
                     volumeOptionTile(size: 4000 * 1024 * 1024, name: "FAT32 (4GB)")
-                    volumeOptionTile(size: -1, name: "自定义 MB")
+                    volumeOptionTile(size: -1, name: "Custom")
                 }
                 
                 if isCustomVolumeSelected {
                     HStack(spacing: 6) {
-                        TextField("数值", text: $customVolumeValueString)
+                        TextField("Value", text: $customVolumeValueString)
                             .textFieldStyle(.plain)
                             .font(.system(size: 11.5))
                             .padding(.horizontal, 8)
@@ -130,10 +134,9 @@ public struct CompressAdvancedOptionsSectionView: View {
             
             Divider()
             
-            // 加密与口令配置 (全量应用竹绿 .tint)
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Toggle("启用高强度 AES-256 位加密", isOn: $enableEncryption)
+                    Toggle("Enable AES-256 Encryption", isOn: $enableEncryption)
                         .font(.system(size: 11.5, weight: .bold))
                         .tint(TTZipTheme.bambooGreen)
                     
@@ -142,7 +145,7 @@ public struct CompressAdvancedOptionsSectionView: View {
                     Button(action: onOpenPasswordVault) {
                         HStack(spacing: 4) {
                             Image(systemName: "key.fill")
-                            Text("🔑 从密码库选择口令...")
+                            Text("🔑 Choose from Vault...")
                         }
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(TTZipTheme.kintsugiGold)
@@ -155,7 +158,7 @@ public struct CompressAdvancedOptionsSectionView: View {
                 }
                 
                 if enableEncryption {
-                    TTSecureTextField("设置加密解压密码", text: $password)
+                    TTSecureTextField("Enter encryption password", text: $password)
                         .font(.system(size: 12))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -164,11 +167,11 @@ public struct CompressAdvancedOptionsSectionView: View {
                         .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
                 }
                 
-                Toggle("固实压缩包 (Solid Archive - 提高多小文件压缩率)", isOn: $enableSolidArchive)
+                Toggle("Solid Archive (Optimized for small files)", isOn: $enableSolidArchive)
                     .disabled(selectedFormat != .sevenZip)
                     .tint(TTZipTheme.bambooGreen)
                 
-                Toggle("加密文件名与目录树结构", isOn: $encryptFileNames)
+                Toggle("Encrypt File Names and Directory Structure", isOn: $encryptFileNames)
                     .disabled(!enableEncryption || selectedFormat != .sevenZip)
                     .tint(TTZipTheme.bambooGreen)
             }
@@ -176,23 +179,22 @@ public struct CompressAdvancedOptionsSectionView: View {
             
             Divider()
             
-            // 清理与自动化 Toggle 组 (双列网格高保真配图与竹绿 .tint)
             VStack(alignment: .leading, spacing: 8) {
-                Text("系统清理与自动化策略")
+                Text("Cleanup & Automation Policies")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary)
                 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    Toggle("过滤 macOS 垃圾 (.DS_Store / __MACOSX)", isOn: $skipMacJunk)
+                    Toggle("Filter macOS Junk (.DS_Store / __MACOSX)", isOn: $skipMacJunk)
                         .tint(TTZipTheme.bambooGreen)
                     
-                    Toggle("选中项目独立单独打包", isOn: $createSeparateArchives)
+                    Toggle("Create Separate Archives per Item", isOn: $createSeparateArchives)
                         .tint(TTZipTheme.bambooGreen)
                     
-                    Toggle("压缩成功后移至废纸篓", isOn: $deleteSourceAfterCompress)
+                    Toggle("Move Source Files to Trash After Compression", isOn: $deleteSourceAfterCompress)
                         .tint(TTZipTheme.bambooGreen)
                     
-                    Toggle("完成后在 Finder 中高亮显示", isOn: $openFinderAfterCompress)
+                    Toggle("Reveal in Finder Upon Completion", isOn: $openFinderAfterCompress)
                         .tint(TTZipTheme.bambooGreen)
                 }
                 .font(.system(size: 11))
@@ -251,39 +253,39 @@ public struct CompressAdvancedOptionsSectionView: View {
     private func formatGuidanceInfo(_ format: ArchiveCompressionFormat) -> (icon: String, color: Color, title: String, desc: String) {
         switch format {
         case .sevenZip:
-            return ("sparkles", .blue, "7-Zip (LZMA2) 现代标准", "极限空间压缩比，推荐用于大文档、工程代码库备份")
+            return ("sparkles", .blue, "7-Zip (LZMA2) Standard", "High compression ratio, recommended for documents and code repositories.")
         case .zip:
-            return ("doc.zipper", .purple, "ZIP 经典跨平台", "最高全平台兼容性，完美适配 Windows 与移动端解压")
+            return ("doc.zipper", .purple, "ZIP Universal", "Maximum cross-platform compatibility across Windows, Linux, and mobile devices.")
         case .zst:
-            return ("bolt.circle.fill", .orange, "Zstandard (.zst) 极速引擎", "RFC 8878 标准物理数据帧，多 GB/s 超高速全核并发解压")
+            return ("bolt.circle.fill", .orange, "Zstandard (.zst) Fast Stream", "RFC 8878 high-throughput multi-GB/s parallel decompression.")
         case .tarZst:
-            return ("bolt.fill", .orange, "TAR.ZST Meta 极速引擎", "支持多 GB/s 超高速多核并行解包与数据流吞吐")
+            return ("bolt.fill", .orange, "TAR.ZST Meta Stream", "Ultra-fast multi-core parallel streaming archive.")
         case .tarGz, .gz:
-            return ("terminal.fill", .green, "TAR.GZ Linux/DevOps", "标准 Unix 服务器发布与开源项目代码镜像格式")
+            return ("terminal.fill", .green, "TAR.GZ Linux/DevOps", "Standard Unix server distribution and code archive format.")
         case .tar:
-            return ("folder.fill", .brown, "TAR POSIX 零拷贝", "无压缩极速归档打包，满载磁盘物理 I/O 带宽")
+            return ("folder.fill", .brown, "TAR POSIX Zero-Copy", "Uncompressed fast archiving maximizing raw disk throughput.")
         case .bz2, .tarBz2:
-            return ("shippingbox.fill", .indigo, "BZIP2 传统高压", "pbzip2 多块并行拆分算法，传统 UNIX 高度无损归档")
+            return ("shippingbox.fill", .indigo, "BZIP2 High Density", "Parallel pbzip2 block-level compression for Unix archives.")
         case .xz, .tarXz:
-            return ("cpu.fill", .cyan, "XZ 源码极限高压", "Parallel LZMA2 线程池分片，开源软件发布与镜像必备")
+            return ("cpu.fill", .cyan, "XZ Source Archive", "Parallel LZMA2 slicing for software release distributions.")
         case .lzip:
-            return ("shield.checkerboard", .pink, "LZIP 安全容错归档", "基于 32-bit CRC32 LZMA 并行切块，高容错数据备份")
+            return ("shield.checkerboard", .pink, "LZIP Resilient Archive", "CRC32 protected slicing for robust long-term backup.")
         case .lz4:
-            return ("bolt.horizontal.fill", .teal, "LZ4 Sub-millisecond 帧", "极速毫秒级流体压解，吞吐突破数 GB/s 物理极限")
+            return ("bolt.horizontal.fill", .teal, "LZ4 Sub-millisecond Frame", "Ultra-fast frame compression exceeding multi-GB/s throughput.")
         case .brotli:
-            return ("globe", .orange, "BROTLI 网页资源优化", "Google Brotli 算法，针对 Web 文本与前端静态资源优化")
+            return ("globe", .orange, "BROTLI Web Compression", "Google Brotli algorithm optimized for web resources.")
         case .lrzip:
-            return ("slider.horizontal.below.square.filled.and.arrow.between.any.capsule", .mint, "LRZIP 超长距离预处理", "Gigabyte-window 重复串预处理，海量大文件压缩率第一")
+            return ("slider.horizontal.below.square.filled.and.arrow.between.any.capsule", .mint, "LRZIP Long Range Match", "Gigabyte-window matching for large multi-gigabyte corpora.")
         case .aar:
-            return ("apple.logo", .red, "AAR Apple Native 归档", "100% macOS Native Apple Silicon 硬件加速 (LZFSE/PBZX)")
+            return ("apple.logo", .red, "AAR Apple Native Archive", "100% macOS Apple Silicon hardware acceleration (LZFSE/PBZX).")
         case .snappy:
-            return ("paperplane.fill", .yellow, "SNAPPY Framed 内存流", "Google Snappy 高吞吐无延迟流式压缩引擎")
+            return ("paperplane.fill", .yellow, "SNAPPY Framed Stream", "Google Snappy low-latency memory stream compression.")
         case .wim:
-            return ("window.vertical.closed", .blue, "WIM Windows 镜像", "Windows 部署镜像与系统安装文件封装规范")
+            return ("window.vertical.closed", .blue, "WIM Windows Image", "Windows deployment image packaging standard.")
         case .dmg:
-            return ("disc.fill", .gray, "DMG Apple 磁盘映像", "macOS 标准 APFS/UDZO 可挂载虚拟磁盘格式")
+            return ("disc.fill", .gray, "DMG Apple Disk Image", "macOS standard mountable virtual disk format.")
         case .iso:
-            return ("opticaldisc.fill", .purple, "ISO 光盘镜像", "ISO9660 / Joliet / UDF 通用复合光盘映像")
+            return ("opticaldisc.fill", .purple, "ISO Optical Image", "ISO9660 / Joliet / UDF universal optical disc image.")
         }
     }
 }

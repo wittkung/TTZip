@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
@@ -10,9 +17,8 @@ public struct BenchmarkConfigSectionView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // 顶部模式 Pills
             HStack(spacing: 12) {
-                Text("测试模式")
+                Text("Test Mode")
                     .font(.system(size: 12, weight: .bold, design: .serif))
                     .foregroundStyle(TTZipTheme.bambooGreen)
                 
@@ -63,7 +69,7 @@ public struct BenchmarkConfigSectionView: View {
     private var syntheticConfigView: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("数据规模")
+                Text("Data Scale")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary)
                 
@@ -89,7 +95,7 @@ public struct BenchmarkConfigSectionView: View {
             }
             
             VStack(alignment: .leading, spacing: 8) {
-                Text("压缩率预设")
+                Text("Compression Level")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary)
                 
@@ -116,7 +122,7 @@ public struct BenchmarkConfigSectionView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "info.circle")
                         .font(.system(size: 10))
-                    Text("说明：\(viewModel.selectedLevel.detailDescription)")
+                    Text("Description: \(viewModel.selectedLevel.detailDescription)")
                         .font(.system(size: 10.5))
                 }
                 .foregroundStyle(.secondary)
@@ -128,7 +134,7 @@ public struct BenchmarkConfigSectionView: View {
     private var customFileConfigView: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("自选跑分样本")
+                Text("Custom Benchmark Corpus")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary)
                 
@@ -155,7 +161,7 @@ public struct BenchmarkConfigSectionView: View {
                         
                         Spacer()
                         
-                        Button("更换样本...") {
+                        Button("Change Corpus...") {
                             viewModel.pickCustomPath()
                         }
                         .buttonStyle(.bordered)
@@ -169,7 +175,7 @@ public struct BenchmarkConfigSectionView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.system(size: 14, weight: .semibold))
-                            Text("点击选择本地文件或文件夹进行性能测试...")
+                            Text("Click to select local file or directory for benchmark...")
                                 .font(.system(size: 12, weight: .medium))
                         }
                         .foregroundStyle(TTZipTheme.bambooGreen)
@@ -194,34 +200,34 @@ public struct BenchmarkConfigSectionView: View {
                 Image(systemName: "gauge.with.dots.needle.bottom.100percent")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(TTZipTheme.kintsugiGold)
-                Text("前端算法与 UI 渲染性能基准")
+                Text("Frontend Algorithm & UI Rendering Benchmark")
                     .font(.system(size: 13, weight: .bold))
             }
-            Text("覆盖超大目录树构建、20,000 条目实时搜索防抖过滤、有界 LRU 缓存命中以及 60Hz 进度事件门控节流。")
+            Text("Covers large directory tree construction, 20,000-item debounced search filtering, bounded LRU cache access, and 60Hz progress event throttling.")
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
             
             if let report = viewModel.frontendReport {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("全项通过状态:")
+                        Text("Overall Status:")
                             .font(.system(size: 11, weight: .bold))
-                        Text(report.isAllPassed ? "🟢 全部达标 (Passed)" : "🔴 未达标")
+                        Text(report.isAllPassed ? "🟢 Passed" : "🔴 Failed")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(report.isAllPassed ? TTZipTheme.bambooGreen : .red)
                     }
                     if let lastTree = report.treeBuildMetrics.last {
-                        Text("• 50k 条目树构建: \(String(format: "%.1f", lastTree.durationMs)) ms (\(String(format: "%.0f", lastTree.throughputItemsPerSec)) items/s)")
+                        Text("• 50k Item Tree Build: \(String(format: "%.1f", lastTree.durationMs)) ms (\(String(format: "%.0f", lastTree.throughputItemsPerSec)) items/s)")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
                     if let firstSearch = report.searchFilterMetrics.first {
-                        Text("• 20k 条目搜索过滤: \(String(format: "%.1f", firstSearch.durationMs)) ms (\(String(format: "%.0f", firstSearch.filterThroughputItemsPerSec)) items/s)")
+                        Text("• 20k Item Search Filter: \(String(format: "%.1f", firstSearch.durationMs)) ms (\(String(format: "%.0f", firstSearch.filterThroughputItemsPerSec)) items/s)")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
                     if let throttle = report.throttleMetrics.first {
-                        Text("• 进度事件节流拦截率: \(String(format: "%.1f", throttle.suppressionRatio))%")
+                        Text("• Event Throttling Suppression Rate: \(String(format: "%.1f", throttle.suppressionRatio))%")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }

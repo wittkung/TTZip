@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_tar_native.c
+ * @brief High-performance native TAR/GZ/BZ2/XZ archive creation and extraction engine.
+ */
+
 #include "include/CTTZipBridge.h"
 #include "include/ttzip_native_archive.h"
 #include "include/ttzip_tar_zstd_direct.h"
@@ -51,7 +63,6 @@ static void write_reg_file_data(struct archive* a, const char* full_path, int64_
     close(fd);
 }
 
-// 辅助递归函数：向 libarchive 写入文件或目录节点
 static int add_file_or_dir_to_archive(
     struct archive* a,
     const char* full_path,
@@ -313,7 +324,6 @@ int ttzip_extract_tar_native_c(
         char full_dest_path[4096];
         ttzip_common_join_path(full_dest_path, sizeof(full_dest_path), dest_dir, entry_pathname);
         
-        // Fast-path bypass for root/single-file entries without subdirectories (dest_dir already guaranteed)
         if (strchr(entry_pathname, '/') != NULL) {
             char parent_dir[1024];
             snprintf(parent_dir, sizeof(parent_dir), "%s", full_dest_path);

@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import AppKit
 
-/// 系统通用对话框统一处理服务
+/// Unified helper service for native system open/save dialogs.
 @MainActor
 public enum SystemDialogHelper {
-    /// 拉起目录选择面板
-    public static func pickDirectory(prompt: String = "选择目标文件夹", defaultPath: String? = nil) -> String? {
+    /// Presents directory selection panel.
+    public static func pickDirectory(prompt: String = "Select Destination Folder", defaultPath: String? = nil) -> String? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -19,9 +26,9 @@ public enum SystemDialogHelper {
         return nil
     }
 
-    /// 拉起单文件或多文件选择面板
+    /// Presents file selection panel.
     public static func pickFiles(
-        prompt: String = "打开文件",
+        prompt: String = "Open Files",
         canChooseDirectories: Bool = true,
         allowsMultipleSelection: Bool = true
     ) -> [String] {

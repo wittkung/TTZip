@@ -1,14 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 【3.6 模板方法模式 (Template Method Pattern)】ZIP 格式特化模板
-/// 实现 PKZip 标头校验、Central Directory 重建、原生 C 极速 GCD 16 核并发解压与 PKZip 打包
+/// Specialized ZIP format workflow template (Template Method Pattern).
+/// Implements PKZip header verification, central directory reconstruction, in-process C parallel extraction, and store-bypass writing.
 public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @unchecked Sendable {
     public override init() {
         super.init()
     }
 
-    // MARK: - Step 1: Hook 钩子 (前置校验)
+    // MARK: - Step 1: Pre-execution Validation Hook
     public override func preExecutionCheck(context: ArchiveTemplateContext) throws {
         try super.preExecutionCheck(context: context)
         if context.operation == .extract || context.operation == .inspect {
@@ -19,7 +26,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
         }
     }
 
-    // MARK: - Step 3: 原语步骤 (执行核心 ZIP 算法)
+    // MARK: - Step 3: Core Algorithm Primitive
     public override func executeCoreAlgorithm(context: ArchiveTemplateContext) throws -> WorkflowResult {
         switch context.operation {
         case .compress:
@@ -68,7 +75,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                         state: .completed,
                         bytesProcessed: totalOrig,
                         totalBytes: totalOrig,
-                        currentFileName: "ZIP 打包完成",
+                        currentFileName: "ZIP Archive Completed",
                         throughputMBs: 0
                     ))
                     return WorkflowResult(
@@ -196,7 +203,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
         }
     }
 
-    // MARK: - Step 4: Hook 钩子 (校验 ZIP 产物完整性与 PKZip 标头/Central Directory)
+    // MARK: - Step 4: Output Integrity Hook (Validates PKZip signatures PK\x03\x04 / PK\x01\x02 / PK\x05\x06)
     public override func verifyOutputIntegrity(context: ArchiveTemplateContext, result: inout WorkflowResult) throws {
         try super.verifyOutputIntegrity(context: context, result: &result)
 
@@ -209,7 +216,6 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                 throw ArchiveError.readFailed(code: -502)
             }
 
-            // PKZip Signature Check: PK\x03\x04 (0x04034b50) or PK\x01\x02 or PK\x05\x06
             let isPkHeader = (data[0] == 0x50 && data[1] == 0x4B && data[2] == 0x03 && data[3] == 0x04) ||
                              (data[0] == 0x50 && data[1] == 0x4B && data[2] == 0x05 && data[3] == 0x06) ||
                              (data[0] == 0x50 && data[1] == 0x4B && data[2] == 0x01 && data[3] == 0x02)

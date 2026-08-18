@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 格式与压缩级别组合的实测物理指标数据模型
+/// Metric model for format and compression level combinations.
 public struct CombinationMetrics: Codable, Sendable {
     public let formatRaw: String
     public let levelRaw: Int
@@ -26,7 +33,7 @@ public struct CombinationMetrics: Codable, Sendable {
     }
 }
 
-/// 动态计算并覆盖更新存储各组合最新物理实测速度与压缩比的管理中心
+/// Dynamic benchmark speed and ratio cache management subsystem.
 public final class BenchmarkSpeedCache: @unchecked Sendable {
     public static let shared = BenchmarkSpeedCache()
     
@@ -37,7 +44,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
         loadFromDisk()
     }
     
-    /// 清空内存中及磁盘上的 Benchmark 速度记录与缓存 (用于测试隔离)
+    /// Clears cached metrics in memory and on disk.
     public func clearCache() {
         queue.sync(flags: .barrier) {
             self.metricsData.removeAll()
@@ -49,7 +56,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
         return "\(format.rawValue)_\(level.rawValue)"
     }
     
-    /// 动态覆盖记录某组合最新单次物理实测指标 (只保留最新一轮测试结果)
+    /// Dynamically records physical throughput and ratio metrics for a format and level combination.
     public func record(
         format: ArchiveCompressionFormat,
         level: ArchiveCompressionLevel,
@@ -61,7 +68,6 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
         queue.async(flags: .barrier) { [weak self] in
             guard let self = self else { return }
             let key = self.cacheKey(format: format, level: level)
-            // 直接覆盖已有组合结果，只保留最新测试数据
             let latest = CombinationMetrics(
                 formatRaw: format.rawValue,
                 levelRaw: level.rawValue,
@@ -75,7 +81,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
         }
     }
     
-    /// 获取某组合最新一轮测试指标
+    /// Retrieves latest metrics for target format and compression level.
     public func getLatestMetrics(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel) -> CombinationMetrics? {
         queue.sync {
             let key = cacheKey(format: format, level: level)
@@ -83,7 +89,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
         }
     }
     
-    /// 动态计算某格式与级别相对于该格式最新测试中最大速度的百分比 (最高实测速度标为 100%)
+    /// Calculates relative speed percentage compared to maximum observed throughput for the format (100% = max throughput).
     public func relativeSpeedPercentage(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel) -> Int {
         return queue.sync {
             let key = cacheKey(format: format, level: level)
@@ -106,7 +112,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
         }
     }
     
-    /// 获取某组合最新测试的压缩体积比 (%)，若未跑测则按估计衰减返回
+    /// Retrieves latest compression ratio percentage for target format and level.
     public func compressionRatioPercent(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel) -> Double {
         return queue.sync {
             let key = cacheKey(format: format, level: level)
@@ -117,17 +123,16 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
         }
     }
     
-    /// 实测相对压缩体积与节省空间标注徽章 (例 "体积 31.5%" 或 "省 68.5%")
+    /// Returns formatted ratio badge string.
     public func ratioBadge(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel) -> String {
         let r = compressionRatioPercent(format: format, level: level)
         let saved = max(0.0, 100.0 - r)
         if level == .store || r >= 99.9 {
-            return "100% 体积"
+            return "100% Size"
         }
-        return String(format: "体积 %.1f%% (省 %.1f%%)", r, saved)
+        return String(format: "%.1f%% Size (%.1f%% Saved)", r, saved)
     }
     
-    /// 未获取物理实测值时的动态速度衰减预估
     private func defaultDynamicSpeedFallback(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel) -> Int {
         if level == .store { return 100 }
         let decayPerLevel: Double
@@ -141,7 +146,6 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
         return max(10, min(100, pct))
     }
     
-    /// 未获取物理实测值时的动态体积压缩比预估
     private func defaultDynamicRatioFallback(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel) -> Double {
         if level == .store { return 100.0 }
         let baseRatio: Double
@@ -155,13 +159,12 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
         return max(5.0, baseRatio - levelImprovement)
     }
     
-    /// 批量覆盖持久化最新全维度测试结果 JSON 报告
+    /// Batch persists comprehensive benchmark report JSON to disk.
     public func saveFullReport(rows: [ExhaustiveBenchmarkRow]) {
         queue.async(flags: .barrier) { [weak self] in
             guard let self = self else { return }
             for row in rows {
                 let key = self.cacheKey(format: row.format, level: row.level)
-                // 每次跑测直接覆盖原组合，只保留最新测试数据
                 let latest = CombinationMetrics(
                     formatRaw: row.format.rawValue,
                     levelRaw: row.level.rawValue,

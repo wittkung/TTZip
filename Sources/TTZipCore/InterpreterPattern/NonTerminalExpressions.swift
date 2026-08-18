@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - AndExpression (逻辑与非终结符)
+// MARK: - AndExpression
 
-/// 逻辑与 (AND) 抽象语法树非终结节点
+/// Non-terminal AST node representing logical conjunction (AND).
 public struct AndExpression: ArchiveFilterExpressionProtocol {
     public let left: any ArchiveFilterExpressionProtocol
     public let right: any ArchiveFilterExpressionProtocol
@@ -13,7 +20,6 @@ public struct AndExpression: ArchiveFilterExpressionProtocol {
     }
     
     public func evaluate(entry: ArchiveEntry) -> Bool {
-        // 短路求值优化：如果左侧为 false，无需评估右侧
         return left.evaluate(entry: entry) && right.evaluate(entry: entry)
     }
     
@@ -22,9 +28,9 @@ public struct AndExpression: ArchiveFilterExpressionProtocol {
     }
 }
 
-// MARK: - OrExpression (逻辑或非终结符)
+// MARK: - OrExpression
 
-/// 逻辑或 (OR) 抽象语法树非终结节点
+/// Non-terminal AST node representing logical disjunction (OR).
 public struct OrExpression: ArchiveFilterExpressionProtocol {
     public let left: any ArchiveFilterExpressionProtocol
     public let right: any ArchiveFilterExpressionProtocol
@@ -35,7 +41,6 @@ public struct OrExpression: ArchiveFilterExpressionProtocol {
     }
     
     public func evaluate(entry: ArchiveEntry) -> Bool {
-        // 短路求值优化：如果左侧为 true，无需评估右侧
         return left.evaluate(entry: entry) || right.evaluate(entry: entry)
     }
     
@@ -44,9 +49,9 @@ public struct OrExpression: ArchiveFilterExpressionProtocol {
     }
 }
 
-// MARK: - NotExpression (逻辑非非终结符)
+// MARK: - NotExpression
 
-/// 逻辑非 (NOT) 抽象语法树非终结节点
+/// Non-terminal AST node representing logical negation (NOT).
 public struct NotExpression: ArchiveFilterExpressionProtocol {
     public let operand: any ArchiveFilterExpressionProtocol
     

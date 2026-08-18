@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
@@ -27,7 +34,6 @@ public struct PresetMasterListView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // 报头 (Header)
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     VStack(alignment: .leading, spacing: 1) {
@@ -35,14 +41,14 @@ public struct PresetMasterListView: View {
                             .font(.system(size: 9, weight: .bold, design: .serif))
                             .tracking(2)
                             .foregroundStyle(TTZipTheme.kintsugiGold)
-                        Text("预设方案")
+                        Text("Presets")
                             .font(.system(size: 16, weight: .bold, design: .serif))
                             .foregroundStyle(.primary)
                     }
                     
                     Spacer()
                     
-                    Text("\(presets.count) 项")
+                    Text("\(presets.count) Items")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundStyle(TTZipTheme.bambooGreen)
                         .padding(.horizontal, 8)
@@ -55,12 +61,10 @@ public struct PresetMasterListView: View {
             .padding(.top, 16)
             .frame(height: 52)
             
-            // 统一置顶分割线 (金缮金强调线)
             Rectangle()
                 .fill(TTZipTheme.kintsugiGold)
                 .frame(height: 1.5)
             
-            // 预设列表项
             ScrollView {
                 LazyVStack(spacing: 6) {
                     ForEach(presets) { preset in
@@ -111,7 +115,7 @@ public struct PresetMasterListView: View {
                             Button(action: {
                                 onDuplicatePreset?(preset)
                             }) {
-                                Label("克隆衍生预设", systemImage: "doc.on.doc")
+                                Label("Duplicate Preset", systemImage: "doc.on.doc")
                             }
                         }
                     }
@@ -122,13 +126,12 @@ public struct PresetMasterListView: View {
             
             Divider()
             
-            // 底部新建与重置工具栏
             VStack(spacing: 8) {
                 Button(action: onCreateNewPreset) {
                     HStack(spacing: 6) {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 12, weight: .bold))
-                        Text("新建预设方案")
+                        Text("New Preset")
                             .font(.system(size: 11.5, weight: .bold))
                     }
                     .foregroundStyle(.white)
@@ -144,7 +147,7 @@ public struct PresetMasterListView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.counterclockwise")
                             .font(.system(size: 10))
-                        Text("恢复系统默认预设")
+                        Text("Reset to Defaults")
                             .font(.system(size: 10.5, weight: .medium))
                     }
                     .foregroundStyle(.secondary)
@@ -208,15 +211,15 @@ public struct PresetMasterListView: View {
     private func levelStyle(for level: ArchiveCompressionLevel) -> (String, Color) {
         switch level {
         case .store:
-            return ("仅存储", Color.secondary)
+            return ("Store", Color.secondary)
         case .fastest, .fast, .fast1, .fast2, .fast3, .fast4, .fast5:
-            return ("极速", TTZipTheme.bambooGreen)
+            return ("Fast", TTZipTheme.bambooGreen)
         case .normal, .level5, .level6, .level7:
-            return ("标准", Color.blue)
+            return ("Normal", Color.blue)
         case .maximum, .ultra, .level8, .level9, .level10, .level11, .level12, .level13, .level14, .level15, .level16, .level17, .level18, .level19, .level20, .level21, .level22:
-            return ("极限", TTZipTheme.kintsugiGold)
+            return ("Ultra", TTZipTheme.kintsugiGold)
         default:
-            return ("标准", Color.blue)
+            return ("Normal", Color.blue)
         }
     }
 }

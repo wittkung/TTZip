@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// Libarchive UUDecode 错误类型
+/// Libarchive UUDecode error types.
 public enum LibarchiveUUDecodeError: LocalizedError, Sendable, Equatable {
     case missingBeginHeader
     case missingEndFooter
@@ -27,10 +34,10 @@ public enum LibarchiveUUDecodeError: LocalizedError, Sendable, Equatable {
     }
 }
 
-/// 纯内存 libarchive ASCII .uu 黄金语料库高速解码器 (100% 进程内纯 Swift 原生，零外部 CLI 依赖)
+/// In-memory libarchive ASCII `.uu` golden corpus decoder (100% native in-process Swift, zero CLI dependencies).
 public enum LibarchiveUUDecoder: Sendable {
     
-    /// UU 头部元数据
+    /// UU header metadata.
     public struct UUHeader: Sendable, Equatable {
         public let mode: Int
         public let filename: String
@@ -43,7 +50,7 @@ public enum LibarchiveUUDecoder: Sendable {
         }
     }
     
-    /// 解析 UU 头部信息 (`begin 644 filename` 或 `begin-base64 644 filename`)
+    /// Parses UU header line (`begin 644 filename` or `begin-base64 644 filename`).
     public static func parseHeader(from line: String) -> UUHeader? {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("begin ") {
@@ -64,7 +71,7 @@ public enum LibarchiveUUDecoder: Sendable {
         return nil
     }
 
-    /// 从 .uu 纯文本内容中直接还原二进制归档数据 (100% 内存直通，零磁盘 I/O)
+    /// Reconstructs binary archive payload directly from `.uu` text content (100% in-memory direct streaming).
     public static func decode(uuString: String) throws -> Data {
         guard let data = uuString.data(using: .utf8) ?? uuString.data(using: .ascii) else {
             throw LibarchiveUUDecodeError.emptyData
@@ -72,7 +79,7 @@ public enum LibarchiveUUDecoder: Sendable {
         return try decode(data: data)
     }
 
-    /// 从原始字节流中解码
+    /// Decodes raw byte stream containing uuencoded data.
     public static func decode(data: Data) throws -> Data {
         var result = Data()
         result.reserveCapacity(data.count * 3 / 4)
@@ -80,7 +87,6 @@ public enum LibarchiveUUDecoder: Sendable {
         var started = false
         var header: UUHeader?
         
-        // 逐行切分快速解析 (支持 \n 与 \r\n)
         let lines = data.split(separator: UInt8(ascii: "\n"))
         var lineIndex = 0
         
@@ -105,7 +111,6 @@ public enum LibarchiveUUDecoder: Sendable {
                 continue
             }
             
-            // 已进入编码数据主体
             if let lineStr = String(bytes: lineBytes, encoding: .ascii) {
                 let trimmed = lineStr.trimmingCharacters(in: .whitespacesAndNewlines)
                 if trimmed == "end" || trimmed.hasPrefix("end ") || trimmed == "====" {
@@ -114,7 +119,6 @@ public enum LibarchiveUUDecoder: Sendable {
             }
             
             if header?.isBase64 == true {
-                // Base64 编码模式
                 if let lineStr = String(bytes: lineBytes, encoding: .ascii)?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !lineStr.isEmpty {
                     if let chunk = Data(base64Encoded: lineStr, options: .ignoreUnknownCharacters) {
@@ -124,19 +128,18 @@ public enum LibarchiveUUDecoder: Sendable {
                 continue
             }
             
-            // 标准 POSIX/libarchive UUDecode 模式
+            // Standard POSIX / libarchive UUDecode mode
             guard let firstByte = lineBytes.first else {
                 continue
             }
             
             let lineLength = decodeByte(firstByte)
             if lineLength == 0 {
-                // 0 长度行 (如 `)，跳过
                 continue
             }
             
             var byteCount = Int(lineLength)
-            var idx = 1 // 从首字节后的第 1 个字符开始
+            var idx = 1
             
             while byteCount > 0 && idx < lineBytes.count {
                 let c0 = decodeByte(lineBytes[idx])
@@ -171,7 +174,7 @@ public enum LibarchiveUUDecoder: Sendable {
         return result
     }
 
-    /// 从文件 URL 读取并解码
+    /// Decodes from file URL.
     public static func decode(fileURL: URL) throws -> Data {
         do {
             let data = try Data(contentsOf: fileURL)
@@ -183,7 +186,7 @@ public enum LibarchiveUUDecoder: Sendable {
         }
     }
 
-    /// 从文件路径读取并解码
+    /// Decodes from file path.
     public static func decode(filePath: String) throws -> Data {
         return try decode(fileURL: URL(fileURLWithPath: filePath))
     }

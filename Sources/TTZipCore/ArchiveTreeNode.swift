@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 代表归档文件内部的项目节点（支持树状层级）
+/// Represents a hierarchical tree node for archive file and directory navigation.
 public struct ArchiveTreeNode: Identifiable, Sendable, Equatable {
     public var id: String { path }
     public let name: String
@@ -32,15 +39,15 @@ public struct ArchiveTreeNode: Identifiable, Sendable, Equatable {
     }
 }
 
-// MARK: - PrototypeCopyable 原型模式扩展
+// MARK: - PrototypeCopyable Prototype Pattern Extension
 extension ArchiveTreeNode: PrototypeCopyable {
-    /// 原型模式默认克隆：递归深拷贝整棵节点树
+    /// Creates a deep clone of the entire tree hierarchy.
     public func clone() -> ArchiveTreeNode {
         return cloneTree()
     }
     
-    /// 树形层级深拷贝克隆 API (Deep Copy Tree)
-    /// - Returns: 全新深拷贝的 ArchiveTreeNode 独立树节点
+    /// Recursively deep-copies this tree node and all descendants.
+    /// - Returns: Independent cloned `ArchiveTreeNode` subtree.
     public func cloneTree() -> ArchiveTreeNode {
         let clonedChildren = children?.map { $0.cloneTree() }
         return ArchiveTreeNode(
@@ -56,8 +63,7 @@ extension ArchiveTreeNode: PrototypeCopyable {
     }
 }
 
-
-// MARK: - ArchiveComponentProtocol 组合模式扩展
+// MARK: - ArchiveComponentProtocol Composite Pattern Extension
 extension ArchiveTreeNode: ArchiveComponentProtocol {
     public var sizeBytes: Int64 {
         if isDirectory, let children = children, !children.isEmpty {
@@ -92,7 +98,7 @@ extension ArchiveTreeNode: ArchiveComponentProtocol {
         }
     }
     
-    /// 将当前节点转构为标准的组合 Component (Leaf 或 Composite)
+    /// Converts this node into a composite Component (Leaf or Composite Directory).
     public func toComponent() -> ArchiveComponentProtocol {
         if isDirectory {
             let childComponents = (children ?? []).map { $0.toComponent() }
@@ -102,7 +108,7 @@ extension ArchiveTreeNode: ArchiveComponentProtocol {
         }
     }
     
-    /// 从组合 Component 节点反向构造 ArchiveTreeNode
+    /// Reconstructs an `ArchiveTreeNode` from a composite Component.
     public init(component: ArchiveComponentProtocol, detectedEncoding: String = "UTF-8") {
         self.name = component.name
         self.path = component.path
@@ -127,12 +133,10 @@ extension ArchiveTreeNode: ArchiveComponentProtocol {
     }
 }
 
-
-/// 将扁平的 ArchiveEntry 路径列表转构为层级化的 ArchiveTreeNode 目录树
+/// Builds a hierarchical list of `ArchiveTreeNode` objects from flat `ArchiveEntry` lists.
 public final class ArchiveTreeBuilder: @unchecked Sendable {
     public static func buildTree(from entries: [ArchiveEntry]) -> [ArchiveTreeNode] {
         let rootComponent = ArchiveComponentTreeBuilder.buildTree(from: entries)
         return rootComponent.getChildren().map { ArchiveTreeNode(component: $0) }
     }
 }
-

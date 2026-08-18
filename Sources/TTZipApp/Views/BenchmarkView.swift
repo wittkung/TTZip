@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 性能测试 Command Center - 旗舰高透社论美学 UI
+/// Benchmark command center view.
 public struct BenchmarkView: View {
     @StateObject private var viewModel = BenchmarkViewModel()
     
@@ -9,14 +16,13 @@ public struct BenchmarkView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header 栏 - 顶部对齐高度 52pt
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("BENCHMARK MATRIX")
                         .font(.system(size: 9, weight: .bold, design: .serif))
                         .tracking(2)
                         .foregroundStyle(TTZipTheme.kintsugiGold)
-                    Text("性能测试与算法比对")
+                    Text("Performance & Benchmarks")
                         .font(.system(size: 16, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                 }
@@ -27,7 +33,7 @@ public struct BenchmarkView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 11, weight: .bold))
-                        Text(viewModel.isRunning ? "压测中..." : "开始全套压测 (⌘R)")
+                        Text(viewModel.isRunning ? "Benchmarking..." : "Run Suite (⌘R)")
                             .font(.system(size: 11, weight: .bold))
                     }
                     .foregroundStyle(.white)
@@ -50,20 +56,16 @@ public struct BenchmarkView: View {
             .padding(.horizontal, 20)
             .frame(height: 52)
             
-            // 统一置顶分割线 (金缮金强调线对齐)
             Rectangle()
                 .fill(TTZipTheme.kintsugiGold)
                 .frame(height: 1.5)
             
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
-                    // 1. 顶部 Apple Silicon 硬件感知 Banner
                     BenchmarkHardwareBannerView()
                     
-                    // 2. 竞品软件检测与工具链管理面板
                     BenchmarkCompetitorPanel(viewModel: viewModel)
                     
-                    // 3. 双模式配置面板
                     BenchmarkConfigSectionView(viewModel: viewModel)
                     
                     if let err = viewModel.errorMessage {
@@ -80,7 +82,6 @@ public struct BenchmarkView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     
-                    // 4. 运行中实时跑分指示器
                     if viewModel.isRunning {
                         LiveBenchmarkSpeedDialView(
                             itemName: viewModel.currentPresetName,
@@ -93,7 +94,6 @@ public struct BenchmarkView: View {
                         )
                     }
                     
-                    // 5. 跑分可视化画布
                     if !viewModel.suiteResults.isEmpty {
                         resultsCanvas
                     }
@@ -111,17 +111,15 @@ public struct BenchmarkView: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
         .frame(minWidth: 320, minHeight: 300)
-        .alert("授权安装 Homebrew 包管理器", isPresented: $viewModel.showHomebrewConsentModal) {
-            Button("同意并安装 Homebrew 及 7-Zip 工具链") {
+        .alert("Homebrew Package Manager Installation", isPresented: $viewModel.showHomebrewConsentModal) {
+            Button("Agree and Install Homebrew & 7-Zip") {
                 viewModel.installSevenZipToolchain(consentedHomebrew: true)
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("检测到当前系统尚未安装 Homebrew。自动化部署 7-Zip (7zz) 高性能 CLI 工具链依赖 Homebrew。\n\n是否同意自动为您安装 Homebrew 包管理器及 7-Zip 工具链？")
+            Text("Homebrew is required to install 7-Zip CLI (7zz). Install now?")
         }
     }
-    
-    // MARK: - 跑分结果画布
     
     private var resultsCanvas: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -130,7 +128,7 @@ public struct BenchmarkView: View {
                     Image(systemName: "chart.bar.fill")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(TTZipTheme.bambooGreen)
-                    Text("测试结果与算法对比")
+                    Text("Benchmark Results")
                         .font(.system(size: 14, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                 }
@@ -138,11 +136,11 @@ public struct BenchmarkView: View {
                 Spacer()
                 
                 if viewModel.testMode == .synthetic {
-                    Text("合成数据 · \(viewModel.selectedSize.rawValue)")
+                    Text("Synthetic · \(viewModel.selectedSize.rawValue)")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                 } else if let path = viewModel.customPath {
-                    Text("样本: \((path as NSString).lastPathComponent)")
+                    Text("Sample: \((path as NSString).lastPathComponent)")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(TTZipTheme.bambooGreen)
                 }

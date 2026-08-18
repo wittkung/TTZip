@@ -1,0 +1,98 @@
+name: Feature Proposal / Architecture Request
+description: Propose a new feature, archive format support, or architectural optimization for TTZip.
+title: "[Feature]: "
+labels: ["enhancement", "proposal", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Thank you for proposing a feature or architecture enhancement for TTZip! 🚀
+        TTZip is engineered for extreme native performance on macOS 14+ (Sonoma, Sequoia) and Apple Silicon.
+        Please review [ARCHITECTURE.md](https://github.com/wittkung/TTZip/blob/main/ARCHITECTURE.md) and ensure your proposal adheres to our core systems invariants: zero-allocation hot paths, lockless concurrency, and stream-first architecture.
+
+  - type: input
+    id: feature-title
+    attributes:
+      label: Feature / Proposal Summary
+      description: A concise, descriptive summary of the proposed feature or architectural enhancement.
+      placeholder: e.g. Streaming Zstandard dictionary compression with zero-copy buffer pooling
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem Statement & Motivation
+      description: What problem does this feature solve? What use cases, workflows, or archive formats benefit from this proposal?
+      placeholder: Clearly describe the problem, current limitations in TTZip or existing macOS archive utilities, and why this addition is valuable...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Technical Solution & API Design
+      description: Detail your proposed technical design, Swift / C API signatures, data flow, and subsystem interactions.
+      placeholder: |
+        // Example proposed Swift / C API or pipeline interaction
+        public final class FeatureCompressor: ArchiveStreamWriter {
+            // ...
+        }
+      render: swift
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target-subsystems
+    attributes:
+      label: Target Subsystems
+      description: Which TTZip subsystems will be modified or introduced?
+      options:
+        - "TTZipCore (Archiving pipelines, engine dispatch, compression algorithms)"
+        - "CTTZipBridge (In-process C bindings, SIMD vectorization, LZMA/zstd/deflate)"
+        - "TTZipApp (SwiftUI frontend, NSOutlineView, macOS desktop UI)"
+        - "TTZipCLI (Command-line interface, ttzip-cli, streaming pipes)"
+        - "Vendor C Libraries (libarchive, libdeflate, liblzma, zstd, etc.)"
+        - "Cross-Subsystem / Global Architecture"
+    validations:
+      required: true
+
+  - type: textarea
+    id: systems-invariant-impact
+    attributes:
+      label: Systems Invariant & Hot-Path Impact Analysis
+      description: Detail how this proposal complies with TTZip's core systems engineering and performance invariants.
+      placeholder: |
+        Please address the following invariants:
+        - Zero-Allocation Hot Path: How does this avoid per-chunk / per-file heap malloc or Data(count:) kernel zero-filling?
+        - Lockless GCD Concurrency: How does this avoid locks (NSLock / mutex / semaphore) inside parallel worker loops?
+        - Mac App Store Sandbox Compliance: Is this compatible with -DMAS_BUILD and App Sandbox restrictions?
+        - Stream-First Architecture: How is memory bounded to fixed buffers with zero unbounded RAM usage?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives-considered
+    attributes:
+      label: Alternatives Considered & Technical Trade-offs
+      description: What alternative designs, algorithms, or libraries did you consider, and why was this approach chosen?
+      placeholder: Describe discarded alternatives, trade-offs (e.g. CPU vs RAM vs compression ratio), and why this design is superior...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: design-principles-alignment
+    attributes:
+      label: Design Principles & Governance Alignment Checklist
+      description: Please confirm that this proposal adheres to TTZip's architectural rules and engineering invariants.
+      options:
+        - label: "I have reviewed ARCHITECTURE.md and GEMINI.md regarding hot-path performance invariants."
+          required: true
+        - label: "This proposal introduces zero heap allocations or locks inside parallel compression/decompression hot loops."
+          required: true
+        - label: "This proposal maintains dual-channel release compatibility (MAS Sandbox -DMAS_BUILD and Direct Sparkle)."
+          required: true
+        - label: "This proposal preserves 100% in-process C execution without spawning external CLI subprocesses."
+          required: true
+        - label: "I am prepared to submit benchmarks demonstrating zero throughput regression against historical peak floors."
+          required: false

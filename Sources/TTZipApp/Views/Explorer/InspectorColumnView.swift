@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AppKit
 import TTZipCore
@@ -150,7 +157,7 @@ public struct InspectorColumnView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
-                                .help("在 Finder 中显示")
+                                .help("Reveal in Finder")
                                 
                                 Button(action: {
                                     if item.isArchive { onSelectArchive(item.path) } else { onCompressPath(item.path) }
@@ -158,7 +165,7 @@ public struct InspectorColumnView: View {
                                     if width >= 380 {
                                         HStack(spacing: 3) {
                                             Image(systemName: item.isArchive ? "arrow.down.doc" : "archivebox").font(.system(size: 10))
-                                            Text(item.isArchive ? "解压" : "压缩")
+                                            Text(item.isArchive ? "Extract" : "Compress")
                                                 .font(.system(size: 11, weight: .semibold))
                                                 .lineLimit(1)
                                                 .fixedSize(horizontal: true, vertical: false)
@@ -178,7 +185,7 @@ public struct InspectorColumnView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
-                                .help(item.isArchive ? "解压查看包内内容" : "新建压缩包")
+                                .help(item.isArchive ? "Extract and view contents" : "New archive")
                             }
                         }
                     }
@@ -354,7 +361,7 @@ public struct InspectorColumnView: View {
     }
     
     private func formatDate(_ date: Date?) -> String {
-        guard let date = date else { return "未知" }
+        guard let date = date else { return "Unknown" }
         return date.formatted(.dateTime.year().month().day().hour().minute())
     }
     
@@ -375,14 +382,14 @@ public struct InspectorColumnView: View {
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                    Text("全量 EXIF & 硬件属性检查器")
+                    Text("EXIF & Hardware Properties")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                 }
                 
                 Spacer()
                 
-                Text("\(deepMetadataDict.count) 项参数")
+                Text("\(deepMetadataDict.count) Properties")
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundStyle(TTZipTheme.bambooGreen)
                     .padding(.horizontal, 6)
@@ -395,12 +402,12 @@ public struct InspectorColumnView: View {
             
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 6) {
-                    detailPopoverRow(icon: "doc", label: "文件名", value: item.name)
-                    detailPopoverRow(icon: "internaldrive", label: "文件体积", value: item.sizeText)
-                    detailPopoverRow(icon: "folder", label: "文件类型", value: item.kindText)
-                    detailPopoverRow(icon: "calendar", label: "修改时间", value: formatDate(effectiveModificationDate))
+                    detailPopoverRow(icon: "doc", label: "File Name", value: item.name)
+                    detailPopoverRow(icon: "internaldrive", label: "File Size", value: item.sizeText)
+                    detailPopoverRow(icon: "folder", label: "Kind", value: item.kindText)
+                    detailPopoverRow(icon: "calendar", label: "Modified", value: formatDate(effectiveModificationDate))
                     if let dims = asyncDimensions {
-                        detailPopoverRow(icon: "aspectratio", label: "媒体尺寸", value: dims)
+                        detailPopoverRow(icon: "aspectratio", label: "Dimensions", value: dims)
                     }
                     
                     if !deepMetadataDict.isEmpty {
@@ -420,13 +427,13 @@ public struct InspectorColumnView: View {
     }
     
     private func metadataIcon(for key: String) -> String {
-        if key.contains("相机") || key.contains("设备") { return "camera" }
-        if key.contains("曝光") || key.contains("ISO") { return "sparkles" }
-        if key.contains("光圈") || key.contains("焦距") { return "camera.aperture" }
-        if key.contains("分辨率") || key.contains("尺寸") { return "ruler" }
-        if key.contains("色彩") || key.contains("Profile") { return "paintpalette" }
-        if key.contains("码率") || key.contains("帧率") { return "waveform.path.badge.plus" }
-        if key.contains("权限") || key.contains("POSIX") { return "lock.shield" }
+        if key.contains("Camera") || key.contains("Device") || key.contains("相机") || key.contains("设备") { return "camera" }
+        if key.contains("Exposure") || key.contains("ISO") || key.contains("曝光") { return "sparkles" }
+        if key.contains("Aperture") || key.contains("Focal") || key.contains("光圈") || key.contains("焦距") { return "camera.aperture" }
+        if key.contains("Resolution") || key.contains("Dimension") || key.contains("分辨率") || key.contains("尺寸") { return "ruler" }
+        if key.contains("Color") || key.contains("Profile") || key.contains("色彩") { return "paintpalette" }
+        if key.contains("Bitrate") || key.contains("Frame") || key.contains("码率") || key.contains("帧率") { return "waveform.path.badge.plus" }
+        if key.contains("Permission") || key.contains("POSIX") || key.contains("权限") { return "lock.shield" }
         return "info.circle"
     }
     

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
@@ -48,7 +55,7 @@ public struct PasswordVaultEntryRowView: View {
                     }
                     
                     if let lastUsed = entry.lastUsedAt {
-                        Text("最近解锁使用: \(DateFormatterCache.shared.string(fromShortDateTime: lastUsed))")
+                        Text("Last used: \(DateFormatterCache.shared.string(fromShortDateTime: lastUsed))")
                             .font(.system(size: 9))
                             .foregroundStyle(.tertiary)
                     }
@@ -60,7 +67,7 @@ public struct PasswordVaultEntryRowView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "key.fill")
                             .font(.system(size: 10))
-                        Text("填入此口令")
+                        Text("Use Password")
                             .font(.system(size: 10.5, weight: .bold))
                     }
                     .padding(.horizontal, 9)

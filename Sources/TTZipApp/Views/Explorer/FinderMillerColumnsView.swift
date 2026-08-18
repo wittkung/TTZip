@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 import AppKit
@@ -24,16 +31,16 @@ public struct FinderMillerColumnsView: View {
     @State private var eventMonitor: Any? = nil
     
     @State private var showNewFolderAlert: Bool = false
-    @State private var newFolderName: String = "未命名文件夹"
+    @State private var newFolderName: String = "Untitled Folder"
     @State private var targetCreateFolderDir: URL? = nil
     
     @State private var showNewFileAlert: Bool = false
-    @State private var newFileName: String = "未命名文件.txt"
+    @State private var newFileName: String = "Untitled.txt"
     @State private var targetCreateFileDir: URL? = nil
     
     private func createNewFolder(in dir: URL, name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let baseName = trimmed.isEmpty ? "未命名文件夹" : trimmed
+        let baseName = trimmed.isEmpty ? "Untitled Folder" : trimmed
         var targetURL = dir.appendingPathComponent(baseName)
         
         var counter = 2
@@ -57,7 +64,7 @@ public struct FinderMillerColumnsView: View {
     
     private func createNewFile(in dir: URL, name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let baseName = trimmed.isEmpty ? "未命名文件.txt" : trimmed
+        let baseName = trimmed.isEmpty ? "Untitled.txt" : trimmed
         
         let pathExtension = (baseName as NSString).pathExtension
         let nameWithoutExt = (baseName as NSString).deletingPathExtension
@@ -118,38 +125,38 @@ public struct FinderMillerColumnsView: View {
             }
         }
         .clipped()
-        .alert("新建文件夹", isPresented: $showNewFolderAlert) {
-            TextField("文件夹名称", text: $newFolderName)
-            Button("取消", role: .cancel) {
-                newFolderName = "未命名文件夹"
+        .alert("New Folder", isPresented: $showNewFolderAlert) {
+            TextField("Folder Name", text: $newFolderName)
+            Button("Cancel", role: .cancel) {
+                newFolderName = "Untitled Folder"
             }
-            Button("创建") {
+            Button("Create") {
                 let dir = targetCreateFolderDir ?? rootDirectory
                 createNewFolder(in: dir, name: newFolderName)
-                newFolderName = "未命名文件夹"
+                newFolderName = "Untitled Folder"
             }
         } message: {
             if let dir = targetCreateFolderDir {
-                Text("将在以下路径创建新文件夹：\n\(dir.path)")
+                Text("Creating new folder in:\n\(dir.path)")
             } else {
-                Text("创建新的文件夹")
+                Text("Create a new folder")
             }
         }
-        .alert("新建空白文件", isPresented: $showNewFileAlert) {
-            TextField("文件名 (含扩展名, 如 .txt / .md)", text: $newFileName)
-            Button("取消", role: .cancel) {
-                newFileName = "未命名文件.txt"
+        .alert("New File", isPresented: $showNewFileAlert) {
+            TextField("File Name (e.g. text.txt)", text: $newFileName)
+            Button("Cancel", role: .cancel) {
+                newFileName = "Untitled.txt"
             }
-            Button("创建") {
+            Button("Create") {
                 let dir = targetCreateFileDir ?? rootDirectory
                 createNewFile(in: dir, name: newFileName)
-                newFileName = "未命名文件.txt"
+                newFileName = "Untitled.txt"
             }
         } message: {
             if let dir = targetCreateFileDir {
-                Text("将在以下路径创建空文件：\n\(dir.path)")
+                Text("Creating new file in:\n\(dir.path)")
             } else {
-                Text("创建新的空白文件")
+                Text("Create a new empty file")
             }
         }
         .onAppear {
@@ -173,13 +180,13 @@ public struct FinderMillerColumnsView: View {
                 }
                 if event.keyCode >= 123 && event.keyCode <= 126 {
                     switch event.keyCode {
-                    case 123: // Left
+                    case 123:
                         navigateSelectionLeft()
-                    case 124: // Right
+                    case 124:
                         navigateSelectionRight()
-                    case 125: // Down
+                    case 125:
                         navigateSelectionDown()
-                    case 126: // Up
+                    case 126:
                         navigateSelectionUp()
                     default:
                         break
@@ -335,12 +342,12 @@ public struct FinderMillerColumnsView: View {
             },
             onTriggerNewFolder: { dir in
                 targetCreateFolderDir = dir
-                newFolderName = "未命名文件夹"
+                newFolderName = "Untitled Folder"
                 showNewFolderAlert = true
             },
             onTriggerNewFile: { dir in
                 targetCreateFileDir = dir
-                newFileName = "未命名文件.txt"
+                newFileName = "Untitled.txt"
                 showNewFileAlert = true
             },
             onRefresh: {

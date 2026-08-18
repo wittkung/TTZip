@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 新建压缩工程 目标基础配置区组件 (竹绿主题高透卡片版)
+/// Compression target configuration view.
 public struct CompressTargetConfigSectionView: View {
     @Binding public var outputName: String
     @Binding public var targetDirectory: String
@@ -25,18 +32,18 @@ public struct CompressTargetConfigSectionView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("压缩包目标配置", systemImage: "gearshape.fill")
+            Label("Archive Target Configuration", systemImage: "gearshape.fill")
                 .font(.system(size: 13, weight: .bold, design: .serif))
                 .foregroundStyle(TTZipTheme.bambooGreen)
             
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
-                    Text("输出文件名")
+                    Text("Output Name")
                         .font(.system(size: 11.5, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: 75, alignment: .trailing)
+                        .frame(width: 85, alignment: .trailing)
                     
-                    TextField("输出文件名", text: $outputName)
+                    TextField("Output Name", text: $outputName)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 10)
@@ -50,13 +57,13 @@ public struct CompressTargetConfigSectionView: View {
                 }
                 
                 HStack(spacing: 12) {
-                    Text("保存位置")
+                    Text("Destination")
                         .font(.system(size: 11.5, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: 75, alignment: .trailing)
+                        .frame(width: 85, alignment: .trailing)
                     
                     HStack(spacing: 6) {
-                        TextField("目标文件夹路径", text: $targetDirectory)
+                        TextField("Destination folder path", text: $targetDirectory)
                             .textFieldStyle(.plain)
                             .font(.system(size: 11.5))
                             .padding(.horizontal, 10)
@@ -68,7 +75,7 @@ public struct CompressTargetConfigSectionView: View {
                                     .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
                             )
                         
-                        Button("浏览...") { onPickDirectory() }
+                        Button("Browse...") { onPickDirectory() }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                     }
@@ -76,30 +83,30 @@ public struct CompressTargetConfigSectionView: View {
             }
             
             HStack(spacing: 12) {
-                Text("封装格式")
+                Text("Format")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .frame(width: 75, alignment: .trailing)
+                    .frame(width: 85, alignment: .trailing)
                 
                 HStack(spacing: 8) {
-                    formatOptionTile(format: .sevenZip, name: "7-Zip", ext: ".7z (推荐)")
-                    formatOptionTile(format: .zip, name: "ZIP", ext: ".zip (通用)")
-                    formatOptionTile(format: .tarZst, name: "TAR.ZST", ext: ".zst (极速)")
+                    formatOptionTile(format: .sevenZip, name: "7-Zip", ext: ".7z (Recommended)")
+                    formatOptionTile(format: .zip, name: "ZIP", ext: ".zip (Universal)")
+                    formatOptionTile(format: .tarZst, name: "TAR.ZST", ext: ".zst (Fast)")
                     formatOptionTile(format: .tarGz, name: "TAR.GZ", ext: ".tar.gz (Linux)")
                 }
             }
             
             HStack(spacing: 12) {
-                Text("压缩级别")
+                Text("Level")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .frame(width: 75, alignment: .trailing)
+                    .frame(width: 85, alignment: .trailing)
                 
                 HStack(spacing: 6) {
-                    levelOptionTile(level: .store, name: "仅存储 (0x)")
-                    levelOptionTile(level: .fast, name: "快速 (1x)")
-                    levelOptionTile(level: .normal, name: "标准 (5x)")
-                    levelOptionTile(level: .ultra, name: "极限 (9x)")
+                    levelOptionTile(level: .store, name: "Store (0x)")
+                    levelOptionTile(level: .fast, name: "Fast (1x)")
+                    levelOptionTile(level: .normal, name: "Standard (5x)")
+                    levelOptionTile(level: .ultra, name: "Ultra (9x)")
                 }
             }
         }

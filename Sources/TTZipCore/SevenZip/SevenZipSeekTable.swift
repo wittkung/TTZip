@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 7Z 归档内存级随机访问与快速单文件抽取索引表 (Seekable 7Z Index)
+/// In-memory random access and single-file extraction seek table for 7z archives.
 public final class SevenZipSeekTable: @unchecked Sendable {
     
     public struct SeekEntry: Sendable {
@@ -29,12 +36,12 @@ public final class SevenZipSeekTable: @unchecked Sendable {
         self.entriesByPath = map
     }
     
-    /// O(1) 按相对路径检索文件元数据
+    /// O(1) metadata lookup by relative archive path.
     public func entry(forPath path: String) -> SeekEntry? {
         return entriesByPath[path]
     }
     
-    /// 针对特定条目执行单文件快速提取
+    /// Extracts a single entry directly to a destination directory.
     public func extractSingleFile(path: String, destinationDir: String, password: String? = nil) throws -> Bool {
         guard let entry = entry(forPath: path) else { return false }
         if entry.isDirectory {
@@ -55,14 +62,13 @@ public final class SevenZipSeekTable: @unchecked Sendable {
         return true
     }
     
-    /// 获取单文件的解压内存数据 (Data)
+    /// Extracts single entry data directly into a Swift `Data` buffer.
     public func extractData(forPath path: String, password: String? = nil) -> Data? {
         guard let entry = entry(forPath: path), !entry.isDirectory else { return nil }
         if entry.isEmptyStream || entry.uncompressedSize == 0 {
             return Data()
         }
         
-        // 尝试通过 C 引擎快速提取
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_7z_seek_\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -81,7 +87,6 @@ public final class SevenZipSeekTable: @unchecked Sendable {
             return try? Data(contentsOf: lastComponentFile)
         }
         
-        // 递归查找匹配文件
         if let enumerator = FileManager.default.enumerator(at: tempDir, includingPropertiesForKeys: nil) {
             for case let fileURL as URL in enumerator {
                 if fileURL.lastPathComponent == (path as NSString).lastPathComponent {

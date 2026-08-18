@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
@@ -16,6 +23,7 @@ final class SafeAtomicInt64: @unchecked Sendable {
 }
 
 extension ArchiveWriter {
+    /// Recursively calculates physical directory byte size using POSIX `lstat` and `opendir`.
     static func recursivePathSize(at path: String) -> Int64 {
         var st = stat()
         if lstat(path, &st) != 0 { return 0 }
@@ -39,6 +47,7 @@ extension ArchiveWriter {
         }
     }
     
+    /// Splits an archive file into numbered volumes (`.001`, `.002`, etc.) when split volume size is specified.
     public static func sliceArchiveIfNeeded(archivePath: String, splitSizeBytes: Int64) throws {
         let fm = FileManager.default
         guard fm.fileExists(atPath: archivePath) else { return }
@@ -76,4 +85,3 @@ extension ArchiveWriter {
         try fm.removeItem(atPath: archivePath)
     }
 }
-

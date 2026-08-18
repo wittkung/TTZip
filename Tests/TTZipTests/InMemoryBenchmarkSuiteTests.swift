@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import XCTest
 @testable import TTZipCore
 
@@ -70,7 +77,7 @@ final class InMemoryBenchmarkSuiteTests: XCTestCase {
         let report = try await InMemoryBenchmarkEngine.shared.runInMemoryBenchmark(config: config)
         let table = InMemoryBenchmarkEngine.shared.generateTurboBenchTable(report: report)
 
-        XCTAssertTrue(table.contains("TurboBench / lzbench 对齐纯内存极限性能基准测试结果"))
+        XCTAssertTrue(table.contains("In-Memory Benchmark Results (TurboBench / lzbench Model / Apple Silicon RAM)"))
         XCTAssertTrue(table.contains("Algorithm"))
         XCTAssertTrue(table.contains("Zstandard"))
         XCTAssertTrue(table.contains("PASSED (OK)"))

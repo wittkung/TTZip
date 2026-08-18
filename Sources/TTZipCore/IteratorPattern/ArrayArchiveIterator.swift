@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 排序维度属性
+/// Sorting keys for archive entry ordering.
 public enum ArchiveSortKey: Sendable {
     case path
     case name
@@ -8,14 +15,13 @@ public enum ArchiveSortKey: Sendable {
     case modificationDate
 }
 
-/// 排序方向
+/// Sort direction for archive collections.
 public enum ArchiveSortOrder: Sendable {
     case ascending
     case descending
 }
 
-/// 数组归档迭代器 (Array Archive Iterator)
-/// 支持在内存数组之上的高级谓词过滤 (扩展名/文件大小/名称/正则/自定义谓词)、多维排序、切片与幂等指针控制
+/// In-memory array archive iterator supporting multi-criteria filtering, multi-dimensional sorting, and pagination slicing.
 public final class ArrayArchiveIterator: ArchiveIteratorProtocol, @unchecked Sendable {
     public typealias Element = ArchiveEntry
     
@@ -38,7 +44,7 @@ public final class ArrayArchiveIterator: ArchiveIteratorProtocol, @unchecked Sen
         self.rawEntries = entries
         var result = entries
         
-        // 1. 扩展名过滤
+        // 1. Extension filtering
         if let exts = extensions, !exts.isEmpty {
             let lowerExts = Set(exts.map { $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".")) })
             result = result.filter { entry in
@@ -47,7 +53,7 @@ public final class ArrayArchiveIterator: ArchiveIteratorProtocol, @unchecked Sen
             }
         }
         
-        // 2. 文件大小过滤
+        // 2. Size range filtering
         if let minS = minSize {
             result = result.filter { $0.uncompressedSize >= minS }
         }
@@ -55,12 +61,12 @@ public final class ArrayArchiveIterator: ArchiveIteratorProtocol, @unchecked Sen
             result = result.filter { $0.uncompressedSize <= maxS }
         }
         
-        // 3. 名称子串过滤
+        // 3. Name substring filtering
         if let pattern = namePattern, !pattern.isEmpty {
             result = result.filter { $0.path.localizedCaseInsensitiveContains(pattern) }
         }
         
-        // 4. 正则表达式过滤
+        // 4. Regular expression filtering
         if let regexStr = regexPattern, !regexStr.isEmpty, let regex = try? NSRegularExpression(pattern: regexStr, options: [.caseInsensitive]) {
             result = result.filter { entry in
                 let range = NSRange(location: 0, length: entry.path.utf16.count)
@@ -68,12 +74,12 @@ public final class ArrayArchiveIterator: ArchiveIteratorProtocol, @unchecked Sen
             }
         }
         
-        // 5. 自定义谓词过滤
+        // 5. Custom predicate filtering
         if let pred = predicate {
             result = result.filter(pred)
         }
         
-        // 6. 排序
+        // 6. Sorting
         if let key = sortBy {
             result.sort { a, b in
                 let isAsc = (sortOrder == .ascending)
@@ -103,7 +109,7 @@ public final class ArrayArchiveIterator: ArchiveIteratorProtocol, @unchecked Sen
         self.filteredEntries = result
     }
     
-    /// 切片获取子迭代器 API (Pagination / Slicing)
+    /// Returns a sliced sub-iterator for pagination.
     public func slice(offset: Int, limit: Int) -> ArrayArchiveIterator {
         lock.lock()
         defer { lock.unlock() }

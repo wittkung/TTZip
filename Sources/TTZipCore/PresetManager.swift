@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 自定义压缩预设持久化管理单例（集成 Pattern 4.4 仓储与数据映射模式）
+/// Repository and persistence manager for compression presets.
 public final class PresetManager: @unchecked Sendable {
     public static let shared = PresetManager()
     
@@ -76,13 +83,13 @@ public final class PresetManager: @unchecked Sendable {
         }
     }
     
-    /// 基于原型模式 (Prototype Pattern) 克隆/衍生预设方案
+    /// Duplicates an existing preset using Prototype Pattern.
     @discardableResult
     public func duplicatePreset(id: UUID, newName: String? = nil) -> CompressionPreset? {
         let result: (String, CompressionPreset)? = rwLock.withWriteLock {
             presetCache.removeAll()
             guard let source = cachedPresets.first(where: { $0.id == id }) else { return nil }
-            let defaultName = newName ?? "\(source.name) 副本"
+            let defaultName = newName ?? "\(source.name) Copy"
             let item = source.clone(newId: UUID(), newName: defaultName)
             cachedPresets.append(item)
             try? repository.save(item)
@@ -95,7 +102,7 @@ public final class PresetManager: @unchecked Sendable {
         return nil
     }
     
-    /// 基于指定原型配置衍生全新预设并保存
+    /// Derives and saves a new preset from a prototype model.
     @discardableResult
     public func createPresetFromPrototype(_ prototype: CompressionPreset, newName: String? = nil) -> CompressionPreset {
         let cloned = rwLock.withWriteLock { () -> CompressionPreset in
@@ -143,7 +150,7 @@ public final class PresetManager: @unchecked Sendable {
                 skipMacJunk: true
             ),
             CompressionPreset(
-                name: "7Z 开发包",
+                name: "7Z Source Package",
                 format: .sevenZip,
                 level: .normal,
                 defaultPassword: nil,
@@ -151,7 +158,7 @@ public final class PresetManager: @unchecked Sendable {
                 skipGitDirectory: true
             ),
             CompressionPreset(
-                name: "TAR.ZST 极速",
+                name: "TAR.ZST Fast",
                 format: .tarZst,
                 level: .ultra,
                 defaultPassword: nil,

@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 竞品测试对比报告生成与持久化导出组件
+/// Competitor benchmark report generator and serialization exporter.
 public enum CompetitorReportWriter {
     public static func saveCompetitorReport(rows: [CompetitorBenchmarkRow]) {
         let currentDir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -25,7 +32,6 @@ public enum CompetitorReportWriter {
             try? json.write(to: archiveJsonURL)
         }
 
-        // 维护与更新物理最高纪录存储器 (Peak Performance Matrix)
         var peakDict: [String: PeakPerformanceRecord] = [:]
         if let existingData = try? Data(contentsOf: peakMatrixURL),
            let decoded = try? JSONDecoder().decode([String: PeakPerformanceRecord].self, from: existingData) {
@@ -57,16 +63,16 @@ public enum CompetitorReportWriter {
         }
 
         let topo = AppleSiliconTuner.shared.topology
-        var md = "# TTZip vs 竞品全维度性能对比测试报告 (Exhaustive Competitor Benchmark Report)\n\n"
-        md += "> **测试时间**: \(Date())\n"
-        md += "> **测试环境**: Apple Silicon (\(topo.totalCores) 核 [P:\(topo.performanceCores) / E:\(topo.efficiencyCores)]) | macOS \(ProcessInfo.processInfo.operatingSystemVersionString)\n"
-        md += "> **竞品包含**: Apple ditto (Native macOS), 7-Zip 7zz CLI (ARM64), System tar, Zstandard zstd CLI, Parallel pigz, Info-ZIP, pbzip2, pixz, plzip, lz4, brotli, lrzip, aa, snappy, wimlib-imagex, hdiutil\n"
-        md += "> **基准策略**: 竞品工具全开硬件与并发极限 (`-mmt=on`, `-T0`, `-p max`, `-n max`)，TTZip 走 16MB mmap / NEON SIMD / C 原生架构\n\n"
-        md += "| 数据集维度 | 归档格式 | 压缩等级 | 加密 | 竞品工具 | 竞品压缩体积 (压缩率) | TTZip 压缩体积 (压缩率) | 竞品打包吞吐 | TTZip 打包吞吐 | 打包领先 | 竞品解压吞吐 | TTZip 解压吞吐 | 解压领先 | AOP 核心瓶颈阶段 |\n"
+        var md = "# TTZip Exhaustive Competitor Benchmark Report\n\n"
+        md += "> **Timestamp**: \(Date())\n"
+        md += "> **Environment**: Apple Silicon (\(topo.totalCores) cores [P:\(topo.performanceCores) / E:\(topo.efficiencyCores)]) | macOS \(ProcessInfo.processInfo.operatingSystemVersionString)\n"
+        md += "> **Competitors**: Apple ditto (Native macOS), 7-Zip 7zz CLI (ARM64), System tar, Zstandard zstd CLI, Parallel pigz, Info-ZIP, pbzip2, pixz, plzip, lz4, brotli, lrzip, aa, snappy, wimlib-imagex, hdiutil\n"
+        md += "> **Execution Model**: Competitor tools configured with full concurrency (`-mmt=on`, `-T0`, `-p max`, `-n max`), TTZip executing in-process via 16MB mmap / NEON SIMD / native C architecture\n\n"
+        md += "| Dataset Dimension | Archive Format | Level | Encryption | Competitor Tool | Competitor Size (Ratio) | TTZip Size (Ratio) | Competitor Comp (MB/s) | TTZip Comp (MB/s) | Comp Speedup | Competitor Extract (MB/s) | TTZip Extract (MB/s) | Extract Speedup | AOP Bottleneck Stage |\n"
         md += "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
 
         for r in rows {
-            let encStr = r.isEncrypted ? "AES-256" : "无"
+            let encStr = r.isEncrypted ? "AES-256" : "None"
             let compSizeStr = String(format: "%.2f MB (%.1f%%)", Double(r.archiveSizeBytes) / (1024.0 * 1024.0), r.compressionRatioPercent)
             let ttSizeStr = String(format: "%.2f MB (%.1f%%)", Double(r.ttzipArchiveSizeBytes) / (1024.0 * 1024.0), r.ttzipCompressionRatioPercent)
             let cComp = String(format: "%.1f MB/s", r.compressThroughputMBs)
@@ -122,41 +128,41 @@ public enum CompetitorReportWriter {
 
         var peakHeaderExtra = ""
         if let rec = peakRecord {
-            peakHeaderExtra = " | 🏛️ 历史最高纪录: 打包 \(String(format: "%.1f MB/s", rec.peakCompressMBs)) / 解压 \(String(format: "%.1f MB/s", rec.peakExtractMBs))"
+            peakHeaderExtra = " | 🏛️ Historical Peak: Comp \(String(format: "%.1f MB/s", rec.peakCompressMBs)) / Extract \(String(format: "%.1f MB/s", rec.peakExtractMBs))"
         }
 
         let tableHeader = """
 
         ========================================================================================================================
-        ⚔️ [单项全竞品 PK \(stepCount)/\(totalItems)] \(payloadName) | 格式: \(format.rawValue.uppercased()) | 级别: \(level.rawValue) | 加密: \(isEncrypted ? "AES-256" : "无")\(peakHeaderExtra)
+        ⚔️ [Competitor Matrix PK \(stepCount)/\(totalItems)] \(payloadName) | Format: \(format.rawValue.uppercased()) | Level: \(level.rawValue) | Encryption: \(isEncrypted ? "AES-256" : "None")\(peakHeaderExtra)
         ========================================================================================================================
-        │ 引擎 / 软件名称          │ 打包/压缩速率   │ 解压/释放速率   │ 压缩包体积 (压缩率)   │ 实测耗时 (打包/解压)│ TTZip 超越倍数         │
+        │ Engine / Tool Name       │ Compression (MB/s)│ Extraction (MB/s) │ Archive Size (Ratio)  │ Elapsed Time (C / E)│ TTZip Multiplier       │
         ------------------------------------------------------------------------------------------------------------------------
 
         """
         var tableBody = "│ \(ttNameStr) │ \(ttCompSpeed) │ \(ttExtractSpeed) │ \(ttSizeStr) │ \(ttTimeStr) │ \(ttMultStr) │\n"
 
         if let rec = peakRecord {
-            let pNameStr    = pad("🏛️ TTZip (历史最高纪录)", 26)
+            let pNameStr    = pad("🏛️ TTZip (Historical Peak)", 26)
             let pCompSpeed  = pad(String(format: "%8.1f MB/s", rec.peakCompressMBs), 17)
             let pExtSpeed   = pad(String(format: "%8.1f MB/s", rec.peakExtractMBs), 17)
             let pSizeStr    = pad("---", 22)
-            let pTimeStr    = pad("历史峰值数据", 19)
-            let pMultStr    = pad("🏆 历史最快基准", 22)
+            let pTimeStr    = pad("Peak Record", 19)
+            let pMultStr    = pad("🏆 Peak Baseline", 22)
             tableBody += "│ \(pNameStr) │ \(pCompSpeed) │ \(pExtSpeed) │ \(pSizeStr) │ \(pTimeStr) │ \(pMultStr) │\n"
         }
 
         for res in itemCompetitorResults {
             let compNameStr    = pad("⚡ \(res.name)", 26)
-            let compCompSpeed  = pad(res.compDur > 0 ? String(format: "%8.1f MB/s", res.compMBs) : "  直通(只测解压)", 17)
+            let compCompSpeed  = pad(res.compDur > 0 ? String(format: "%8.1f MB/s", res.compMBs) : "  Decompress Only", 17)
             let compExtSpeed   = pad(String(format: "%8.1f MB/s", res.extractMBs), 17)
             let compSizeMb     = Double(res.row.archiveSizeBytes) / (1024.0 * 1024.0)
             let compRatio      = res.row.compressionRatioPercent
             let compSizeStr    = pad(String(format: "%.2f MB (%.1f%%)", compSizeMb, compRatio), 22)
-            let compTimeStr    = pad(res.compDur > 0 ? String(format: "%.3fs / %.3fs", res.compDur, res.extractDur) : String(format: "  跳过 / %.3fs", res.extractDur), 19)
+            let compTimeStr    = pad(res.compDur > 0 ? String(format: "%.3fs / %.3fs", res.compDur, res.extractDur) : String(format: "  Skip / %.3fs", res.extractDur), 19)
             
             let cMult          = (res.compDur > 0 && res.compMBs > 0) ? (ttCompMBs / res.compMBs) : 1.0
-            let compMultStr    = pad(res.compDur == 0 ? "⚡ 直通(专向解压)" : (cMult >= 1.0 ? "🚀 TTZip 打包领先 \(String(format: "%.1f", cMult))x" : "⚡ 竞品打包领先 \(String(format: "%.1f", 1.0 / cMult))x"), 22)
+            let compMultStr    = pad(res.compDur == 0 ? "⚡ Direct (Decompress)" : (cMult >= 1.0 ? "🚀 TTZip leads \(String(format: "%.1f", cMult))x" : "⚡ Competitor leads \(String(format: "%.1f", 1.0 / cMult))x"), 22)
 
             tableBody += "│ \(compNameStr) │ \(compCompSpeed) │ \(compExtSpeed) │ \(compSizeStr) │ \(compTimeStr) │ \(compMultStr) │\n"
         }

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
@@ -154,7 +161,7 @@ public final class EPUBArchiveUnpacker {
             }
             
             let finalTitle = chapterTitle ?? item.url.deletingPathExtension().lastPathComponent
-            let displayTitle = (finalTitle.hasPrefix("第") || finalTitle.contains("章") || finalTitle.lowercased().contains("chapter")) ? finalTitle : "第 \(idx + 1) 章 · \(finalTitle)"
+            let displayTitle = (finalTitle.hasPrefix("第") || finalTitle.contains("章") || finalTitle.lowercased().contains("chapter")) ? finalTitle : "Chapter \(idx + 1) · \(finalTitle)"
             chapters.append(EPUBChapterItem(id: "\(idx)", title: displayTitle, fileURL: item.url))
         }
         

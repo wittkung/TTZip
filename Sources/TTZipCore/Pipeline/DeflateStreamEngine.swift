@@ -1,27 +1,34 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
 // MARK: - Deflate Stream Enums & Configuration
 
-/// Deflate 引擎执行分层模式
+/// Deflate execution tier mode.
 public enum DeflateTierMode: Int32, Sendable, Codable, Equatable {
-    /// Tier 1: 内存完整缓冲快速路径 (libdeflate)
+    /// Tier 1: In-memory full-buffer fast path (libdeflate).
     case tier1Block = 1
-    /// Tier 2: 状态机增量流式管道 (zlib-ng SIMD)
+    /// Tier 2: State machine incremental streaming pipeline (zlib-ng SIMD).
     case tier2Stream = 2
 }
 
-/// Deflate 窗口与标头格式
+/// Deflate window and container header format.
 public enum DeflateWindowBits: Int32, Sendable, Codable, Equatable {
-    /// 原始 DEFLATE 流 (无标头与尾部校验，RFC 1951，常用于 ZIP)
+    /// Raw DEFLATE stream without header or trailer checksum (RFC 1951, standard in ZIP).
     case raw = -15
-    /// 标准 Zlib 标头与 Adler-32 (RFC 1950)
+    /// Standard zlib header and Adler-32 checksum (RFC 1950).
     case zlib = 15
-    /// GZIP 标头与 CRC-32 (RFC 1952)
+    /// GZIP header and CRC-32 checksum (RFC 1952).
     case gzip = 31
 }
 
-/// Deflate 压缩策略
+/// Deflate compression strategies.
 public enum DeflateStrategy: Int32, Sendable, Codable, Equatable {
     case defaultStrategy = 0
     case filtered = 1
@@ -30,7 +37,7 @@ public enum DeflateStrategy: Int32, Sendable, Codable, Equatable {
     case fixed = 4
 }
 
-/// Deflate 刷新模式
+/// Deflate buffer flush modes.
 public enum DeflateFlushMode: Int32, Sendable, Codable, Equatable {
     case noFlush = 0
     case syncFlush = 2
@@ -47,7 +54,7 @@ public enum DeflateFlushMode: Int32, Sendable, Codable, Equatable {
     }
 }
 
-/// Deflate 错误类型
+/// Deflate stream processing errors.
 public enum DeflateStreamError: LocalizedError, Sendable, Equatable {
     case initializationFailed(Int32)
     case processingFailed(String)
@@ -71,7 +78,7 @@ public enum DeflateStreamError: LocalizedError, Sendable, Equatable {
     }
 }
 
-/// Deflate 流式配置实体
+/// Deflate streaming configuration payload.
 public struct DeflateStreamConfig: Sendable, Codable, Equatable {
     public var tierMode: DeflateTierMode
     public var compressionLevel: Int
@@ -114,7 +121,7 @@ public struct DeflateStreamConfig: Sendable, Codable, Equatable {
     }
 }
 
-/// Deflate 流式运行状态度量
+/// Runtime telemetry metrics for Deflate streams.
 public struct DeflateStreamMetrics: Sendable, Equatable {
     public let totalIn: UInt64
     public let totalOut: UInt64
@@ -125,7 +132,7 @@ public struct DeflateStreamMetrics: Sendable, Equatable {
 
 // MARK: - DeflateStreamCompressor
 
-/// 高性能原生 Deflate 流式压缩器
+/// High-performance streaming Deflate compressor wrapping SIMD-accelerated C state machines.
 public final class DeflateStreamCompressor: @unchecked Sendable {
     private var state = ttzip_deflate_stream_state_t()
     private var isClosed = false
@@ -184,7 +191,7 @@ public final class DeflateStreamCompressor: @unchecked Sendable {
         )
     }
     
-    /// 流式压缩指针缓冲区
+    /// Streams compression on raw pointer buffer.
     public func compress(
         buffer: UnsafeRawPointer,
         count: Int,
@@ -234,7 +241,7 @@ public final class DeflateStreamCompressor: @unchecked Sendable {
         }
     }
     
-    /// 流式压缩 Data 块并返回压缩数据
+    /// Streams compression on Data block.
     public func compress(
         chunk: Data,
         flush: DeflateFlushMode = .noFlush,
@@ -272,7 +279,7 @@ public final class DeflateStreamCompressor: @unchecked Sendable {
         return output
     }
     
-    /// 结束压缩并刷出所有剩余尾部数据
+    /// Finishes stream and flushes trailing compressed bytes.
     public func finish(
         outputChunkSize: Int = 64 * 1024,
         chunkHandler: (UnsafeRawBufferPointer) -> Void
@@ -304,7 +311,7 @@ public final class DeflateStreamCompressor: @unchecked Sendable {
         }
     }
     
-    /// 结束压缩并返回所有剩余尾部数据
+    /// Finishes stream and returns remaining trailing bytes.
     public func finish(outputChunkSize: Int = 64 * 1024) throws -> Data {
         var output = Data()
         try finish(outputChunkSize: outputChunkSize) { outChunk in
@@ -313,7 +320,7 @@ public final class DeflateStreamCompressor: @unchecked Sendable {
         return output
     }
     
-    /// 关闭压缩器并安全回收句柄
+    /// Closes compressor and releases underlying handles.
     public func close() {
         guard !isClosed else { return }
         isClosed = true
@@ -323,7 +330,7 @@ public final class DeflateStreamCompressor: @unchecked Sendable {
 
 // MARK: - DeflateStreamDecompressor
 
-/// 高性能原生 Deflate/Inflate 流式解压器
+/// High-performance streaming Deflate/Inflate decompressor wrapping SIMD-accelerated C state machines.
 public final class DeflateStreamDecompressor: @unchecked Sendable {
     private var state = ttzip_deflate_stream_state_t()
     private var isClosed = false
@@ -373,7 +380,7 @@ public final class DeflateStreamDecompressor: @unchecked Sendable {
         )
     }
     
-    /// 流式解压指针缓冲区
+    /// Streams decompression on raw pointer buffer.
     public func decompress(
         buffer: UnsafeRawPointer,
         count: Int,
@@ -435,7 +442,7 @@ public final class DeflateStreamDecompressor: @unchecked Sendable {
         }
     }
     
-    /// 流式解压 Data 块并返回解压数据
+    /// Streams decompression on Data block.
     public func decompress(
         chunk: Data,
         flush: DeflateFlushMode = .noFlush,
@@ -473,7 +480,7 @@ public final class DeflateStreamDecompressor: @unchecked Sendable {
         return output
     }
     
-    /// 结束解压并刷出剩余数据
+    /// Finishes decompression and flushes trailing decompressed bytes.
     public func finish(
         outputChunkSize: Int = 64 * 1024,
         chunkHandler: (UnsafeRawBufferPointer) -> Void
@@ -511,7 +518,7 @@ public final class DeflateStreamDecompressor: @unchecked Sendable {
         }
     }
     
-    /// 结束解压并返回剩余数据
+    /// Finishes decompression and returns trailing decompressed bytes.
     public func finish(outputChunkSize: Int = 64 * 1024) throws -> Data {
         var output = Data()
         try finish(outputChunkSize: outputChunkSize) { outChunk in
@@ -520,7 +527,7 @@ public final class DeflateStreamDecompressor: @unchecked Sendable {
         return output
     }
     
-    /// 关闭解压器并安全回收句柄
+    /// Closes decompressor and releases underlying handles.
     public func close() {
         guard !isClosed else { return }
         isClosed = true
@@ -528,12 +535,12 @@ public final class DeflateStreamDecompressor: @unchecked Sendable {
     }
 }
 
-// MARK: - DeflateStreamEngine (Unified High-Level Pipeline API)
+// MARK: - DeflateStreamEngine
 
-/// 统一的高性能 Deflate 流式引擎管道门面
+/// High-level facade for streaming Deflate transformations.
 public enum DeflateStreamEngine: Sendable {
     
-    /// 一站式内存压缩
+    /// In-memory one-shot compression.
     public static func compress(
         data: Data,
         config: DeflateStreamConfig = DeflateStreamConfig(),
@@ -548,7 +555,7 @@ public enum DeflateStreamEngine: Sendable {
         return result
     }
     
-    /// 一站式内存解压
+    /// In-memory one-shot decompression.
     public static func decompress(
         data: Data,
         windowBits: Int = 15,
@@ -563,7 +570,7 @@ public enum DeflateStreamEngine: Sendable {
         return result
     }
     
-    /// 异步流式压缩管道 (AsyncSequence -> AsyncThrowingStream)
+    /// Asynchronous streaming compression pipeline (`AsyncSequence` -> `AsyncThrowingStream`).
     public static func compressStream<S: AsyncSequence>(
         _ sequence: S,
         config: DeflateStreamConfig = DeflateStreamConfig(),
@@ -602,7 +609,7 @@ public enum DeflateStreamEngine: Sendable {
         }
     }
     
-    /// 异步流式解压管道 (AsyncSequence -> AsyncThrowingStream)
+    /// Asynchronous streaming decompression pipeline (`AsyncSequence` -> `AsyncThrowingStream`).
     public static func decompressStream<S: AsyncSequence>(
         _ sequence: S,
         windowBits: Int = 15,

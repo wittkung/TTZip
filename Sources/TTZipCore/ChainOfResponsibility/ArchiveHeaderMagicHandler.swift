@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 4. Magic Bytes 标头魔数匹配与归档完整性校验处理者 (ArchiveHeaderMagicHandler)
+/// Archive header magic byte validation handler.
 public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unchecked Sendable {
     
     public override init(nextHandler: ArchiveValidationHandlerProtocol? = nil) {
@@ -8,7 +15,6 @@ public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unc
     }
     
     override public func process(context: ArchiveValidationContext) throws -> ArchiveValidationResult {
-        // 仅在解压 (.extract)、探索 (.inspect) 或修复 (.repair) 模式下对输入归档文件校验魔数
         guard context.operation == .extract || context.operation == .inspect || context.operation == .repair else {
             return .success
         }
@@ -24,7 +30,6 @@ public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unc
             try? fileHandle.close()
         }
         
-        // 读取文件前 4096 字节（支持 SFX 自解压 Stub 标头扫描）
         let headerData: Data
         do {
             headerData = try fileHandle.read(upToCount: 4096) ?? Data()
@@ -44,7 +49,6 @@ public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unc
                 return .failure(.invalidHeaderMagic(expected: targetFmt.rawValue.uppercased(), actual: "0x[\(actualHex)]"))
             }
         } else {
-            // 未显式指定格式时，自动匹配是否满足任意已知归档魔数或文件扩展名
             let (isRecognized, _) = detectArchiveFormat(headerData: headerData, path: archivePath)
             if !isRecognized {
                 let actualHex = headerData.prefix(8).map { String(format: "%02X", $0) }.joined(separator: " ")
@@ -55,7 +59,6 @@ public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unc
         return .success
     }
     
-    /// 校验标头 Data 是否符合指定 ArchiveCompressionFormat 的 Magic Signature
     private func verifyHeaderMatchesFormat(headerData: Data, format: ArchiveCompressionFormat) -> Bool {
         let bytes = [UInt8](headerData)
         guard !bytes.isEmpty else { return false }
@@ -90,7 +93,6 @@ public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unc
         }
     }
     
-    /// 识别标头魔数格式
     private func detectArchiveFormat(headerData: Data, path: String) -> (Bool, String) {
         let bytes = [UInt8](headerData)
         guard !bytes.isEmpty else { return (false, "empty") }
@@ -108,7 +110,6 @@ public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unc
         if isSnappyMagic(bytes) { return (true, "SNAPPY") }
         if isTarMagic(bytes) { return (true, "TAR") }
         
-        // 文件名后缀兜底识别
         let ext = (path as NSString).pathExtension.lowercased()
         let knownExts: Set<String> = [
             "zip", "7z", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz", "zst", "tzst",
@@ -121,15 +122,13 @@ public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unc
         return (false, "UNKNOWN")
     }
     
-    // MARK: - Magic Signature Helpers
+    // MARK: - Magic Signature Checkers
     
     private func isZipMagic(_ bytes: [UInt8]) -> Bool {
         guard bytes.count >= 4 else { return false }
-        // PK\x03\x04 (Local Header), PK\x05\x06 (EOCD), PK\x07\x08 (Data Descriptor)
         if bytes[0] == 0x50 && bytes[1] == 0x4B && ((bytes[2] == 0x03 && bytes[3] == 0x04) || (bytes[2] == 0x05 && bytes[3] == 0x06) || (bytes[2] == 0x07 && bytes[3] == 0x08)) {
             return true
         }
-        // Self-Extracting (.exe / SFX) Zip 支持: 标头包含 MZ 且在缓冲中存在 PK\x03\x04
         if bytes.count >= 16 && bytes[0] == 0x4D && bytes[1] == 0x5A {
             let limit = bytes.count - 3
             for i in 0..<limit {
@@ -143,11 +142,9 @@ public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unc
     
     private func isSevenZipMagic(_ bytes: [UInt8]) -> Bool {
         guard bytes.count >= 6 else { return false }
-        // 37 7A BC AF 27 1C (7z\xBC\xAF\x27\x1C)
         if bytes[0] == 0x37 && bytes[1] == 0x7A && bytes[2] == 0xBC && bytes[3] == 0xAF && bytes[4] == 0x27 && bytes[5] == 0x1C {
             return true
         }
-        // Self-Extracting (.exe / SFX) 7z 支持: 标头包含 MZ 且在缓冲中存在 37 7A BC AF 27 1C
         if bytes.count >= 16 && bytes[0] == 0x4D && bytes[1] == 0x5A {
             let limit = bytes.count - 5
             for i in 0..<limit {
@@ -161,32 +158,27 @@ public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unc
     
     private func isGzipMagic(_ bytes: [UInt8]) -> Bool {
         guard bytes.count >= 2 else { return false }
-        // 1F 8B
         return bytes[0] == 0x1F && bytes[1] == 0x8B
     }
     
     private func isBzip2Magic(_ bytes: [UInt8]) -> Bool {
         guard bytes.count >= 3 else { return false }
-        // 42 5A 68 (BZh)
         return bytes[0] == 0x42 && bytes[1] == 0x5A && bytes[2] == 0x68
     }
     
     private func isXzMagic(_ bytes: [UInt8]) -> Bool {
         guard bytes.count >= 6 else { return false }
-        // FD 37 7A 58 5A 00
         return bytes[0] == 0xFD && bytes[1] == 0x37 && bytes[2] == 0x7A && bytes[3] == 0x58 && bytes[4] == 0x5A && bytes[5] == 0x00
     }
     
     private func isZstdMagic(_ bytes: [UInt8]) -> Bool {
         guard bytes.count >= 4 else { return false }
-        // 28 B5 2F FD
         return bytes[0] == 0x28 && bytes[1] == 0xB5 && bytes[2] == 0x2F && bytes[3] == 0xFD
     }
     
     private func isWimMagic(_ bytes: [UInt8]) -> Bool {
         guard bytes.count >= 8 else { return false }
-        // MSWIM\0\0\0
-        return bytes[0] == 0x4D && bytes[1] == 0x53 && bytes[2] == 0x57 && bytes[3] == 0x49 && bytes[4] == 0x4D && bytes[5] == 0x00 && bytes[6] == 0x00 && bytes[7] == 0x00
+        return bytes[0] == 0x4D && bytes[1] == 0x53 && bytes[2] == 0x49 && bytes[3] == 0x4D && bytes[4] == 0x49 && bytes[5] == 0x00 && bytes[6] == 0x00 && bytes[7] == 0x00
     }
     
     private func isLz4Magic(_ bytes: [UInt8]) -> Bool {
@@ -211,7 +203,6 @@ public final class ArchiveHeaderMagicHandler: BaseArchiveValidationHandler, @unc
     
     private func isTarMagic(_ bytes: [UInt8]) -> Bool {
         guard bytes.count >= 262 else { return false }
-        // TAR header "ustar" magic at byte 257
         let magic = String(bytes: bytes[257..<262], encoding: .ascii) ?? ""
         return magic == "ustar"
     }

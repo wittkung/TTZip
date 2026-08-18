@@ -1,16 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 深度优先遍历顺序枚举
+/// Depth-first traversal order classification.
 public enum DFSTraversalOrder: Sendable {
-    /// 前序遍历 (Pre-order: 先访问根节点，再依次访问子节点)
+    /// Pre-order: root visited before children.
     case preOrder
-    /// 后序遍历 (Post-order: 先依次访问完子节点，再访问根节点)
+    /// Post-order: children visited before root.
     case postOrder
 }
 
-/// 深度优先组合树迭代器 (Depth-First Tree Iterator)
-/// 遍历 `ArchiveCompositeDirectory` / `ArchiveTreeNode` / `ArchiveComponentProtocol` 组合树
-/// 采用**显式栈 (Explicit Stack) 结构**，杜绝深层嵌套目录导致的 Call Stack 栈溢出 (Stack Overflow)
+/// Depth-first composite tree iterator traversing tree structures using an explicit stack to prevent recursion overflow.
 public final class DepthFirstTreeIterator: ArchiveIteratorProtocol, @unchecked Sendable {
     public typealias Element = ArchiveEntry
     
@@ -24,7 +29,6 @@ public final class DepthFirstTreeIterator: ArchiveIteratorProtocol, @unchecked S
     private let order: DFSTraversalOrder
     private var cachedTotalNodeCount: Int?
     
-    // 显式栈数据结构 (代替递归)
     private var preOrderStack: [ArchiveComponentProtocol] = []
     private var postOrderStack: [PostOrderFrame] = []
     
@@ -63,7 +67,6 @@ public final class DepthFirstTreeIterator: ArchiveIteratorProtocol, @unchecked S
         }
     }
     
-    /// 后序遍历显式栈推进逻辑：推进至最左侧未遍历的叶节点/子树
     private func advancePostOrder() {
         while !postOrderStack.isEmpty {
             let topIndex = postOrderStack.count - 1
@@ -74,7 +77,6 @@ public final class DepthFirstTreeIterator: ArchiveIteratorProtocol, @unchecked S
                 let childFrame = PostOrderFrame(node: child, childIndex: 0, children: child.getChildren())
                 postOrderStack.append(childFrame)
             } else {
-                // 当前栈顶节点的所有子节点已访问完毕，准备被产出
                 break
             }
         }

@@ -1,7 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 广度优先组合树迭代器 (Breadth-First Tree Iterator)
-/// 按层级 Queue 队列顺序依次遍历 `ArchiveCompositeDirectory` / `ArchiveTreeNode` / `ArchiveComponentProtocol` 组合树
+/// Breadth-first composite tree iterator traversing tree structures in level order.
 public final class BreadthFirstTreeIterator: ArchiveIteratorProtocol, @unchecked Sendable {
     public typealias Element = ArchiveEntry
     

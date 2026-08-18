@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 import zlib
 
-/// 专为 Level 0 (Store 模式) 打造的多核并发页对齐物理落盘引擎
-/// 充分利用 Apple Silicon 多核算力并发计算 CRC32，并结合系统 Page Cache 打满 RAM/NVMe 总线带宽
+/// Multi-core parallel page-aligned physical disk-writing engine for Level 0 (Store mode).
+/// Leverages Apple Silicon multi-core SIMD for concurrent CRC32 computation and APFS direct I/O.
 public final class ZipStoreStreamWriter: @unchecked Sendable {
     public static let shared = ZipStoreStreamWriter()
     

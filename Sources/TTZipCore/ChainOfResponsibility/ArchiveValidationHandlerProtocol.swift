@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档校验错误类型
+/// Archive validation error cases.
 public enum ArchiveValidationError: Error, LocalizedError, Equatable, Sendable {
     case fileNotFound(path: String)
     case fileNotReadable(path: String)
@@ -14,27 +21,27 @@ public enum ArchiveValidationError: Error, LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .fileNotFound(let path):
-            return "校验失败: 目标路径不存在 [\(path)]"
+            return "Validation failed: target path does not exist [\(path)]"
         case .fileNotReadable(let path):
-            return "校验失败: 目标文件没有可读权限 [\(path)]"
+            return "Validation failed: target file lacks read permissions [\(path)]"
         case .zipSlipDetected(let path, let detail):
-            return "安全拦截: 检测到 ZipSlip/Path Traversal 逃逸攻击 [路径: \(path), 详情: \(detail)]"
+            return "Security violation: Zip Slip / path traversal escape detected [path: \(path), detail: \(detail)]"
         case .symlinkEscapeDetected(let path):
-            return "安全拦截: 检测到 Symlink 符号链接越界逃逸 [\(path)]"
+            return "Security violation: symlink escape detected [\(path)]"
         case .insufficientDiskSpace(let required, let available):
             let reqMB = String(format: "%.2f MB", Double(required) / 1024.0 / 1024.0)
             let availMB = String(format: "%.2f MB", Double(available) / 1024.0 / 1024.0)
-            return "校验失败: 目标磁盘空间不足 (需要 \(reqMB), 可用 \(availMB))"
+            return "Validation failed: insufficient disk space (required \(reqMB), available \(availMB))"
         case .invalidHeaderMagic(let expected, let actual):
-            return "校验失败: 标头 Magic Bytes 魔数损坏或不匹配 (预期: \(expected), 实际: \(actual))"
+            return "Validation failed: header magic bytes corrupted or mismatched (expected: \(expected), actual: \(actual))"
         case .licenseRequired(let feature):
-            return "许可门禁拦截: 功能 [\(feature)] 需要 TTZip Pro / Enterprise 商业授权"
+            return "License gatekeeper: feature [\(feature)] requires a valid commercial license"
         case .custom(let message):
-            return "校验失败: \(message)"
+            return "Validation failed: \(message)"
         }
     }
     
-    /// 转换为底层传统 ArchiveError (用于向后兼容 Legacy Facade 异常断言)
+    /// Converts to standard `ArchiveError` for legacy compatibility.
     public var asArchiveError: ArchiveError {
         switch self {
         case .fileNotFound, .fileNotReadable:
@@ -53,7 +60,7 @@ public enum ArchiveValidationError: Error, LocalizedError, Equatable, Sendable {
     }
 }
 
-/// 归档校验结果
+/// Archive validation result type.
 public enum ArchiveValidationResult: Equatable, Sendable {
     case success
     case failure(ArchiveValidationError)
@@ -69,23 +76,23 @@ public enum ArchiveValidationResult: Equatable, Sendable {
     }
 }
 
-/// 责任链处理者接口协议
+/// Chain of Responsibility handler protocol for archive pre-flight validation.
 public protocol ArchiveValidationHandlerProtocol: AnyObject, Sendable {
-    /// 下一个处理者引用
+    /// Next handler in the chain.
     var nextHandler: ArchiveValidationHandlerProtocol? { get set }
     
-    /// 链式装配：设置下一个 Handler 并返回该 Handler
+    /// Configures the next handler in the pipeline and returns it for chaining.
     @discardableResult
     func setNext(handler: ArchiveValidationHandlerProtocol) -> ArchiveValidationHandlerProtocol
     
-    /// 责任链递归/下发入口
+    /// Handles validation dispatch across the pipeline.
     func handle(context: ArchiveValidationContext) throws -> ArchiveValidationResult
     
-    /// 当前具体 Handler 的私有业务校验逻辑
+    /// Executes the concrete validation logic for this handler.
     func process(context: ArchiveValidationContext) throws -> ArchiveValidationResult
 }
 
-/// 责任链处理者抽象基类 (Base Handler)
+/// Base class implementation for Chain of Responsibility validation handlers.
 open class BaseArchiveValidationHandler: ArchiveValidationHandlerProtocol, @unchecked Sendable {
     private var _nextHandler: ArchiveValidationHandlerProtocol?
     private let lock = NSLock()
@@ -114,7 +121,6 @@ open class BaseArchiveValidationHandler: ArchiveValidationHandlerProtocol, @unch
         return handler
     }
     
-    /// 递归/下发处理入口：若当前校验通过则传递给 nextHandler，遇到失败立即可强行短路拦截
     public func handle(context: ArchiveValidationContext) throws -> ArchiveValidationResult {
         let result = try process(context: context)
         guard result.isSuccess else {
@@ -126,7 +132,6 @@ open class BaseArchiveValidationHandler: ArchiveValidationHandlerProtocol, @unch
         return .success
     }
     
-    /// 默认基础处理逻辑（子类重写）
     open func process(context: ArchiveValidationContext) throws -> ArchiveValidationResult {
         return .success
     }

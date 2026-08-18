@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
 // MARK: - ZipParallelWriter Bounded Queue Extension
 
 extension ZipParallelWriter {
     
-    /// 使用 BoundedProducerConsumerQueue 提供带背压控制的高并发 ZIP 归档处理方法
+    /// Creates archive with cooperative backpressure control via `BoundedProducerConsumerQueue`.
     public func createArchiveWithBoundedQueue(
         outputPath: String,
         inputPaths: [String],
@@ -48,7 +55,6 @@ extension ZipParallelWriter {
         
         _ = try await producerTask.value
         
-        // 执行底层的 ZipParallelWriter 物理创建
         let result = try self.createArchive(
             outputPath: outputPath,
             inputPaths: inputPaths,
@@ -66,7 +72,7 @@ extension ZipParallelWriter {
 
 extension ArchiveOperationPipeline {
     
-    /// 使用 生产者-消费者 (Producer-Consumer) 有界队列引擎进行流式归档处理
+    /// Creates archive using the streaming producer-consumer bounded queue engine.
     public func createArchiveWithProducerConsumerEngine(
         inputPath: String,
         outputPath: String,
@@ -87,7 +93,7 @@ extension ArchiveOperationPipeline {
     }
 }
 
-// MARK: - Helper Thread-Safe Progress Counter
+// MARK: - Thread-Safe Progress Counter Helper
 
 private final class ConcurrencyProgressCounter: @unchecked Sendable {
     private let lock = NSLock()

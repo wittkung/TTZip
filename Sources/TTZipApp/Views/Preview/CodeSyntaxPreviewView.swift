@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AppKit
 import TTZipCore
@@ -40,7 +47,7 @@ public struct CodeTextEditorContainerView: View {
                         Circle()
                             .fill(Color.orange)
                             .frame(width: 6, height: 6)
-                        Text("未保存")
+                        Text("Unsaved")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(Color.orange)
                     }
@@ -56,7 +63,7 @@ public struct CodeTextEditorContainerView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 11, weight: .bold))
-                        Text("已存至磁盘")
+                        Text("Saved to disk")
                             .font(.system(size: 11, weight: .bold))
                     }
                     .foregroundStyle(TTZipTheme.bambooGreen)
@@ -68,7 +75,7 @@ public struct CodeTextEditorContainerView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "square.and.arrow.down.fill")
                                 .font(.system(size: 11, weight: .bold))
-                            Text("保存 (⌘S)")
+                            Text("Save (⌘S)")
                                 .font(.system(size: 11, weight: .bold))
                         }
                         .foregroundStyle(isEdited ? Color.white : TTZipTheme.bambooGreen)
@@ -79,7 +86,7 @@ public struct CodeTextEditorContainerView: View {
                     }
                     .buttonStyle(.plain)
                     .keyboardShortcut("s", modifiers: [.command])
-                    .help("保存改动到本地文件 (⌘S)")
+                    .help("Save changes to local file (⌘S)")
                 }
             }
             .padding(.horizontal, 12)

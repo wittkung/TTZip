@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 单个测试用例执行结果记录
+/// Individual test case execution record.
 public struct TestCaseRecord: Sendable, Codable {
     public let name: String
     public let className: String
@@ -26,7 +33,7 @@ public struct TestCaseRecord: Sendable, Codable {
     }
 }
 
-/// 完整测试执行会话报告模型
+/// Comprehensive test execution session report model.
 public struct TestSessionReport: Sendable, Codable {
     public let timestamp: TimeInterval
     public let totalTests: Int

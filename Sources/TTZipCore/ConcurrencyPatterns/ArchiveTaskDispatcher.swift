@@ -1,8 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 优先级任务调度器 (Archive Task Dispatcher)
-/// 维护 critical, userInitiated, utility, background 4 级优先级队列表
-/// 支持根据优先级出队、单个任务取消与批量任务取消
+/// Priority-based archive task dispatcher managing 4 distinct priority queues.
 public final class ArchiveTaskDispatcher: @unchecked Sendable {
     private var criticalQueue: [any ArchiveWorkItemProtocol] = []
     private var userInitiatedQueue: [any ArchiveWorkItemProtocol] = []
@@ -14,7 +19,7 @@ public final class ArchiveTaskDispatcher: @unchecked Sendable {
 
     public init() {}
 
-    /// 提交单个并发任务单元
+    /// Submits a single work item for execution.
     public func submit(_ item: any ArchiveWorkItemProtocol) {
         lock.lock()
         defer { lock.unlock() }
@@ -33,7 +38,7 @@ public final class ArchiveTaskDispatcher: @unchecked Sendable {
         }
     }
 
-    /// 批量提交并发任务单元
+    /// Submits a batch of work items for execution.
     public func submitBatch(_ items: [any ArchiveWorkItemProtocol]) {
         lock.lock()
         defer { lock.unlock() }
@@ -53,7 +58,7 @@ public final class ArchiveTaskDispatcher: @unchecked Sendable {
         }
     }
 
-    /// 按优先级从高到低 (.critical -> .userInitiated -> .utility -> .background) 出队
+    /// Dequeues the next item in descending priority order (.critical -> .userInitiated -> .utility -> .background).
     public func popHighestPriorityItem() -> (any ArchiveWorkItemProtocol)? {
         lock.lock()
         defer { lock.unlock() }
@@ -76,14 +81,14 @@ public final class ArchiveTaskDispatcher: @unchecked Sendable {
             if let item = selectedItem {
                 if cancelledIDs.contains(item.itemID) {
                     cancelledIDs.remove(item.itemID)
-                    continue // 已取消任务，丢弃并同步清理 cancelledIDs 记录，防范 Set 无界增长
+                    continue
                 }
                 return item
             }
         }
     }
 
-    /// 取消指定 itemID 的任务
+    /// Cancels a pending work item by identifier.
     public func cancel(itemID: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -91,7 +96,7 @@ public final class ArchiveTaskDispatcher: @unchecked Sendable {
         cancelledIDs.insert(itemID)
     }
 
-    /// 取消调度器中所有未执行的任务
+    /// Cancels all pending work items in dispatcher queues.
     public func cancelAll() {
         lock.lock()
         defer { lock.unlock() }
@@ -107,26 +112,25 @@ public final class ArchiveTaskDispatcher: @unchecked Sendable {
         backgroundQueue.removeAll()
     }
 
-    /// 检查特定任务是否已被取消
+    /// Checks if a work item has been marked cancelled.
     public func isCancelled(itemID: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         return cancelledIDs.contains(itemID)
     }
 
-    /// 队列中剩余待处理任务总数
+    /// Total count of pending items across all priority queues.
     public var count: Int {
         lock.lock()
         defer { lock.unlock() }
         return criticalQueue.count + userInitiatedQueue.count + utilityQueue.count + backgroundQueue.count
     }
 
-    /// 队列是否为空
     public var isEmpty: Bool {
         return count == 0
     }
 
-    /// 获取特定优先级的待处理任务数量
+    /// Count of pending items for a specific priority tier.
     public func pendingCount(for priority: TaskPriorityLevel) -> Int {
         lock.lock()
         defer { lock.unlock() }
@@ -142,7 +146,7 @@ public final class ArchiveTaskDispatcher: @unchecked Sendable {
         }
     }
 
-    /// 清空调度器并重置取消记录
+    /// Clears all queues and resets cancellation sets.
     public func clear() {
         lock.lock()
         defer { lock.unlock() }

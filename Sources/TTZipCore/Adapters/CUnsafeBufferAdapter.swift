@@ -1,11 +1,24 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 内存安全 C 指针与 Buffer 辅助适配包装器 (Adapter Pattern)
-/// 消除悬挂指针 (Dangling Pointer) 与内存泄露风险
+/// Adapter Pattern: Memory-safe C pointer and buffer interoperability adapter.
+///
+/// Eliminates dangling pointer dereferences, heap buffer overruns, and stack exhaustion
+/// when interfacing Swift memory collections with underlying C static libraries.
 public enum CUnsafeBufferAdapter {
     
-    /// 安全转换 Swift 可选 String 为 C 语言 const char* 指针
+    /// Safely converts an optional Swift `String` to a temporary `const char*` pointer.
+    /// - Parameters:
+    ///   - string: Input Swift string, or `nil`.
+    ///   - body: Closure receiving the C string pointer.
+    /// - Returns: Closure return value.
     @inline(__always)
     public static func withCString<R>(_ string: String?, _ body: (UnsafePointer<CChar>?) throws -> R) rethrows -> R {
         guard let string = string else {
@@ -16,7 +29,11 @@ public enum CUnsafeBufferAdapter {
         }
     }
 
-    /// 安全转换 Swift [String] 为 C 语言 const char* const* 连续指针数组（作用域安全，自动清理，零栈溢出）
+    /// Safely converts `[String]` into a scoped `const char* const*` pointer array with automatic deallocation.
+    /// - Parameters:
+    ///   - strings: Array of Swift strings.
+    ///   - body: Closure receiving the C string pointer array.
+    /// - Returns: Closure return value.
     public static func withCStringsArray<R>(_ strings: [String], _ body: (UnsafePointer<UnsafePointer<CChar>?>) throws -> R) rethrows -> R {
         var cStrings: [UnsafeMutablePointer<CChar>?] = []
         cStrings.reserveCapacity(strings.count + 1)
@@ -42,7 +59,11 @@ public enum CUnsafeBufferAdapter {
         }
     }
 
-    /// 安全转换 Swift [String] 为 C 语言 posix_spawn argv 专属的 NULL 结尾指针数组
+    /// Safely converts `[String]` into a `NULL`-terminated pointer array suitable for `posix_spawn` argv.
+    /// - Parameters:
+    ///   - strings: Array of Swift argument strings.
+    ///   - body: Closure receiving the NULL-terminated pointer array.
+    /// - Returns: Closure return value.
     public static func withCStringsNullTerminatedArray<R>(_ strings: [String], _ body: (UnsafePointer<UnsafePointer<CChar>?>) throws -> R) rethrows -> R {
         var cStrings: [UnsafeMutablePointer<CChar>?] = []
         cStrings.reserveCapacity(strings.count + 1)
@@ -69,7 +90,11 @@ public enum CUnsafeBufferAdapter {
         }
     }
 
-    /// 安全转换 Swift Data 为 C 语言 RawPointer 及其字节长度
+    /// Safely provides raw byte pointer and count representation of Swift `Data`.
+    /// - Parameters:
+    ///   - data: Input Data payload.
+    ///   - body: Closure receiving `(UnsafeRawPointer, Int)`.
+    /// - Returns: Closure return value.
     @inline(__always)
     public static func withBufferPointer<R>(_ data: Data, _ body: (UnsafeRawPointer, Int) throws -> R) rethrows -> R {
         if data.isEmpty {
@@ -86,7 +111,11 @@ public enum CUnsafeBufferAdapter {
         }
     }
 
-    /// 安全转换 Swift Data 为 C 语言 MutableRawPointer 及其容量
+    /// Safely provides mutable raw byte pointer and capacity representation of Swift `Data`.
+    /// - Parameters:
+    ///   - data: Inout Data payload.
+    ///   - body: Closure receiving `(UnsafeMutableRawPointer, Int)`.
+    /// - Returns: Closure return value.
     @inline(__always)
     public static func withMutableBufferPointer<R>(_ data: inout Data, _ body: (UnsafeMutableRawPointer, Int) throws -> R) rethrows -> R {
         let count = data.count
@@ -104,25 +133,31 @@ public enum CUnsafeBufferAdapter {
         }
     }
 
-    /// 分配 Apple Silicon 16KB 物理页界限对齐内存块
+    /// Allocates an Apple Silicon 16KB hardware page-aligned memory buffer.
+    /// - Parameter capacity: Minimum capacity in bytes.
+    /// - Returns: Pointer to aligned buffer, or `nil` on failure.
     @inline(__always)
     public static func allocateAlignedBuffer(capacity: Int) -> UnsafeMutableRawPointer? {
         return ttzip_core_aligned_alloc_16k(capacity)
     }
 
-    /// 释放对齐内存块
+    /// Deallocates a 16KB hardware page-aligned memory buffer.
+    /// - Parameter pointer: Pointer previously returned by `allocateAlignedBuffer`.
     @inline(__always)
     public static func deallocateAlignedBuffer(_ pointer: UnsafeMutableRawPointer) {
         ttzip_core_aligned_free_16k(pointer)
     }
 
-    /// 享元模式: 从 MemoryPageFlyweightPool 借出 4K/64K 页面对齐 Buffer 享元
+    /// Flyweight Pattern: Borrows a 4KB or 64KB page-aligned buffer from the shared flyweight pool.
+    /// - Parameter size: Target page size enum (`.page4K` or `.page64K`).
+    /// - Returns: Active `MemoryPageBufferFlyweight` handle.
     @inline(__always)
     public static func borrowPageBuffer(size: MemoryPageSize = .page64K) -> MemoryPageBufferFlyweight {
         return MemoryPageFlyweightPool.shared.borrowBuffer(size: size)
     }
 
-    /// 归还 Buffer 享元
+    /// Returns a borrowed page buffer flyweight back to the shared pool.
+    /// - Parameter buffer: Buffer handle to return.
     @inline(__always)
     public static func returnPageBuffer(_ buffer: MemoryPageBufferFlyweight) {
         MemoryPageFlyweightPool.shared.returnBuffer(buffer)

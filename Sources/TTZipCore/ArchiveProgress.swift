@@ -1,7 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档操作的实时进度与状态元数据
+/// Real-time progress and telemetry metadata for archiving operations.
 public struct ArchiveProgress: Sendable {
+    /// Progress lifecycle states.
     public enum State: Sendable, Equatable {
         case idle
         case processing
@@ -10,12 +18,18 @@ public struct ArchiveProgress: Sendable {
         case failed(error: String)
     }
     
+    /// Current execution state.
     public let state: State
+    /// Number of bytes processed so far.
     public let bytesProcessed: Int64
+    /// Total byte size of expected workload.
     public let totalBytes: Int64
+    /// Name or path of file currently being compressed or extracted.
     public let currentFileName: String
+    /// Monotonic throughput calculation in MB/s.
     public let throughputMBs: Double
     
+    /// Normalized fraction completed (0.0 to 1.0).
     public var fractionCompleted: Double {
         guard totalBytes > 0 else { return 0.0 }
         return min(1.0, max(0.0, Double(bytesProcessed) / Double(totalBytes)))

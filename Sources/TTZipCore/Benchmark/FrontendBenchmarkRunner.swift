@@ -1,12 +1,19 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 前端核心算法与交互性能基准测试执行器
+/// Frontend core algorithm and UI interaction performance benchmark executor.
 public final class FrontendBenchmarkRunner: Sendable {
     public static let shared = FrontendBenchmarkRunner()
     
     public init() {}
     
-    /// 生成模拟层级归档条目数据集
+    /// Generates synthetic hierarchical archive entry dataset.
     public func generateSyntheticEntries(count: Int) -> [ArchiveEntry] {
         var entries: [ArchiveEntry] = []
         entries.reserveCapacity(count)
@@ -30,7 +37,7 @@ public final class FrontendBenchmarkRunner: Sendable {
         return entries
     }
     
-    /// 执行目录树构建性能压测
+    /// Runs tree build performance benchmarks across node scales.
     public func runTreeBuildBenchmark(entryCounts: [Int] = [1000, 10000, 50000]) async -> [TreeBuildMetric] {
         var results: [TreeBuildMetric] = []
         
@@ -50,7 +57,7 @@ public final class FrontendBenchmarkRunner: Sendable {
         return results
     }
     
-    /// 执行实时搜索与过滤性能压测
+    /// Runs real-time search and filter performance benchmarks.
     public func runSearchFilterBenchmark(datasetSize: Int = 20000, queries: [String] = ["file_100", "Folder_2", "sub", "nonexistent"]) async -> [SearchFilterMetric] {
         let entries = generateSyntheticEntries(count: datasetSize)
         var results: [SearchFilterMetric] = []
@@ -73,7 +80,7 @@ public final class FrontendBenchmarkRunner: Sendable {
         return results
     }
     
-    /// 执行高频事件节流压测
+    /// Runs high-frequency event throttling benchmarks.
     public func runThrottleBenchmark(eventCount: Int = 10000, targetHz: Double = 60.0) async -> [ProgressThrottleMetric] {
         let intervalNs = UInt64(1_000_000_000.0 / targetHz)
         var lastEmitted: UInt64 = 0
@@ -83,7 +90,7 @@ public final class FrontendBenchmarkRunner: Sendable {
         var currentNano = startNano
         
         for _ in 0..<eventCount {
-            currentNano += 1000 // 模拟每 1 微秒到达一个高频事件 (1,000,000 eps)
+            currentNano += 1000
             if lastEmitted == 0 || (currentNano - lastEmitted >= intervalNs) {
                 lastEmitted = currentNano
                 emittedCount += 1
@@ -95,13 +102,12 @@ public final class FrontendBenchmarkRunner: Sendable {
         return [metric]
     }
     
-    /// 运行全套前端基准测试并生成综合报告
+    /// Executes full frontend performance benchmark suite.
     public func runFullFrontendSuite() async -> FrontendPerformanceReport {
         let treeMetrics = await runTreeBuildBenchmark(entryCounts: [1000, 10000, 50000])
         let searchMetrics = await runSearchFilterBenchmark(datasetSize: 20000)
         let throttleMetrics = await runThrottleBenchmark(eventCount: 10000)
         
-        // 严格硬门禁判定：50k 树构建 <= 250ms (Debug), 20k 搜索吞吐 >= 500,000 items/s (Debug), 节流拦截率 >= 97%
         let isTreePassed = treeMetrics.last.map { $0.durationMs <= 250.0 } ?? true
         let isSearchPassed = searchMetrics.allSatisfy { $0.filterThroughputItemsPerSec >= 500_000.0 }
         let isThrottlePassed = throttleMetrics.allSatisfy { $0.suppressionRatio >= 97.0 }

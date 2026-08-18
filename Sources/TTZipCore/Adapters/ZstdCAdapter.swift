@@ -1,14 +1,31 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// Zstandard 原生 C 引擎适配器 (Adapter Pattern)
-/// 将 C 语言 ttzip_zstd_compress_file_stream 适配为符合 ZstdEngineProtocol
+/// Adapter Pattern: Native C Zstandard streaming compression and decompression adapter.
+///
+/// Bridges native C routines (`ttzip_zstd_compress_file_stream` and `ttzip_zstd_decompress_file_stream`)
+/// with Swift `ZstdEngineProtocol`, leveraging Apple Silicon multi-core threading and Long Distance Matching (LDM).
 public final class ZstdCAdapter: ZstdEngineProtocol, Sendable {
     public static let shared = ZstdCAdapter()
     
     private init() {}
     
-    /// 压缩单文件/流为 Zstandard 帧
+    /// Compresses a file or stream into a Zstandard frame.
+    /// - Parameters:
+    ///   - srcPath: Path to source input file.
+    ///   - dstPath: Path to destination compressed output file.
+    ///   - level: Compression level (-5 to 22).
+    ///   - enableLDM: Whether to enable Long Distance Matching windowing.
+    ///   - dictPath: Optional external dictionary file path.
+    ///   - progressHandler: Optional progress callback.
+    /// - Returns: `true` if compression succeeded, otherwise `false`.
     public func compressFile(
         srcPath: String,
         dstPath: String,
@@ -84,7 +101,13 @@ public final class ZstdCAdapter: ZstdEngineProtocol, Sendable {
         return false
     }
     
-    /// 解压 Zstandard 帧文件
+    /// Decompresses a Zstandard frame file.
+    /// - Parameters:
+    ///   - srcPath: Path to source `.zst` file.
+    ///   - dstPath: Path to destination decompressed output file.
+    ///   - dictPath: Optional external dictionary file path.
+    ///   - progressHandler: Optional progress callback.
+    /// - Returns: `true` if decompression succeeded, otherwise `false`.
     public func decompressFile(
         srcPath: String,
         dstPath: String,

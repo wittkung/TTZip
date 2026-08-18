@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 
 public enum DiskSortOption: String, CaseIterable, Identifiable, Codable {
-    case nameAsc = "名称 (A-Z)"
-    case nameDesc = "名称 (Z-A)"
-    case sizeDesc = "体积 (从大到小)"
-    case sizeAsc = "体积 (从小到大)"
-    case dateDesc = "修改时间 (最新)"
-    case dateAsc = "修改时间 (最早)"
-    case kind = "文件类型"
+    case nameAsc = "Name (A-Z)"
+    case nameDesc = "Name (Z-A)"
+    case sizeDesc = "Size (Largest First)"
+    case sizeAsc = "Size (Smallest First)"
+    case dateDesc = "Date Modified (Newest)"
+    case dateAsc = "Date Modified (Oldest)"
+    case kind = "Kind"
     
     public var id: String { rawValue }
     

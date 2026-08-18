@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
 extension ArchiveExtractor {
     
-    /// 执行格式专有极速解压管道分发，若成功解锁则返回 true (100% 纯 C 原生引擎, 零 Subprocess)
+    /// Dispatches format-specific fast-path extraction pipelines (100% in-process C engines).
     internal func dispatchFastExtraction(
         archivePath: String,
         destinationDir: String,
@@ -20,7 +27,7 @@ extension ArchiveExtractor {
             }
         }
 
-        // 2. TAR.ZST / ZSTD 纯 C 原生极速 Direct 解压
+        // 2. TAR.ZST / ZSTD in-process C Direct decompression
         if targetFormat == .tarZst || targetFormat == .zst || pathLower.hasSuffix(".tar.zst") || pathLower.hasSuffix(".tzst") || pathLower.hasSuffix(".zst") {
             let status = ttzip_extract_tar_zstd_direct_c(archivePath, destinationDir, options.skipMacJunk)
             if status == 0 {
@@ -35,7 +42,7 @@ extension ArchiveExtractor {
             }
         }
 
-        // 3. TAR 及衍生全变体与 UnRAR 纯 C 原生直连解压
+        // 3. TAR derivatives and uncompressed TAR extraction
         if targetFormat == .tar || targetFormat == .tarGz || targetFormat == .tarBz2 || targetFormat == .tarXz || ArchiveCompressionFormat.tarFamilyExtensions.contains(where: { pathLower.hasSuffix($0) }) {
             let status = ttzip_extract_archive_advanced(archivePath, destinationDir, options.skipMacJunk, password)
             if status == 0 {
@@ -46,7 +53,7 @@ extension ArchiveExtractor {
             }
         }
 
-        // 4. Apple Archive (AAR) - 100% 进程内纯原生流式解压
+        // 4. Apple Archive (AAR) streaming decompression
         if targetFormat == .aar || pathLower.hasSuffix(".aar") {
             if let ok = try? NativeAppleArchiveEngine.shared.extract(archivePath: archivePath, destinationDir: destinationDir), ok {
                 Self.cleanupQuarantineAttributes(at: destinationDir)
@@ -54,7 +61,7 @@ extension ArchiveExtractor {
             }
         }
         
-        // 5. WIM 专有极速解压 (100% 纯原生 C / libarchive 引擎)
+        // 5. WIM archive extraction
         if targetFormat == .wim || pathLower.hasSuffix(".wim") {
             let status = ttzip_extract_archive_advanced(archivePath, destinationDir, options.skipMacJunk, password)
             if status == 0 {
@@ -63,7 +70,7 @@ extension ArchiveExtractor {
             }
         }
 
-        // 6. ZIP C 语言多核解压
+        // 6. ZIP in-process multi-threaded extraction
         // 🔒 API CONTRACT: ZIP Parallel Decompression Engine Route (mmap + libdeflate + NEON SIMD)
         // SEE: .agents/rules/zip-engine-freeze.md
         if targetFormat == .zip || pathLower.hasSuffix(".zip") {
@@ -92,14 +99,13 @@ extension ArchiveExtractor {
         password: String?,
         advancedOptions: ArchiveAdvancedOptions?
     ) -> Bool {
-        // 先尝试纯 C 原生解压
         if ttzip_extract_archive_advanced(archivePath, destinationDir, options.skipMacJunk, password) == 0 {
             if let items = try? FileManager.default.contentsOfDirectory(atPath: destinationDir), !items.isEmpty {
                 Self.cleanupQuarantineAttributes(at: destinationDir)
                 return true
             }
         }
-        // 若为单文件 .zst
+        
         let archiveUrl = URL(fileURLWithPath: archivePath)
         var targetName = archiveUrl.deletingPathExtension().lastPathComponent
         if targetName.isEmpty || targetName.hasPrefix("arc_") {
@@ -129,5 +135,3 @@ extension ArchiveExtractor {
         return true
     }
 }
-
-

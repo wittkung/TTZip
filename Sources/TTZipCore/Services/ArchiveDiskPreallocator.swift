@@ -1,20 +1,28 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 跨格式通用 APFS 物理磁盘预分配与文件系统优化服务
-/// 在任意归档格式 (ZIP, 7z, Zstd 等) 执行解压落盘或压缩包写盘前，提前一次性锁定 APFS 连续簇空间，
-/// 彻底消除文件扩展写入过程中的 POSIX 锁瓶颈与磁盘碎片化。
+/// Unified APFS physical disk space preallocation and filesystem optimization service.
+///
+/// Pre-locks contiguous APFS clusters before extraction or archive creation to eliminate
+/// POSIX file expansion lock contention and disk fragmentation.
 public struct ArchiveDiskPreallocator: Sendable {
     public init() {}
     
-    /// 对打开的文件描述符执行 APFS 空间预分配
+    /// Preallocates APFS space for an open file descriptor.
     @discardableResult
     public static func preallocate(fileDescriptor: Int32, targetSizeBytes: Int64) -> Bool {
         guard fileDescriptor >= 0, targetSizeBytes > 0 else { return false }
         return ttzip_apfs_preallocate(fileDescriptor, targetSizeBytes) == 0
     }
     
-    /// 对指定物理路径执行 APFS 空间预分配
+    /// Preallocates APFS space for specified physical file path.
     @discardableResult
     public static func preallocate(atPath path: String, targetSizeBytes: Int64) -> Bool {
         guard targetSizeBytes > 0 else { return false }
@@ -24,7 +32,7 @@ public struct ArchiveDiskPreallocator: Sendable {
         return preallocate(fileDescriptor: fd, targetSizeBytes: targetSizeBytes)
     }
     
-    /// 执行 APFS 块级 COW (Copy-on-Write) 零拷贝扩展克隆
+    /// Performs APFS block-level copy-on-write clone range expansion.
     @discardableResult
     public static func cloneRange(sourceFd: Int32, sourceOffset: Int64 = 0, targetFd: Int32, targetOffset: Int64 = 0, countBytes: UInt64) -> Bool {
         guard sourceFd >= 0, targetFd >= 0, countBytes > 0 else { return false }

@@ -1,14 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import QuartzCore
 
-/// 专业基准测试数据规模模组
+/// Benchmark payload size options.
 public enum BenchmarkDataSize: String, Sendable, CaseIterable, Identifiable {
-    case tiny = "50 MB (微型采样)"
-    case small = "100 MB (极速响应测试)"
-    case medium = "500 MB (标准基准压测)"
-    case large = "1.0 GB (1GB 旗舰数据流)"
-    case stress = "2.0 GB (全载极限测算)"
+    case tiny = "50 MB (Micro Sampling)"
+    case small = "100 MB (Fast Response Test)"
+    case medium = "500 MB (Standard Benchmark)"
+    case large = "1.0 GB (1GB Flagship Stream)"
+    case stress = "2.0 GB (Full Load Stress Test)"
     
     public var id: String { rawValue }
     
@@ -27,38 +34,38 @@ public enum BenchmarkDataSize: String, Sendable, CaseIterable, Identifiable {
     }
 }
 
-/// 专业测试数据集熵值与负载类型
+/// Benchmark dataset entropy and content profile categories.
 public enum BenchmarkDatasetProfile: String, Sendable, CaseIterable, Identifiable {
-    case codeText = "高冗余代码与日志 (Code & Text Payload)"
-    case mixedOffice = "混合办公与工程文档 (Mixed Project Data)"
-    case mediaBinary = "高熵流媒体与二进制 (High Entropy Payload)"
+    case codeText = "High-Redundancy Code & Text"
+    case mixedOffice = "Mixed Office & Engineering Documents"
+    case mediaBinary = "High-Entropy Media & Binary"
     
     public var id: String { rawValue }
     
     public var description: String {
         switch self {
-        case .codeText: return "高可压缩性文本/JSON/源代码，重点测试算法字典与模式匹配极限"
-        case .mixedOffice: return "真实办公文档、PDF与代码混合包，测试综合均衡性能"
-        case .mediaBinary: return "接近不可压缩的低冗余二进制流，重点测试 IO 与算法吞吐上限"
+        case .codeText: return "Highly compressible text, JSON, and source code testing dictionary pattern matching"
+        case .mixedOffice: return "Balanced mixture of documents, PDFs, and scripts testing realistic workloads"
+        case .mediaBinary: return "Low redundancy binary stream testing maximum I/O and codec throughput limits"
         }
     }
 }
 
-/// 综合性能评估结果模型 (涵盖 5 大专业评价维度与已安装软件真实对比)
+/// Comprehensive benchmark evaluation report.
 public struct BenchmarkResult: Sendable, Identifiable {
     public var id: String { "\(formatName)_\(dataSizeMB)MB_\(UUID().uuidString)" }
     
     public let dataSizeMB: Double
     public let elapsedSeconds: Double
-    public let throughputMBs: Double              // 1. 压缩吞吐率 (MB/s)
-    public let decompressionThroughputMBs: Double // 2. 解压吞吐率 (MB/s)
+    public let throughputMBs: Double              // Compression throughput (MB/s)
+    public let decompressionThroughputMBs: Double // Decompression throughput (MB/s)
     public let originalSizeBytes: Int64
     public let compressedSizeBytes: Int64
-    public let compressionRatioPercent: Double   // 3. 压缩体积比 (%)
-    public let spaceSavedPercent: Double          // 4. 空间节省率 (%)
+    public let compressionRatioPercent: Double   // Compressed volume ratio (%)
+    public let spaceSavedPercent: Double          // Space savings ratio (%)
     public let nativeMacOsSeconds: Double
-    public let speedupMultiplier: Double         // 5. 相对 macOS 原生 Zip 提速倍率 (x)
-    public let installedCompetitorScores: [CompetitorRealScore] // 真实安装并测试的竞品数据
+    public let speedupMultiplier: Double         // Speedup multiplier relative to macOS native zip
+    public let installedCompetitorScores: [CompetitorRealScore] // Installed competitor metrics
     
     public var kekaSpeedup: Double {
         installedCompetitorScores.first(where: { $0.tool.toolId == "keka" || $0.tool.toolId == "7zip_cli" })?.relativeSpeedupVsNative ?? 0.0
@@ -71,8 +78,8 @@ public struct BenchmarkResult: Sendable, Identifiable {
     public let usedCores: Int
     public let formatName: String
     public let datasetProfileName: String
-    public let efficiencyScore: Int               // 综合工程效能得分 (0 ~ 100)
-    public let recommendationBadge: String         // 适用场景判定推荐
+    public let efficiencyScore: Int               // Overall engineering efficiency score (0 - 100)
+    public let recommendationBadge: String         // Recommendation badge
     
     public init(
         dataSizeMB: Double,
@@ -88,9 +95,9 @@ public struct BenchmarkResult: Sendable, Identifiable {
         chipName: String,
         usedCores: Int,
         formatName: String,
-        datasetProfileName: String = "混合办公工程文档",
+        datasetProfileName: String = "Mixed Office Documents",
         efficiencyScore: Int = 85,
-        recommendationBadge: String = "通用推荐"
+        recommendationBadge: String = "Recommended"
     ) {
         self.dataSizeMB = dataSizeMB
         self.elapsedSeconds = elapsedSeconds
@@ -126,7 +133,7 @@ public struct BenchmarkProgress: Sendable {
     public var totalBytes: Int64 = 0
     public var currentThroughputMBs: Double = 0.0
     public var progressPercent: Double = 0.0
-    public var statusText: String = "准备就绪"
+    public var statusText: String = "Ready"
     
     public init(
         state: State = .idle,
@@ -134,7 +141,7 @@ public struct BenchmarkProgress: Sendable {
         totalBytes: Int64 = 0,
         currentThroughputMBs: Double = 0.0,
         progressPercent: Double = 0.0,
-        statusText: String = "准备就绪"
+        statusText: String = "Ready"
     ) {
         self.state = state
         self.bytesProcessed = bytesProcessed
@@ -145,11 +152,11 @@ public struct BenchmarkProgress: Sendable {
     }
 }
 
-/// Apple Silicon 全核心硬件极限压测与效能评估引擎
+/// Multi-core hardware stress testing and efficiency benchmarking engine.
 public final class BenchmarkEngine: @unchecked Sendable {
     public init() {}
     
-    /// 一键全算法极速矩阵压测（支持用户指定压缩层级与增量实时推送结果）
+    /// Runs full preset benchmark suite across major formats.
     public func runAllPresetsSuite(
         size: BenchmarkDataSize,
         profile: BenchmarkDatasetProfile = .mixedOffice,
@@ -158,10 +165,10 @@ public final class BenchmarkEngine: @unchecked Sendable {
         progressHandler: (@Sendable (Int, Int, String, BenchmarkProgress) -> Void)? = nil
     ) async throws -> [BenchmarkResult] {
         let presets: [(name: String, format: ArchiveCompressionFormat, splitSize: Int64?, rec: String, score: Int)] = [
-            ("7-Zip LZMA2 现代高压缩", .sevenZip, nil, "📦 极致体积归档", 92),
-            ("Meta Zstandard 极速并发", .tarZst, nil, "⚡ 闪电吞吐", 98),
-            ("ZIP 标准分卷打包", .zip, 100 * 1024 * 1024, "✉️ 跨平台分卷打包 (100MB 切片)", 94),
-            ("TAR GZ 极速流体", .tarGz, nil, "🚀 Unix/Linux 基础设施", 88)
+            ("7-Zip LZMA2 High Compression", .sevenZip, nil, "High Compression Ratio", 92),
+            ("Meta Zstandard Parallel", .tarZst, nil, "Ultra Fast Throughput", 98),
+            ("ZIP Multi-Volume Split", .zip, 100 * 1024 * 1024, "Cross-Platform Split (100MB)", 94),
+            ("TAR GZ Fast Stream", .tarGz, nil, "Unix Infrastructure", 88)
         ]
         
         var results: [BenchmarkResult] = []
@@ -184,14 +191,14 @@ public final class BenchmarkEngine: @unchecked Sendable {
         return results
     }
     
-    /// 执行单项性能基准压测
+    /// Executes a single benchmark test run.
     public func runBenchmark(
         size: BenchmarkDataSize,
         profile: BenchmarkDatasetProfile = .mixedOffice,
         format: ArchiveCompressionFormat = .sevenZip,
         level: ArchiveCompressionLevel = .normal,
         splitVolumeSizeBytes: Int64? = nil,
-        recommendation: String = "通用标准打包",
+        recommendation: String = "Standard Archiving",
         baseScore: Int = 85,
         progressHandler: (@Sendable (BenchmarkProgress) -> Void)? = nil
     ) async throws -> BenchmarkResult {
@@ -199,14 +206,14 @@ public final class BenchmarkEngine: @unchecked Sendable {
         let tuner = AppleSiliconTuner.shared
         let totalBytes = size.bytes
         
-        // 1. 生成专业负载测试数据集
+        // 1. Generate synthetic dataset
         progressHandler?(BenchmarkProgress(
             state: .generatingData,
             bytesProcessed: 0,
             totalBytes: totalBytes,
             currentThroughputMBs: 0,
             progressPercent: 0.1,
-            statusText: "构建 \(profile.rawValue) [\(String(format: "%.1f", size.sizeMB)) MB] 专业测试模组..."
+            statusText: "Generating \(profile.rawValue) [\(String(format: "%.1f", size.sizeMB)) MB] dataset..."
         ))
         
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("TTZipBenchmark_\(UUID().uuidString)")
@@ -218,17 +225,16 @@ public final class BenchmarkEngine: @unchecked Sendable {
         let sampleFilePath = tempDir.appendingPathComponent("benchmark_data.bin").path
         let outputArchivePath = tempDir.appendingPathComponent("benchmark_output.\(format.rawValue)").path
         
-        // 生成对应特征数据集
         try generateSyntheticDataset(at: sampleFilePath, targetBytes: totalBytes, profile: profile)
         
-        // 2. 开启多核并行压测
+        // 2. Launch multi-core compression benchmark
         progressHandler?(BenchmarkProgress(
             state: .compressing,
             bytesProcessed: 0,
             totalBytes: totalBytes,
             currentThroughputMBs: 0,
             progressPercent: 0.2,
-            statusText: "调度 Apple Silicon \(tuner.topology.totalCores) 核 CPU 开启 \(format.rawValue.uppercased()) 多核测试..."
+            statusText: "Dispatching \(tuner.topology.totalCores) cores for \(format.rawValue.uppercased()) benchmark..."
         ))
         
         let startTime = CACurrentMediaTime()
@@ -252,7 +258,7 @@ public final class BenchmarkEngine: @unchecked Sendable {
                     totalBytes: totalBytes,
                     currentThroughputMBs: throughput,
                     progressPercent: min(1.0, percent),
-                    statusText: "全核运转中: \(String(format: "%.1f", throughput)) MB/s · \(String(format: "%.1f", percent * 100))%"
+                    statusText: "Active: \(String(format: "%.1f", throughput)) MB/s · \(String(format: "%.1f", percent * 100))%"
                 ))
             }
             .executeCreate()
@@ -262,7 +268,8 @@ public final class BenchmarkEngine: @unchecked Sendable {
         
         let compressedSize = (try? FileManager.default.attributesOfItem(atPath: outputArchivePath)[.size] as? Int64) ?? totalBytes
         let throughput = size.sizeMB / elapsed
-        // 实测零拷贝解压吞吐率
+        
+        // Measure decompression throughput
         let decompTargetDir = tempDir.appendingPathComponent("decomp_bench").path
         try? FileManager.default.createDirectory(atPath: decompTargetDir, withIntermediateDirectories: true)
         
@@ -278,12 +285,12 @@ public final class BenchmarkEngine: @unchecked Sendable {
         let decompSpeed = size.sizeMB / decompElapsed
         let ratio = (Double(compressedSize) / Double(totalBytes)) * 100.0
         
-        // 动态物理采样标定：计算当前设备与样本下 macOS 系统原生 ditto 工具的真实吞吐率
+        // Measure system ditto baseline
         let nativeMeasuredMBs = measureNativeSystemZipThroughput(samplePath: sampleFilePath, targetMB: size.sizeMB)
         let nativeEstimatedSeconds = size.sizeMB / max(1.0, nativeMeasuredMBs)
         let speedup = max(1.0, throughput / max(1.0, nativeMeasuredMBs))
         
-        // 探测已安装竞品并执行物理对比测试
+        // Probe installed competitors
         let installedCompetitorScores = measureRealCompetitorScores(samplePath: sampleFilePath, targetMB: size.sizeMB, nativeSpeedMBs: nativeMeasuredMBs)
         
         let result = BenchmarkResult(
@@ -311,19 +318,19 @@ public final class BenchmarkEngine: @unchecked Sendable {
             totalBytes: totalBytes,
             currentThroughputMBs: throughput,
             progressPercent: 1.0,
-            statusText: "压测完成！巅峰压缩吞吐 \(String(format: "%.1f", throughput)) MB/s (提速 \(String(format: "%.1f", speedup))x)"
+            statusText: "Benchmark complete: Peak throughput \(String(format: "%.1f", throughput)) MB/s (\(String(format: "%.1f", speedup))x speedup)"
         ))
         
         return result
     }
     
-    /// 支持用户选择自定义文件/文件夹进压测
+    /// Runs benchmark against custom user-selected files or directories.
     public func runCustomFileBenchmark(
         inputPath: String,
         format: ArchiveCompressionFormat = .sevenZip,
         level: ArchiveCompressionLevel = .normal,
         splitVolumeSizeBytes: Int64? = nil,
-        recommendation: String = "自定义用户样本实测",
+        recommendation: String = "Custom Sample Test",
         baseScore: Int = 90,
         progressHandler: (@Sendable (BenchmarkProgress) -> Void)? = nil
     ) async throws -> BenchmarkResult {
@@ -345,7 +352,7 @@ public final class BenchmarkEngine: @unchecked Sendable {
             totalBytes: totalBytes,
             currentThroughputMBs: 0,
             progressPercent: 0.1,
-            statusText: "针对用户样本 [\(filename)] 准备评估..."
+            statusText: "Preparing evaluation for [\(filename)]..."
         ))
         
         let tempDir = fm.temporaryDirectory.appendingPathComponent("TTZipCustomBenchmark_\(UUID().uuidString)")
@@ -376,7 +383,7 @@ public final class BenchmarkEngine: @unchecked Sendable {
                     totalBytes: totalBytes,
                     currentThroughputMBs: throughput,
                     progressPercent: min(1.0, percent),
-                    statusText: "正在打包样本: \(String(format: "%.1f", throughput)) MB/s · \(String(format: "%.1f", min(1.0, percent) * 100))%"
+                    statusText: "Packaging sample: \(String(format: "%.1f", throughput)) MB/s · \(String(format: "%.1f", min(1.0, percent) * 100))%"
                 ))
             }
             .executeCreate()
@@ -414,7 +421,7 @@ public final class BenchmarkEngine: @unchecked Sendable {
             chipName: tuner.topology.chipName,
             usedCores: tuner.topology.totalCores,
             formatName: format.rawValue.uppercased(),
-            datasetProfileName: "自定义样本: \(filename)",
+            datasetProfileName: "Custom Sample: \(filename)",
             efficiencyScore: baseScore,
             recommendationBadge: recommendation
         )
@@ -425,7 +432,7 @@ public final class BenchmarkEngine: @unchecked Sendable {
             totalBytes: totalBytes,
             currentThroughputMBs: throughput,
             progressPercent: 1.0,
-            statusText: "样本压测完成！巅峰吞吐 \(String(format: "%.1f", throughput)) MB/s (提速 \(String(format: "%.1f", speedup))x)"
+            statusText: "Sample benchmark complete: Peak throughput \(String(format: "%.1f", throughput)) MB/s (\(String(format: "%.1f", speedup))x speedup)"
         ))
         
         return result
@@ -447,4 +454,3 @@ public final class BenchmarkEngine: @unchecked Sendable {
         return BenchmarkDatasetGenerator.shared.measureRealCompetitorScores(samplePath: samplePath, targetMB: targetMB, nativeSpeedMBs: nativeSpeedMBs)
     }
 }
-

@@ -1,21 +1,27 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 数据映射模式通用接口 Protocol (Data Mapper Pattern)
-/// 隔离领域实体模型 (DomainModel) 与持久化存储对象 (StorageDTO)，实现相互独立演进
+/// Generic data mapper protocol transforming domain entities to persistence DTOs (Data Mapper Pattern).
 public protocol DataMapperProtocol: Sendable {
     associatedtype DomainModel: Sendable
     associatedtype StorageDTO: Sendable
     
-    /// 将领域实体模型转换为持久化 DTO
+    /// Maps domain entity into storage DTO.
     func toStorage(domain: DomainModel) -> StorageDTO
     
-    /// 将持久化 DTO 恢复为领域实体模型
+    /// Maps storage DTO into domain entity.
     func toDomain(storage: StorageDTO) -> DomainModel
 }
 
 // MARK: - 1. CompressionPreset ↔ PresetStorageDTO Data Mapper
 
-/// 预设持久化 DTO（包含 schemaVersion 支持无缝升级）
+/// Preset storage DTO supporting versioned migration.
 public struct PresetStorageDTO: Codable, Sendable, Equatable {
     public var schemaVersion: Int
     public var presetId: String
@@ -26,7 +32,7 @@ public struct PresetStorageDTO: Codable, Sendable, Equatable {
     public var embeddedPassword: String?
     public var omitMacJunkFiles: Bool
     public var omitGitDirFiles: Bool
-    public var legacyFormatName: String? // v1/v2 历史兼容升级字段
+    public var legacyFormatName: String?
     
     public init(
         schemaVersion: Int = 3,
@@ -53,7 +59,7 @@ public struct PresetStorageDTO: Codable, Sendable, Equatable {
     }
 }
 
-/// 预设数据映射器 (Preset Data Mapper)
+/// Data mapper converting `CompressionPreset` to `PresetStorageDTO`.
 public final class PresetDataMapper: DataMapperProtocol, @unchecked Sendable {
     public typealias DomainModel = CompressionPreset
     public typealias StorageDTO = PresetStorageDTO
@@ -78,13 +84,11 @@ public final class PresetDataMapper: DataMapperProtocol, @unchecked Sendable {
     public func toDomain(storage: PresetStorageDTO) -> CompressionPreset {
         let uuid = UUID(uuidString: storage.presetId) ?? UUID()
         
-        // 自动解析旧版本字段与格式映射升级 (v1/v2 ➔ v3)
         let formatString = storage.legacyFormatName ?? storage.compressionFormatRaw
         let format: ArchiveCompressionFormat
         if let direct = ArchiveCompressionFormat(rawValue: formatString) {
             format = direct
         } else {
-            // Safe Fallback: 适配历史小写或非标枚举名
             switch formatString.lowercased() {
             case "7z", "sevenzip": format = .sevenZip
             case "zip": format = .zip
@@ -113,11 +117,11 @@ public final class PresetDataMapper: DataMapperProtocol, @unchecked Sendable {
 
 // MARK: - 2. VaultPasswordEntry ↔ KeychainStorageDTO Data Mapper
 
-/// Keychain 持久化 DTO（包含安全二进制编码与状态）
+/// Keychain persistence DTO payload.
 public struct KeychainStorageDTO: Codable, Sendable, Equatable {
     public var entryUUIDString: String
     public var itemLabel: String
-    public var passwordData: Data // 安全二进制编码 payload
+    public var passwordData: Data
     public var itemCategory: String
     public var createdTimestamp: Double
     public var usageCount: Int
@@ -142,7 +146,7 @@ public struct KeychainStorageDTO: Codable, Sendable, Equatable {
     }
 }
 
-/// Keychain 密码库数据映射器 (Keychain Data Mapper)
+/// Data mapper converting `VaultPasswordEntry` to `KeychainStorageDTO`.
 public final class KeychainDataMapper: DataMapperProtocol, @unchecked Sendable {
     public typealias DomainModel = VaultPasswordEntry
     public typealias StorageDTO = KeychainStorageDTO
@@ -182,7 +186,7 @@ public final class KeychainDataMapper: DataMapperProtocol, @unchecked Sendable {
 
 // MARK: - 3. ArchiveTaskRecord ↔ HistoryJSONDTO Data Mapper
 
-/// 归档历史记录 JSON DTO
+/// History record JSON persistence DTO.
 public struct HistoryJSONDTO: Codable, Sendable, Equatable {
     public var recordId: String
     public var taskType: String
@@ -211,7 +215,7 @@ public struct HistoryJSONDTO: Codable, Sendable, Equatable {
     }
 }
 
-/// 归档历史记录数据映射器 (Archive History Data Mapper)
+/// Data mapper converting `ArchiveTaskRecord` to `HistoryJSONDTO`.
 public final class ArchiveHistoryDataMapper: DataMapperProtocol, @unchecked Sendable {
     public typealias DomainModel = ArchiveTaskRecord
     public typealias StorageDTO = HistoryJSONDTO

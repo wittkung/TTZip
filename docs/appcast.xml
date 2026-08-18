@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>TTZip Changelog</title>
+        <link>https://ttzip.metastudyline.com/appcast.xml</link>
+        <description>Most recent changes with links to updates.</description>
+        <language>en</language>
+        <item>
+            <title>Version 1.5.0</title>
+            <sparkle:releaseNotesLink>https://ttzip.metastudyline.com</sparkle:releaseNotesLink>
+            <pubDate>Tue, 18 Aug 2026 00:00:00 +0800</pubDate>
+            <enclosure url="https://github.com/wittkung/TTZip/releases/download/v1.5.0/TTZip-1.5.0.zip"
+                       sparkle:version="10500"
+                       sparkle:shortVersionString="1.5.0"
+                       length="25000000"
+                       type="application/octet-stream" />
+        </item>
+    </channel>
+</rss>

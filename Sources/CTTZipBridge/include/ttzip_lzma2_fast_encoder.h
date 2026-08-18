@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_lzma2_fast_encoder.h
+ * @brief Fast NEON-accelerated LZMA2 Level 1 and tuned multi-level block compressor.
+ */
+
 #ifndef TTZIP_LZMA2_FAST_ENCODER_H
 #define TTZIP_LZMA2_FAST_ENCODER_H
 
@@ -9,10 +21,6 @@
 extern "C" {
 #endif
 
-// Fast NEON-accelerated LZMA2 L1 Block Compressor
-// Bypasses liblzma for Level 1, achieving max throughput on Apple Silicon.
-// Outputs raw LZMA2 block payload into dst.
-// Returns 0 on success, non-zero error code on failure.
 int ttzip_lzma2_fast_encode(
     const uint8_t* src,
     size_t src_len,

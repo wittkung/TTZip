@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipDiagnostics.h"
 #include <stdio.h>
 #include <string.h>
@@ -89,10 +96,9 @@ static size_t custom_strlen(const char* str) {
 }
 
 static void ttzip_signal_handler(int sig) {
-    // Write out pre-formatted text segments to avoid complex formatting
     const char* sig_name = (sig == SIGBUS) ? "SIGBUS" : ((sig == SIGSEGV) ? "SIGSEGV" : "UNKNOWN");
     
-    const char* p1 = "\n🔴 [TTZip CRASH] Signal=";
+    const char* p1 = "\n[TTZip CRASH] Signal=";
     const char* p2 = " | Layer=";
     const char* p3 = " | Op=";
     const char* p4 = " | File=";
@@ -138,7 +144,7 @@ void ttzip_install_signal_handlers(void) {
     sigaction(SIGBUS, &sa, NULL);
     sigaction(SIGSEGV, &sa, NULL);
     
-    // 忽略 SIGPIPE，将管道中断转化为同步 EPIPE 错误以便优雅退出状态码 141
+    // Ignore SIGPIPE so pipeline breaks turn into synchronous EPIPE returns
     signal(SIGPIPE, SIG_IGN);
 }
 

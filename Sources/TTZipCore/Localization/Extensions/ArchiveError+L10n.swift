@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
 extension ArchiveError {
     
-    /// 获取当前语言或指定语言下的本地化错误描述
+    /// Localized error description for the current or specified language.
     public func localizedDescription(for language: AppLanguage? = nil) -> String {
         let manager = TTZipLocalizationManager.shared
         switch self {

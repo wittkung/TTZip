@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 独立专有的 全核硬件感知 Zstandard (.zst) 高吞吐流式压缩器
+/// High-throughput streaming writer for Zstandard (.zst) format compression.
 public final class ZstdStreamWriter: @unchecked Sendable {
     public static let shared = ZstdStreamWriter()
     
     private init() {}
     
-    /// 执行物理 Zstandard (.zst) 单文件/多文件压缩
+    /// Stream-compresses a file or directory into Zstandard format.
     public func compress(
         srcPath: String,
         dstPath: String,

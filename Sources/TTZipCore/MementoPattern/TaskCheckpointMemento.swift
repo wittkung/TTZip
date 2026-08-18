@@ -1,7 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 任务断点快照备忘录 (Task Checkpoint Memento)
-/// 记录长耗时任务（密码爆破/修复）断点快照（任务ID、任务名、状态名、已处理字节、总字节、字典 Offset、TPS 算力、校验和）
+/// Task checkpoint state snapshot memento recording execution metrics for long-running operations.
 public struct TaskCheckpointMemento: ArchiveMementoProtocol, Codable, Sendable, Equatable {
     public let id: UUID
     public let timestamp: Date
@@ -40,8 +46,7 @@ public struct TaskCheckpointMemento: ArchiveMementoProtocol, Codable, Sendable, 
     }
 }
 
-/// 任务断点快照管理者 (Task Checkpoint Caretaker)
-/// 支持断点快照到磁盘 JSON 文件 (~/Library/Caches/TTZip/Checkpoints/) 的序列化与反序列化，实现程序退出/崩溃无缝断点续传
+/// Task checkpoint caretaker persisting state snapshots to disk for crash recovery and resume capabilities.
 public final class TaskCheckpointCaretaker: ArchiveCaretakerProtocol, @unchecked Sendable {
     private var historyStack: [TaskCheckpointMemento] = []
     private var redoStack: [TaskCheckpointMemento] = []
@@ -70,7 +75,7 @@ public final class TaskCheckpointCaretaker: ArchiveCaretakerProtocol, @unchecked
         saveCheckpoint(memento)
     }
     
-    /// 保存任务断点快照，同步写入内存历史与磁盘 JSON
+    /// Persists task checkpoint to memory history and atomic disk JSON.
     public func saveCheckpoint(_ memento: TaskCheckpointMemento) {
         lock.lock()
         defer { lock.unlock() }
@@ -82,7 +87,6 @@ public final class TaskCheckpointCaretaker: ArchiveCaretakerProtocol, @unchecked
             historyStack.removeFirst(historyStack.count - maxDepth)
         }
         
-        // 序列化至磁盘 JSON 文件
         persistToDisk(memento)
     }
     
@@ -101,11 +105,11 @@ public final class TaskCheckpointCaretaker: ArchiveCaretakerProtocol, @unchecked
             let data = try encoder.encode(memento)
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            // 写入失败降级防护
+            // Best effort checkpoint write
         }
     }
     
-    /// 从磁盘加载特定 taskID 的断点快照
+    /// Loads checkpoint for specified taskID from disk.
     public func loadCheckpoint(taskID: UUID) -> TaskCheckpointMemento? {
         lock.lock()
         defer { lock.unlock() }
@@ -120,12 +124,11 @@ public final class TaskCheckpointCaretaker: ArchiveCaretakerProtocol, @unchecked
             let memento = try decoder.decode(TaskCheckpointMemento.self, from: data)
             return memento
         } catch {
-            // JSON 损坏/解析失败容错
             return nil
         }
     }
     
-    /// 删除磁盘上的 taskID 断点快照
+    /// Deletes task checkpoint file from disk.
     public func deleteCheckpoint(taskID: UUID) {
         lock.lock()
         defer { lock.unlock() }
@@ -134,7 +137,7 @@ public final class TaskCheckpointCaretaker: ArchiveCaretakerProtocol, @unchecked
         try? FileManager.default.removeItem(at: fileURL)
     }
     
-    /// 列出磁盘上保存的所有断点快照
+    /// Lists all persisted checkpoints on disk ordered by timestamp descending.
     public func listCheckpoints() -> [TaskCheckpointMemento] {
         lock.lock()
         defer { lock.unlock() }

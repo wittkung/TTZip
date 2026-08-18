@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 高性能无锁本地化吞吐速率格式化引擎
+/// High-performance lock-free throughput rate formatting engine.
 public enum ThroughputFormatter {
     
-    /// 格式化吞吐速率 (MB/s)
+    /// Formats throughput rate in MB/s with locale-sensitive decimal formatting.
     public static func format(mbPerSec: Double, language: AppLanguage = .en) -> String {
         guard mbPerSec >= 0 else { return "0.0 MB/s" }
         

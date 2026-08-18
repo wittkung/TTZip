@@ -1,7 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 享元模式 (Flyweight Pattern): 共享字节数格式化文本享元池与量化缓存
-/// 消除 UI (MillerColumnItemRowView, DiskItemInfo) 及 CLI 列表渲染成千上万个条目时的高频 ByteCountFormatter 分配与重复 String 堆分配。
+/// Flyweight Pattern: Shared byte count formatted string pool with quantized caching.
+///
+/// Eliminates high-frequency `ByteCountFormatter` allocations and redundant string heap
+/// churn when rendering large directories in UI and CLI lists.
 public final class ByteCountFormatterFlyweight: @unchecked Sendable {
     public static let shared = ByteCountFormatterFlyweight()
     
@@ -15,15 +24,11 @@ public final class ByteCountFormatterFlyweight: @unchecked Sendable {
         return fmt
     }()
     
-    // 命中与未命中统计数据
     private var internalHitCount: Int = 0
     private var internalMissCount: Int = 0
-    
-    // 最大缓存条目数量阈值
     private let maxCacheSize = 20_000
     
     private init() {
-        // 预热常用小尺寸格式化享元字符串 (0 B 到 1024 B)
         for bytes in Int64(0)...Int64(1024) {
             stringCache[bytes] = formatter.string(fromByteCount: bytes)
         }
@@ -50,7 +55,7 @@ public final class ByteCountFormatterFlyweight: @unchecked Sendable {
         #endif
     }
     
-    /// 享元核心：通过字节量化与词典共享池获取格式化文本 (线程安全 100%)
+    /// Formats byte count using quantized cache and dictionary pool (100% thread-safe).
     public func string(fromByteCount bytes: Int64) -> String {
         let targetBytes = max(0, bytes)
         
@@ -69,7 +74,7 @@ public final class ByteCountFormatterFlyweight: @unchecked Sendable {
         return formatted
     }
     
-    /// 量化格式化：针对海量大尺寸文件进行按 64KB/1MB 量化收敛，极大提高 UI 渲染时的享元复用率
+    /// Quantized formatting: rounds large byte counts to 64KB/1MB boundaries for higher hit ratios.
     public func quantizedString(fromByteCount bytes: Int64, chunkSize: Int64 = 64 * 1024) -> String {
         let targetBytes = max(0, bytes)
         if targetBytes < 1024 * 1024 {
@@ -81,7 +86,6 @@ public final class ByteCountFormatterFlyweight: @unchecked Sendable {
     
     // MARK: - Stats & Maintenance
     
-    /// 统一内存释放接口 (遵从享元池统一 clearPool 规范)
     public func clearPool() {
         clearCache()
     }
@@ -93,7 +97,6 @@ public final class ByteCountFormatterFlyweight: @unchecked Sendable {
         internalHitCount = 0
         internalMissCount = 0
         
-        // 重新预热常用小尺寸
         for bytes in Int64(0)...Int64(1024) {
             stringCache[bytes] = formatter.string(fromByteCount: bytes)
         }

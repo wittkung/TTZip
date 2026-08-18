@@ -1,14 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 整合版 压缩包目标配置与动态引擎高级参数统一卡片组件
+/// Integrated compression configuration and engine parameters view.
 public struct CompressIntegratedConfigSectionView: View {
     @Binding public var outputName: String
     @Binding public var targetDirectory: String
     @Binding public var selectedFormat: ArchiveCompressionFormat
     @Binding public var compressionLevel: ArchiveCompressionLevel
     
-    // 动态格式专属参数
+    // Dynamic format options
     @Binding public var compressionAlgorithm: String
     @Binding public var dictionarySizeMB: Int
     @Binding public var zipEncryptionMethod: String
@@ -17,7 +24,7 @@ public struct CompressIntegratedConfigSectionView: View {
     @Binding public var zstdEnableLDM: Bool
     @Binding public var preservePosixAttributes: Bool
     
-    // 全局硬件与策略参数
+    // Global parameters
     @Binding public var cpuThreadsOption: String
     @Binding public var splitVolumeOption: Int64?
     @Binding public var isCustomVolumeSelected: Bool
@@ -85,33 +92,33 @@ public struct CompressIntegratedConfigSectionView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Label("压缩包目标与引擎参数整合配置", systemImage: "slider.horizontal.3")
+                Label("Target & Engine Parameters", systemImage: "slider.horizontal.3")
                     .font(.system(size: 13, weight: .bold, design: .serif))
                     .foregroundStyle(TTZipTheme.bambooGreen)
                 Spacer()
             }
             
-            // 1. 基础输出设置
+            // 1. Output Settings
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 12) {
-                    Text("输出文件名").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing)
-                    TextField("输出文件名", text: $outputName)
+                    Text("Output Name").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 85, alignment: .trailing)
+                    TextField("Output Name", text: $outputName)
                         .textFieldStyle(.plain).font(.system(size: 12, weight: .medium)).padding(.horizontal, 10).padding(.vertical, 5)
                         .background(Color.primary.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 
                 HStack(spacing: 12) {
-                    Text("保存位置").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing)
+                    Text("Destination").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 85, alignment: .trailing)
                     HStack(spacing: 6) {
-                        TextField("目标文件夹路径", text: $targetDirectory)
+                        TextField("Destination folder path", text: $targetDirectory)
                             .textFieldStyle(.plain).font(.system(size: 11.5)).padding(.horizontal, 10).padding(.vertical, 5)
                             .background(Color.primary.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        Button("浏览...") { onPickDirectory() }.buttonStyle(.bordered).controlSize(.small)
+                        Button("Browse...") { onPickDirectory() }.buttonStyle(.bordered).controlSize(.small)
                     }
                 }
                 
                 HStack(alignment: .top, spacing: 12) {
-                    Text("封装格式").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing).padding(.top, 4)
+                    Text("Format").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 85, alignment: .trailing).padding(.top, 4)
                     let all16Formats: [ArchiveCompressionFormat] = [
                         .sevenZip, .zip, .tar, .zst, .gz, .bz2, .xz, .lzip,
                         .lz4, .brotli, .lrzip, .aar, .snappy, .wim, .dmg, .iso
@@ -128,35 +135,35 @@ public struct CompressIntegratedConfigSectionView: View {
             
             Divider()
             
-            // 2. 动态暴露格式专属高级选项卡片区
+            // 2. Format specific parameters
             formatSpecificAdvancedSection
             
             Divider()
             
-            // 3. 硬件调度与自动化策略
+            // 3. Hardware & Automation policies
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 12) {
-                    Text("CPU 线程").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing)
+                    Text("CPU Threads").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 85, alignment: .trailing)
                     Picker("", selection: $cpuThreadsOption) {
-                        Text("全核满载 (\(cachedTotalCores) 线程)").tag("全核")
-                        Text("半核负载 (\(max(1, cachedTotalCores / 2)) 线程)").tag("半核")
-                        Text("单线程后台").tag("单核")
+                        Text("All Cores (\(cachedTotalCores) Threads)").tag("全核")
+                        Text("Half Load (\(max(1, cachedTotalCores / 2)) Threads)").tag("半核")
+                        Text("Single Thread").tag("单核")
                     }
                     .pickerStyle(.segmented).tint(TTZipTheme.bambooGreen)
                 }
                 
                 HStack(spacing: 12) {
-                    Text("分卷限制").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing)
+                    Text("Split Volume").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 85, alignment: .trailing)
                     HStack(spacing: 6) {
-                        volTile(size: nil, name: "不分卷")
+                        volTile(size: nil, name: "No Split")
                         volTile(size: 700 * 1024 * 1024, name: "700MB")
                         volTile(size: 4700 * 1024 * 1024, name: "4.7GB")
                         volTile(size: 4000 * 1024 * 1024, name: "4GB (FAT32)")
-                        volTile(size: -1, name: "自定义")
+                        volTile(size: -1, name: "Custom")
                     }
                     if isCustomVolumeSelected {
                         HStack(spacing: 4) {
-                            TextField("数值", text: $customVolumeValueString).textFieldStyle(.plain).font(.system(size: 11))
+                            TextField("Value", text: $customVolumeValueString).textFieldStyle(.plain).font(.system(size: 11))
                                 .padding(.horizontal, 6).padding(.vertical, 3).background(Color.primary.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 6)).frame(width: 60)
                             Picker("", selection: $customVolumeUnit) { Text("MB").tag("MB"); Text("GB").tag("GB") }.pickerStyle(.segmented).tint(TTZipTheme.bambooGreen).frame(width: 70)
                         }
@@ -164,13 +171,13 @@ public struct CompressIntegratedConfigSectionView: View {
                 }
                 
                 HStack(spacing: 12) {
-                    Text("安全加密").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing)
+                    Text("Encryption").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 85, alignment: .trailing)
                     HStack(spacing: 10) {
-                        Toggle("启用口令加密", isOn: $enableEncryption).font(.system(size: 11, weight: .bold)).tint(TTZipTheme.bambooGreen)
+                        Toggle("Enable Encryption", isOn: $enableEncryption).font(.system(size: 11, weight: .bold)).tint(TTZipTheme.bambooGreen)
                         if enableEncryption {
-                            TTSecureTextField("解压口令密码", text: $password).font(.system(size: 11)).padding(.horizontal, 8).padding(.vertical, 4).background(Color.primary.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 6))
+                            TTSecureTextField("Password", text: $password).font(.system(size: 11)).padding(.horizontal, 8).padding(.vertical, 4).background(Color.primary.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 6))
                             Button(action: onOpenPasswordVault) {
-                                HStack(spacing: 3) { Image(systemName: "key.fill"); Text("密码库...") }
+                                HStack(spacing: 3) { Image(systemName: "key.fill"); Text("Vault...") }
                                     .font(.system(size: 10.5, weight: .semibold)).foregroundStyle(TTZipTheme.kintsugiGold).padding(.horizontal, 7).padding(.vertical, 3).background(TTZipTheme.kintsugiGold.opacity(0.12)).clipShape(Capsule())
                             }.buttonStyle(.plain)
                         }
@@ -178,10 +185,10 @@ public struct CompressIntegratedConfigSectionView: View {
                 }
                 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    Toggle("过滤 macOS 垃圾文件 (.DS_Store)", isOn: $skipMacJunk).tint(TTZipTheme.bambooGreen)
-                    Toggle("选中项目独立单独打包", isOn: $createSeparateArchives).tint(TTZipTheme.bambooGreen)
-                    Toggle("压缩成功后移至废纸篓", isOn: $deleteSourceAfterCompress).tint(TTZipTheme.bambooGreen)
-                    Toggle("完成后在 Finder 中高亮显示", isOn: $openFinderAfterCompress).tint(TTZipTheme.bambooGreen)
+                    Toggle("Filter macOS Junk (.DS_Store)", isOn: $skipMacJunk).tint(TTZipTheme.bambooGreen)
+                    Toggle("Create Separate Archives per Item", isOn: $createSeparateArchives).tint(TTZipTheme.bambooGreen)
+                    Toggle("Move Source Files to Trash After Compression", isOn: $deleteSourceAfterCompress).tint(TTZipTheme.bambooGreen)
+                    Toggle("Reveal in Finder Upon Completion", isOn: $openFinderAfterCompress).tint(TTZipTheme.bambooGreen)
                 }
                 .font(.system(size: 11)).padding(.top, 4)
             }
@@ -197,59 +204,59 @@ public struct CompressIntegratedConfigSectionView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "gearshape.2.fill").font(.system(size: 11)).foregroundStyle(TTZipTheme.bambooGreen)
-                Text("\(selectedFormat.rawValue.uppercased()) 引擎专属高级选项").font(.system(size: 11.5, weight: .bold)).foregroundStyle(.primary)
+                Text("\(selectedFormat.rawValue.uppercased()) Engine Parameters").font(.system(size: 11.5, weight: .bold)).foregroundStyle(.primary)
                 Spacer()
-                Button(action: onShowMatrix) { Text("查看算法矩阵...").font(.system(size: 10.5)).foregroundStyle(.secondary) }.buttonStyle(.plain)
+                Button(action: onShowMatrix) { Text("Algorithm Matrix...").font(.system(size: 10.5)).foregroundStyle(.secondary) }.buttonStyle(.plain)
             }
             
             switch selectedFormat {
             case .sevenZip:
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
-                        Text("核心算法").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).frame(width: 65, alignment: .trailing)
+                        Text("Algorithm").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing)
                         Picker("", selection: $compressionAlgorithm) {
-                            Text("LZMA2 (默认高压缩)").tag("LZMA2")
-                            Text("LZMA (旧版兼容)").tag("LZMA")
-                            Text("PPMd (文本/源码特化)").tag("PPMd")
-                            Text("BZip2 (多核加持)").tag("BZip2")
-                            Text("Copy (无压缩极速打包)").tag("Copy")
+                            Text("LZMA2 (Default)").tag("LZMA2")
+                            Text("LZMA (Legacy)").tag("LZMA")
+                            Text("PPMd (Text/Code)").tag("PPMd")
+                            Text("BZip2 (Parallel)").tag("BZip2")
+                            Text("Copy (Store)").tag("Copy")
                         }.pickerStyle(.menu).controlSize(.small)
                     }
                     HStack(spacing: 12) {
-                        Text("字典大小").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).frame(width: 65, alignment: .trailing)
+                        Text("Dictionary").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing)
                         Picker("", selection: $dictionarySizeMB) {
-                            Text("16 MB").tag(16); Text("32 MB (标准)").tag(32); Text("64 MB (高压)").tag(64); Text("128 MB").tag(128); Text("256 MB (极限)").tag(256)
+                            Text("16 MB").tag(16); Text("32 MB (Standard)").tag(32); Text("64 MB").tag(64); Text("128 MB").tag(128); Text("256 MB (Ultra)").tag(256)
                         }.pickerStyle(.segmented).tint(TTZipTheme.bambooGreen)
                     }
                     HStack(spacing: 16) {
-                        Toggle("固实压缩包 (Solid Archive)", isOn: $enableSolidArchive).tint(TTZipTheme.bambooGreen)
-                        Toggle("加密文件名与目录树结构", isOn: $encryptFileNames).disabled(!enableEncryption).tint(TTZipTheme.bambooGreen)
+                        Toggle("Solid Archive", isOn: $enableSolidArchive).tint(TTZipTheme.bambooGreen)
+                        Toggle("Encrypt File Names", isOn: $encryptFileNames).disabled(!enableEncryption).tint(TTZipTheme.bambooGreen)
                     }.font(.system(size: 11))
                 }
             case .zip:
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
-                        Text("加密格式").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).frame(width: 65, alignment: .trailing)
+                        Text("Encryption").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing)
                         Picker("", selection: $zipEncryptionMethod) {
-                            Text("AES-256 (高强度安全推荐)").tag("AES-256")
-                            Text("ZipCrypto (标准旧版兼容)").tag("ZipCrypto")
+                            Text("AES-256 (Recommended)").tag("AES-256")
+                            Text("ZipCrypto (Legacy)").tag("ZipCrypto")
                         }.pickerStyle(.segmented).tint(TTZipTheme.bambooGreen)
                     }
-                    Toggle("强制使用 UTF-8 文件名编码 (解决 Windows 乱码)", isOn: $zipEncodingUTF8).font(.system(size: 11)).tint(TTZipTheme.bambooGreen)
+                    Toggle("Force UTF-8 File Names", isOn: $zipEncodingUTF8).font(.system(size: 11)).tint(TTZipTheme.bambooGreen)
                 }
             case .zst, .tarZst:
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
-                        Text("ZSTD 级别").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).frame(width: 65, alignment: .trailing)
+                        Text("ZSTD Level").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing)
                         Picker("", selection: $zstdLevel) {
-                            Text("Level 1 (极速 2GB/s)").tag(1); Text("Level 3 (默认推荐)").tag(3); Text("Level 9 (平衡高压)").tag(9); Text("Level 19 (极限)").tag(19)
+                            Text("Level 1 (Fast)").tag(1); Text("Level 3 (Default)").tag(3); Text("Level 9 (Balanced)").tag(9); Text("Level 19 (Ultra)").tag(19)
                         }.pickerStyle(.segmented).tint(TTZipTheme.bambooGreen)
                     }
-                    Toggle("启用 LDM 超长距离去重算法 (Long Distance Matching)", isOn: $zstdEnableLDM).font(.system(size: 11)).tint(TTZipTheme.bambooGreen)
+                    Toggle("Enable Long Distance Matching (LDM)", isOn: $zstdEnableLDM).font(.system(size: 11)).tint(TTZipTheme.bambooGreen)
                 }
             case .tarGz, .gz, .tarBz2, .tarXz, .tar, .bz2, .xz, .lzip, .lz4, .brotli, .lrzip, .aar, .snappy, .wim, .dmg, .iso:
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("完整保留 UNIX POSIX 文件权限与所有者属性 (chmod/chown)", isOn: $preservePosixAttributes).font(.system(size: 11)).tint(TTZipTheme.bambooGreen)
+                    Toggle("Preserve UNIX POSIX File Permissions and Owner (chmod/chown)", isOn: $preservePosixAttributes).font(.system(size: 11)).tint(TTZipTheme.bambooGreen)
                 }
             }
         }
@@ -301,7 +308,7 @@ public struct CompressIntegratedConfigSectionView: View {
     private func compressionLevelSection(fmt: ArchiveCompressionFormat) -> some View {
         let levelsList = fmt.supportedLevels
         return HStack(spacing: 12) {
-            Text("压缩级别").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 75, alignment: .trailing)
+            Text("Level").font(.system(size: 11.5, weight: .medium)).foregroundStyle(.secondary).frame(width: 85, alignment: .trailing)
             HStack(spacing: 6) {
                 ForEach(levelsList, id: \.rawValue) { lvl in
                     self.levelTileView(fmt: fmt, lvl: lvl)
@@ -314,11 +321,11 @@ public struct CompressIntegratedConfigSectionView: View {
         let ratioPct = Int(round(lvl.compressionRatioPercent(for: fmt)))
         let titleName: String
         switch lvl {
-        case .store: titleName = "仅存储 (\(ratioPct)%)"
-        case .level1: titleName = "极速 (\(ratioPct)%)"
-        case .level6: titleName = "标准 (\(ratioPct)%)"
-        case .level9: titleName = "极限 (\(ratioPct)%)"
-        default: titleName = "级别 \(lvl.rawValue) (\(ratioPct)%)"
+        case .store: titleName = "Store (\(ratioPct)%)"
+        case .level1: titleName = "Fast (\(ratioPct)%)"
+        case .level6: titleName = "Standard (\(ratioPct)%)"
+        case .level9: titleName = "Ultra (\(ratioPct)%)"
+        default: titleName = "Level \(lvl.rawValue) (\(ratioPct)%)"
         }
         return levelTile(level: lvl, name: titleName)
     }

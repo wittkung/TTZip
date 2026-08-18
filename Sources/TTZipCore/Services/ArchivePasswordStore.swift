@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 进程级解压密码缓存存储区 (线程安全，LRU 容量上限管制与敏感内存安全抹除)
+/// Process-level thread-safe archive password LRU cache with secure memory erasure.
 public final class ArchivePasswordStore: @unchecked Sendable {
     public static let shared = ArchivePasswordStore()
     private let lock = NSLock()
@@ -93,5 +100,4 @@ public final class ArchivePasswordStore: @unchecked Sendable {
         }
         str = ""
     }
-
 }

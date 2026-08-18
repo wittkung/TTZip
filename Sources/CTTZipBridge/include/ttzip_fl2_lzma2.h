@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_fl2_lzma2.h
+ * @brief High-performance Fast-LZMA2 multi-threaded block and streaming compressor.
+ */
+
 #ifndef TTZIP_FL2_LZMA2_H
 #define TTZIP_FL2_LZMA2_H
 
@@ -12,22 +24,6 @@ extern "C" {
 #define TTZIP_FL2C_MAGIC 0x464C3243U /* "FL2C" */
 #define TTZIP_FL2S_MAGIC 0x464C3253U /* "FL2S" */
 
-/**
- * High-performance Fast-LZMA2 Multi-Threaded Block Compressor.
- * 
- * Routes Level 1 to handwritten ARM64 NEON Fast-Path, and Level 3~9 to Fast-LZMA2 Radix-MF.
- * 
- * @param src Pointer to input data
- * @param src_len Input data length in bytes
- * @param dst Pointer to destination buffer
- * @param dst_capacity Capacity of destination buffer
- * @param out_compressed_len Pointer to store output compressed size
- * @param level Compression level (1 to 9)
- * @param is_zero_block Hint whether input is all zeros (triggers NEON zero-chunk fast path)
- * @param out_dict_size Output pointer for effective dictionary size
- * @param thread_count Number of threads (0 for auto P-Core detection)
- * @return 0 on success, negative error code on failure
- */
 int ttzip_fl2_compress_block(
     const uint8_t* src,
     size_t src_len,
@@ -40,9 +36,6 @@ int ttzip_fl2_compress_block(
     int thread_count
 );
 
-/**
- * Fast-LZMA2 Streaming Compression API for XZ and TAR.XZ pipelines.
- */
 typedef struct ttzip_fl2_stream_ctx_s ttzip_fl2_stream_ctx_t;
 
 ttzip_fl2_stream_ctx_t* ttzip_fl2_stream_create(int level, uint32_t dict_size, int thread_count);

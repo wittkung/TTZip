@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 7z 零拷贝 `mmap` 32-Byte 签名头与 Header Database 安全解析器
+/// Zero-copy `mmap` parser for 7z 32-byte Signature Header and Header Database structures.
 public final class SevenZipHeaderReader: @unchecked Sendable {
     public static let shared = SevenZipHeaderReader()
     
@@ -27,7 +34,7 @@ public final class SevenZipHeaderReader: @unchecked Sendable {
         return val
     }
     
-    /// 从 mmap 字节指针安全验证并解析 7z 32 字节 Signature Header
+    /// Parses and verifies the 32-byte 7z Signature Header.
     public func parseSignatureHeader(from bytePtr: UnsafePointer<UInt8>, fileSize: Int) -> SevenZipSignatureHeader? {
         guard fileSize >= 32 else { return nil }
         
@@ -51,7 +58,7 @@ public final class SevenZipHeaderReader: @unchecked Sendable {
         )
     }
     
-    /// 解析 7z 文件获得包含条目属性的物理描述符数组
+    /// Parses 7z header descriptors from mapped buffer.
     public func readDescriptors(from bytePtr: UnsafePointer<UInt8>, fileSize: Int) -> [SevenZipEntryDescriptor]? {
         guard let header = parseSignatureHeader(from: bytePtr, fileSize: fileSize) else { return nil }
         
@@ -60,7 +67,6 @@ public final class SevenZipHeaderReader: @unchecked Sendable {
             return nil
         }
         
-        // 解析基础 Header 块（如果 C 库 CLI 在场则混合互补解析）
         var descriptors: [SevenZipEntryDescriptor] = []
         let dummyCount = 1
         for i in 0..<dummyCount {

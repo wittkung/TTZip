@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 
-/// 全局流体动画状态（确保不同视图间流体形态绝对连贯且高效缓存）
+/// Global fluid animation state ensuring cross-view fluid phase coherence.
 @MainActor
 public final class TTZipGlobalFluidState {
     public static let shared = TTZipGlobalFluidState()
@@ -21,7 +28,7 @@ public final class TTZipGlobalFluidState {
     }
 }
 
-/// 流体动态背景视图 (100% 恢复 ITTime 极速 4.0x 下采样硬件纹理渲染系统)
+/// Fluid dynamic background canvas view.
 public struct TTZipFluidBackgroundView: View {
     public let baseColor: Color
     public var speed: Double = 0.3

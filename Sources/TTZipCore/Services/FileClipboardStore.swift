@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import SwiftUI
 import AppKit
 
-/// 全局文件剪贴板调度器 (支持 ⌘C 复制 / ⌘X 剪切 / ⌘V 粘贴，自动文件名碰撞避让)
+/// Global file clipboard dispatcher supporting copy, cut, paste, and automatic filename collision avoidance.
 @MainActor
 public final class FileClipboardStore: ObservableObject {
     public static let shared = FileClipboardStore()

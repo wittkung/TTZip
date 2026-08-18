@@ -1,10 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 /**
  * @file ttzip_platform.h
- * @brief 跨平台系统级基础抽象、内存页对齐与符号导出定义中枢
- * @details 本头文件对标 libarchive `archive_platform.h` 与 `archive_windows.h`，
- *          提供 Windows (MSVC/MinGW)、macOS (Darwin/Apple Silicon) 与 Linux 的统一宏隔离与系统层接口。
- * @version 4.0
- * @author TTZip Core Engineering Team
+ * @brief Cross-platform system abstraction layer, page alignment, and symbol export macros.
+ * @details Aligned with libarchive archive_platform.h conventions across macOS, Linux, and Windows.
  */
 
 #ifndef TTZIP_PLATFORM_H
@@ -49,7 +53,7 @@
 #endif
 
 /* ============================================================================
- * 1. 跨平台动态库导出与调用约定宏定义
+ * 1. Dynamic Library Export and Calling Convention Macros
  * ============================================================================ */
 
 #if defined(TTZIP_OS_WINDOWS)
@@ -76,7 +80,7 @@
 #endif
 
 /* ============================================================================
- * 2. 线程局部存储 (TLS) 跨平台宏定义
+ * 2. Thread-Local Storage (TLS) Macros
  * ============================================================================ */
 
 #if defined(_MSC_VER)
@@ -92,7 +96,7 @@
 #endif
 
 /* ============================================================================
- * 3. 跨平台数据类型与上限修复
+ * 3. Cross-Platform Data Types and Limits
  * ============================================================================ */
 
 #if defined(_MSC_VER)
@@ -130,7 +134,7 @@
 typedef int64_t ttzip_off_t;
 
 /* ============================================================================
- * 4. 内存与物理页对齐常量 (Apple Silicon 16KB vs 工业通用 4KB)
+ * 4. Page Alignment Constants (Apple Silicon 16KB vs Generic 4KB)
  * ============================================================================ */
 
 #if defined(TTZIP_OS_MACOS) && defined(__aarch64__)
@@ -140,22 +144,22 @@ typedef int64_t ttzip_off_t;
 #endif
 
 /* ============================================================================
- * 5. 跨平台状态码与错误模型 (对标 libarchive 6-Level 错误体系)
+ * 5. Status Codes (Libarchive 6-Level Hierarchy)
  * ============================================================================ */
 
-#define TTZIP_STATUS_EOF          1   /**< 归档正常结束 (End of Archive) */
-#define TTZIP_STATUS_OK           0   /**< 操作完全成功 (Success) */
-#define TTZIP_STATUS_RETRY     (-10)  /**< 瞬态等待，重试可能成功 (Transient Retry) */
-#define TTZIP_STATUS_WARN      (-20)  /**< 局部非致命警告，可继续读取 (Recoverable Warning) */
-#define TTZIP_STATUS_FAILED    (-25)  /**< 当前条目损坏，跳过并恢复解析 (Item Error, Recoverable) */
-#define TTZIP_STATUS_FATAL     (-30)  /**< 致命不可逆崩溃 (Fatal Unrecoverable Error) */
+#define TTZIP_STATUS_EOF          1   /**< End of Archive */
+#define TTZIP_STATUS_OK           0   /**< Success */
+#define TTZIP_STATUS_RETRY     (-10)  /**< Transient Retry */
+#define TTZIP_STATUS_WARN      (-20)  /**< Recoverable Warning */
+#define TTZIP_STATUS_FAILED    (-25)  /**< Item Error (Recoverable) */
+#define TTZIP_STATUS_FATAL     (-30)  /**< Fatal Unrecoverable Error */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* ============================================================================
- * 6. 跨平台微秒 / 毫秒级高精度休眠
+ * 6. High-Precision Microsecond / Millisecond Sleep
  * ============================================================================ */
 
 static inline void ttzip_sleep_ms(uint32_t ms) {
@@ -189,7 +193,7 @@ static inline void ttzip_sleep_us(uint32_t us) {
 }
 
 /* ============================================================================
- * 7. 编译器内置函数与预取指令抽象
+ * 7. Prefetch and Branch Prediction Hints
  * ============================================================================ */
 
 #if defined(_MSC_VER)
@@ -208,7 +212,7 @@ static inline void ttzip_sleep_us(uint32_t us) {
 #endif
 
 /* ============================================================================
- * 8. 跨平台页对齐内存申请与释放接口
+ * 8. Page-Aligned Memory Allocation Primitives
  * ============================================================================ */
 
 static inline void* ttzip_platform_aligned_alloc(size_t alignment, size_t size) {

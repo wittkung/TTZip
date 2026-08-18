@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipBridge_7zStore.h"
 #include "include/CTTZip7zStoreInternal.h"
 #include "include/CTTZipBridge.h"
@@ -200,7 +207,7 @@ int ttzip_create_7z_store_fast_c(
         header_buf[h_idx++] = 0x08; // kSubStreamsInfo
         header_buf[h_idx++] = 0x00; // kEnd of kSubStreamsInfo
         header_buf[h_idx++] = 0x00; // kEnd of kMainStreamsInfo
-    } // end kMainStreamsInfo
+    }
 
     header_buf[h_idx++] = 0x05; // kFilesInfo
     h_idx += ttzip_7z_write_varint(header_buf + h_idx, num_files);

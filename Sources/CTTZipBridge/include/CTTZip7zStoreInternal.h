@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file CTTZip7zStoreInternal.h
+ * @brief Internal type aliases and function mappings for 7Z store/solid pipeline.
+ */
+
 #ifndef CTTZIP_7Z_STORE_INTERNAL_H
 #define CTTZIP_7Z_STORE_INTERNAL_H
 
@@ -18,4 +30,4 @@ typedef ttzip_io_file_list_t ttzip_7z_store_list_t;
 #define ttzip_7z_write_varint ttzip_varint_write_u64
 #define ttzip_7z_write_all ttzip_io_write_all
 
-#endif
+#endif // CTTZIP_7Z_STORE_INTERNAL_H

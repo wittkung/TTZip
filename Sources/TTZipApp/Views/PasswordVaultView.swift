@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 import LocalAuthentication
 
-/// 现代高透社论美学 - 本地密码钥匙串安全宝库
+/// Keychain and password safe vault view.
 public struct PasswordVaultView: View {
     @StateObject private var viewModel: PasswordVaultViewModel
     @FocusState private var isMasterPasswordFocused: Bool
@@ -17,7 +24,6 @@ public struct PasswordVaultView: View {
     public var body: some View {
         VStack(spacing: 0) {
             if !viewModel.isUnlocked {
-                // 1. 未解锁锁定状态：极简高透防护舱 (Crystal Safe Vault)
                 VStack(spacing: 24) {
                     ZStack {
                         Circle()
@@ -34,11 +40,11 @@ public struct PasswordVaultView: View {
                     }
                     
                     VStack(spacing: 6) {
-                        Text(viewModel.isMasterPasswordSet ? "安全密码钥匙串已锁定" : "设置主解锁口令")
+                        Text(viewModel.isMasterPasswordSet ? "Keychain Vault Locked" : "Setup Master Password")
                             .font(.system(size: 18, weight: .bold, design: .serif))
                             .foregroundStyle(.primary)
                         
-                        Text(viewModel.isMasterPasswordSet ? "请输入主口令或使用 Touch ID 指纹一键验证解锁" : "首次使用请创建主解密口令，解压密码将基于该口令全量加密存储")
+                        Text(viewModel.isMasterPasswordSet ? "Enter master password or use Touch ID to unlock" : "Create a master password. Stored passwords are encrypted with this credential.")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -47,8 +53,7 @@ public struct PasswordVaultView: View {
                     
                     VStack(spacing: 12) {
                         if !viewModel.isMasterPasswordSet {
-                            // 首次开启：设置主口令 + 确认主口令
-                            TTSecureTextField("设置新的主解锁口令 (请妥善保管)", text: $viewModel.masterPasswordInput)
+                            TTSecureTextField("New Master Password", text: $viewModel.masterPasswordInput)
                                 .font(.system(size: 12, weight: .medium))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -57,7 +62,7 @@ public struct PasswordVaultView: View {
                                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
                                 .frame(width: 320)
                             
-                            TTSecureTextField("再次输入以确认主口令", text: $viewModel.confirmMasterPasswordInput)
+                            TTSecureTextField("Confirm Master Password", text: $viewModel.confirmMasterPasswordInput)
                                 .font(.system(size: 12, weight: .medium))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -73,7 +78,7 @@ public struct PasswordVaultView: View {
                             }
                             
                             Button(action: { viewModel.setupFirstMasterPassword() }) {
-                                Text("创建主解锁口令并开启密码库")
+                                Text("Create Master Password")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(.white)
                                     .frame(width: 320)
@@ -92,8 +97,7 @@ public struct PasswordVaultView: View {
                             .keyboardShortcut(.return, modifiers: [])
                             .disabled(viewModel.masterPasswordInput.isEmpty || viewModel.confirmMasterPasswordInput.isEmpty)
                         } else {
-                            // 已设置主口令：解锁视图
-                            TTSecureTextField("输入主口令解锁密码库", text: $viewModel.masterPasswordInput)
+                            TTSecureTextField("Enter Master Password", text: $viewModel.masterPasswordInput)
                                 .font(.system(size: 12, weight: .medium))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -114,7 +118,7 @@ public struct PasswordVaultView: View {
                                     HStack(spacing: 4) {
                                         Image(systemName: "touchid")
                                             .font(.system(size: 12, weight: .bold))
-                                        Text("Touch ID 解锁")
+                                        Text("Touch ID")
                                             .font(.system(size: 11, weight: .bold))
                                     }
                                     .foregroundStyle(.white)
@@ -133,7 +137,7 @@ public struct PasswordVaultView: View {
                                 .buttonStyle(.plain)
                                 
                                 Button(action: { viewModel.unlockVault() }) {
-                                    Text("解锁密码库")
+                                    Text("Unlock")
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundStyle(Color.primary)
                                         .padding(.horizontal, 14)
@@ -148,7 +152,7 @@ public struct PasswordVaultView: View {
                             }
                             
                             HStack(spacing: 16) {
-                                Button("忘记主口令？重置密码库") {
+                                Button("Forgot master password? Reset vault") {
                                     viewModel.newMasterPasswordInput = ""
                                     viewModel.isResetSheetPresented = true
                                 }
@@ -157,7 +161,7 @@ public struct PasswordVaultView: View {
                                 .foregroundStyle(.secondary)
                                 
                                 if viewModel.hasBackupVault {
-                                    Button("找回历史密码库备份") {
+                                    Button("Restore vault backup") {
                                         viewModel.oldMasterPasswordInput = ""
                                         viewModel.recoverErrorMessage = ""
                                         viewModel.isRecoverSheetPresented = true
@@ -184,16 +188,14 @@ public struct PasswordVaultView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // 2. 已解锁状态：密码库主控制列表
                 VStack(alignment: .leading, spacing: 0) {
-                    // Header 栏 - 顶部对齐高度 52pt
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("KEYCHAIN VAULT")
                                 .font(.system(size: 9, weight: .bold, design: .serif))
                                 .tracking(2)
                                 .foregroundStyle(TTZipTheme.kintsugiGold)
-                            Text("钥匙串密码库")
+                            Text("Password Vault")
                                 .font(.system(size: 16, weight: .bold, design: .serif))
                                 .foregroundStyle(.primary)
                         }
@@ -203,7 +205,7 @@ public struct PasswordVaultView: View {
                                 Image(systemName: "bolt.shield.fill")
                                     .font(.system(size: 10))
                                     .foregroundStyle(TTZipTheme.bambooGreen)
-                                Text("自动解密归档包")
+                                Text("Auto-Unlock Archives")
                                     .font(.system(size: 10.5, weight: .bold))
                                     .foregroundStyle(.primary)
                             }
@@ -211,13 +213,13 @@ public struct PasswordVaultView: View {
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .tint(TTZipTheme.bambooGreen)
-                        .help("解锁密码库后，打开加密压缩包时自动比对库中保存的解压口令")
+                        .help("Auto-matches saved passwords when opening encrypted archives")
                         
                         Button(action: { viewModel.lockVault() }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "lock.fill")
                                     .font(.system(size: 10))
-                                Text("锁定密码库")
+                                Text("Lock Vault")
                                     .font(.system(size: 10.5, weight: .bold))
                             }
                             .foregroundStyle(.secondary)
@@ -232,7 +234,7 @@ public struct PasswordVaultView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "plus.circle.fill")
                                     .font(.system(size: 11, weight: .bold))
-                                Text("添加密码 (⌘N)")
+                                Text("Add Password (⌘N)")
                                     .font(.system(size: 11, weight: .bold))
                             }
                             .foregroundStyle(.white)
@@ -254,7 +256,6 @@ public struct PasswordVaultView: View {
                     .padding(.horizontal, 20)
                     .frame(height: 52)
                     
-                    // 统一置顶分割线 (金缮金强调线对齐)
                     Rectangle()
                         .fill(TTZipTheme.kintsugiGold)
                         .frame(height: 1.5)
@@ -267,9 +268,9 @@ public struct PasswordVaultView: View {
                                 .foregroundStyle(TTZipTheme.bambooGreen.opacity(0.4))
                             
                             VStack(spacing: 4) {
-                                Text("密码库当前无数据")
+                                Text("No Saved Passwords")
                                     .font(.system(size: 13, weight: .bold))
-                                Text("点击右上角 [添加密码] 保存常用解压口令")
+                                Text("Click [Add Password] to save credentials")
                                     .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                             }
@@ -364,22 +365,22 @@ public struct PasswordVaultView: View {
     }
 }
 
-/// 重置主口令 Sheet
+/// Reset master password sheet.
 struct PasswordVaultResetSheet: View {
     @ObservedObject var viewModel: PasswordVaultViewModel
     
     var body: some View {
         VStack(spacing: 20) {
             VStack(spacing: 6) {
-                Text("重置密码库主口令")
+                Text("Reset Master Password")
                     .font(.system(size: 16, weight: .bold))
-                Text("重置将清空当前密码库并设置新主口令。历史条目将自动备份以供日后找回。")
+                Text("Resetting clears the active vault and configures a new master password. An archive backup will be created.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             
-            TTSecureTextField("输入新的主解锁口令", text: $viewModel.newMasterPasswordInput)
+            TTSecureTextField("New Master Password", text: $viewModel.newMasterPasswordInput)
                 .font(.system(size: 12))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -389,7 +390,7 @@ struct PasswordVaultResetSheet: View {
                 .frame(width: 280)
             
             HStack(spacing: 12) {
-                Button("取消") {
+                Button("Cancel") {
                     viewModel.isResetSheetPresented = false
                 }
                 .buttonStyle(.plain)
@@ -399,7 +400,7 @@ struct PasswordVaultResetSheet: View {
                 .background(Color.primary.opacity(0.06))
                 .clipShape(Capsule())
                 
-                Button("确认重置") {
+                Button("Confirm Reset") {
                     viewModel.resetVault()
                 }
                 .buttonStyle(.plain)
@@ -417,22 +418,22 @@ struct PasswordVaultResetSheet: View {
     }
 }
 
-/// 找回历史备份 Sheet
+/// Recover vault backup sheet.
 struct PasswordVaultRecoverSheet: View {
     @ObservedObject var viewModel: PasswordVaultViewModel
     
     var body: some View {
         VStack(spacing: 20) {
             VStack(spacing: 6) {
-                Text("找回历史密码库备份")
+                Text("Restore Vault Backup")
                     .font(.system(size: 16, weight: .bold))
-                Text("请输入该备份创建时使用的主解锁口令进行还原解密。")
+                Text("Enter the historical master password used when this backup was created.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             
-            TTSecureTextField("输入历史主口令", text: $viewModel.oldMasterPasswordInput)
+            TTSecureTextField("Historical Master Password", text: $viewModel.oldMasterPasswordInput)
                 .font(.system(size: 12))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -448,7 +449,7 @@ struct PasswordVaultRecoverSheet: View {
             }
             
             HStack(spacing: 12) {
-                Button("取消") {
+                Button("Cancel") {
                     viewModel.isRecoverSheetPresented = false
                 }
                 .buttonStyle(.plain)
@@ -458,7 +459,7 @@ struct PasswordVaultRecoverSheet: View {
                 .background(Color.primary.opacity(0.06))
                 .clipShape(Capsule())
                 
-                Button("验证并恢复") {
+                Button("Verify & Restore") {
                     viewModel.recoverVault()
                 }
                 .buttonStyle(.plain)

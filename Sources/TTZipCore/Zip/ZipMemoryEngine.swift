@@ -1,13 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 纯 UMA 统一内存 Buffer-to-Buffer 极速编解码测试与运算引擎
+/// High-throughput unified memory buffer-to-buffer ZIP codec engine (30+ GB/s).
 public final class ZipMemoryEngine: @unchecked Sendable {
     public static let shared = ZipMemoryEngine()
     
     private init() {}
     
-    /// 执行纯内存零拷贝并发 ZIP 集中解压，不产生任何磁盘文件系统落盘开销 (测算 30+ GB/s 算力极限)
+    /// In-memory zero-copy parallel ZIP decompression without filesystem I/O overhead.
     public func extractInMemory(archiveData: Data) -> [(path: String, data: Data)]? {
         return archiveData.withUnsafeBytes { rawIn in
             guard let bytePtr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
@@ -42,7 +49,7 @@ public final class ZipMemoryEngine: @unchecked Sendable {
                 if desc.compressionMethod == 0 { // Store
                     let outData = Data(bytes: payloadPtr, count: Int(desc.compressedSize))
                     resultsBox.set(idx: idx, res: (path: desc.path, data: outData))
-                } else if desc.compressionMethod == 8 { // Deflate 零拷贝直译
+                } else if desc.compressionMethod == 8 { // Deflate
                     let uncompSize = Int(desc.uncompressedSize)
                     let rawDst = UnsafeMutablePointer<UInt8>.allocate(capacity: uncompSize)
                     let decompSize = ttzip_libdeflate_decompress(payloadPtr, Int(desc.compressedSize), rawDst, uncompSize)
@@ -59,7 +66,7 @@ public final class ZipMemoryEngine: @unchecked Sendable {
         }
     }
     
-    /// 执行基于 MmapBufferHandle 的只读零拷贝并发 ZIP 集中解压
+    /// In-memory zero-copy parallel ZIP decompression from `MmapBufferHandle`.
     public func extractInMemory(handle: MmapBufferHandle) -> [(path: String, data: Data)]? {
         guard let bytePtr = handle.bytes.baseAddress else { return nil }
         let fileSize = handle.count
@@ -92,7 +99,6 @@ public final class ZipMemoryEngine: @unchecked Sendable {
             guard let payloadSlice = handle.slice(offset: payloadOffset, length: Int(desc.compressedSize)),
                   let payloadPtr = payloadSlice.baseAddress else { return }
 
-            
             if desc.compressionMethod == 0 { // Store
                 let outData = Data(bytes: payloadPtr, count: Int(desc.compressedSize))
                 resultsBox.set(idx: idx, res: (path: desc.path, data: outData))
@@ -112,4 +118,3 @@ public final class ZipMemoryEngine: @unchecked Sendable {
         return resultsBox.values.compactMap { $0 }
     }
 }
-

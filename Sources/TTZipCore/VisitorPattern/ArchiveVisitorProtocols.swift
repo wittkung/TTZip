@@ -1,20 +1,27 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 访问者模式核心接口 (GoF Visitor Pattern Protocols)
+// MARK: - Visitor Pattern Core Protocols
 
-/// GoF 23 种设计模式收官之作 — 访问者模式 (Visitor Pattern) 核心访问者接口
-/// 封装作用于 `ArchiveComponentProtocol` 组合树中各元素的操作，可以在不改变各元素的类的前提下定义作用于这些元素的新操作。
+/// Core visitor protocol for operating across `ArchiveComponentProtocol` composite trees (GoF Visitor Pattern).
+/// Encapsulates operations executed across tree nodes without mutating underlying component representations.
 public protocol ArchiveComponentVisitorProtocol<Result> {
     associatedtype Result
     
-    /// 访问叶子节点 (Single Leaf File)
+    /// Visits leaf file node.
     func visit(leaf: ArchiveLeafFile) -> Result
     
-    /// 访问组合目录节点 (Composite Directory)
+    /// Visits composite directory node.
     func visit(directory: ArchiveCompositeDirectory) -> Result
 }
 
-// MARK: - 闭包访问者类型 (Closure-based Visitor)
+// MARK: - Closure-based Visitor
 
 public struct ArchiveComponentVisitor<Result>: Sendable {
     public let visitLeafBlock: @Sendable (ArchiveLeafFile) -> Result
@@ -29,19 +36,18 @@ public struct ArchiveComponentVisitor<Result>: Sendable {
     }
 }
 
-// MARK: - 访问者双向与兼容默认实现
+// MARK: - Default Implementations
 
 extension ArchiveComponentVisitorProtocol {
-    /// 兼容与替代访问方法 (Composite Directory Alias)
     public func visit(composite: ArchiveCompositeDirectory) -> Result {
         return visit(directory: composite)
     }
 }
 
-// MARK: - 组合组件协议扩展 (Double Dispatch Protocol Extensions)
+// MARK: - Double Dispatch Protocol Extensions
 
 extension ArchiveComponentProtocol {
-    /// 强类型访问者双重分发 API (Double Dispatch API)
+    /// Strongly-typed double dispatch entrypoint for visitors.
     public func accept<V: ArchiveComponentVisitorProtocol>(visitor: V) -> V.Result {
         if let leaf = self as? ArchiveLeafFile {
             return visitor.visit(leaf: leaf)

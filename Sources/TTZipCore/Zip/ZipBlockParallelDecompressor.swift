@@ -1,13 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 512KB 分块多核并发 Deflate 极速解压引擎 (消除单超大文件单线程解压瓶颈)
+/// Multi-core parallel Deflate decompression engine for 512KB blocks,
+/// utilizing 64-byte cacheline-aligned buffers to avoid single-thread bottlenecks.
 public final class ZipBlockParallelDecompressor: @unchecked Sendable {
     public static let shared = ZipBlockParallelDecompressor()
     
     private init() {}
     
-    /// 将 512KB 分块并发由 CPU 全核同时解压至 64 字节缓存行对齐的 Buffer 中
+    /// Decompresses partitioned 512KB blocks concurrently across CPU cores into an aligned destination buffer.
     public func decompressBlocksConcurrently(
         compressedData: Data,
         uncompressedSize: Int64,
@@ -19,7 +27,7 @@ public final class ZipBlockParallelDecompressor: @unchecked Sendable {
         guard totalBlocks > 0, uncompressedSize > 0 else { return nil }
         
         var alignedOutPtr: UnsafeMutableRawPointer? = nil
-        let pageSize = 64 // 64 字节 Cache Line 对齐
+        let pageSize = 64 // 64-byte cacheline alignment
         let alignedLength = ((Int(uncompressedSize) + pageSize - 1) / pageSize) * pageSize
         posix_memalign(&alignedOutPtr, pageSize, alignedLength)
         

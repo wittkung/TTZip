@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 import LocalAuthentication
@@ -21,11 +28,10 @@ public final class PasswordVaultViewModel: ObservableObject {
     
     @Published public var newLabel: String = ""
     @Published public var newPassword: String = ""
-    @Published public var newCategory: String = "通用"
+    @Published public var newCategory: String = "General"
     @Published public var copiedID: UUID? = nil
     @Published public var visiblePasswordIDs: Set<UUID> = []
     
-    // MARK: - 【4.5 依赖注入模式 (Dependency Injection Pattern)】使用 @Injected 解耦 Repository 与 VaultManager
     @Injected public var repository: KeychainPasswordRepository
     @Injected public var manager: PasswordVaultManager
     
@@ -58,11 +64,11 @@ public final class PasswordVaultViewModel: ObservableObject {
     
     public func setupFirstMasterPassword() {
         guard masterPasswordInput == confirmMasterPasswordInput else {
-            unlockErrorMessage = "两次输入的主口令不一致，请重新输入"
+            unlockErrorMessage = "Master passwords do not match. Please try again."
             return
         }
         guard !masterPasswordInput.isEmpty else {
-            unlockErrorMessage = "主口令不能为空"
+            unlockErrorMessage = "Master password cannot be empty."
             return
         }
         
@@ -83,7 +89,7 @@ public final class PasswordVaultViewModel: ObservableObject {
             masterPasswordInput = ""
             refreshState()
         } else {
-            unlockErrorMessage = "解锁口令错误，请重试"
+            unlockErrorMessage = "Incorrect master password. Please try again."
         }
     }
     
@@ -99,7 +105,7 @@ public final class PasswordVaultViewModel: ObservableObject {
         var error: NSError?
         
         if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "使用 Touch ID 解锁 TTZip 钥匙串密码库") { success, _ in
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Authenticate to unlock TTZip Password Vault") { success, _ in
                 Task { @MainActor in
                     if success {
                         let ok = self.manager.unlockWithBiometrics()
@@ -108,22 +114,22 @@ public final class PasswordVaultViewModel: ObservableObject {
                             self.unlockErrorMessage = ""
                             self.refreshState()
                         } else {
-                            self.unlockErrorMessage = "指纹验证通过，但未找到预存的解锁主口令，请手动输入口令"
+                            self.unlockErrorMessage = "Biometric authentication succeeded, but master password not found."
                         }
                     } else {
-                        self.unlockErrorMessage = "Touch ID 指纹验证失败"
+                        self.unlockErrorMessage = "Touch ID authentication failed."
                     }
                 }
             }
         } else {
-            unlockErrorMessage = "当前设备不支持 Touch ID 或未在系统设置中启用"
+            unlockErrorMessage = "Touch ID is not supported or not enabled in System Settings."
         }
     }
     
     public func addEntry() {
         guard !newLabel.isEmpty, !newPassword.isEmpty else { return }
-        let finalLabel = newLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "解压口令" : newLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalCategory = newCategory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "通用" : newCategory.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalLabel = newLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Password" : newLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalCategory = newCategory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "General" : newCategory.trimmingCharacters(in: .whitespacesAndNewlines)
         let entry = PasswordVaultEntry(label: finalLabel, password: newPassword, category: finalCategory)
         
         try? repository.save(entry)
@@ -157,7 +163,7 @@ public final class PasswordVaultViewModel: ObservableObject {
             recoverErrorMessage = ""
             refreshState()
         } else {
-            recoverErrorMessage = "验证历史主口令失败，恢复解密中断"
+            recoverErrorMessage = "Failed to verify previous master password."
         }
     }
 }

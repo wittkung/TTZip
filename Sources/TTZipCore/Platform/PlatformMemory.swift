@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
@@ -7,7 +14,7 @@ import Darwin
 import Glibc
 #endif
 
-/// 零开销进程内存遥测快照 (物理驻留内存、内核记录的历史峰值高水位与虚拟内存)
+/// In-process memory telemetry snapshot (Resident Set Size, high-water mark peak RSS, and virtual size).
 public struct MemoryCeilingSnapshot: Sendable, Equatable {
     public let currentRSSBytes: UInt64
     public let peakRSSBytes: UInt64
@@ -27,16 +34,10 @@ public struct MemoryCeilingSnapshot: Sendable, Equatable {
     }
 }
 
-/// 跨平台高性能对齐内存分配、虚拟映射与敏感内存物理销毁中枢
-///
-/// 对标 libarchive 内存架构与安全规范，提供：
-/// - 页对齐缓冲区分配 (Apple Silicon 16KB / 通用 4KB)
-/// - 内存屏障敏感数据安全物理清零 (`secureZero`)，彻底免疫死存储消除 (DSE)
-/// - 虚拟内存只读映射 RAII 作用域封装 (`mapFileReadOnly`) 与独立句柄
-/// - 零开销进程内存高水位采样 (`currentMemoryUsage`)
+/// Cross-platform aligned memory allocation, virtual memory mapping, and dead-store immune memory sanitization subsystem.
 public enum PlatformMemory {
     
-    /// 零开销获取当前进程的物理驻留内存 (RSS)、峰值高水位物理内存 (Peak RSS) 与虚拟内存快照
+    /// Queries current process physical resident memory (RSS), peak RSS high-water mark, and virtual memory snapshot.
     @inlinable
     public static func currentMemoryUsage() -> MemoryCeilingSnapshot {
         #if os(macOS)
@@ -65,21 +66,21 @@ public enum PlatformMemory {
         #endif
     }
     
-    /// 申请指定对齐字节的连续物理内存块
+    /// Allocates contiguous physical memory buffer with custom byte alignment.
     @inlinable
     public static func allocateAlignedPages(alignment: Int, byteCount: Int) -> UnsafeMutableRawPointer? {
         guard byteCount > 0, alignment > 0 else { return nil }
         return ttzip_platform_aligned_alloc(alignment, byteCount)
     }
     
-    /// 释放由 ``allocateAlignedPages`` 分配的内存
+    /// Deallocates memory previously allocated by ``allocateAlignedPages``.
     @inlinable
     public static func deallocateAlignedPages(pointer: UnsafeMutableRawPointer?) {
         guard let pointer = pointer else { return }
         ttzip_platform_aligned_free(pointer)
     }
     
-    /// 申请指定字节大小的页对齐堆内存缓冲区 (默认当前系统页对齐尺寸)
+    /// Allocates page-aligned heap buffer conforming to default platform page alignment (16KB on Apple Silicon).
     @inlinable
     public static func allocateAlignedPageBuffer(byteCount: Int) -> UnsafeMutableRawPointer? {
         guard byteCount > 0 else { return nil }
@@ -87,14 +88,14 @@ public enum PlatformMemory {
         return ttzip_platform_aligned_alloc(alignment, byteCount)
     }
     
-    /// 释放由 ``allocateAlignedPageBuffer(byteCount:)`` 分配的页对齐内存
+    /// Deallocates page-aligned heap buffer previously allocated by ``allocateAlignedPageBuffer(byteCount:)``.
     @inlinable
     public static func deallocateAlignedPageBuffer(_ pointer: UnsafeMutableRawPointer?) {
         guard let pointer = pointer else { return }
         ttzip_platform_aligned_free(pointer)
     }
     
-    /// 物理强制擦除敏感内存缓冲区 (密码、密钥与中间状态)
+    /// Erases sensitive memory (passwords, keys, decryption state) with dead-store elimination immunity.
     @inlinable
     public static func secureZero(pointer: UnsafeMutableRawPointer, byteCount: Int) {
         guard byteCount > 0 else { return }
@@ -108,7 +109,7 @@ public enum PlatformMemory {
         #endif
     }
     
-    /// 以只读模式将物理文件映射至虚拟内存并返回映射句柄
+    /// Maps physical file into virtual address space in read-only mode and returns mapping descriptor.
     public static func mapFileReadOnly(filePath: String) throws -> PlatformMmapResult {
         let fd = open(filePath, O_RDONLY)
         guard fd >= 0 else {
@@ -135,7 +136,7 @@ public enum PlatformMemory {
         return PlatformMmapResult(pointer: UnsafeRawPointer(mappedPtr), size: fileSize, rawDescriptor: fd)
     }
     
-    /// 以只读零拷贝模式将物理文件映射至虚拟内存地址空间并执行 RAII 闭包
+    /// Maps physical file into virtual address space in read-only mode within RAII closure scope.
     public static func mapFileReadOnly<R: Sendable>(
         atPath path: String,
         _ body: @Sendable (UnsafeRawBufferPointer) throws -> R

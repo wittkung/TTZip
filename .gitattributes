@@ -1,0 +1,73 @@
+# ==============================================================================
+# TTZip Git Attributes Configuration
+# High-Performance Swift 6 + C11 Native Archiving Engine
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Global Line Ending Normalization (Force LF across platforms)
+# ------------------------------------------------------------------------------
+* text=auto eol=lf
+
+# Explicit source code classifications
+*.swift text eol=lf diff=swift
+*.c text eol=lf diff=c
+*.h text eol=lf diff=c
+*.cpp text eol=lf diff=cpp
+*.hpp text eol=lf diff=cpp
+*.m text eol=lf diff=objc
+*.sh text eol=lf
+*.py text eol=lf
+*.rb text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.xml text eol=lf
+*.plist text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.patch text eol=lf
+
+# ------------------------------------------------------------------------------
+# 2. Binary File Protections (Prevent CRLF/LF mangling & binary corruption)
+# ------------------------------------------------------------------------------
+*.a binary
+*.dylib binary
+*.so binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.icns binary
+*.ico binary
+*.xcframework binary
+*.car binary
+*.zip binary
+*.7z binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+*.zst binary
+*.lz4 binary
+*.lzip binary
+*.dmg binary
+*.iso binary
+*.wim binary
+
+# ------------------------------------------------------------------------------
+# 3. GitHub Linguist Overrides (Accurate Language Statistics & Clean Diffs)
+# ------------------------------------------------------------------------------
+# Mark pre-compiled 3rd-party vendor code as vendored (excluded from stats)
+Vendor/** linguist-vendored
+
+# Mark AI specs, workflows and generated patches as generated (collapsed in PR diffs)
+specs/** linguist-generated
+.specify/** linguist-generated
+.agents/** linguist-generated
+Package.resolved linguist-generated
+*.patch linguist-generated
+Formula/** linguist-generated
+reports/** linguist-generated
+site/** linguist-generated
+docs/** linguist-documentation

@@ -1,10 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 /**
  * @file ttzip_crc64.c
- * @brief ARM64 PMULL 硬件加速与标量回退 CRC64 (ECMA-182 / XZ) 校验引擎实现
- * @details 基于 ARMv8-A vmull_p64 无进位乘法实现 4 路 64 字节向量折叠与 Barrett 模约化。
- *          完全对齐 7Z/XZ 归档规范与 lzma_crc64 黄金标准（生成多项式 0xC96C5795D7870F42ULL，反转进出）。
- * @version 1.0
- * @author TTZip Core Engineering Team
+ * @brief ARM64 PMULL hardware accelerated and scalar fallback CRC64 (ECMA-182 / XZ).
+ * @details Implements 4-way 64-byte vector folding and Barrett reduction via ARMv8-A vmull_p64.
+ *          Strictly matches 7Z/XZ specifications and lzma_crc64 standards (poly 0xC96C5795D7870F42ULL).
  */
 
 #include "include/ttzip_crc64.h"

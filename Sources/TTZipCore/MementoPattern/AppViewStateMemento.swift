@@ -1,18 +1,25 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 工作区页签枚举 (Workspace Tab Enum for Core & App)
+/// Workspace navigation tab classification.
 public enum WorkspaceTab: String, CaseIterable, Identifiable, Codable, Sendable {
-    case home = "浏览/解压"
-    case compressWorkspace = "新建压缩文件"
-    case presets = "预设工作区"
-    case benchmark = "性能测试"
-    case vault = "密码库"
-    case settings = "商业授权"
+    case home = "home"
+    case compressWorkspace = "compressWorkspace"
+    case presets = "presets"
+    case benchmark = "benchmark"
+    case vault = "vault"
+    case settings = "settings"
     
     public var id: String { rawValue }
 }
 
-/// GUI 工作区 UI 布局快照备忘录 (App View State Memento)
+/// GUI workspace state snapshot memento.
 public struct AppViewStateMemento: ArchiveMementoProtocol, Codable, Sendable, Equatable {
     public let id: UUID
     public let timestamp: Date
@@ -42,8 +49,7 @@ public struct AppViewStateMemento: ArchiveMementoProtocol, Codable, Sendable, Eq
     }
 }
 
-/// GUI 工作区布局管理者 (App View State Caretaker)
-/// 支持工作区布局快照保存与恢复，具备 Undo/Redo 双栈历史记录
+/// Caretaker managing undo/redo history for workspace layout state.
 public final class AppViewStateCaretaker: ArchiveCaretakerProtocol, @unchecked Sendable {
     private var undoStack: [AppViewStateMemento] = []
     private var redoStack: [AppViewStateMemento] = []

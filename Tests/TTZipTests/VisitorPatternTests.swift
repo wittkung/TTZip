@@ -83,7 +83,7 @@ final class VisitorPatternTests: XCTestCase {
         XCTAssertFalse(threats.isEmpty)
         XCTAssertEqual(threats.first?.type, .zipBomb)
         XCTAssertEqual(threats.first?.level, .critical)
-        XCTAssertTrue(threats.first?.detail.contains("Zip 炸弹") == true)
+        XCTAssertTrue(threats.first?.detail.contains("Zip Bomb") == true)
     }
     
     func testSecurityScannerVisitorCleanTreeNoThreats() {
@@ -124,9 +124,9 @@ final class VisitorPatternTests: XCTestCase {
         let stats = tree.accept(visitor: visitor)
         
         XCTAssertFalse(stats.categoryDistribution.isEmpty)
-        let videoCount = stats.categoryDistribution.first { $0.category == "视频" }?.count ?? 0
-        let docCount = stats.categoryDistribution.first { $0.category == "文档/代码/字幕" }?.count ?? 0
-        let photoCount = stats.categoryDistribution.first { $0.category == "图片" }?.count ?? 0
+        let videoCount = stats.categoryDistribution.first { $0.category == "Video" }?.count ?? 0
+        let docCount = stats.categoryDistribution.first { $0.category == "Document/Code" }?.count ?? 0
+        let photoCount = stats.categoryDistribution.first { $0.category == "Image" }?.count ?? 0
         
         XCTAssertEqual(videoCount, 1)
         XCTAssertEqual(docCount, 2)

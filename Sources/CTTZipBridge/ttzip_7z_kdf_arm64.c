@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_7z_kdf_arm64.c
+ * @brief 7Z ARM64 SHA-256 hardware accelerated Key Derivation Function (KDF).
+ */
+
 #include "include/ttzip_7z_kdf_arm64.h"
 #include "include/CTTZipBridge.h"
 #include <string.h>
@@ -106,7 +118,7 @@ static inline void sha256_transform_armv8_block(uint32_t state[8], const uint8_t
 }
 #endif
 
-// UTF-8 to UTF-16LE 栈上转码器 (零堆分配)
+// Zero-heap stack UTF-8 to UTF-16LE transcoder
 static int utf8_to_utf16le_stack(const char* utf8, uint8_t* out_buf, size_t max_out_bytes, size_t* out_len) {
     if (!out_buf || max_out_bytes < 2) {
         if (out_len) *out_len = 0;
@@ -168,7 +180,7 @@ int ttzip_7z_kdf_sha256_armv8(
     if (salt_len > 16) return TTZIP_ERR_INVALID_PARAM;
     if (num_cycles_power > 24) return TTZIP_ERR_INVALID_PARAM;
 
-    // 栈上固定 536 字节缓冲区: [Salt (<=16) | UTF-16LE Password (<=512) | Counter (8)]
+    // Stack fixed 536-byte buffer: [Salt (<=16) | UTF-16LE Password (<=512) | Counter (8)]
     uint8_t kdf_buf[536];
     size_t effective_salt_len = 0;
     if (salt && salt_len > 0) {
@@ -202,7 +214,7 @@ int ttzip_7z_kdf_sha256_armv8(
     }
     CC_SHA256_Final(out_key, &ctx);
 
-    // 显式擦除敏感内存 (防 Clang DSE 死存储消除)
+    // Explicitly wipe sensitive buffers (Dead-store elimination immunity)
     ttzip_secure_zero(kdf_buf, sizeof(kdf_buf));
     ttzip_secure_zero(&ctx, sizeof(ctx));
     return TTZIP_OK;
@@ -224,11 +236,10 @@ int ttzip_7z_crypto_session_init(
     session->is_active = true;
     session->num_cycles_power = num_cycles_power > 0 ? num_cycles_power : 19;
     
-    // 生成密码学安全的随机 IV
+    // Cryptographically secure random IV
     if (SecRandomCopyBytes(kSecRandomDefault, 16, session->aes_iv) != errSecSuccess) {
         memset(session->aes_iv, 0x5A, 16);
     }
 
-    // 单次派生 AES 密钥
     return ttzip_7z_kdf_sha256_armv8(password, salt, salt_len, session->num_cycles_power, session->aes_key);
 }

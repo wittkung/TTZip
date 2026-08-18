@@ -1,11 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-//  StandardsComplianceChecker.swift
-//  TTZipCore
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
 //
-//  Authoritative standards compliance validation engine.
-//  Validates archive headers and streams against official specifications
-//  (PKWARE APPNOTE.TXT, POSIX.1-2001 Pax/ustar, RFC 1952 GZIP, RFC 8878 Zstandard, 7z Specification, etc.)
-//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 
 import Foundation
 import CTTZipBridge
@@ -229,8 +228,8 @@ public enum StandardsComplianceChecker {
 
             let diskNum = buffer.loadUnaligned(fromByteOffset: Int(eocdOffset + 4), as: UInt16.self).littleEndian
             let startCDDisk = buffer.loadUnaligned(fromByteOffset: Int(eocdOffset + 6), as: UInt16.self).littleEndian
-            let totalEntriesDisk = buffer.loadUnaligned(fromByteOffset: Int(eocdOffset + 8), as: UInt16.self).littleEndian
-            let totalEntries = buffer.loadUnaligned(fromByteOffset: Int(eocdOffset + 10), as: UInt16.self).littleEndian
+            let _ = buffer.loadUnaligned(fromByteOffset: Int(eocdOffset + 8), as: UInt16.self).littleEndian
+            let _ = buffer.loadUnaligned(fromByteOffset: Int(eocdOffset + 10), as: UInt16.self).littleEndian
             let cdSize = buffer.loadUnaligned(fromByteOffset: Int(eocdOffset + 12), as: UInt32.self).littleEndian
             let cdOffset = buffer.loadUnaligned(fromByteOffset: Int(eocdOffset + 16), as: UInt32.self).littleEndian
             let commentLen = buffer.loadUnaligned(fromByteOffset: Int(eocdOffset + 20), as: UInt16.self).littleEndian
@@ -265,6 +264,9 @@ public enum StandardsComplianceChecker {
                     }
                 }
             }
+            if isZip64 {
+                validatedHeaders.append("PKWARE APPNOTE: Archive verified as Zip64 format")
+            }
 
             // Traverse Central Directory headers
             if actualCDOffset >= 0 && actualCDOffset + actualCDSize <= fileSize {
@@ -281,7 +283,7 @@ public enum StandardsComplianceChecker {
                         parsedCDHeader = true
                     }
 
-                    let flag = buffer.loadUnaligned(fromByteOffset: Int(cdPos + 8), as: UInt16.self).littleEndian
+                    let _ = buffer.loadUnaligned(fromByteOffset: Int(cdPos + 8), as: UInt16.self).littleEndian
                     let nameLen = Int(buffer.loadUnaligned(fromByteOffset: Int(cdPos + 28), as: UInt16.self).littleEndian)
                     let extraLen = Int(buffer.loadUnaligned(fromByteOffset: Int(cdPos + 30), as: UInt16.self).littleEndian)
                     let commentLength = Int(buffer.loadUnaligned(fromByteOffset: Int(cdPos + 32), as: UInt16.self).littleEndian)
@@ -545,7 +547,7 @@ public enum StandardsComplianceChecker {
         citation: StandardCitation?
     ) -> StandardsComplianceReport {
         var validatedHeaders: [String] = []
-        var warnings: [String] = []
+        let warnings: [String] = []
         var violations: [String] = []
 
         guard fileSize >= 4 else {
@@ -706,7 +708,7 @@ public enum StandardsComplianceChecker {
         citation: StandardCitation?
     ) -> StandardsComplianceReport {
         var validatedHeaders: [String] = []
-        var warnings: [String] = []
+        let warnings: [String] = []
         var violations: [String] = []
 
         guard fileSize >= 4 else {
@@ -770,7 +772,7 @@ public enum StandardsComplianceChecker {
         citation: StandardCitation?
     ) -> StandardsComplianceReport {
         var validatedHeaders: [String] = []
-        var warnings: [String] = []
+        let warnings: [String] = []
         var violations: [String] = []
 
         guard fileSize >= 12 else {
@@ -831,7 +833,7 @@ public enum StandardsComplianceChecker {
         citation: StandardCitation?
     ) -> StandardsComplianceReport {
         var validatedHeaders: [String] = []
-        var warnings: [String] = []
+        let warnings: [String] = []
         var violations: [String] = []
 
         guard fileSize >= 4 else {
@@ -877,7 +879,7 @@ public enum StandardsComplianceChecker {
         citation: StandardCitation?
     ) -> StandardsComplianceReport {
         var validatedHeaders: [String] = []
-        var warnings: [String] = []
+        let warnings: [String] = []
         var violations: [String] = []
 
         guard fileSize >= 6 else {
@@ -931,7 +933,7 @@ public enum StandardsComplianceChecker {
         citation: StandardCitation?
     ) -> StandardsComplianceReport {
         var validatedHeaders: [String] = []
-        var warnings: [String] = []
+        let warnings: [String] = []
         var violations: [String] = []
 
         guard fileSize >= 10 else {
@@ -984,7 +986,7 @@ public enum StandardsComplianceChecker {
         citation: StandardCitation?
     ) -> StandardsComplianceReport {
         var validatedHeaders: [String] = []
-        var warnings: [String] = []
+        let warnings: [String] = []
         var violations: [String] = []
 
         guard fileSize >= 208 else {
@@ -1038,7 +1040,7 @@ public enum StandardsComplianceChecker {
         citation: StandardCitation?
     ) -> StandardsComplianceReport {
         var validatedHeaders: [String] = []
-        var warnings: [String] = []
+        let warnings: [String] = []
         var violations: [String] = []
 
         guard fileSize >= 512 else {

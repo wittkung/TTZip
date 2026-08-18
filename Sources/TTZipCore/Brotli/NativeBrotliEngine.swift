@@ -1,15 +1,23 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import Compression
 import CTTZipBridge
 
-/// macOS 原生 In-Process Brotli (.br / .tar.br) 极速流式编解码引擎
-/// 基于 Apple `Compression.framework` (`COMPRESSION_BROTLI`) 与原生 TAR 管道
+/// Native in-process Brotli (.br / .tar.br) streaming codec engine.
+///
+/// Backed by Apple `Compression.framework` (`COMPRESSION_BROTLI`) and native TAR pipeline.
 public final class NativeBrotliEngine: @unchecked Sendable {
     public static let shared = NativeBrotliEngine()
     
     private init() {}
     
-    /// 流式压缩单文件至 Brotli 格式
+    /// Stream-compresses a single file into Brotli (.br) format.
     public func compressFile(
         srcPath: String,
         dstPath: String,
@@ -77,7 +85,7 @@ public final class NativeBrotliEngine: @unchecked Sendable {
         return true
     }
     
-    /// 流式解压 Brotli 文件
+    /// Stream-decompresses a Brotli (.br) file.
     public func decompressFile(
         srcPath: String,
         dstPath: String,
@@ -147,7 +155,7 @@ public final class NativeBrotliEngine: @unchecked Sendable {
         return true
     }
     
-    /// 归档打包为 Brotli (.br / .tar.br) 格式
+    /// Packs and compresses input paths into Brotli (.br / .tar.br) archive container.
     public func createArchive(
         outputPath: String,
         inputPaths: [String],
@@ -158,17 +166,17 @@ public final class NativeBrotliEngine: @unchecked Sendable {
         let tempTar = FileManager.default.temporaryDirectory.appendingPathComponent("tt_br_tar_\(UUID().uuidString).tar").path
         defer { try? FileManager.default.removeItem(atPath: tempTar) }
         
-        // 1. 生成纯 TAR 流
+        // 1. Generate uncompressed TAR stream
         let status = CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
             ttzip_create_tar_native_c(tempTar, "tar", cInputPaths, inputPaths.count, skipMacJunk, 1)
         }
         guard status == 0 else { return false }
         
-        // 2. Brotli 流式压缩 TAR 为 .br
+        // 2. Stream compress TAR container with Brotli
         return try compressFile(srcPath: tempTar, dstPath: outputPath, level: level, progressHandler: progressHandler)
     }
     
-    /// 解压 Brotli (.br / .tar.br) 归档
+    /// Extracts a Brotli (.br / .tar.br) archive container.
     public func extractArchive(
         archivePath: String,
         destinationDir: String,
@@ -178,11 +186,11 @@ public final class NativeBrotliEngine: @unchecked Sendable {
         let tempTar = FileManager.default.temporaryDirectory.appendingPathComponent("tt_br_ext_\(UUID().uuidString).tar").path
         defer { try? FileManager.default.removeItem(atPath: tempTar) }
         
-        // 1. Brotli 解压至纯 TAR
+        // 1. Decompress Brotli container to uncompressed TAR stream
         let decOk = try decompressFile(srcPath: archivePath, dstPath: tempTar, progressHandler: progressHandler)
         guard decOk else { return false }
         
-        // 2. 提取 TAR 到目标目录
+        // 2. Extract TAR entries into target directory
         let extractStatus = ttzip_extract_tar_native_c(tempTar, destinationDir, skipMacJunk)
         return extractStatus == 0
     }

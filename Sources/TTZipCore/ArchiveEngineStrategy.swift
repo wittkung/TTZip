@@ -1,27 +1,34 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档格式压缩与解压引擎统一策略接口 (结合 Strategy Pattern 与 Bridge Pattern)
+/// Strategy Pattern & Bridge Pattern: Unified interface for format-specific compression and extraction strategies.
 public protocol ArchiveFormatEngineStrategy: Sendable {
-    /// 该策略支持的归档格式
+    /// Format supported by this strategy.
     var format: ArchiveCompressionFormat { get }
     
-    /// 该策略关联的 Bridge 桥接实现者 (Bridge Implementor)
+    /// Associated Bridge Pattern implementor.
     var bridgeImplementor: ArchiveEngineImplementorProtocol { get }
 
-    /// 该策略绑定的模板方法模式骨架 (Template Method Pattern Engine)
+    /// Associated Template Method Pattern workflow engine.
     var engineTemplate: BaseArchiveEngineTemplate { get }
     
-    /// 判断给定的文件路径是否符合该策略处理范围
+    /// Checks whether this strategy can process the given filesystem path.
     func canHandle(path: String) -> Bool
     
-    /// 执行解压操作
+    /// Executes extraction workflow.
     func extract(archivePath: String, destinationDir: String, options: ArchiveFilterOptions, password: String?) throws -> Bool
     
-    /// 执行压缩操作
+    /// Executes compression workflow.
     func compress(outputPath: String, inputPaths: [String], level: ArchiveCompressionLevel, options: ArchiveFilterOptions, password: String?) throws -> Bool
 }
 
-/// 归档引擎策略集中注册表
+/// Central registry for format engine strategies.
 public final class ArchiveEngineRegistry: @unchecked Sendable {
     public static let shared = ArchiveEngineRegistry()
     private let lock = NSLock()
@@ -40,21 +47,21 @@ public final class ArchiveEngineRegistry: @unchecked Sendable {
         ]
     }
     
-    /// 注册格式处理策略
+    /// Registers a new format strategy.
     public func register(strategy: ArchiveFormatEngineStrategy) {
         lock.lock()
         defer { lock.unlock() }
         strategies.append(strategy)
     }
     
-    /// 查找能处理特定路径的解压策略
+    /// Finds a registered extraction strategy capable of handling the target path.
     public func findExtractor(for path: String) -> ArchiveFormatEngineStrategy? {
         lock.lock()
         defer { lock.unlock() }
         return strategies.first(where: { $0.canHandle(path: path) })
     }
     
-    /// 根据底层硬件拓扑与 Payload 动态推荐最优压缩算法策略 (结合 CompressionStrategyContext 策略模式)
+    /// Recommends the optimal compression strategy based on workload characteristics and hardware topology.
     public func selectOptimalCompressionStrategy(
         inputPaths: [String],
         targetFormat: ArchiveCompressionFormat,
@@ -68,7 +75,7 @@ public final class ArchiveEngineRegistry: @unchecked Sendable {
     }
 }
 
-// MARK: - 针对各格式的具体策略实现 (Concrete Format Engine Strategies)
+// MARK: - Concrete Format Engine Strategies
 
 private final class StrategySyncBox<T>: @unchecked Sendable {
     var value: T?
@@ -92,7 +99,7 @@ private func executeStrategyBridgeSync<T: Sendable>(_ block: @Sendable @escaping
     throw ArchiveError.readFailed(code: -999)
 }
 
-/// Zip 归档格式专属策略实现
+/// ZIP format engine strategy implementation.
 public final class ZipFormatEngineStrategy: ArchiveFormatEngineStrategy {
     public let format: ArchiveCompressionFormat = .zip
     public let bridgeImplementor: ArchiveEngineImplementorProtocol
@@ -139,7 +146,7 @@ public final class ZipFormatEngineStrategy: ArchiveFormatEngineStrategy {
     }
 }
 
-/// 7z 归档格式专属策略实现
+/// 7z format engine strategy implementation.
 public final class SevenZipFormatEngineStrategy: ArchiveFormatEngineStrategy {
     public let format: ArchiveCompressionFormat = .sevenZip
     public let bridgeImplementor: ArchiveEngineImplementorProtocol
@@ -186,7 +193,7 @@ public final class SevenZipFormatEngineStrategy: ArchiveFormatEngineStrategy {
     }
 }
 
-/// Tar 衍生系列归档格式专属策略实现
+/// TAR and derivative formats engine strategy implementation.
 public final class TarFormatEngineStrategy: ArchiveFormatEngineStrategy {
     public let format: ArchiveCompressionFormat
     public let bridgeImplementor: ArchiveEngineImplementorProtocol
@@ -235,7 +242,7 @@ public final class TarFormatEngineStrategy: ArchiveFormatEngineStrategy {
     }
 }
 
-/// Zstandard (zst) 归档格式专属策略实现
+/// Zstandard (zst) format engine strategy implementation.
 public final class ZstdFormatEngineStrategy: ArchiveFormatEngineStrategy {
     public let format: ArchiveCompressionFormat = .zst
     public let bridgeImplementor: ArchiveEngineImplementorProtocol

@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档性能指标统计数据结构
+/// Value type encapsulating archive operation performance measurements.
 public struct PerformanceMetrics: Sendable, Equatable {
     public let bytesProcessed: Int64
     public let durationSeconds: Double
@@ -13,8 +20,7 @@ public struct PerformanceMetrics: Sendable, Equatable {
     }
 }
 
-/// 吞吐率 (MB/s) 与耗时瓶颈测量具体装饰器 (Concrete Decorator)
-/// 透明叠加实时耗时测量、处理字节数统计与吞吐速率 (MB/s) 算力指标计算。
+/// Concrete decorator measuring execution duration, processed byte count, and throughput (MB/s).
 open class PerformanceMetricsDecorator: ArchiveOperationDecorator, @unchecked Sendable {
     private let lock = NSLock()
     private var _lastCompressMetrics: PerformanceMetrics?
@@ -48,7 +54,6 @@ open class PerformanceMetricsDecorator: ArchiveOperationDecorator, @unchecked Se
         super.init(inner: inner)
     }
 
-    /// 透明叠加性能测量的压缩处理
     open override func compressStream(
         inputPaths: [String],
         outputPath: String,
@@ -73,12 +78,11 @@ open class PerformanceMetricsDecorator: ArchiveOperationDecorator, @unchecked Se
 
         updateCompressMetrics(metrics)
 
-        TTLogger.debug(String(format: "📊 [PerformanceMetricsDecorator] 压缩性能: 写入 %lld B, 耗时 %.3fs, 吞吐率 %.2f MB/s", bytesWritten, elapsed, throughput))
+        TTLogger.debug(String(format: "[PerformanceMetricsDecorator] Compression: wrote %lld B, duration %.3fs, throughput %.2f MB/s", bytesWritten, elapsed, throughput))
 
         return bytesWritten
     }
 
-    /// 透明叠加性能测量的解压处理
     open override func extractStream(
         archivePath: String,
         destinationDir: String,
@@ -103,7 +107,7 @@ open class PerformanceMetricsDecorator: ArchiveOperationDecorator, @unchecked Se
 
         updateExtractMetrics(metrics)
 
-        TTLogger.debug(String(format: "📊 [PerformanceMetricsDecorator] 解压性能: 提取 %lld B, 耗时 %.3fs, 吞吐率 %.2f MB/s", bytesExtracted, elapsed, throughput))
+        TTLogger.debug(String(format: "[PerformanceMetricsDecorator] Extraction: extracted %lld B, duration %.3fs, throughput %.2f MB/s", bytesExtracted, elapsed, throughput))
 
         return bytesExtracted
     }

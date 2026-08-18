@@ -1,4 +1,11 @@
-# macOS System Files
+# ==============================================================================
+# TTZip Repository Hygiene & Git Ignore Rules
+# High-Performance Swift 6 + C11 Native Archiving Engine
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. macOS System & Finder Metadata
+# ------------------------------------------------------------------------------
 .DS_Store
 .AppleDouble
 .LSOverride
@@ -7,59 +14,89 @@ Icon?
 .Spotlight-V100
 .Trashes
 
-# Xcode User Data & SwiftPM Build Artifacts
+# ------------------------------------------------------------------------------
+# 2. SwiftPM & Xcode Build Outputs
+# ------------------------------------------------------------------------------
 .build/
 .build_*/
-*.xcworkspace
-xcuserdata/
+build/
+dist/
+build_dist/
+build_app/
 DerivedData/
+xcuserdata/
+*.xcworkspace/
 .swiftpm/
 !TTZip.xcodeproj/project.pbxproj
+!TTZip.xcodeproj/project.xcworkspace/contents.xcworkspacedata
 
-# C / C++ Build Artifacts
+# ------------------------------------------------------------------------------
+# 3. C / C++ Compilation & Intermediate Objects
+# ------------------------------------------------------------------------------
 *.o
-*.a
-*.dylib
+*.obj
+*.dSYM/
 *.so
+*.dylib
+*.dll
+*.out
+*.app
+*.ipa
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
 
-# Environment & Local Overrides
-.env.local
-*.user
+# ------------------------------------------------------------------------------
+# 4. Vendor Upstream Clones & Git Worktrees
+# (Isolates development upstream clones while preserving pre-built static libs)
+# ------------------------------------------------------------------------------
+Vendor/*-upstream/
+Vendor/turbobench/
+Vendor/worktrees/
 
-# Temporary Benchmark & Test Output Artifacts
+# ------------------------------------------------------------------------------
+# 5. Static Libraries & Binary Targets
+# (Globally ignore .a except tracked Vendor libraries required by Package.swift)
+# ------------------------------------------------------------------------------
+*.a
+Vendor/lib/
+Vendor/libTTZipVendor.a
+!Vendor/TTZipVendor.xcframework/**/*.a
+
+
+# ------------------------------------------------------------------------------
+# 6. Benchmark Outputs, Test Payloads & Scratch Debris
+# ------------------------------------------------------------------------------
 ditto_out.zip
 keka_7z.7z
 keka_zip.zip
 payload/
 scratch_bench/
-build_app/
-build_dist/
-build/
-dist/
+scratch/
+reports/
 *.bin
+*.tbb
 test*.7z
 test*.zip
 test*.tar*
 test*.txt
 test_*
-Vendor/libarchive-upstream/
-Vendor/libdeflate-upstream/
-Vendor/lz4-upstream/
-Vendor/turbobench/
-Vendor/worktrees/
-Vendor/xz-upstream/
-Vendor/zstd-upstream/
-*.tbb
 
-# Local Documentation, Internal Reports & Raw Benchmarks
-docs/
+# ------------------------------------------------------------------------------
+# 7. Environment, IDE & Local Overrides
+# ------------------------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+*.user
+.vscode/
+.idea/
 
-# Scratch & Local Drafts
-scratch/
-
-# Internal Spec Kit & AI Agent Metadata
+# ------------------------------------------------------------------------------
+# 8. Spec Kit & Agent Machine-Local State
+# ------------------------------------------------------------------------------
+GEMINI.md
 .agents/
 .specify/
 specs/
-GEMINI.md
-AGENTS.md
+

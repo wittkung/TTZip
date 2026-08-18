@@ -1,7 +1,12 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
-
-// MARK: - 【3.8 中介者模式 (Mediator Pattern)】GUI SwiftUI View Class 适配器组件
 
 public final class CompressModalMediatorComponent: ArchiveMediatorComponentProtocol, @unchecked Sendable {
     public let componentId: String = "CompressModalView"

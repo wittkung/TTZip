@@ -1,14 +1,19 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-
-
-/// 自定义常用压缩预设模型
+/// Value type representing a reusable user-defined compression preset configuration.
 public struct CompressionPreset: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public var name: String
     public var format: ArchiveCompressionFormat
     public var level: ArchiveCompressionLevel
-    public var splitVolumeSizeBytes: Int64? // nil 表示不分卷，如 20 * 1024 * 1024 * 1024 (20GB)
+    public var splitVolumeSizeBytes: Int64? // nil means no multi-volume split (e.g. 20 * 1024 * 1024 * 1024 for 20GB)
     public var defaultPassword: String?
     public var skipMacJunk: Bool
     public var skipGitDirectory: Bool
@@ -35,29 +40,25 @@ public struct CompressionPreset: Identifiable, Codable, Equatable, Sendable {
     
     public var splitVolumeDescription: String {
         guard let bytes = splitVolumeSizeBytes, bytes > 0 else {
-            return "不分卷"
+            return "Single Volume"
         }
         let gb = Double(bytes) / (1024.0 * 1024.0 * 1024.0)
         if gb >= 1.0 {
-            return String(format: "%.0f GB 分卷", gb)
+            return String(format: "%.0f GB Volume", gb)
         }
         let mb = Double(bytes) / (1024.0 * 1024.0)
-        return String(format: "%.0f MB 分卷", mb)
+        return String(format: "%.0f MB Volume", mb)
     }
 }
 
-// MARK: - PrototypeCopyable 原型模式扩展
+// MARK: - PrototypeCopyable Prototype Pattern Extension
 extension CompressionPreset: PrototypeCopyable {
-    /// 原型模式默认克隆：分配新 UUID 独立标识符，保持继承名称与所有选项
+    /// Creates an independent clone with a new UUID.
     public func clone() -> CompressionPreset {
         return clone(newId: UUID(), newName: nil)
     }
     
-    /// 特化预设衍生与克隆 API (Prototype Copy)
-    /// - Parameters:
-    ///   - newId: 目标新预设 UUID (默认自动分配全新 UUID)
-    ///   - newName: 目标新预设名称 (若为 nil 则继承当前预设原名)
-    /// - Returns: 独立全新配制的 CompressionPreset 副本
+    /// Prototype copy with custom ID and optional new name.
     public func clone(newId: UUID = UUID(), newName: String? = nil) -> CompressionPreset {
         return CompressionPreset(
             id: newId,
@@ -71,4 +72,3 @@ extension CompressionPreset: PrototypeCopyable {
         )
     }
 }
-

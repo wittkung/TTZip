@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 预设编辑草稿状态备忘录 (Preset Editor Memento)
+/// Preset editor draft state snapshot memento.
 public struct PresetEditorMemento: ArchiveMementoProtocol, Codable, Sendable, Equatable {
     public let id: UUID
     public let timestamp: Date
@@ -39,8 +46,7 @@ public struct PresetEditorMemento: ArchiveMementoProtocol, Codable, Sendable, Eq
     }
 }
 
-/// 预设编辑草稿管理者 (Preset Editor Caretaker)
-/// 线程安全地管理预设编辑草稿状态的双栈 (Undo/Redo Stack)，防止草稿丢失
+/// Caretaker managing undo/redo history for compression preset editing drafts.
 public final class PresetEditorCaretaker: ArchiveCaretakerProtocol, @unchecked Sendable {
     private var undoStack: [PresetEditorMemento] = []
     private var redoStack: [PresetEditorMemento] = []
@@ -56,7 +62,6 @@ public final class PresetEditorCaretaker: ArchiveCaretakerProtocol, @unchecked S
         lock.lock()
         defer { lock.unlock() }
         
-        // 避免推送完全相同的相邻状态
         if let top = undoStack.last, top == memento {
             return
         }

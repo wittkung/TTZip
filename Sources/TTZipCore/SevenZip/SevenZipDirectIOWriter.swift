@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 针对 7z 解压释放的 NVMe Direct I/O 页对齐直写落盘引擎
+/// Direct I/O and page-aligned storage writer for 7z extraction.
 public final class SevenZipDirectIOWriter: @unchecked Sendable {
     public static let shared = SevenZipDirectIOWriter()
     
@@ -11,7 +18,6 @@ public final class SevenZipDirectIOWriter: @unchecked Sendable {
         if fd < 0 { return false }
         defer { close(fd) }
         
-        // 结合系统 Page Cache 与 APFS 空间预分配打满 RAM/NVMe 总线吞吐
         SevenZipAPFSPreallocator.shared.preallocateFileExtent(fd: fd, targetSize: expectedSize)
         if data.isEmpty { return true }
         

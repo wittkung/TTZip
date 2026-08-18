@@ -1,22 +1,29 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 【3.1 策略模式】损坏归档修复与数据拯救策略接口协议
+/// Corrupted archive salvage and structural repair strategy interface (Strategy Pattern).
 public protocol ArchiveRepairStrategyProtocol: Sendable {
-    /// 策略显示名称
+    /// Strategy name.
     var repairStrategyName: String { get }
     
-    /// 探查归档文件特征，判断本策略是否可用于修复该损坏归档
+    /// Inspects damaged file characteristics to determine repair applicability.
     func canRepair(damagedArchivePath: String) async -> Bool
     
-    /// 执行数据拯救与重构，返回成功挽救的有效条目数量
+    /// Executes stream salvage and structural rebuild, returning count of recovered items.
     func repair(damagedArchivePath: String, repairedOutputPath: String) async throws -> Int
 }
 
-// MARK: - 具体损坏归档修复策略实现 (Concrete Archive Repair Strategies)
+// MARK: - Concrete Archive Repair Strategies
 
-/// 1. Zip 中央目录重构与标头扫描修复策略 (`ZipCentralDirectoryReconstructionStrategy`)
+/// 1. ZIP central directory reconstruction and local header scanner strategy (`ZipCentralDirectoryReconstructionStrategy`).
 public final class ZipCentralDirectoryReconstructionStrategy: ArchiveRepairStrategyProtocol {
-    public let repairStrategyName: String = "Zip 中央目录重构与标头扫描策略"
+    public let repairStrategyName: String = "ZIP Central Directory Reconstruction Strategy"
     
     public init() {}
     
@@ -25,7 +32,6 @@ public final class ZipCentralDirectoryReconstructionStrategy: ArchiveRepairStrat
         if pathLower.hasSuffix(".zip") || pathLower.hasSuffix(".jar") || pathLower.hasSuffix(".docx") {
             return true
         }
-        // 尝试读取前 4 字节判断 local file header 魔数 (0x04034b50 / PK\x03\x04)
         guard let fileHandle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: damagedArchivePath)) else { return false }
         defer { try? fileHandle.close() }
         let headerData = (try? fileHandle.read(upToCount: 4)) ?? Data()
@@ -48,7 +54,6 @@ public final class ZipCentralDirectoryReconstructionStrategy: ArchiveRepairStrat
             
             var recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir)) ?? []
             
-            // 如果标准解包失败/只救回 0 个条目（如 End of Central Directory 被物理截断），执行 Raw Local File Header 字节补救
             if recoveredItems.isEmpty, let fileData = try? Data(contentsOf: URL(fileURLWithPath: damagedArchivePath)) {
                 Self.salvageZipLocalHeaders(fileData: fileData, outputDir: tempDir)
                 recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir)) ?? []
@@ -120,9 +125,9 @@ public final class ZipCentralDirectoryReconstructionStrategy: ArchiveRepairStrat
     }
 }
 
-/// 2. Tar 截断流容错拯救策略 (`TarTruncatedSalvageStrategy`)
+/// 2. TAR truncated stream fault-tolerant salvage strategy (`TarTruncatedSalvageStrategy`).
 public final class TarTruncatedSalvageStrategy: ArchiveRepairStrategyProtocol {
-    public let repairStrategyName: String = "Tar 截断流容错拯救策略"
+    public let repairStrategyName: String = "TAR Truncated Stream Salvage Strategy"
     
     public init() {}
     
@@ -147,7 +152,6 @@ public final class TarTruncatedSalvageStrategy: ArchiveRepairStrategyProtocol {
             
             var recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir)) ?? []
             
-            // 如果标准解包归档已截断导致提取失败，启动 POSIX Tar Block Header 分片扫频补救
             if recoveredItems.isEmpty, let fileData = try? Data(contentsOf: URL(fileURLWithPath: damagedArchivePath)) {
                 Self.salvageTarBlocks(fileData: fileData, outputDir: tempDir)
                 recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir)) ?? []
@@ -210,9 +214,9 @@ public final class TarTruncatedSalvageStrategy: ArchiveRepairStrategyProtocol {
     }
 }
 
-/// 3. 7-Zip Magic Header 与数据块修复策略 (`SevenZipMagicHeaderRepairStrategy`)
+/// 3. 7-Zip magic header and stream block repair strategy (`SevenZipMagicHeaderRepairStrategy`).
 public final class SevenZipMagicHeaderRepairStrategy: ArchiveRepairStrategyProtocol {
-    public let repairStrategyName: String = "7-Zip Magic Header 与块修复策略"
+    public let repairStrategyName: String = "7-Zip Magic Header & Block Repair Strategy"
     
     public init() {}
     
@@ -221,7 +225,6 @@ public final class SevenZipMagicHeaderRepairStrategy: ArchiveRepairStrategyProto
         if ArchiveCompressionFormat.sevenZipFamilyExtensions.contains(where: { lower.hasSuffix($0) }) {
             return true
         }
-        // 7z 魔数判断 `7z\xBC\xAF\x27\x1C`
         guard let fileHandle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: damagedArchivePath)) else { return false }
         defer { try? fileHandle.close() }
         let headerData = (try? fileHandle.read(upToCount: 6)) ?? Data()
@@ -257,7 +260,7 @@ public final class SevenZipMagicHeaderRepairStrategy: ArchiveRepairStrategyProto
 
 // MARK: - Archive Repair Strategy Context
 
-/// 损坏归档修复策略调配上下文 (`ArchiveRepairStrategyContext`)
+/// Coordinator selecting and executing archive repair strategies.
 public final class ArchiveRepairStrategyContext: @unchecked Sendable {
     public static let shared = ArchiveRepairStrategyContext()
     private let lock = NSLock()
@@ -287,7 +290,7 @@ public final class ArchiveRepairStrategyContext: @unchecked Sendable {
         return strategies
     }
     
-    /// 匹配最适合修复给用损坏归档的策略
+    /// Matches the most suitable repair strategy for a damaged archive.
     public func selectStrategy(for damagedArchivePath: String) async -> ArchiveRepairStrategyProtocol {
         let currentStrategies = getStrategies()
         
@@ -299,7 +302,7 @@ public final class ArchiveRepairStrategyContext: @unchecked Sendable {
         return currentStrategies.first ?? ZipCentralDirectoryReconstructionStrategy()
     }
     
-    /// 使用匹配策略修复损坏归档
+    /// Repairs damaged archive using selected strategy.
     public func repairArchive(damagedArchivePath: String, repairedOutputPath: String) async throws -> Int {
         let strategy = await selectStrategy(for: damagedArchivePath)
         return try await strategy.repair(damagedArchivePath: damagedArchivePath, repairedOutputPath: repairedOutputPath)

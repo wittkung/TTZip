@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 针对性基准测试筛选与打解压路由动作配置结构体
+/// Targeted benchmark filter configuration structure.
 public struct TargetedBenchmarkFilter: Codable, Sendable {
     public enum TargetAction: String, Codable, Sendable {
         case extractionOnly = "extraction"
@@ -46,7 +53,7 @@ public struct TargetedBenchmarkFilter: Codable, Sendable {
         self.target_cases = target_cases
     }
     
-    /// 从指定 JSON 文件路径解构加载配置
+    /// Loads configuration from specified JSON file path.
     public static func load(from path: String) -> TargetedBenchmarkFilter? {
         let expandedPath = (path as NSString).expandingTildeInPath
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: expandedPath)),
@@ -56,7 +63,7 @@ public struct TargetedBenchmarkFilter: Codable, Sendable {
         return config
     }
     
-    /// 获取匹配的特定测试用例
+    /// Matches specific test case.
     public func matchCase(pkIdx: Int, payload: String, format: String, level: Int, encryption: String) -> TargetCase? {
         guard let cases = target_cases, !cases.isEmpty else { return nil }
         return cases.first { tc in
@@ -86,13 +93,13 @@ public struct TargetedBenchmarkFilter: Codable, Sendable {
         }
     }
     
-    /// 判断指定的压测组合是否匹配该筛选器
+    /// Checks whether scenario matches filter.
     public func matches(pkIdx: Int, payload: String, format: String, level: Int, encryption: String) -> Bool {
         guard let cases = target_cases, !cases.isEmpty else { return true }
         return matchCase(pkIdx: pkIdx, payload: payload, format: format, level: level, encryption: encryption) != nil
     }
 
-    /// 判断指定的竞品测试组合在当前场景下是否可以跳过慢速打包阶段，直接针对 TTZip 产物评估解压速度
+    /// Evaluates whether competitor compression pass should be skipped.
     public func shouldSkipCompress(pkIdx: Int, payload: String, format: String, level: Int, encryption: String) -> Bool {
         if let tc = matchCase(pkIdx: pkIdx, payload: payload, format: format, level: level, encryption: encryption) {
             return tc.skip_compress ?? (tc.test_target == "extraction")

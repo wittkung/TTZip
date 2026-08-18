@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipBridge_APFS.h"
 #include "include/CTTZipBridge.h"
 #include <stdio.h>
@@ -27,7 +34,6 @@ int ttzip_apfs_preallocate(int fd, int64_t target_size) {
 #endif
     return ftruncate(fd, target_size);
 }
-
 
 int ttzip_stat_file_info(const char* path, uint64_t* out_size, uint32_t* out_mode, uint64_t* out_mtime) {
     if (!path) return -1;

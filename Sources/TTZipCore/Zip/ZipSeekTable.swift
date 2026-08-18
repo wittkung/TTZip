@@ -1,8 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 内存级 ZIP 随机访问与检查点索引表 (Seekable ZIP Index)
-/// 支持针对单条目的 O(1) 瞬时定位与无需全包解压的 Range 预读
+/// In-memory random access and checkpoint index table for ZIP archives.
+///
+/// Enables O(1) single-entry location and range pre-reading without full archive decompression.
 public final class ZipSeekTable: @unchecked Sendable {
     
     public struct SeekEntry: Sendable {
@@ -58,12 +66,12 @@ public final class ZipSeekTable: @unchecked Sendable {
         self.allEntries = list
     }
     
-    /// O(1) 按相对路径查找条目
+    /// O(1) entry lookup by relative archive path.
     public func entry(forPath path: String) -> SeekEntry? {
         return entriesByPath[path]
     }
     
-    /// 针对特定条目执行单文件瞬时解压 (零全量解压开销)
+    /// Extracts a single entry directly into a Swift `Data` buffer without full extraction overhead.
     public func extractSingleEntry(
         path: String,
         from bytePtr: UnsafePointer<UInt8>,

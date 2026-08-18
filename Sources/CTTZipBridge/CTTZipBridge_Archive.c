@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipBridge_Archive.h"
 #include "include/CTTZipBridge.h"
 #include "include/CTTZipCommon.h"
@@ -178,7 +185,6 @@ int ttzip_extract_archive_advanced(
         ARCHIVE_EXTRACT_UNLINK
     );
 
-    
     if (password && password[0] != '\0') {
         archive_read_add_passphrase(a, password);
     }
@@ -354,7 +360,7 @@ int ttzip_stream_archive_entries_to_fd(
                     }
                     archive_read_close(a);
                     archive_read_free(a);
-                    return -2; // TTY binary refused
+                    return -2;
                 }
                 ssize_t written = write(target_fd, sample_buff, sample_size);
                 (void)written;

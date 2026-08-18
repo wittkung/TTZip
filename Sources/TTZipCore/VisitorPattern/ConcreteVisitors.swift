@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import CTTZipBridge
 import zlib
 
-// MARK: - 1. 安全威胁数据结构 (Security Threat Data Models)
+// MARK: - 1. Security Threat Data Models
 
 public enum SecurityThreatLevel: String, Sendable, Equatable, CustomStringConvertible {
     case low = "LOW"
@@ -35,9 +42,9 @@ public struct SecurityThreat: Sendable, Equatable, Identifiable {
     }
 }
 
-// MARK: - 2. SecurityScannerVisitor (安全扫描访问者)
+// MARK: - 2. SecurityScannerVisitor
 
-/// 递归遍历 Composite 树，检查路径穿越 (Zip Slip)、Zip 炸弹倍率及非法可执行扩展名
+/// Recursively scans composite tree for Zip Slip path traversal, Zip Bomb compression ratios, and dangerous executables.
 public final class SecurityScannerVisitor: ArchiveComponentVisitorProtocol, @unchecked Sendable {
     public typealias Result = [SecurityThreat]
     
@@ -67,7 +74,7 @@ public final class SecurityScannerVisitor: ArchiveComponentVisitorProtocol, @unc
                 path: path,
                 type: .zipSlip,
                 level: .critical,
-                detail: "检测到非法路径穿越攻击 (Zip Slip): \(path)"
+                detail: "Detected illegal path traversal attack (Zip Slip): \(path)"
             ))
         }
         
@@ -78,11 +85,11 @@ public final class SecurityScannerVisitor: ArchiveComponentVisitorProtocol, @unc
                 path: path,
                 type: .executableExtension,
                 level: .high,
-                detail: "检测到非法可执行脚本/扩展名: .\(ext)"
+                detail: "Detected dangerous executable script or binary extension: .\(ext)"
             ))
         }
         
-        // 3. Zip Bomb Check (Ratio multiplier)
+        // 3. Zip Bomb Check
         let compressedSize = leaf.compressedSizeBytes ?? 0
         if compressedSize > 0 {
             let ratio = Double(leaf.sizeBytes) / Double(compressedSize)
@@ -91,7 +98,7 @@ public final class SecurityScannerVisitor: ArchiveComponentVisitorProtocol, @unc
                     path: path,
                     type: .zipBomb,
                     level: .critical,
-                    detail: "检测到疑似 Zip 炸弹风险 (解压倍率: \(String(format: "%.1f", ratio))x, 解压大小: \(leaf.sizeBytes) bytes)"
+                    detail: "Detected suspected Zip Bomb risk (decompression ratio: \(String(format: "%.1f", ratio))x, uncompressed size: \(leaf.sizeBytes) bytes)"
                 ))
             }
         }
@@ -109,7 +116,7 @@ public final class SecurityScannerVisitor: ArchiveComponentVisitorProtocol, @unc
                 path: path,
                 type: .zipSlip,
                 level: .critical,
-                detail: "目录检测到非法路径穿越攻击 (Zip Slip): \(path)"
+                detail: "Directory detected illegal path traversal attack (Zip Slip): \(path)"
             ))
         }
         
@@ -121,7 +128,7 @@ public final class SecurityScannerVisitor: ArchiveComponentVisitorProtocol, @unc
     }
 }
 
-// MARK: - 3. FolderStatsVisitor (统计分析访问者)
+// MARK: - 3. FolderStatsVisitor
 
 public struct FolderStatsResult: Sendable, Equatable {
     public let totalFiles: Int
@@ -152,7 +159,7 @@ public struct FolderStatsResult: Sendable, Equatable {
     }
 }
 
-/// 递归遍历 Composite 树，精确汇总 totalFiles, totalDirectories, totalSizeBytes, maxDepth
+/// Recursively aggregates metrics across composite trees (totalFiles, totalDirectories, totalSizeBytes, maxDepth).
 public final class FolderStatsVisitor: ArchiveComponentVisitorProtocol, @unchecked Sendable {
     public typealias Result = FolderStatsResult
     
@@ -206,22 +213,22 @@ public final class FolderStatsVisitor: ArchiveComponentVisitorProtocol, @uncheck
     private func categorize(filename: String) -> String {
         let ext = (filename as NSString).pathExtension.lowercased()
         if ["mp4", "mov", "webm", "mkv", "avi", "flv", "m4v", "ts", "3gp"].contains(ext) {
-            return "视频"
+            return "Video"
         } else if ["mp3", "wav", "flac", "m4a", "aac", "ogg", "opus", "aiff"].contains(ext) {
-            return "音频"
+            return "Audio"
         } else if ["png", "jpg", "jpeg", "webp", "gif", "svg", "heic"].contains(ext) {
-            return "图片"
+            return "Image"
         } else if ["srt", "ass", "txt", "swift", "json", "md", "py", "c", "cpp", "vtt", "pdf"].contains(ext) {
-            return "文档/代码/字幕"
+            return "Document/Code"
         } else if ["zip", "7z", "rar", "tar", "gz", "zst", "bz2"].contains(ext) {
-            return "归档包"
+            return "Archive"
         } else {
-            return "其他"
+            return "Other"
         }
     }
 }
 
-// MARK: - 4. ChecksumCalculatorVisitor (校验和计算访问者)
+// MARK: - 4. ChecksumCalculatorVisitor
 
 public struct ChecksumResult: Sendable, Equatable {
     public let crc32: UInt32
@@ -245,7 +252,7 @@ public struct ChecksumResult: Sendable, Equatable {
     }
 }
 
-/// 递归遍历 Composite 树中的所有叶子节点，累计计算全树的 CRC32 / SHA256 复合签名
+/// Recursively computes aggregate composite tree checksums (CRC32 and SHA-256 signatures).
 public final class ChecksumCalculatorVisitor: ArchiveComponentVisitorProtocol, @unchecked Sendable {
     public typealias Result = ChecksumResult
     
@@ -328,9 +335,9 @@ public final class ChecksumCalculatorVisitor: ArchiveComponentVisitorProtocol, @
     }
 }
 
-// MARK: - 5. TreeRendererVisitor (ASCII 树渲染访问者)
+// MARK: - 5. TreeRendererVisitor
 
-/// 生成极美观的控制台与 Inspector 格式化目录树文本 (├── file.txt, └── subfolder/)
+/// Formats composite directory tree into formatted ASCII tree text (`├── file.txt`, `└── folder/`).
 public final class TreeRendererVisitor: ArchiveComponentVisitorProtocol, @unchecked Sendable {
     public typealias Result = String
     

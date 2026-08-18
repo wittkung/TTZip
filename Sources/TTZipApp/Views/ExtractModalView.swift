@@ -1,5 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
+import AppKit
 
 @MainActor
 private final class ExtractModalEventObserver: ObservableObject, ArchiveEventObserverProtocol {
@@ -22,9 +30,9 @@ private final class ExtractModalEventObserver: ObservableObject, ArchiveEventObs
     }
 }
 
-struct ExtractModalView: View {
-    let archivePath: String
-    @Binding var isPresented: Bool
+public struct ExtractModalView: View {
+    public let archivePath: String
+    @Binding public var isPresented: Bool
     
     @State private var destinationDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first?.path ?? "/tmp"
     @State private var autoOpenFolder = true
@@ -33,20 +41,24 @@ struct ExtractModalView: View {
     @State private var statusMessage = ""
     @StateObject private var eventObserver = ExtractModalEventObserver()
     
+    public init(archivePath: String, isPresented: Binding<Bool>) {
+        self.archivePath = archivePath
+        self._isPresented = isPresented
+    }
+    
     private var vaultEntries: [PasswordVaultEntry] {
         _ = eventObserver.vaultUpdateTrigger
         return PasswordVaultManager.shared.getEntries()
     }
     
-    var body: some View {
+    public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header 栏 - 顶部对齐高度 52pt
             HStack(spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "square.and.arrow.up.fill")
                         .font(.system(size: 14))
                         .foregroundStyle(TTZipTheme.kintsugiGold)
-                    Text("解压提取归档包")
+                    Text("Extract Archive")
                         .font(.system(size: 16, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                 }
@@ -77,7 +89,6 @@ struct ExtractModalView: View {
             .padding(.horizontal, 20)
             .frame(height: 52)
             
-            // 统一置顶分割线 (金缮金强调线对齐)
             Rectangle()
                 .fill(TTZipTheme.kintsugiGold)
                 .frame(height: 1.5)
@@ -85,12 +96,12 @@ struct ExtractModalView: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("解压输出目标路径")
+                        Text("Destination Path")
                             .font(.system(size: 10, weight: .bold, design: .serif))
                             .tracking(1)
                             .foregroundStyle(TTZipTheme.kintsugiGold)
                         HStack(spacing: 8) {
-                            TextField("解压路径", text: $destinationDir)
+                            TextField("Destination directory", text: $destinationDir)
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 12, design: .monospaced))
                                 .padding(.horizontal, 10)
@@ -100,9 +111,9 @@ struct ExtractModalView: View {
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                                         .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
-                                )
+                                 )
                             
-                            Button("选择路径...") {
+                            Button("Browse...") {
                                 pickDirectory()
                             }
                             .buttonStyle(.plain)
@@ -116,12 +127,12 @@ struct ExtractModalView: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("解压口令 (如已加密)")
+                        Text("Password (If Encrypted)")
                             .font(.system(size: 10, weight: .bold, design: .serif))
                             .tracking(1)
                             .foregroundStyle(TTZipTheme.kintsugiGold)
                         HStack(spacing: 8) {
-                            TTSecureTextField("无口令请留空", text: $password)
+                            TTSecureTextField("Leave empty if unencrypted", text: $password)
                                 .font(.system(size: 12, design: .monospaced))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 7)
@@ -143,7 +154,7 @@ struct ExtractModalView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "key.fill")
                                         .font(.system(size: 10))
-                                    Text("密码库")
+                                    Text("Vault")
                                         .font(.system(size: 11, weight: .bold))
                                 }
                                 .padding(.horizontal, 12)
@@ -156,7 +167,7 @@ struct ExtractModalView: View {
                         }
                     }
                     
-                    Toggle("解压完成后自动在 Finder 中高亮查看", isOn: $autoOpenFolder)
+                    Toggle("Reveal in Finder when completed", isOn: $autoOpenFolder)
                         .font(.system(size: 12, weight: .medium))
                         .toggleStyle(.checkbox)
                 }
@@ -177,7 +188,7 @@ struct ExtractModalView: View {
                 HStack(spacing: 12) {
                     Spacer()
                     
-                    Button("取消") { isPresented = false }
+                    Button("Cancel") { isPresented = false }
                         .buttonStyle(.plain)
                         .font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 16)
@@ -191,7 +202,7 @@ struct ExtractModalView: View {
                                 ProgressView()
                                     .controlSize(.small)
                             }
-                            Text(isExtracting ? "正在提取..." : "开始提取解压")
+                            Text(isExtracting ? "Extracting..." : "Start Extraction")
                                 .font(.system(size: 12, weight: .bold))
                         }
                         .padding(.horizontal, 18)
@@ -216,7 +227,7 @@ struct ExtractModalView: View {
     }
     
     private func pickDirectory() {
-        if let path = SystemDialogHelper.pickDirectory(prompt: "选择解压目标文件夹", defaultPath: destinationDir) {
+        if let path = SystemDialogHelper.pickDirectory(prompt: "Select extraction destination folder", defaultPath: destinationDir) {
             destinationDir = path
         }
     }
@@ -234,7 +245,7 @@ struct ExtractModalView: View {
         }
         
         isExtracting = true
-        statusMessage = "正在解压提取文件..."
+        statusMessage = "Extracting archive files..."
         ArchiveAppMediator.shared.send(event: .requestExtraction(archivePath: archivePath, destinationPath: destinationDir))
         
         Task {
@@ -246,7 +257,7 @@ struct ExtractModalView: View {
                     engineFacade: SecurityProtectionProxy.shared
                 )
                 await MainActor.run {
-                    self.statusMessage = String(format: "✅ 解压完成! (耗时 %.2fs)", cmdResult.executionDuration)
+                    self.statusMessage = String(format: "✅ Extracted! (%.2fs)", cmdResult.executionDuration)
                     self.isExtracting = false
                     
                     if self.autoOpenFolder {
@@ -260,7 +271,7 @@ struct ExtractModalView: View {
             } catch {
                 ArchiveAppMediator.shared.send(event: .extractionFailed(archivePath: archivePath, error: error.localizedDescription))
                 await MainActor.run {
-                    self.statusMessage = "解压失败: \(error.localizedDescription)"
+                    self.statusMessage = "Extraction failed: \(error.localizedDescription)"
                     self.isExtracting = false
                 }
             }

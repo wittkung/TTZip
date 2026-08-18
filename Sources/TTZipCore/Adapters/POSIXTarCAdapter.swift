@@ -1,14 +1,28 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// POSIX Tar / posix_spawn 底层系统引擎适配器 (Adapter Pattern)
-/// 将 /usr/bin/tar 与 ttzip_core_posix_spawn_fast 适配为标准的 Swift 归档/子进程协议
+/// Adapter Pattern: POSIX Tar and accelerated posix_spawn adapter.
+///
+/// Bridges native C-level in-process TAR creation and extraction primitives with
+/// Swift high-level archiving contracts.
 public final class POSIXTarCAdapter: POSIXTarEngineProtocol, Sendable {
     public static let shared = POSIXTarCAdapter()
     
     private init() {}
     
-    /// 调度底层极速 posix_spawn 子进程
+    /// Spawns a child process using optimized `posix_spawn` routines.
+    /// - Parameters:
+    ///   - binaryPath: Full path to target executable binary.
+    ///   - arguments: Command-line arguments.
+    ///   - workingDirectory: Optional directory to execute within.
+    /// - Returns: Process termination status code.
     public func spawnProcess(
         binaryPath: String,
         arguments: [String],
@@ -25,7 +39,11 @@ public final class POSIXTarCAdapter: POSIXTarEngineProtocol, Sendable {
         }
     }
     
-    /// 进程内极速解压 Tar 归档包 (100% 纯原生 C 静态库驱动)
+    /// Extracts a TAR archive in-process using native C static library bindings.
+    /// - Parameters:
+    ///   - archivePath: Path to input TAR archive file.
+    ///   - destinationDir: Target extraction directory path.
+    /// - Returns: `true` if extraction succeeded cleanly, otherwise `false`.
     public func extractTar(
         archivePath: String,
         destinationDir: String
@@ -35,7 +53,12 @@ public final class POSIXTarCAdapter: POSIXTarEngineProtocol, Sendable {
         return status == 0
     }
     
-    /// 进程内极速创建打包 Tar 归档包 (100% 纯原生 C 静态库驱动)
+    /// Creates a TAR archive in-process using native C static library bindings.
+    /// - Parameters:
+    ///   - outputPath: Target output archive path.
+    ///   - inputPaths: Array of source file and directory paths.
+    ///   - workingDirectory: Optional base path for relative source paths.
+    /// - Returns: `true` if creation succeeded cleanly, otherwise `false`.
     public func createTar(
         outputPath: String,
         inputPaths: [String],

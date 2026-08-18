@@ -1,16 +1,23 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 访问者模式双重分发与递归传递扩展 (Visitor Pattern Dispatch & Traversal Helpers)
+// MARK: - Visitor Pattern Traversal Helpers
 
 extension ArchiveComponentProtocol {
-    /// 辅助方法：向特定访问者广播当前节点
+    /// Dispatches visitor across current component.
     public func dispatchVisitor<V: ArchiveComponentVisitorProtocol>(_ visitor: V) -> V.Result {
         return self.accept(visitor: visitor)
     }
 }
 
 extension ArchiveCompositeDirectory {
-    /// 组合容器目录节点的子节点递归遍历分发方法
+    /// Recursively dispatches visitor across all child nodes.
     public func acceptChildren<V: ArchiveComponentVisitorProtocol>(visitor: V) -> [V.Result] {
         return getChildren().map { $0.accept(visitor: visitor) }
     }

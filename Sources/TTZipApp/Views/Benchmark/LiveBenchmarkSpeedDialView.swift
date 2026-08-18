@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 运行中 Live 速度仪表盘与多核调配监控组件
+/// Live speed gauge and multi-core resource allocation monitoring component.
 public struct LiveBenchmarkSpeedDialView: View {
     let itemName: String
     let itemIndex: Int
@@ -31,7 +38,6 @@ public struct LiveBenchmarkSpeedDialView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // 当前测试项目提示 Banner + 暂停/停止控制组
             HStack(spacing: 10) {
                 HStack(spacing: 6) {
                     if isPaused {
@@ -43,7 +49,7 @@ public struct LiveBenchmarkSpeedDialView: View {
                             .tint(TTZipTheme.bambooGreen)
                     }
                     
-                    Text(isPaused ? "已暂停测试 [\(itemIndex)/\(totalItems)]" : "正在测试项目 [\(itemIndex)/\(totalItems)]")
+                    Text(isPaused ? "Paused [\(itemIndex)/\(totalItems)]" : "Testing [\(itemIndex)/\(totalItems)]")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(isPaused ? Color.orange : TTZipTheme.bambooGreen)
                 }
@@ -60,14 +66,13 @@ public struct LiveBenchmarkSpeedDialView: View {
                 
                 Spacer()
                 
-                // 暂停 / 继续 & 停止操作按键
                 HStack(spacing: 8) {
                     if let toggle = onTogglePause {
                         Button(action: toggle) {
                             HStack(spacing: 4) {
                                 Image(systemName: isPaused ? "play.fill" : "pause.fill")
                                     .font(.system(size: 10, weight: .bold))
-                                Text(isPaused ? "继续" : "暂停")
+                                Text(isPaused ? "Resume" : "Pause")
                                     .font(.system(size: 11, weight: .bold))
                             }
                             .padding(.horizontal, 10)
@@ -84,7 +89,7 @@ public struct LiveBenchmarkSpeedDialView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "stop.fill")
                                     .font(.system(size: 10, weight: .bold))
-                                Text("停止")
+                                Text("Stop")
                                     .font(.system(size: 11, weight: .bold))
                             }
                             .padding(.horizontal, 10)
@@ -146,7 +151,7 @@ public struct LiveBenchmarkSpeedDialView: View {
                 Text(String(format: "%.1f", progress.currentThroughputMBs))
                     .font(.system(size: 20, weight: .bold, design: .monospaced))
                     .foregroundStyle(TTZipTheme.bambooGreen)
-                Text("MB/s 实时吞吐")
+                Text("MB/s Real-time")
                     .font(.system(size: 8.5, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
@@ -163,7 +168,7 @@ public struct LiveBenchmarkSpeedDialView: View {
             
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("已处理流量")
+                    Text("Processed")
                         .font(.system(size: 9.5))
                         .foregroundStyle(.secondary)
                     Text(formattedSize(progress.bytesProcessed))
@@ -173,10 +178,10 @@ public struct LiveBenchmarkSpeedDialView: View {
                 Divider().frame(height: 20)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("硬件资源投入")
+                    Text("Hardware Engine")
                         .font(.system(size: 9.5))
                         .foregroundStyle(.secondary)
-                    Text("Apple Silicon 全核引擎")
+                    Text("Apple Silicon All-Cores")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(TTZipTheme.bambooGreen)
                 }

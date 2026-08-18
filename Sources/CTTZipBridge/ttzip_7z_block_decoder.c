@@ -1,5 +1,14 @@
-// ttzip_7z_block_decoder.c
-// TTZip 原生 7Z 载荷多块并发解码器 (支持 LZMA2, Zstd, Direct Store)
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_7z_block_decoder.c
+ * @brief TTZip native 7Z parallel multi-block payload decoder (LZMA2, Zstd, Direct Store).
+ */
 
 #include "include/ttzip_7z_block_decoder.h"
 #include "include/CTTZipCommon.h"
@@ -113,18 +122,18 @@ int ttzip_7z_decode_payload_parallel(
 
     TTZIP_SLICE_SCOPE_BEGIN("2_7zDec_ParallelLZMA2Decode");
     if (primary_method_id == 0x00 || primary_method_id == 0x06F10701 || primary_method_id == 0x6F10701) {
-        // 7z Copy / Store / Raw AES 解密后原生直通
+        // 7z Copy / Store / Raw AES direct pass-through
         size_t cpy_len = payload_len < total_unpack_bytes ? payload_len : total_unpack_bytes;
         memcpy(unpack_buf, payload_start, cpy_len);
         total_unpack_bytes = cpy_len;
     } else if (primary_method_id == 0x04F71101 || primary_method_id == 0x4F71101) {
-        // 7z-Zstandard 原生极速解码
+        // 7z-Zstandard native decoding
         size_t zstd_dec = ttzip_zstd_decompress(payload_start, payload_len, unpack_buf, total_unpack_bytes);
         if (zstd_dec > 0) {
             total_unpack_bytes = zstd_dec;
         }
     } else if (primary_method_id == 0x040108 || primary_method_id == 0x40108) {
-        // 7z-Deflate 原生 libdeflate NEON 直通解码 (Method ID 0x040108)
+        // 7z-Deflate libdeflate NEON pass-through (Method ID 0x040108)
         size_t def_dec = ttzip_libdeflate_decompress(payload_start, payload_len, unpack_buf, total_unpack_bytes);
         if (def_dec > 0) {
             total_unpack_bytes = def_dec;
@@ -135,7 +144,7 @@ int ttzip_7z_decode_payload_parallel(
             return TTZIP_ERR_CORRUPT_HEADER;
         }
     } else if (primary_method_id == 0x030101 || primary_method_id == 0x30101) {
-        // 7z-LZMA1 原生解码 (Method ID 0x030101，支持 5 字节字典/上下文参数属性)
+        // 7z-LZMA1 native decoding (Method ID 0x030101)
         size_t actual_unpacked = 0;
         int dec_res = ttzip_lzma1_decode_block_native(
             payload_start,

@@ -1,8 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
-/// 磁盘流式读取生产者 (DiskReadProducer)
-/// 结合 MemoryPageFlyweightPool 分配页对齐 Buffer 流式读入数据块
+/// Streaming disk read producer using `MemoryPageFlyweightPool` for zero-allocation I/O chunking.
 public final class DiskReadProducer: AsyncProducerProtocol, @unchecked Sendable {
     private let fileURL: URL
     private let chunkSize: Int
@@ -69,8 +75,7 @@ public final class DiskReadProducer: AsyncProducerProtocol, @unchecked Sendable 
     }
 }
 
-/// 多线程并行压缩消费者组 (CompressorConsumerGroup)
-/// 利用 Apple Silicon / 多核并发对 Input Queue 数据块进行全核极速压缩
+/// Multi-threaded parallel compressor consumer group leveraging Apple Silicon SIMD and multicore acceleration.
 public final class CompressorConsumerGroup: @unchecked Sendable {
     private let workerCount: Int
     private let compressionLevel: ArchiveCompressionLevel
@@ -83,7 +88,7 @@ public final class CompressorConsumerGroup: @unchecked Sendable {
         self.compressionLevel = compressionLevel
     }
 
-    /// 开启并行压缩管道工作线程，从 inputQueue 读取 Chunk，压缩后推入 outputQueue
+    /// Starts parallel compression pipelines consuming from input queue and pushing compressed chunks to output queue.
     public func startProcessing(
         inputQueue: BoundedProducerConsumerQueue<ArchiveDataChunk>,
         outputQueue: BoundedProducerConsumerQueue<ArchiveDataChunk>
@@ -163,8 +168,7 @@ public final class CompressorConsumerGroup: @unchecked Sendable {
     }
 }
 
-/// 顺序落盘写出消费者 (DiskWriteConsumer)
-/// 保证多线程并发压缩产生的数据块严格无序错位，保序落盘写出
+/// Sequential disk write consumer ensuring ordered writes from out-of-order parallel compressors.
 public final class DiskWriteConsumer: AsyncConsumerProtocol, @unchecked Sendable {
     private let outputPath: String
     public let maxReorderBufferCapacity: Int
@@ -237,7 +241,6 @@ public final class DiskWriteConsumer: AsyncConsumerProtocol, @unchecked Sendable
 
         pendingChunks[chunk.chunkID] = chunk
 
-        // 顺序排空待写出 Chunk
         while let nextChunk = pendingChunks.removeValue(forKey: nextExpectedChunkID) {
             if !nextChunk.data.isEmpty, let handle = fileHandle {
                 try handle.write(contentsOf: nextChunk.data)
@@ -247,7 +250,6 @@ public final class DiskWriteConsumer: AsyncConsumerProtocol, @unchecked Sendable
             nextExpectedChunkID += 1
         }
 
-        // 当 nextExpectedChunkID 推进并清理缓冲区后，若 pendingChunks.count < maxReorderBufferCapacity，唤醒被挂起的 Continuation
         if pendingChunks.count < maxReorderBufferCapacity && !waitingContinuations.isEmpty {
             let toResume = waitingContinuations
             waitingContinuations.removeAll()
@@ -271,7 +273,6 @@ public final class DiskWriteConsumer: AsyncConsumerProtocol, @unchecked Sendable
             return
         }
 
-        // 1. 容量上限检查：当缓冲区满且当前 chunk 不是紧接着需要的 nextExpectedChunkID 时，挂起等待背压释放
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let handled = checkCapacityAndRegisterContinuation(chunk, continuation: continuation)
             if !handled {
@@ -279,7 +280,6 @@ public final class DiskWriteConsumer: AsyncConsumerProtocol, @unchecked Sendable
             }
         }
 
-        // 2. 写入 pendingChunks 并顺序排空落盘
         let continuationsToResume: [CheckedContinuation<Void, Error>]
         do {
             continuationsToResume = try performSyncConsume(chunk)
@@ -296,7 +296,6 @@ public final class DiskWriteConsumer: AsyncConsumerProtocol, @unchecked Sendable
         }
     }
 
-    /// 取消消费者并释放所有挂起的 Continuation
     public func cancel(error: Error? = nil) {
         lock.lock()
         if isCancelled {
@@ -316,7 +315,6 @@ public final class DiskWriteConsumer: AsyncConsumerProtocol, @unchecked Sendable
         }
     }
 
-    /// 标记消费完成，刷盘关闭 Handle
     public func finish() throws {
         lock.lock()
         defer { lock.unlock() }
@@ -327,10 +325,10 @@ public final class DiskWriteConsumer: AsyncConsumerProtocol, @unchecked Sendable
     }
 }
 
-/// 归档管道 Producer-Consumer 核心引擎 (ArchivePipelineProducerConsumerEngine)
+/// Core pipeline orchestrator executing streaming producer-consumer transformations.
 public final class ArchivePipelineProducerConsumerEngine: Sendable {
 
-    /// 管道执行统计报告
+    /// Metrics telemetry report for pipeline executions.
     public struct PipelineStats: Sendable, Equatable {
         public let totalOriginalBytes: Int64
         public let totalCompressedBytes: Int64
@@ -341,7 +339,7 @@ public final class ArchivePipelineProducerConsumerEngine: Sendable {
 
     public init() {}
 
-    /// 贯穿运行 Full Producer-Consumer 管道
+    /// Runs end-to-end streaming producer-consumer pipeline.
     public func processPipeline(
         inputPath: String,
         outputPath: String,
@@ -366,7 +364,7 @@ public final class ArchivePipelineProducerConsumerEngine: Sendable {
 
         do {
             try await withThrowingTaskGroup(of: Void.self) { group in
-                // Task 1: 生产者 Task -> 从磁盘 Read 数据存入 inputQueue
+                // Stage 1: Producer task reading from disk into input queue
                 group.addTask {
                     do {
                         while let chunk = try await producer.produce() {
@@ -383,7 +381,7 @@ public final class ArchivePipelineProducerConsumerEngine: Sendable {
                     }
                 }
 
-                // Task 2: 消费者组 Task -> 从 inputQueue 读取，多线程并行压缩，推入 outputQueue
+                // Stage 2: Compressor consumer group reading from input queue and pushing compressed chunks
                 group.addTask {
                     do {
                         try await compressorGroup.startProcessing(inputQueue: inputQueue, outputQueue: outputQueue)
@@ -395,7 +393,7 @@ public final class ArchivePipelineProducerConsumerEngine: Sendable {
                     }
                 }
 
-                // Task 3: 磁盘落盘 Task -> 从 outputQueue 读取保序写入磁盘
+                // Stage 3: Disk write consumers draining output queue and ordering disk writes
                 for _ in 0..<max(2, workerCount) {
                     group.addTask {
                         do {
@@ -434,4 +432,3 @@ public final class ArchivePipelineProducerConsumerEngine: Sendable {
         )
     }
 }
-

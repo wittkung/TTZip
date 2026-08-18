@@ -1,7 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 【3.5 状态模式 (State Pattern)】归档任务状态机上下文 (Context)
-/// 负责封装任务运行状态、字节统计、Checkpoint 偏移量、运行指标及 NSLock 状态转换安全锁
+/// Archive task state machine context (State Pattern Context).
+///
+/// Encapsulates execution state, byte metrics, checkpoint offsets, throughput telemetry, and thread synchronization.
 public final class ArchiveTaskContext: @unchecked Sendable {
     public let id: UUID
     public let taskName: String
@@ -19,9 +27,9 @@ public final class ArchiveTaskContext: @unchecked Sendable {
     private let notificationLock = NSLock()
     private var _pendingNotifications: [(oldStateName: String, newState: ArchiveTaskStateProtocol)] = []
     
-    /// 状态变更回调
+    /// State transition callback.
     public var onStateChanged: (@Sendable (ArchiveTaskContext, ArchiveTaskStateProtocol) -> Void)?
-    /// 进度更新回调
+    /// Progress update callback.
     public var onProgressUpdated: (@Sendable (ArchiveTaskContext) -> Void)?
     
     public init(
@@ -40,7 +48,7 @@ public final class ArchiveTaskContext: @unchecked Sendable {
         self._tempFiles = []
     }
     
-    // MARK: - 线程安全属性访问
+    // MARK: - Thread-Safe Property Accessors
     
     public var currentState: ArchiveTaskStateProtocol {
         stateLock.lock()
@@ -89,7 +97,7 @@ public final class ArchiveTaskContext: @unchecked Sendable {
     public var canCancel: Bool { currentState.canCancel }
     public var stateName: String { currentState.stateName }
     
-    // MARK: - 状态转变与控制 API
+    // MARK: - State Control Operations
     
     public func prepare() throws {
         stateLock.lock()
@@ -153,7 +161,7 @@ public final class ArchiveTaskContext: @unchecked Sendable {
         try state.complete(context: self)
     }
     
-    // MARK: - 内部状态转移实现
+    // MARK: - State Transitions
     
     @discardableResult
     public func transitionTo(_ newState: ArchiveTaskStateProtocol) -> Bool {
@@ -161,12 +169,10 @@ public final class ArchiveTaskContext: @unchecked Sendable {
         let callback: (@Sendable (ArchiveTaskContext, ArchiveTaskStateProtocol) -> Void)?
         
         stateLock.lock()
-        // 终态保护：已处于 CompletedState 或 FailedState 时禁止转出
         if _currentState is CompletedState || _currentState is FailedState {
             stateLock.unlock()
             return false
         }
-        // 善后中保护：处于 CancellingState 时只能转入 FailedState
         if _currentState is CancellingState && !(newState is FailedState) {
             stateLock.unlock()
             return false
@@ -175,7 +181,6 @@ public final class ArchiveTaskContext: @unchecked Sendable {
         oldStateName = _currentState.stateName
         _currentState = newState
         
-        // 离开 PausedState 时无缝累加暂停时长，避免在 Paused 下取消/失败导致指标失真
         if let pauseStart = _pauseStartTime, !(newState is PausedState) {
             let duration = Date().timeIntervalSince(pauseStart)
             if duration > 0 {
@@ -184,7 +189,6 @@ public final class ArchiveTaskContext: @unchecked Sendable {
             _pauseStartTime = nil
         }
         
-        // 处理运行指标打点
         if newState is RunningState {
             if _metrics.startTime == nil {
                 _metrics.startTime = Date()
@@ -225,7 +229,7 @@ public final class ArchiveTaskContext: @unchecked Sendable {
         }
     }
     
-    // MARK: - 辅助状态与指标更新 API
+    // MARK: - Progress & Diagnostic Updates
     
     public func setCheckpointOffset(_ offset: Int64) {
         stateLock.lock()
@@ -283,5 +287,5 @@ public final class ArchiveTaskContext: @unchecked Sendable {
     }
 }
 
-/// 状态机别名，增强代码可读性
+/// Type alias for `ArchiveTaskContext`.
 public typealias ArchiveTaskStateMachine = ArchiveTaskContext

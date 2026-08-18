@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AVKit
 import PDFKit
@@ -5,40 +12,40 @@ import QuickLookUI
 import WebKit
 import TTZipCore
 
-/// 媒体预览视图工厂 (Factory Pattern & Open-Closed Principle)
+/// Media preview view factory for dynamic media previews.
 public enum MediaPreviewFactory {
     
-    /// 归档扩展名集合
+    /// Archive extensions.
     public static let archiveExtensions: Set<String> = [
         "7z", "zip", "rar", "tar", "gz", "tgz", "bz2", "xz", "001", "002", "003", "zst", "iso"
     ]
     
-    /// 电子书扩展名集合
+    /// E-book extensions.
     public static let ebookExtensions: Set<String> = [
         "mobi", "azw", "azw3", "fb2", "cbz", "cbr", "ibooks"
     ]
     
-    /// 图像扩展名集合
+    /// Image extensions.
     public static let imageExtensions: Set<String> = [
         "png", "jpg", "jpeg", "gif", "webp", "heic", "svg", "bmp", "tiff", "ico"
     ]
     
-    /// 视频扩展名集合
+    /// Video extensions.
     public static let videoExtensions: Set<String> = [
         "mp4", "mov", "m4v", "avi", "mkv", "webm", "ogv", "flv", "3gp", "ts"
     ]
     
-    /// 音频扩展名集合
+    /// Audio extensions.
     public static let audioExtensions: Set<String> = [
         "mp3", "wav", "m4a", "aac", "flac", "aifc", "aiff", "ogg", "opus", "m4b", "alac", "wma", "caf"
     ]
     
-    /// DOCX/文档扩展名集合
+    /// Document extensions.
     public static let docxExtensions: Set<String> = [
         "docx", "doc", "rtf", "odt"
     ]
     
-    /// 文本与代码扩展名集合
+    /// Text and code extensions.
     public static let textExtensions: Set<String> = [
         "txt", "md", "markdown", "log", "ini", "conf", "cfg", "properties", "env", "plist",
         "swift", "kt", "kts", "java", "rs", "go", "c", "cpp", "h", "hpp", "cs", "m", "mm",
@@ -46,11 +53,11 @@ public enum MediaPreviewFactory {
         "html", "css", "json", "xml", "yaml", "yml", "sql", "gradle", "srt", "ass", "vtt", "lrc", "sub"
     ]
     
-    /// 动态识别 URL 对应的 MediaPreviewType (同步快速解析)
+    /// Detects MediaPreviewType synchronously for URL.
     public static func detectType(url: URL) -> MediaPreviewType {
         let ext = url.pathExtension.lowercased()
         if archiveExtensions.contains(ext) {
-            return .unsupported("压缩包文件已加载，请展开双击或查看包内条目")
+            return .unsupported("Archive loaded. Double-click to browse contents.")
         }
         if imageExtensions.contains(ext), let image = NSImage(contentsOf: url) {
             return .image(image)
@@ -72,7 +79,7 @@ public enum MediaPreviewFactory {
                 title: url.deletingPathExtension().lastPathComponent,
                 formatName: ext.uppercased(),
                 fileSizeDescription: sizeStr,
-                excerptText: "电子书文件解析就绪，可在下侧画板中全屏翻阅。",
+                excerptText: "E-Book ready for full-screen reading.",
                 coverImage: nil
             )
             return .ebook(meta)
@@ -80,12 +87,12 @@ public enum MediaPreviewFactory {
         return .quickLook(url)
     }
 
-    /// 动态识别 URL 对应的 MediaPreviewType (异步深度解包与加载)
+    /// Detects MediaPreviewType asynchronously with deep unpacking.
     public static func detectTypeAsync(url: URL) async -> MediaPreviewType {
         let ext = url.pathExtension.lowercased()
         
         if archiveExtensions.contains(ext) {
-            return .unsupported("压缩包文件已加载，请展开双击或查看包内条目")
+            return .unsupported("Archive loaded. Double-click to browse contents.")
         }
         
         if ext == "epub" {
@@ -97,7 +104,7 @@ public enum MediaPreviewFactory {
                     title: url.deletingPathExtension().lastPathComponent,
                     formatName: "EPUB",
                     fileSizeDescription: "",
-                    excerptText: "EPUB 开放出版格式电子书，包含完整章节结构与多媒体重排版。",
+                    excerptText: "EPUB open publication format e-book with full structure.",
                     coverImage: nil
                 )
                 return .ebook(meta)
@@ -112,7 +119,7 @@ public enum MediaPreviewFactory {
                 title: url.deletingPathExtension().lastPathComponent,
                 formatName: ext.uppercased(),
                 fileSizeDescription: sizeStr,
-                excerptText: "电子书文件解析就绪，可在下侧画板中全屏翻阅。",
+                excerptText: "E-Book ready for full-screen reading.",
                 coverImage: nil
             )
             return .ebook(meta)
@@ -153,7 +160,7 @@ public enum MediaPreviewFactory {
         return .quickLook(url)
     }
     
-    /// 根据文件名后缀解析对应的 SFSymbol 图标名称
+    /// Resolves SF Symbol icon name for file name.
     public static func iconName(for fileName: String) -> String {
         let ext = (fileName as NSString).pathExtension.lowercased()
         if imageExtensions.contains(ext) { return "photo.fill" }
@@ -171,7 +178,6 @@ public enum MediaPreviewFactory {
         return "doc.fill"
     }
 
-    /// 根据 URL 直接构建动态预览 AnyView
     @MainActor
     public static func makePreviewView(url: URL, fileName: String = "") async -> AnyView {
         let previewType = await detectTypeAsync(url: url)
@@ -179,7 +185,6 @@ public enum MediaPreviewFactory {
         return makePreviewView(type: previewType, fileName: name, fileURL: url)
     }
 
-    /// 根据已分配的 MediaPreviewType 构建动态预览 AnyView
     @MainActor
     public static func makePreviewView(
         type: MediaPreviewType,
@@ -203,7 +208,7 @@ public enum MediaPreviewFactory {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
                                 .font(.system(size: 24))
                                 .foregroundStyle(TTZipTheme.bambooGreen)
-                            Text("真全屏播放中...")
+                            Text("Full-screen playback active...")
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(.secondary)
                         }

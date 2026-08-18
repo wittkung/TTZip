@@ -1,14 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 import AppKit
 import QuickLook
 
-struct ArchiveExplorerView: View {
-    let archivePath: String
-    var password: String? = nil
-    let entries: [ArchiveEntry]
-    let onExtractClicked: () -> Void
-    let onCloseClicked: () -> Void
+public struct ArchiveExplorerView: View {
+    public let archivePath: String
+    public var password: String? = nil
+    public let entries: [ArchiveEntry]
+    public let onExtractClicked: () -> Void
+    public let onCloseClicked: () -> Void
     
     @StateObject private var treeStore = ArchiveTreeStore()
     @State private var selectedEntryID: String?
@@ -20,14 +27,27 @@ struct ArchiveExplorerView: View {
     @State private var currentTempDir: URL? = nil
     @State private var eventMonitor: Any? = nil
     
-    var selectedEntry: ArchiveEntry? {
+    public init(
+        archivePath: String,
+        password: String? = nil,
+        entries: [ArchiveEntry],
+        onExtractClicked: @escaping () -> Void,
+        onCloseClicked: @escaping () -> Void
+    ) {
+        self.archivePath = archivePath
+        self.password = password
+        self.entries = entries
+        self.onExtractClicked = onExtractClicked
+        self.onCloseClicked = onCloseClicked
+    }
+    
+    public var selectedEntry: ArchiveEntry? {
         guard let id = selectedEntryID else { return nil }
         return entries.first(where: { $0.id == id || $0.path == id })
     }
     
-    var body: some View {
+    public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Top Explorer Bar
             HStack(spacing: TTZipTheme.Spacing.xs) {
                 Image(systemName: "archivebox")
                     .font(.system(size: 18, weight: .light))
@@ -39,14 +59,14 @@ struct ArchiveExplorerView: View {
                 Spacer()
                 
                 Toggle(isOn: $showPreviewPanel.animation(.easeOut(duration: 0.2))) {
-                    Label("预览面板", systemImage: "sidebar.right")
+                    Label("Preview Panel", systemImage: "sidebar.right")
                         .font(TTZipTheme.Typography.callout)
                 }
                 .toggleStyle(.button)
                 .controlSize(.regular)
                 
                 Button(action: onExtractClicked) {
-                    Label("解压至...", systemImage: "square.and.arrow.up")
+                    Label("Extract to...", systemImage: "square.and.arrow.up")
                         .font(TTZipTheme.Typography.callout)
                         .foregroundStyle(Color.white)
                         .padding(.horizontal, TTZipTheme.Spacing.sm)
@@ -69,12 +89,10 @@ struct ArchiveExplorerView: View {
             .padding(.horizontal, TTZipTheme.Spacing.xl)
             .padding(.bottom, TTZipTheme.Spacing.md)
             
-            // 极细分割线
             Rectangle()
                 .fill(TTZipTheme.hairlineBorder)
                 .frame(height: 0.5)
             
-            // 主区域: macOS 原生 NSOutlineView 目录树 + 媒体实时预览左右分栏 (HSplitView)
             HSplitView {
                 Group {
                     if searchText.isEmpty {
@@ -82,13 +100,12 @@ struct ArchiveExplorerView: View {
                             VStack(spacing: 12) {
                                 ProgressView()
                                     .scaleEffect(1.1)
-                                Text("正在加载归档结构...")
+                                Text("Loading archive structure...")
                                     .font(TTZipTheme.Typography.subheadline)
                                     .foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
-                            // 使用 100% macOS 原生 NSOutlineView：从 ArchiveTreeStore 读取记忆体
                             NativeArchiveOutlineView(
                                 nodes: treeStore.rootNodes,
                                 selectedPath: $selectedEntryID,
@@ -98,9 +115,8 @@ struct ArchiveExplorerView: View {
                             )
                         }
                     } else {
-                        // 搜索模式下平铺展示匹配结果
                         Table(treeStore.filteredEntries, selection: $selectedEntryID) {
-                            TableColumn("文件名 (路径)") { entry in
+                            TableColumn("File Name (Path)") { entry in
                                 HStack(spacing: 8) {
                                     Image(systemName: fileIconName(isDirectory: entry.isDirectory, name: entry.name))
                                         .foregroundStyle(entry.isDirectory ? TTZipTheme.bambooGreen : Color.primary)
@@ -115,13 +131,13 @@ struct ArchiveExplorerView: View {
                             }
                             .width(min: 240, ideal: 360)
                             
-                            TableColumn("大小") { entry in
+                            TableColumn("Size") { entry in
                                 Text(entry.isDirectory ? "--" : formatBytes(entry.uncompressedSize))
                                     .foregroundStyle(.secondary)
                             }
                             .width(100)
                             
-                            TableColumn("编码解析") { entry in
+                            TableColumn("Encoding") { entry in
                                 Text(entry.detectedEncoding)
                                     .font(TTZipTheme.Typography.codeCaption)
                                     .padding(.horizontal, TTZipTheme.Spacing.xs)
@@ -140,14 +156,13 @@ struct ArchiveExplorerView: View {
                 }
                 .background(Color.clear)
                 
-                // 右侧媒体实时预览抽屉面板
                 if showPreviewPanel {
                     VStack {
                         if isExtractingTemp {
                             VStack(spacing: 16) {
                                 ProgressView()
                                     .scaleEffect(1.2)
-                                Text("正在实时解压媒体预检数据...")
+                                Text("Extracting preview data...")
                                     .font(TTZipTheme.Typography.subheadline)
                                     .foregroundStyle(.secondary)
                             }
@@ -155,7 +170,7 @@ struct ArchiveExplorerView: View {
                         } else {
                             MediaPreviewView(
                                 fileURL: previewFileURL,
-                                fileName: selectedEntry?.name ?? "未选择文件"
+                                fileName: selectedEntry?.name ?? "No file selected"
                             )
                         }
                     }
@@ -169,19 +184,18 @@ struct ArchiveExplorerView: View {
                 .fill(TTZipTheme.hairlineBorder)
                 .frame(height: 0.5)
             
-            // 底部状态栏
             HStack {
                 if let selected = selectedEntry {
-                    Text("已选中: \(selected.name) (\(formatBytes(selected.uncompressedSize))) · 路径: \(selected.path)")
+                    Text("Selected: \(selected.name) (\(formatBytes(selected.uncompressedSize))) · Path: \(selected.path)")
                         .font(TTZipTheme.Typography.caption)
                         .foregroundStyle(.primary)
                 } else {
-                    Text("就绪")
+                    Text("Ready")
                         .font(TTZipTheme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text("点击文件夹展开 / 折叠目录树，点击文件在右侧面板实时预览")
+                Text("Click folders to expand/collapse, click files to preview")
                     .font(TTZipTheme.Typography.caption)
                     .foregroundStyle(.secondary)
             }
@@ -189,7 +203,7 @@ struct ArchiveExplorerView: View {
             .padding(.vertical, TTZipTheme.Spacing.xs)
             .background(Color.clear)
         }
-        .searchable(text: $searchText, prompt: "搜索包内文件与文件夹...")
+        .searchable(text: $searchText, prompt: "Search files and folders...")
         .onAppear {
             treeStore.updateEntries(entries)
             
@@ -201,13 +215,13 @@ struct ArchiveExplorerView: View {
                         }
                     }
                     switch event.keyCode {
-                    case 123: // Left
+                    case 123:
                         NotificationCenter.default.post(name: .archiveExplorerMoveLeft, object: nil)
-                    case 124: // Right
+                    case 124:
                         NotificationCenter.default.post(name: .archiveExplorerMoveRight, object: nil)
-                    case 125: // Down
+                    case 125:
                         moveSelectionDown()
-                    case 126: // Up
+                    case 126:
                         moveSelectionUp()
                     default:
                         break

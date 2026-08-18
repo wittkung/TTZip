@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
@@ -5,7 +12,7 @@ public struct CompressFileItem: Identifiable, Hashable {
     public let id = UUID()
     public let path: String
     
-    /// 固化的组合组件节点 (Leaf 或 Composite Directory)，在 init 时一次性构建，消除 UI 渲染期间的重复磁盘 I/O
+    /// Cached component node (Leaf or Composite Directory) built at init to eliminate disk I/O during UI rendering.
     public let component: ArchiveComponentProtocol
     
     public init(path: String) {
@@ -15,17 +22,17 @@ public struct CompressFileItem: Identifiable, Hashable {
     
     public var name: String { (path as NSString).lastPathComponent }
     
-    /// O(1) 内存操作：直接从已固化的 component 读取
+    /// Reads directory flag from cached component.
     public var isDirectory: Bool {
         return component.isDirectory
     }
     
-    /// O(1) 内存操作：组合模式透明计算文件或文件夹树总大小
+    /// Calculates aggregate byte size transparently via composite pattern.
     public var size: Int64 {
         return component.sizeBytes
     }
     
-    // MARK: - Hashable / Equatable 手动实现（component 不参与哈希与等价判定）
+    // MARK: - Equatable & Hashable
     
     public static func == (lhs: CompressFileItem, rhs: CompressFileItem) -> Bool {
         return lhs.id == rhs.id && lhs.path == rhs.path

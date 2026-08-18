@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_windows.h
+ * @brief Windows-specific long path handling and UTF-8/UTF-16 conversion helpers.
+ */
+
 #ifndef TTZIP_WINDOWS_H
 #define TTZIP_WINDOWS_H
 
@@ -16,12 +28,10 @@
 extern "C" {
 #endif
 
-// Windows 超长路径最大限制与前缀
 #define TTZIP_WIN_MAX_PATH 32768
 #define TTZIP_WIN_LONG_PATH_PREFIX L"\\\\?\\"
 #define TTZIP_WIN_UNC_PREFIX L"\\\\?\\UNC\\"
 
-// 宽字符与 UTF-8 互转便捷辅助
 static inline wchar_t* ttzip_utf8_to_utf16(const char* utf8_str) {
     if (!utf8_str) return NULL;
     int len = MultiByteToWideChar(CP_UTF8, 0, utf8_str, -1, NULL, 0);

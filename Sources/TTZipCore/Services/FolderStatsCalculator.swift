@@ -1,16 +1,23 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 文件夹与归档结构度量计算器 (配合 Composite Pattern 组合模式)
+/// Folder and archive component metrics calculator (Composite & Visitor Pattern integration).
 public final class FolderStatsCalculator: @unchecked Sendable {
     
-    /// 对任意 ArchiveComponentProtocol (Composite 树节点或 Leaf 节点) 进行统计度量
+    /// Computes recursive metrics for an `ArchiveComponentProtocol` node.
     public static func calculateStats(for component: ArchiveComponentProtocol) -> (size: Int64, subfolders: Int, files: Int, dist: [(category: String, count: Int)]) {
         let visitor = FolderStatsVisitor()
         let res = component.accept(visitor: visitor)
         return (size: res.totalSizeBytes, subfolders: res.totalDirectories, files: res.totalFiles, dist: res.categoryDistribution)
     }
     
-    /// 对指定磁盘路径计算统计度量 (底层使用 Composite Pattern 统一接口)
+    /// Computes recursive metrics for a physical filesystem directory path.
     public static func calculateStats(for targetPath: String) async -> (size: Int64, subfolders: Int, files: Int, dist: [(category: String, count: Int)]) {
         return await Task.detached(priority: .userInitiated) { () -> (size: Int64, subfolders: Int, files: Int, dist: [(category: String, count: Int)]) in
             guard FileManager.default.fileExists(atPath: targetPath) else {
@@ -21,4 +28,3 @@ public final class FolderStatsCalculator: @unchecked Sendable {
         }.value
     }
 }
-

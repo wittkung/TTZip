@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 import AppKit
@@ -84,7 +91,7 @@ public struct SingleMillerColumnView: View {
                                     .clipShape(Circle())
                             }
                             .buttonStyle(.plain)
-                            .help("向前展开上一级目录至左侧")
+                            .help("Expand parent folder to left")
                         } else {
                             Image(systemName: "folder.fill")
                                 .font(.system(size: 10, weight: .semibold))
@@ -122,7 +129,7 @@ public struct SingleMillerColumnView: View {
                         .padding(2)
                     }
                     .menuStyle(.borderlessButton)
-                    .help("更改此文件夹的排序规则")
+                    .help("Change sort order")
                 }
                 .padding(.horizontal, 8)
                 .frame(height: 30)
@@ -134,7 +141,7 @@ public struct SingleMillerColumnView: View {
                     LazyVStack(spacing: 2) {
                         if let items = items {
                             if items.isEmpty {
-                                Text("空文件夹")
+                                Text("Empty Folder")
                                     .font(.system(size: 10))
                                     .foregroundStyle(.secondary)
                                     .padding(.vertical, 12)
@@ -160,7 +167,7 @@ public struct SingleMillerColumnView: View {
                             HStack(spacing: 6) {
                                 ProgressView()
                                     .controlSize(.small)
-                                Text("读取中...")
+                                Text("Loading...")
                                     .font(.system(size: 10))
                                     .foregroundStyle(.secondary)
                             }
@@ -188,13 +195,13 @@ public struct SingleMillerColumnView: View {
                     Button {
                         onTriggerNewFolder(dirURL)
                     } label: {
-                        Label("新建文件夹", systemImage: "folder.badge.plus")
+                        Label("New Folder", systemImage: "folder.badge.plus")
                     }
                     
                     Button {
                         onTriggerNewFile(dirURL)
                     } label: {
-                        Label("新建空白文件...", systemImage: "doc.badge.plus")
+                        Label("New Empty File...", systemImage: "doc.badge.plus")
                     }
                     
                     Divider()
@@ -202,7 +209,7 @@ public struct SingleMillerColumnView: View {
                     Button {
                         FileClipboardStore.shared.paste(to: dirURL)
                     } label: {
-                        Label("粘贴到当前目录", systemImage: "doc.on.clipboard")
+                        Label("Paste into current folder", systemImage: "doc.on.clipboard")
                     }
                     .disabled(!FileClipboardStore.shared.canPaste)
                     
@@ -211,13 +218,13 @@ public struct SingleMillerColumnView: View {
                     Button {
                         onRefresh()
                     } label: {
-                        Label("刷新页面", systemImage: "arrow.clockwise")
+                        Label("Refresh", systemImage: "arrow.clockwise")
                     }
                     
                     Button {
                         NSWorkspace.shared.selectFile(dirURL.path, inFileViewerRootedAtPath: "")
                     } label: {
-                        Label("在 Finder 中打开此目录", systemImage: "folder")
+                        Label("Reveal in Finder", systemImage: "folder")
                     }
                 }
             }

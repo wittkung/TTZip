@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import CTTZipBridge
 
-/// 高性能数据完整性校验引擎 (CRC32 & SHA256)
+/// High-performance data integrity and checksum verification engine (CRC32 & SHA256).
 public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked Sendable {
     private let hashCalculator: HashCalculating
     private var sourceCRCCache: [String: String] = [:]
@@ -12,18 +19,18 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
         self.hashCalculator = hashCalculator
     }
     
-    /// 计算指定文件的 CRC32 校验和字符串 (如 "A1B2C3D4")
+    /// Computes CRC32 checksum string for a file (e.g. `"A1B2C3D4"`).
     public func computeCRC32(filePath: String) -> String {
         let crc = ttzip_compute_file_crc32(filePath)
         return String(format: "%08X", crc)
     }
     
-    /// 异步计算指定文件的 SHA256 哈希指纹 (调用 16MB 页对齐硬件级 HashCalculator 引擎)
+    /// Asynchronously computes SHA256 digest string for a file.
     public func computeSHA256(filePath: String) async throws -> String {
         return try await hashCalculator.computeHash(filePath: filePath, type: .sha256)
     }
 
-    /// 通用解压目录完整性校验：递归核验解压产物总字节与 CRC32 数据散列指纹，打印标准核验日志
+    /// Verifies extracted directory contents: asserts byte totals and CRC32 digests against expectations.
     @discardableResult
     public func verifyExtractedDirectory(
         directoryPath: String,
@@ -35,7 +42,7 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
         let fm = FileManager.default
         let items = (try? fm.contentsOfDirectory(atPath: directoryPath)) ?? []
         if items.isEmpty {
-            TTLogger.debug("  [\(label) 完整性校验] 解压目标目录为空: \(directoryPath)")
+            TTLogger.debug("  [\(label) Integrity Verification] Destination directory is empty: \(directoryPath)")
             return (false, 0, nil)
         }
         
@@ -75,7 +82,7 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
         var targetSrcCRC: String? = sourceCRC32
 
         if sizeValid, let fileToHash = firstFilePath {
-            TTLogger.debug("  🔍 [\(label) 哈希核验中] 正在校验解压产物 CRC32 指纹...")
+            TTLogger.debug("  🔍 [\(label) CRC32 Verification] Verifying extracted payload checksum...")
             crcStr = computeCRC32(filePath: fileToHash)
             
             var isSrcDir: ObjCBool = false
@@ -102,7 +109,7 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
             if let srcCrc = targetSrcCRC, !srcCrc.isEmpty, srcCrc != "00000000" {
                 hashValid = (crcStr == srcCrc)
                 if !hashValid {
-                    TTLogger.error("  ❌ [\(label) 哈希不匹配] 源 CRC32: \(srcCrc) vs 解压 CRC32: \(crcStr ?? "")")
+                    TTLogger.error("  ❌ [\(label) Checksum Mismatch] Source CRC32: \(srcCrc) vs Extracted CRC32: \(crcStr ?? "")")
                 }
             }
         }
@@ -111,15 +118,15 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
         if isValid {
             let crcDisplay: String
             if let srcCrc = targetSrcCRC, let extCrc = crcStr {
-                crcDisplay = " | 源文件 CRC32: \(srcCrc) == 解压 CRC32: \(extCrc)"
+                crcDisplay = " | Source CRC32: \(srcCrc) == Extracted CRC32: \(extCrc)"
             } else if let extCrc = crcStr {
-                crcDisplay = " | 解压 CRC32: \(extCrc)"
+                crcDisplay = " | Extracted CRC32: \(extCrc)"
             } else {
                 crcDisplay = ""
             }
-            TTLogger.debug("  ✅ [\(label) 完整性与哈希校验] 100% 字节精准核验通过 (\(totalExtractedBytes) 字节\(crcDisplay))")
+            TTLogger.debug("  ✅ [\(label) Integrity Check] 100% Bit-exact verified (\(totalExtractedBytes) bytes\(crcDisplay))")
         } else if !sizeValid {
-            TTLogger.error("  ❌ [\(label) 字节校验失败] 原始: \(expectedOriginalBytes) 字节 vs 实测解压: \(totalExtractedBytes) 字节 (checkDir: \(checkDir))")
+            TTLogger.error("  ❌ [\(label) Byte Count Mismatch] Expected: \(expectedOriginalBytes) bytes vs Actual: \(totalExtractedBytes) bytes (checkDir: \(checkDir))")
             if let dbgEnum = fm.enumerator(atPath: checkDir) {
                 while let r = dbgEnum.nextObject() as? String {
                     let fp = (checkDir as NSString).appendingPathComponent(r)
@@ -134,7 +141,7 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
                 stage: .integrityVerification,
                 format: .zip,
                 level: .level1,
-                errorMessage: "[\(label)] 解压解包字节总数不匹配",
+                errorMessage: "[\(label)] Extracted byte size mismatch",
                 destinationDir: directoryPath,
                 expectedBytes: expectedOriginalBytes,
                 actualBytes: totalExtractedBytes

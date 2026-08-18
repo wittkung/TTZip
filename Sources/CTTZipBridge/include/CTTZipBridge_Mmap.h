@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file CTTZipBridge_Mmap.h
+ * @brief Memory-mapped fast ZIP central directory inspection interface.
+ */
+
 #ifndef CTTZipBridge_Mmap_h
 #define CTTZipBridge_Mmap_h
 

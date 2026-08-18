@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 import AppKit
@@ -97,7 +104,7 @@ struct TTZipApp: App {
         .commands {
             CommandGroup(after: .appInfo) {
                 #if !MAS_BUILD
-                Button("检查更新...") {
+                Button("Check for Updates...") {
                     UpdateManager.shared.checkForUpdates()
                 }
                 #endif

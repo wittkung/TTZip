@@ -1,7 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 组合命令/宏命令 (Macro / Composite Command)
-/// 组装并顺序执行一组命令；支持多步骤联动，并在中途任意步骤失败时，自动触发逆序 Rollback 撤销回滚
+/// Composite / macro command orchestrating a sequence of archive operations with automated reverse rollback.
 public final class MacroArchiveCommand: ArchiveCommandProtocol, @unchecked Sendable {
     public let commandId: String
     public let description: String
@@ -22,7 +28,7 @@ public final class MacroArchiveCommand: ArchiveCommandProtocol, @unchecked Senda
     ) {
         self.commandId = commandId
         self.commands = commands
-        self.description = description ?? "宏命令 (包含 \(commands.count) 个原子步骤)"
+        self.description = description ?? "Macro command (\(commands.count) atomic steps)"
     }
     
     deinit {
@@ -48,7 +54,6 @@ public final class MacroArchiveCommand: ArchiveCommandProtocol, @unchecked Senda
                     combinedBackups[k] = v
                 }
             } catch {
-                // ⚠️ 捕获到中途步骤失败：自动触发逆序 Rollback 回滚
                 let rollbackErrors = await performRollback()
                 
                 throw CommandError.macroExecutionFailed(
@@ -67,7 +72,7 @@ public final class MacroArchiveCommand: ArchiveCommandProtocol, @unchecked Senda
         return CommandResult(
             commandId: commandId,
             success: true,
-            message: "宏命令顺利执行完成 (\(commands.count) 个子步骤)",
+            message: "Macro command executed successfully (\(commands.count) sub-steps)",
             artifactsCreated: combinedArtifacts,
             backupPaths: combinedBackups,
             executionDuration: duration
@@ -77,7 +82,7 @@ public final class MacroArchiveCommand: ArchiveCommandProtocol, @unchecked Senda
     public func undo() async throws {
         let (executed, toUndo) = getUndoStateAndReset()
         guard executed || !toUndo.isEmpty else {
-            throw CommandError.invalidState(reason: "宏命令尚未执行，无法撤销")
+            throw CommandError.invalidState(reason: "Macro command has not been executed; cannot undo.")
         }
         
         var undoErrors: [String] = []
@@ -90,12 +95,11 @@ public final class MacroArchiveCommand: ArchiveCommandProtocol, @unchecked Senda
                 }
                 _ = remainingCommands.popLast()
             } catch {
-                undoErrors.append("撤销 [\(command.description)] 失败: \(error.localizedDescription)")
+                undoErrors.append("Undo failed for [\(command.description)]: \(error.localizedDescription)")
             }
         }
         
         if !undoErrors.isEmpty {
-            // 撤销部分步骤发生失败，还原剩余未完成撤销的子命令状态以备后置重试
             restoreUnfinishedState(remainingCommands)
             throw CommandError.undoFailed(reason: undoErrors.joined(separator: "; "))
         }
@@ -107,7 +111,7 @@ public final class MacroArchiveCommand: ArchiveCommandProtocol, @unchecked Senda
         }
     }
     
-    // MARK: - 内部 Rollback 辅助方法
+    // MARK: - Rollback Helpers
     
     private func performRollback() async -> [String] {
         let toRollback = getExecutedListAndReset()
@@ -119,14 +123,14 @@ public final class MacroArchiveCommand: ArchiveCommandProtocol, @unchecked Senda
                     try await command.undo()
                 }
             } catch {
-                rollbackErrors.append("回滚命令 [\(command.description)] 失败: \(error.localizedDescription)")
+                rollbackErrors.append("Rollback failed for [\(command.description)]: \(error.localizedDescription)")
             }
         }
         
         return rollbackErrors
     }
     
-    // MARK: - 内部同步锁辅助函数
+    // MARK: - Internal Synchronization Helpers
     
     private func clearExecutedList() {
         lock.lock()
@@ -173,4 +177,3 @@ public final class MacroArchiveCommand: ArchiveCommandProtocol, @unchecked Senda
         return (wasExecuted, list)
     }
 }
-

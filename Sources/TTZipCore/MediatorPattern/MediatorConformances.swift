@@ -1,8 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 【3.8 中介者模式 (Mediator Pattern)】核心通用组件扩展与适配器
-
-/// 通用中介者匿名回调组件，适用于不需要独立 Class 的闭包订阅者
+/// Anonymous closure-based mediator component subscriber.
 public final class AnonymousMediatorComponent: ArchiveMediatorComponentProtocol, @unchecked Sendable {
     public let componentId: String
     public var mediator: ArchiveMediatorProtocol?
@@ -29,15 +34,15 @@ public final class AnonymousMediatorComponent: ArchiveMediatorComponentProtocol,
     }
 }
 
-// MARK: - 基础组件解耦事件便捷派发扩展
+// MARK: - Component Event Notification Helpers
 
 extension ArchiveMediatorComponentProtocol {
-    /// 向所属中介者快捷发送 AppMediatorEvent
+    /// Dispatches `AppMediatorEvent` to attached mediator.
     public func notifyMediator(_ event: AppMediatorEvent) {
         mediator?.send(event: event, from: self)
     }
     
-    /// 向所属中介者快捷发送 CoreEngineMediatorEvent
+    /// Dispatches `CoreEngineMediatorEvent` to attached mediator.
     public func notifyMediator(_ event: CoreEngineMediatorEvent) {
         mediator?.send(event: event, from: self)
     }

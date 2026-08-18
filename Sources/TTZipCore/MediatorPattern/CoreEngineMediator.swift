@@ -1,15 +1,19 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 【3.8 中介者模式 (Mediator Pattern)】Core 引擎服务中介者 (Core Engine Mediator)
-/// 负责协调: 解压失败 ➔ 密码库自动解锁 ➔ 自动重试解压 ➔ 安全扫描审计 ➔ 临时文件清理
+/// Core engine mediator coordinating multi-stage workflows across password vaults, extractors, security scanners, and cleanups.
 public final class CoreEngineMediator: ArchiveMediatorProtocol, @unchecked Sendable {
-    /// 全局共享单例
     public static let shared = CoreEngineMediator()
     
     private let lock = NSLock()
     private var registry: [String: WeakMediatorComponentWrapper] = [:]
     
-    // 可在测试或自定义架构中注入的服务处理逻辑闭包 (线程安全保护)
     private var _passwordLookupHandler: ((_ archivePath: String) -> String?)?
     private var _retryExtractionHandler: ((_ archivePath: String, _ password: String, _ destination: String) async -> Bool)?
     private var _securityScanHandler: ((_ targetPath: String) -> SecurityScanResult)?
@@ -67,12 +71,10 @@ public final class CoreEngineMediator: ArchiveMediatorProtocol, @unchecked Senda
         }
     }
     
-    // 记录协调流程日志与状态追踪
     private var executionLog: [String] = []
     
     private init() {}
     
-    /// 清空所有 Handler 闭包引用、注册组件与执行日志 (防范闭包泄露与测试重置风险)
     public func reset() {
         lock.lock()
         defer { lock.unlock() }
@@ -84,7 +86,7 @@ public final class CoreEngineMediator: ArchiveMediatorProtocol, @unchecked Senda
         executionLog.removeAll()
     }
     
-    // MARK: - ArchiveMediatorProtocol 实现
+    // MARK: - ArchiveMediatorProtocol Implementation
     
     public func register(component: ArchiveMediatorComponentProtocol) {
         lock.lock()
@@ -114,7 +116,6 @@ public final class CoreEngineMediator: ArchiveMediatorProtocol, @unchecked Senda
     }
     
     public func send(event: CoreEngineMediatorEvent, from component: ArchiveMediatorComponentProtocol? = nil) {
-        // 记录事件履历
         appendLog("Event Sent: \(event.eventName)")
         
         let activeComponents = getActiveComponents()
@@ -123,38 +124,35 @@ public final class CoreEngineMediator: ArchiveMediatorProtocol, @unchecked Senda
             comp.receive(event: event)
         }
         
-        // 自动推进中介者服务协调流水线
         processWorkflow(event: event)
     }
     
-    // MARK: - 协同工作流逻辑 (Mediator Workflow Automation)
+    // MARK: - Mediator Workflow Automation
     
     private func processWorkflow(event: CoreEngineMediatorEvent) {
         switch event {
         case .extractionFailedNeedPassword(let archivePath):
-            appendLog("Step 1: 解压失败需要密码 -> 检索密码库: \(archivePath)")
-            // 自动查询密码库
+            appendLog("Step 1: Extraction failed, requesting password vault lookup for: \(archivePath)")
             if let lookup = passwordLookupHandler {
                 if let pwd = lookup(archivePath) {
-                    appendLog("Step 2: 密码库成功检索到合适口令")
+                    appendLog("Step 2: Password vault found matching credential")
                     send(event: .vaultPasswordUnlocked(archivePath: archivePath, password: pwd))
                 }
             } else {
-                // 使用默认 PasswordVaultManager 进行检索
                 let entries = PasswordVaultManager.shared.getEntries()
                 if let first = entries.first {
-                    appendLog("Step 2: PasswordVaultManager 自动检索出口令")
+                    appendLog("Step 2: PasswordVaultManager retrieved credential")
                     send(event: .vaultPasswordUnlocked(archivePath: archivePath, password: first.password))
                 }
             }
             
         case .vaultPasswordUnlocked(let archivePath, let password):
-            appendLog("Step 3: 密码已解锁 -> 触发重试解压: \(archivePath)")
+            appendLog("Step 3: Password unlocked -> triggering retry extraction for: \(archivePath)")
             let destDir = (NSTemporaryDirectory() as NSString).appendingPathComponent("TTZipExtracted")
             send(event: .retryExtraction(archivePath: archivePath, password: password, destinationPath: destDir))
             
         case .retryExtraction(let archivePath, let password, let destinationPath):
-            appendLog("Step 4: 执行重试解压 [path: \(archivePath), dest: \(destinationPath)]")
+            appendLog("Step 4: Executing retry extraction [path: \(archivePath), dest: \(destinationPath)]")
             if let handler = retryExtractionHandler {
                 Task {
                     let success = await handler(archivePath, password, destinationPath)
@@ -163,30 +161,29 @@ public final class CoreEngineMediator: ArchiveMediatorProtocol, @unchecked Senda
                     }
                 }
             } else {
-                // 默认即刻宣告解压成功以完成闭环
                 send(event: .extractionSucceeded(archivePath: archivePath, extractedFilesCount: 1))
             }
             
         case .extractionSucceeded(let archivePath, let filesCount):
-            appendLog("Step 5: 解压成功 (文件数: \(filesCount)) -> 触发安全扫描: \(archivePath)")
+            appendLog("Step 5: Extraction succeeded (\(filesCount) files) -> triggering security scan for: \(archivePath)")
             send(event: .securityScanRequested(targetPath: archivePath))
             
         case .securityScanRequested(let targetPath):
-            appendLog("Step 6: 安全扫描完成 -> 触发临时文件清理: \(targetPath)")
+            appendLog("Step 6: Security scan completed -> triggering temporary file cleanup for: \(targetPath)")
             if let handler = securityScanHandler {
                 _ = handler(targetPath)
             }
             send(event: .cleanupTempFiles(tempPaths: [targetPath]))
             
         case .cleanupTempFiles(let tempPaths):
-            appendLog("Step 7: 临时文件清理完毕 (\(tempPaths.count) 个路径)")
+            appendLog("Step 7: Temporary cleanup completed for \(tempPaths.count) paths")
             if let handler = tempCleanupHandler {
                 _ = handler(tempPaths)
             }
         }
     }
     
-    // MARK: - 辅助与诊断方法
+    // MARK: - Diagnostics & Helpers
     
     private func getActiveComponents() -> [ArchiveMediatorComponentProtocol] {
         lock.lock()

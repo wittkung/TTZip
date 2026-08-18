@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 1. 文件存在性与读取权限具体校验处理者 (FileExistenceHandler)
+/// File existence and accessibility validation handler.
 public final class FileExistenceHandler: BaseArchiveValidationHandler, @unchecked Sendable {
     private let fileManager: FileManager
     
@@ -40,7 +47,6 @@ public final class FileExistenceHandler: BaseArchiveValidationHandler, @unchecke
         if let dest = context.destinationPath, !dest.isEmpty {
             let parentDir = (dest as NSString).deletingLastPathComponent
             if !parentDir.isEmpty && !fileManager.fileExists(atPath: parentDir) {
-                // 如果父目录不存在，尝试检查父目录的祖先路径或是否可创建
                 let grandparent = (parentDir as NSString).deletingLastPathComponent
                 if !grandparent.isEmpty && fileManager.fileExists(atPath: grandparent) {
                     if !fileManager.isWritableFile(atPath: grandparent) {

@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AppKit
 
-/// macOS 真正真全屏沉浸显示控制器 (超越 Window / 遮罩 Dock 与菜单栏)
+/// Immersive full-screen presentation window controller overriding system Dock and menu bar.
 @MainActor
 public final class FullScreenMediaWindowController {
     public static let shared = FullScreenMediaWindowController()
@@ -27,7 +34,7 @@ public final class FullScreenMediaWindowController {
             backing: .buffered,
             defer: false
         )
-        win.level = .screenSaver // 最高级全屏视效，覆盖系统的 Menu Bar 和 Dock
+        win.level = .screenSaver
         win.isOpaque = true
         win.backgroundColor = .black
         win.hasShadow = false

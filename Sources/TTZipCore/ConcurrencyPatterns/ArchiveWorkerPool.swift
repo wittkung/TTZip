@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 可复用并发线程池 (Archive Worker Pool)
-/// 默认 maxWorkers = ProcessInfo.processInfo.activeProcessorCount，防止 Thread Explosion
-/// 支持动态扩展 API setWorkerCount，支持 start/pause/resume/drain/shutdown 完整生命周期管控
+/// Reusable asynchronous worker pool coordinating bounded concurrency to prevent thread explosion.
+///
+/// Supports dynamic worker scaling, prioritization tiers, and structured lifecycle state transitions.
 public final class ArchiveWorkerPool: @unchecked Sendable {
     public static let shared = ArchiveWorkerPool()
 
@@ -32,51 +39,45 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         self.dispatcher = dispatcher
     }
 
-    /// 当前线程池上限 Workers 数量
     public var maxWorkers: Int {
         lock.lock()
         defer { lock.unlock() }
         return targetWorkerCount
     }
 
-    /// 当前线程池运行状态
     public var state: WorkerPoolState {
         lock.lock()
         defer { lock.unlock() }
         return currentState
     }
 
-    /// 当前正在并发执行任务的 Worker 数量
     public var activeWorkerCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return activeWorkers
     }
 
-    /// 已完成任务累计数
     public var completedTaskCount: Int64 {
         lock.lock()
         defer { lock.unlock() }
         return completedTasksCount
     }
 
-    /// 失败任务累计数
     public var failedTaskCount: Int64 {
         lock.lock()
         defer { lock.unlock() }
         return failedTasksCount
     }
 
-    /// 待处理任务总数
     public var pendingTaskCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return dispatcher.count
     }
 
-    // MARK: - 动态调整 Worker 数量
+    // MARK: - Dynamic Worker Scaling
 
-    /// 动态设置并发 Worker 线程池上限 (如针对 Apple Silicon 性能核 P-Core / 能效核 E-Core 调优)
+    /// Dynamically sets the concurrency limit of the worker pool.
     public func setWorkerCount(_ count: Int) {
         lock.lock()
         let newCount = max(1, count)
@@ -89,9 +90,9 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         }
     }
 
-    // MARK: - 生命周期管控 API
+    // MARK: - Lifecycle Management
 
-    /// 启动线程池
+    /// Starts the worker pool loop.
     public func start() {
         lock.lock()
         guard currentState == .idle || currentState == .paused else {
@@ -104,7 +105,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         adjustWorkers()
     }
 
-    /// 挂起暂停线程池 (Worker 保持挂起状态，暂停出队新任务)
+    /// Suspends task dequeue while keeping existing workers alive.
     public func pause() {
         lock.lock()
         defer { lock.unlock() }
@@ -113,7 +114,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         }
     }
 
-    /// 恢复运行线程池
+    /// Resumes task dequeue on paused worker pool.
     public func resume() {
         lock.lock()
         guard currentState == .paused else {
@@ -126,18 +127,17 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         adjustWorkers()
     }
 
-    /// 排干并平滑关闭 (暂停接收新任务，等待现有任务及队列表任务全部执行完毕后回到 idle)
+    /// Drains all pending tasks gracefully before transitioning back to idle.
     public func drain() async {
         guard startDrain() else { return }
 
         adjustWorkers()
 
-        // 轮询等待调度器清空且活动 Worker 归零
         while true {
             if isDrainCompleted() {
                 break
             }
-            try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+            try? await Task.sleep(nanoseconds: 10_000_000)
         }
 
         finishDrain()
@@ -170,7 +170,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         return isDone || isShutdown
     }
 
-    /// 立即强制关闭线程池 (取消所有待处理及活动任务)
+    /// Shuts down the worker pool immediately, cancelling pending tasks.
     public func shutdown() {
         lock.lock()
         currentState = .shutdown
@@ -187,9 +187,8 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         }
     }
 
-    // MARK: - 任务提交与同步等待 API
+    // MARK: - Task Submission API
 
-    /// 提交单个任务到调度器
     public func submit(_ item: any ArchiveWorkItemProtocol) {
         lock.lock()
         let isIdle = currentState == .idle
@@ -203,7 +202,6 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         }
     }
 
-    /// 批量提交任务到调度器
     public func submitBatch(_ items: [any ArchiveWorkItemProtocol]) {
         lock.lock()
         let isIdle = currentState == .idle
@@ -217,7 +215,6 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         }
     }
 
-    /// 便捷提交 Task 闭包
     @discardableResult
     public func submit(
         priority: TaskPriorityLevel = .userInitiated,
@@ -229,7 +226,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         return itemID
     }
 
-    /// 提交任务并异步等待结果返回
+    /// Submits work item and awaits its asynchronous completion.
     public func executeAndAwait(_ item: any ArchiveWorkItemProtocol) async throws -> any Sendable {
         let itemID = item.itemID
 
@@ -248,7 +245,6 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         }.get()
     }
 
-    /// 提交闭包任务并异步等待结果返回
     public func executeAndAwait(
         priority: TaskPriorityLevel = .userInitiated,
         itemID: String = UUID().uuidString,
@@ -258,7 +254,6 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         return try await executeAndAwait(item)
     }
 
-    /// 取消特定任务
     public func cancel(itemID: String) {
         lock.lock()
         cancelledPoolItemIDs.insert(itemID)
@@ -269,7 +264,6 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         cont?.resume(returning: .failure(CancellationError()))
     }
 
-    /// 取消全部任务
     public func cancelAll() {
         lock.lock()
         for itemID in continuations.keys {
@@ -285,7 +279,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         }
     }
 
-    // MARK: - 内部 Worker 调整与同步锁辅助函数
+    // MARK: - Internal Worker Management
 
     private func stopAllWorkerTasks() {
         for task in workerTasks.values {
@@ -306,7 +300,6 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
 
         guard currentState == .running || currentState == .draining else { return }
 
-        // 清理已结束/已取消的 Worker Task 句柄
         workerTasks = workerTasks.filter { !$0.value.isCancelled }
 
         let currentCount = workerTasks.count
@@ -389,7 +382,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
                 break
             }
             if status.isPaused {
-                try? await Task.sleep(nanoseconds: 20_000_000) // 20ms
+                try? await Task.sleep(nanoseconds: 20_000_000)
                 continue
             }
 
@@ -399,7 +392,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
             }
 
             guard let item = popResult.item else {
-                try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+                try? await Task.sleep(nanoseconds: 10_000_000)
                 continue
             }
 

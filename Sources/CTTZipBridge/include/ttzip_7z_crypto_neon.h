@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_7z_crypto_neon.h
+ * @brief 7Z ARM64 hardware accelerated SHA-256 KDF and AES-256-CBC decryption.
+ */
+
 #ifndef TTZIP_7Z_CRYPTO_NEON_H
 #define TTZIP_7Z_CRYPTO_NEON_H
 
@@ -9,8 +21,6 @@
 extern "C" {
 #endif
 
-/// 7z 专属 ARM64 硬件 SHA-256 密钥派生 (Key Derivation Function)
-/// 将 UTF-16LE 密码与 Salt 经过 2^num_cycles_power 次 SHA-256 迭代派生出 32 字节 AES-256 Key
 int ttzip_7z_kdf_sha256_neon(
     const char* password,
     const uint8_t* salt,
@@ -19,7 +29,6 @@ int ttzip_7z_kdf_sha256_neon(
     uint8_t out_key[32]
 );
 
-/// 7z 专属 ARM64 硬件 AES-256-CBC 向量化高速解密
 int ttzip_7z_aes256_cbc_decrypt_neon(
     const uint8_t* key,
     const uint8_t* iv,

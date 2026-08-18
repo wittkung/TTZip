@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// Liquid Glass 玻璃拟态全局 Spotlight 搜索组件
+/// Liquid Glass styled spotlight search bar component.
 public struct LiquidGlassSearchBar: View {
     @Binding public var searchQuery: String
     @ObservedObject public var searchService: SpotlightSearchService
@@ -19,7 +26,7 @@ public struct LiquidGlassSearchBar: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(isFocused ? TTZipTheme.bambooGreen : .secondary)
             
-            TextField("搜索本地归档与解压项目...", text: $searchQuery)
+            TextField("Search local files and archives...", text: $searchQuery)
                 .textFieldStyle(.plain)
                 .font(.system(size: 11.5))
                 .focused($isFocused)

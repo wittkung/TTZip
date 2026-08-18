@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// ZIP 归档内部单个条目的高阶物理特征描述符
+/// Value type describing physical entry metadata inside a ZIP archive.
 public struct ZipEntryDescriptor: Sendable {
     public let path: String
     public let uncompressedSize: Int64
@@ -13,7 +20,7 @@ public struct ZipEntryDescriptor: Sendable {
     public let encryptionMethod: ZipEncryptionMethod
 }
 
-/// ZIP 条目支持的加密模式类型
+/// Encryption schemes supported by ZIP entries.
 public enum ZipEncryptionMethod: Sendable, Equatable {
     case none
     case zipCrypto
@@ -22,12 +29,13 @@ public enum ZipEncryptionMethod: Sendable, Equatable {
     case aes256
 }
 
-/// 避免并发闭包 capture 非 Sendable 类型的内部 helper 容器
+/// Internal thread-safe box container for Int64 state.
 final class StateBoxInt64: @unchecked Sendable {
     var value: Int64
     init(_ value: Int64) { self.value = value }
 }
 
+/// Internal thread-safe results accumulator for concurrent iterations.
 final class StateBoxResults<T: Sendable>: @unchecked Sendable {
     var values: [T?]
     private let lock = NSLock()
@@ -39,6 +47,7 @@ final class StateBoxResults<T: Sendable>: @unchecked Sendable {
     }
 }
 
+/// Internal container wrapping raw pointers across Sendable boundaries.
 final class SendablePointerBox: @unchecked Sendable {
     let pointer: UnsafePointer<UInt8>
     let size: Int

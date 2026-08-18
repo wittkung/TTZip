@@ -1,8 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import Security
 import CTTZipBridge
 
+/// Value type representing a secure credential entry within the password vault.
 public struct PasswordVaultEntry: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public var label: String
@@ -16,7 +24,7 @@ public struct PasswordVaultEntry: Identifiable, Codable, Equatable, Sendable {
         id: UUID = UUID(),
         label: String,
         password: String,
-        category: String = "通用",
+        category: String = "General",
         createdAt: Date = Date(),
         useCount: Int = 0,
         lastUsedAt: Date? = nil
@@ -31,20 +39,21 @@ public struct PasswordVaultEntry: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+/// Backup envelope structure storing serialized vault entries and historical master hash.
 public struct VaultBackupData: Codable {
     public let oldMasterHash: String
     public let entries: [PasswordVaultEntry]
     public let backupDate: Date
 }
 
-/// 密码库抽象管理接口 (支持依赖注入与解耦)
+/// Protocol abstraction for password vault management and candidate querying.
 public protocol PasswordVaultManaging: Sendable {
     var autoUnlockArchives: Bool { get }
     func getEntries() -> [PasswordVaultEntry]
     func recordUsage(id: UUID)
 }
 
-/// macOS Apple 最佳实践集中式高安全性密码库管理器 (AES-256 GCM 硬件加密持久化 + Keychain + 找回保护)
+/// High-security password vault manager with hardware AES-256 GCM persistence and Keychain integration.
 public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Sendable {
     public static let shared = PasswordVaultManager()
     
@@ -112,7 +121,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         vaultLock.withLock { masterPasswordHash != nil }
     }
     
-    /// 自动使用已解锁密码库中的口令解密压缩包设置 (默认 true)
+    /// Automatically attempts candidate passwords when encountering encrypted archives (defaults to true).
     public var autoUnlockArchives: Bool {
         get {
             vaultLock.withLock {
@@ -136,7 +145,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         }
     }
     
-    /// 首次设置主口令
+    /// Initializes master password for initial setup.
     public func setMasterPassword(_ pwd: String) {
         vaultLock.withLock {
             let hash = hashString(pwd)
@@ -151,7 +160,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         notifyChange()
     }
     
-    /// 首次与重置隔离清理
+    /// Resets vault state for fresh initialization.
     public func resetToFirstRunState() {
         vaultLock.withLock {
             masterPasswordHash = nil
@@ -167,7 +176,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         notifyChange()
     }
     
-    /// 校验主口令解密并加载持久化数据
+    /// Unlocks vault using provided master password string.
     public func unlockVault(with pwd: String) -> Bool {
         let success: Bool = vaultLock.withLock {
             let pwdHash = hashString(pwd)
@@ -191,7 +200,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         return success
     }
 
-    /// Touch ID / 生物识别解锁真正的密码库（安全提取 Keychain 中的 MasterPassword）
+    /// Unlocks vault via biometric authentication reading Keychain master password.
     public func unlockWithBiometrics() -> Bool {
         let success: Bool = vaultLock.withLock {
             if _isUnlocked && activeMasterPassword != nil {
@@ -216,7 +225,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         return success
     }
     
-    /// 忘记密码/重置主口令：将原有加密库移入历史备份库，并清空当前主口令
+    /// Resets master password, backing up existing entries to historical backup container.
     public func resetMasterPassword(newMasterPassword pwd: String) {
         vaultLock.withLock {
             if !entries.isEmpty, let oldHash = masterPasswordHash {
@@ -241,7 +250,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         notifyChange()
     }
     
-    /// 找回历史密码库：凭原口令解密历史备份数据并合并
+    /// Restores previous backup vault entries using original master password.
     public func recoverBackupVault(withOriginalMasterPassword oldPwd: String) -> Bool {
         let success: Bool = vaultLock.withLock {
             guard FileManager.default.fileExists(atPath: backupFileURL.path),
@@ -279,6 +288,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         return success
     }
     
+    /// Locks vault and securely scrubs active password buffers from memory.
     public func lockVault() {
         vaultLock.withLock {
             _isUnlocked = false
@@ -318,7 +328,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         return true
     }
     
-    /// 自动为加密归档尝试已保存口令候选池 (优先按使用频率降序排列)
+    /// Returns sorted candidate passwords for automated decryption attempts.
     public func candidatePasswordsForAutoUnlock() -> [String] {
         if !isUnlocked {
             if PasswordVaultManager.isCLIProcess {
@@ -337,11 +347,11 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         return result
     }
     
-    public func addEntry(id: UUID = UUID(), label: String, password: String, category: String = "通用") {
+    public func addEntry(id: UUID = UUID(), label: String, password: String, category: String = "General") {
         vaultLock.withLock {
             guard _isUnlocked else { return }
-            let finalLabel = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "解压口令" : label.trimmingCharacters(in: .whitespacesAndNewlines)
-            let finalCategory = category.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "通用" : category.trimmingCharacters(in: .whitespacesAndNewlines)
+            let finalLabel = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Password" : label.trimmingCharacters(in: .whitespacesAndNewlines)
+            let finalCategory = category.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "General" : category.trimmingCharacters(in: .whitespacesAndNewlines)
             let newEntry = PasswordVaultEntry(id: id, label: finalLabel, password: password, category: finalCategory)
             entries.append(newEntry)
             saveVaultLocked()
@@ -370,7 +380,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         notifyChange()
     }
     
-    /// 强随机密码生成器
+    /// Generates high-entropy pseudo-random password string.
     public func generateRandomPassword(length: Int = 16, includeSymbols: Bool = true) -> String {
         let letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         let symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?"
@@ -385,9 +395,9 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         return result
     }
     
-    /// 评估密码强度 (1-5 级)
+    /// Evaluates password entropy and strength score (0 to 5).
     public func evaluatePasswordStrength(_ pwd: String) -> (score: Int, label: String) {
-        if pwd.isEmpty { return (0, "极弱") }
+        if pwd.isEmpty { return (0, "Very Weak") }
         var score = 0
         if pwd.count >= 8 { score += 1 }
         if pwd.count >= 12 { score += 1 }
@@ -396,11 +406,11 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         if pwd.rangeOfCharacter(from: .uppercaseLetters) != nil && pwd.rangeOfCharacter(from: .lowercaseLetters) != nil { score += 1 }
         
         switch score {
-        case 0...1: return (score, "极弱 (易破解)")
-        case 2: return (score, "弱")
-        case 3: return (score, "中等")
-        case 4: return (score, "强")
-        default: return (score, "极高安全 (推荐)")
+        case 0...1: return (score, "Very Weak")
+        case 2: return (score, "Weak")
+        case 3: return (score, "Medium")
+        case 4: return (score, "Strong")
+        default: return (score, "Very Strong")
         }
     }
 }

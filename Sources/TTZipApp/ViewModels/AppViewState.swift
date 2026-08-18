@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import SwiftUI
 import Combine
@@ -18,30 +25,25 @@ public struct RecentArchiveRecord: Identifiable, Codable, Equatable, Hashable, S
     }
 }
 
-
-/// TTZip GUI 主视图 ViewModel，协调线程安全的 UI 交互与解耦的领域状态树
+/// TTZip GUI main view ViewModel coordinating UI interactions with decoupled domain state trees.
 @MainActor
 public final class AppViewState: ObservableObject, ArchiveProgressObserverProtocol, ArchiveEventObserverProtocol, ArchiveMediatorComponentProtocol {
     public typealias Memento = AppViewStateMemento
     
-    // MARK: - 【3.9 备忘录模式 (Memento Pattern)】UI 布局快照管理者
     public let workspaceCaretaker = AppViewStateCaretaker()
     
-    // MARK: - 【3.8 中介者模式 (Mediator Pattern)】中介者句柄
     nonisolated public var mediator: ArchiveMediatorProtocol? {
         get { ArchiveAppMediator.shared }
         set {}
     }
 
-    // MARK: - 领域子状态 (Domain Sub-States)
+    // Domain Sub-States
     public let navigationState: NavigationState
     public let explorerState: ArchiveExplorerState
     public let taskState: TaskExecutionState
     public let overlayState: OverlayState
     
     private var cancellables = Set<AnyCancellable>()
-    
-    // MARK: - 【3.9 备忘录模式 (Memento Pattern)】Originator 快照保存与恢复
     
     public func saveWorkspaceSnapshot() {
         workspaceCaretaker.saveMemento(createMemento())
@@ -169,7 +171,6 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
     
     @Published public var recentArchives: [RecentArchiveRecord] = []
     
-    // MARK: - 【4.5 依赖注入模式 (Dependency Injection Pattern)】使用 @Injected 解耦核心服务与中介者
     @Injected public var historyManager: CommandHistoryManager
     @Injected public var passwordVaultManager: PasswordVaultManager
     @Injected public var appMediator: ArchiveMediatorProtocol
@@ -195,8 +196,6 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         self.fileViewer = fileViewer
         self.passwordVault = passwordVault
 
-        
-        // 绑定子状态 objectWillChange 事件以便向 Coordinator 外发广播
         navigationState.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
         explorerState.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
         taskState.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
@@ -228,7 +227,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         ArchiveAppMediator.shared.register(component: self)
     }
     
-    // MARK: - 【3.8 中介者模式 (Mediator Pattern)】接收中介事件
+    // MARK: - Mediator Event Handling
     
     nonisolated public func receive(event: AppMediatorEvent) {
         if Thread.isMainThread {
@@ -268,19 +267,19 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             self.selectedPathsToCompress = inputPaths
             self.showCompressModal = true
         case .compressionCompleted(let outputPath):
-            self.statusMessage = "✅ 压缩完成: \(outputPath)"
+            self.statusMessage = "Compression complete: \(outputPath)"
             self.showCompressModal = false
         case .requestExtraction(let archivePath, _):
             self.currentArchivePath = archivePath
             self.showExtractModal = true
         case .extractionFailed(let archivePath, let error):
-            self.statusMessage = "❌ 解压失败 (\(archivePath)): \(error)"
+            self.statusMessage = "Extraction failed (\(archivePath)): \(error)"
         case .presetSelected(let presetId):
-            self.statusMessage = "预设已切换: \(presetId)"
+            self.statusMessage = "Preset selected: \(presetId)"
         case .securityThreatDetected(let path, let reason):
-            self.statusMessage = "⚠️ 安全警告 (\(path)): \(reason)"
+            self.statusMessage = "Security warning (\(path)): \(reason)"
         case .taskStateChanged(_, let stateDesc):
-            self.statusMessage = "任务状态: \(stateDesc)"
+            self.statusMessage = "Task status: \(stateDesc)"
         case .openTab(let index):
             if index >= 0 && index < WorkspaceTab.allCases.count {
                 self.activeTab = WorkspaceTab.allCases[index]
@@ -296,15 +295,15 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         case .vaultPasswordUnlocked(_, let password):
             self.activePassword = password
         case .extractionSucceeded(let archivePath, _):
-            self.statusMessage = "✅ 解压成功: \(archivePath)"
+            self.statusMessage = "Extraction succeeded: \(archivePath)"
         case .securityScanRequested(let targetPath):
-            self.statusMessage = "🔍 安全扫描中: \(targetPath)"
+            self.statusMessage = "Security scan in progress: \(targetPath)"
         default:
             break
         }
     }
     
-    // MARK: - 【3.5 状态模式 (State Pattern)】状态控制操作 API
+    // MARK: - Task State Control
     
     public func bindTaskStateMachine(_ stateMachine: ArchiveTaskStateMachine) {
         self.activeTaskStateMachine = stateMachine
@@ -329,7 +328,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             try sm.pause()
             updateTaskStateUI()
         } catch {
-            self.statusMessage = "❌ 暂停任务失败: \(error.localizedDescription)"
+            self.statusMessage = "Failed to pause task: \(error.localizedDescription)"
         }
     }
     
@@ -339,7 +338,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             try sm.resume()
             updateTaskStateUI()
         } catch {
-            self.statusMessage = "❌ 恢复任务失败: \(error.localizedDescription)"
+            self.statusMessage = "Failed to resume task: \(error.localizedDescription)"
         }
     }
     
@@ -349,7 +348,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             try sm.cancel()
             updateTaskStateUI()
         } catch {
-            self.statusMessage = "❌ 取消任务失败: \(error.localizedDescription)"
+            self.statusMessage = "Failed to cancel task: \(error.localizedDescription)"
         }
     }
     
@@ -367,7 +366,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         self.canCancelTask = sm.canCancel
     }
     
-    // MARK: - 【3.2 观察者模式 (Observer Pattern)】事件与进度回调实现
+    // MARK: - Observer Protocol Implementations
     
     public nonisolated func onProgressUpdated(_ progress: ArchiveProgressInfo) {
         let isFinal = progress.fractionCompleted >= 1.0 || progress.fractionCompleted <= 0.0
@@ -375,7 +374,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         
         Task { @MainActor in
             let pct = Int(progress.fractionCompleted * 100)
-            self.statusMessage = "⏳ \(progress.operationType.rawValue)进度: \(pct)% (\(progress.currentFileName))"
+            self.statusMessage = "\(progress.operationType.rawValue) progress: \(pct)% (\(progress.currentFileName))"
             self.progressValue = progress.fractionCompleted
         }
     }
@@ -386,7 +385,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         
         Task { @MainActor in
             let pct = Int(progress.fractionCompleted * 100)
-            self.statusMessage = "📦 批处理进度: \(progress.completedTasks)/\(progress.totalTasks) (\(pct)%)"
+            self.statusMessage = "Batch progress: \(progress.completedTasks)/\(progress.totalTasks) (\(pct)%)"
             if progress.totalTasks > 0 {
                 self.progressValue = Double(progress.completedTasks) / Double(progress.totalTasks)
             }
@@ -399,20 +398,20 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             switch event {
             case .archiveCompleted(let path, let op, let duration, _):
                 let name = (path as NSString).lastPathComponent
-                self.statusMessage = String(format: "✅ %@完成: %@ (耗时 %.2fs)", op.rawValue, name, duration)
+                self.statusMessage = String(format: "%@ complete: %@ (%.2fs)", op.rawValue, name, duration)
             case .extractionFailed(let path, let err):
                 let name = (path as NSString).lastPathComponent
-                self.statusMessage = "❌ 解压失败: \(name) (\(err))"
+                self.statusMessage = "Extraction failed: \(name) (\(err))"
             case .securityThreatIntercepted(let path, let threat):
                 let name = (path as NSString).lastPathComponent
-                self.statusMessage = "⚠️ 拦截安全威胁 [\(name)]: \(threat)"
+                self.statusMessage = "Threat intercepted [\(name)]: \(threat)"
             case .passwordVaultUnlocked(let path, _, _):
                 let name = (path as NSString).lastPathComponent
-                self.statusMessage = "⚡️ 密码库解锁成功: \(name)"
+                self.statusMessage = "Password vault unlocked: \(name)"
             case .presetChanged(_, let newName):
-                self.statusMessage = "⚙️ 压缩预设已变更: \(newName)"
+                self.statusMessage = "Preset changed: \(newName)"
             case .taskStateChanged(let taskId, let oldState, let newState):
-                self.statusMessage = "🔄 任务 [\(taskId.uuidString.prefix(8))] 状态变更: \(oldState) ➔ \(newState)"
+                self.statusMessage = "Task [\(taskId.uuidString.prefix(8))] state: \(oldState) ➔ \(newState)"
                 if let sm = self.activeTaskStateMachine, sm.id == taskId {
                     self.updateTaskStateUI()
                 }
@@ -442,7 +441,6 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         self.activePreviewFileName = nil
     }
     
-    /// 快捷静默解压到当前同名目录
     public func quickExtractArchive(archivePath: String, targetDir: String? = nil, password: String? = nil) async {
         let archiveURL = URL(fileURLWithPath: archivePath)
         let archiveName = archiveURL.deletingPathExtension().lastPathComponent
@@ -455,7 +453,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         try? stateMachine.start()
         
         await MainActor.run {
-            self.statusMessage = "⏳ 正在极速解压 \(archiveName)..."
+            self.statusMessage = "Extracting \(archiveName)..."
         }
         
         do {
@@ -468,51 +466,49 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             try? stateMachine.complete()
             await MainActor.run {
                 if res.isVaultUnlocked, let pwd = res.unlockedPassword {
-                    self.statusMessage = "⚡️ 已通过密码库口令完成解压: \(archiveName)"
+                    self.statusMessage = "Extracted with vault password: \(archiveName)"
                     ArchivePasswordStore.shared.setPassword(pwd, for: archivePath)
                 } else {
-                    self.statusMessage = "✅ 解压完成: \(archiveName)"
+                    self.statusMessage = "Extraction complete: \(archiveName)"
                 }
                 self.fileViewer.revealInFinder(at: destDir)
             }
         } catch {
             await MainActor.run {
-                self.statusMessage = "🔒 解压失败或需口令: \(error.localizedDescription)"
+                self.statusMessage = "Extraction failed: \(error.localizedDescription)"
                 self.pendingEncryptedPath = archivePath
                 self.showPasswordPrompt = true
             }
         }
     }
     
-    /// 单独提取包内某个文件/文件夹
     public func extractSingleEntry(archivePath: String, entryPath: String, isDirectory: Bool, destinationDir: String) async {
         let name = (entryPath as NSString).lastPathComponent
         let pwd = ArchivePasswordStore.shared.getPassword(for: archivePath) ?? activePassword
         
         await MainActor.run {
-            self.statusMessage = "⏳ 正在提取包内项目: \(name)..."
+            self.statusMessage = "Extracting entry: \(name)..."
         }
         
         do {
             try await SecurityProtectionProxy.shared.extractSingleEntry(archivePath: archivePath, entryPath: entryPath, destinationDir: destinationDir, password: pwd)
             let targetExtractedFile = (destinationDir as NSString).appendingPathComponent(name)
             await MainActor.run {
-                self.statusMessage = "✅ 提取完成: \(name)"
+                self.statusMessage = "Extracted entry: \(name)"
                 self.fileViewer.revealInFinder(at: targetExtractedFile)
             }
         } catch {
             await MainActor.run {
-                self.statusMessage = "❌ 提取失败: \(error.localizedDescription)"
+                self.statusMessage = "Extraction failed: \(error.localizedDescription)"
             }
         }
     }
     
-    /// 加载并检查归档文件目录树 (支持自动尝试密码库与弹出口令输入框，返回是否成功)
     @discardableResult
     public func loadArchive(path: String, password: String? = nil) async -> Bool {
         closeMediaPreview()
         isLoading = true
-        statusMessage = "正在读取归档元数据..."
+        statusMessage = "Reading archive metadata..."
         activeTab = .home
         
         do {
@@ -525,9 +521,9 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             self.activePassword = res.unlockedPassword
             self.currentEntries = res.entries
             if let pwd = res.unlockedPassword, !pwd.isEmpty {
-                self.statusMessage = "⚡️ 已从密码库自动识别口令并成功解密"
+                self.statusMessage = "Unlocked with vault password"
             } else {
-                self.statusMessage = "加载成功，共计 \(res.entries.count) 个条目"
+                self.statusMessage = "Loaded \(res.entries.count) entries"
             }
             self.isLoading = false
             self.showPasswordPrompt = false
@@ -537,7 +533,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         } catch {
             self.pendingEncryptedPath = path
             self.showPasswordPrompt = true
-            self.statusMessage = "🔒 归档文件已被加密，请输入解压口令以查看内容"
+            self.statusMessage = "Archive is encrypted. Enter password to view contents."
             self.isLoading = false
             return false
         }
@@ -573,34 +569,31 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         }
     }
     
-    /// 取消口令输入时关闭弹框并退出空白的未解密归档页面
     public func cancelPasswordPrompt() {
         showPasswordPrompt = false
         pendingEncryptedPath = nil
         if currentEntries.isEmpty {
             currentArchivePath = nil
             activePassword = nil
-            statusMessage = "已取消解密"
+            statusMessage = "Decryption cancelled"
         }
     }
     
-    /// 打开压缩工作区页签
     public func openCompressWorkspace(paths: [String] = []) {
         selectedPathsToCompress = paths
         activeTab = .compressWorkspace
     }
     
-    /// 重置状态回到准备接收文件的空状态
     public func reset() {
         currentArchivePath = nil
         activePassword = nil
         currentEntries = []
-        statusMessage = "就绪"
+        statusMessage = "Ready"
         isLoading = false
         activeTab = .home
     }
     
-    // MARK: - 【3.4 命令模式 (Command Pattern)】Undo / Redo 菜单绑定与历史逻辑
+    // MARK: - Command Undo / Redo
     
     public func updateUndoRedoState() {
         self.canUndo = historyManager.canUndo
@@ -611,7 +604,7 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
     @discardableResult
     public func executeCommand(_ command: ArchiveCommandProtocol) async throws -> CommandResult {
         guard !self.isLoading else {
-            throw CommandError.invalidState(reason: "已有任务正在进行中，请稍候")
+            throw CommandError.invalidState(reason: "Another task is in progress.")
         }
         self.isLoading = true
         let stateMachine = createAndBindTaskStateMachine(taskName: command.description)
@@ -623,10 +616,10 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
         do {
             let result = try await historyManager.execute(command: command)
             try? stateMachine.complete()
-            self.statusMessage = "✅ 执行命令成功: [\(command.description)]"
+            self.statusMessage = "Command succeeded: [\(command.description)]"
             return result
         } catch {
-            self.statusMessage = "❌ 执行命令失败: \(error.localizedDescription)"
+            self.statusMessage = "Command failed: \(error.localizedDescription)"
             throw error
         }
     }
@@ -641,10 +634,10 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             }
             do {
                 if let res = try await historyManager.undo() {
-                    self.statusMessage = "↩️ \(res.message)"
+                    self.statusMessage = "Undone: \(res.message)"
                 }
             } catch {
-                self.statusMessage = "❌ 撤销失败: \(error.localizedDescription)"
+                self.statusMessage = "Undo failed: \(error.localizedDescription)"
             }
         }
     }
@@ -659,10 +652,10 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             }
             do {
                 if let res = try await historyManager.redo() {
-                    self.statusMessage = "↪️ 重做命令成功: \(res.message)"
+                    self.statusMessage = "Redone: \(res.message)"
                 }
             } catch {
-                self.statusMessage = "❌ 重做失败: \(error.localizedDescription)"
+                self.statusMessage = "Redo failed: \(error.localizedDescription)"
             }
         }
     }
@@ -689,4 +682,3 @@ extension AppViewState: ArchiveOriginatorProtocol {
         }
     }
 }
-

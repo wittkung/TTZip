@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
@@ -27,7 +34,7 @@ public struct PasswordVaultPopoverView: View {
                         Image(systemName: "lock.shield.fill")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(TTZipTheme.bambooGreen)
-                        Text("解锁安全密码库")
+                        Text("Unlock Password Vault")
                             .font(.system(size: 12, weight: .bold))
                     }
                     
@@ -36,7 +43,7 @@ public struct PasswordVaultPopoverView: View {
                             .font(.system(size: 11))
                             .foregroundStyle(TTZipTheme.bambooGreen)
                         
-                        TTSecureTextField("输入密码库主密码", text: $vaultMasterPasswordInput)
+                        TTSecureTextField("Enter vault master password", text: $vaultMasterPasswordInput)
                             .font(.system(size: 12, design: .monospaced))
                             .onSubmit { unlockVault() }
                     }
@@ -54,7 +61,7 @@ public struct PasswordVaultPopoverView: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .font(.system(size: 10))
                                 .foregroundStyle(TTZipTheme.cinnabarRed)
-                            Text("主密码错误，请重新输入")
+                            Text("Incorrect master password")
                                 .font(.system(size: 10.5, weight: .medium))
                                 .foregroundStyle(TTZipTheme.cinnabarRed)
                         }
@@ -63,7 +70,7 @@ public struct PasswordVaultPopoverView: View {
                     HStack {
                         Spacer()
                         Button(action: unlockVault) {
-                            Text("解锁密码库")
+                            Text("Unlock")
                                 .font(.system(size: 11, weight: .bold))
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 6)
@@ -81,9 +88,9 @@ public struct PasswordVaultPopoverView: View {
                     Image(systemName: "key.slash.fill")
                         .font(.system(size: 24))
                         .foregroundStyle(.tertiary)
-                    Text("密码库暂无保存口令")
+                    Text("No Saved Passwords")
                         .font(.system(size: 12, weight: .bold))
-                    Text("可以在左侧菜单【密码库】中统一配置主密码并保存常用的解压口令。")
+                    Text("Configure your master password and save passwords in the sidebar Vault.")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -95,7 +102,7 @@ public struct PasswordVaultPopoverView: View {
                         Image(systemName: "key.fill")
                             .font(.system(size: 11))
                             .foregroundStyle(TTZipTheme.bambooGreen)
-                        Text("已保存密码库")
+                        Text("Saved Passwords")
                             .font(.system(size: 11, weight: .bold, design: .serif))
                             .foregroundStyle(TTZipTheme.kintsugiGold)
                     }
@@ -112,7 +119,7 @@ public struct PasswordVaultPopoverView: View {
                             Image(systemName: "tray")
                                 .font(.system(size: 20))
                                 .foregroundStyle(.tertiary)
-                            Text("密码库暂无保存的口令")
+                            Text("No saved passwords")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }

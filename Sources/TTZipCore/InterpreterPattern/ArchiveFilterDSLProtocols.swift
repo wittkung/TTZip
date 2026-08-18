@@ -1,37 +1,44 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - ArchiveFilterExpressionProtocol (解释器抽象表达式协议)
+// MARK: - ArchiveFilterExpressionProtocol
 
-/// AST 抽象语法树解释器节点协议
+/// Abstract expression protocol for AST interpreter nodes (Interpreter Pattern).
 public protocol ArchiveFilterExpressionProtocol: Sendable {
-    /// 评估归档条目是否符合当前表达式节点条件
-    /// - Parameter entry: 被评估的归档文件条目 (ArchiveEntry)
-    /// - Returns: 符合为 true，否则为 false
+    /// Evaluates whether an archive entry satisfies the filter expression.
+    /// - Parameter entry: Archive entry to evaluate.
+    /// - Returns: True if entry passes filter, false otherwise.
     func evaluate(entry: ArchiveEntry) -> Bool
     
-    /// 表达式的 DSL 可读描述 (用于调试与 AST 节点树生成)
+    /// Human-readable DSL representation of the expression tree.
     var dslDescription: String { get }
 }
 
-// MARK: - DSLToken (词法 Token 枚举)
+// MARK: - DSLToken
 
-/// DSL 词法分析 Token
+/// Lexical tokens generated during DSL tokenization.
 public enum DSLToken: Equatable, Sendable, CustomStringConvertible {
-    case identifier(String)          // 字段名或普通标识符 (如 ext, name, size, modified 等)
-    case colon                        // ':' 键值分隔符
-    case stringLiteral(String)      // 带引号的字符串字面量
-    case numberLiteral(Int64)        // 纯数字
-    case and                          // 逻辑与 (AND, and, &&)
-    case or                           // 逻辑或 (OR, or, ||)
-    case not                          // 逻辑非 (NOT, not, !)
-    case leftParen                    // '('
-    case rightParen                   // ')'
-    case greaterThan                  // '>'
-    case lessThan                     // '<'
-    case greaterThanOrEqual           // '>='
-    case lessThanOrEqual              // '<='
-    case equals                       // '=' or '=='
-    case comma                        // ','
+    case identifier(String)          // Field names or tokens (e.g. ext, name, size, modified)
+    case colon                       // ':' key-value separator
+    case stringLiteral(String)       // Quoted string literal
+    case numberLiteral(Int64)        // Integer number literal
+    case and                         // Logical AND (AND, and, &&)
+    case or                          // Logical OR (OR, or, ||)
+    case not                         // Logical NOT (NOT, not, !)
+    case leftParen                   // '('
+    case rightParen                  // ')'
+    case greaterThan                 // '>'
+    case lessThan                    // '<'
+    case greaterThanOrEqual          // '>='
+    case lessThanOrEqual             // '<='
+    case equals                      // '=' or '=='
+    case comma                       // ','
     
     public var description: String {
         switch self {
@@ -54,9 +61,9 @@ public enum DSLToken: Equatable, Sendable, CustomStringConvertible {
     }
 }
 
-// MARK: - DSLParseError (语法解析异常枚举)
+// MARK: - DSLParseError
 
-/// DSL 解析错误结构
+/// DSL parsing and tokenization error cases.
 public enum DSLParseError: Error, Equatable, Sendable, LocalizedError {
     case unexpectedToken(token: DSLToken?, expected: String)
     case invalidSyntax(message: String, position: Int)

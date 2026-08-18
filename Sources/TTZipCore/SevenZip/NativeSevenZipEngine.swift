@@ -1,12 +1,19 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 全核 7z 原生物理极限封装与编解码引擎统一门面
+/// Unified facade for 7z native parallel compression and decompression operations.
 public final class NativeSevenZipEngine: @unchecked Sendable {
     public static let shared = NativeSevenZipEngine()
     
     private init() {}
     
-    /// 解析 7z 归档头与条目描述符
+    /// Parses 7z archive header and returns entry descriptors.
     public func inspectSevenZip(archivePath: String, password: String? = nil) -> [ArchiveEntry]? {
         let fd = open(archivePath, O_RDONLY)
         if fd < 0 { return nil }
@@ -37,7 +44,7 @@ public final class NativeSevenZipEngine: @unchecked Sendable {
         }
     }
     
-    /// 执行 7z 归档全核多固实块零拷贝解压
+    /// Extracts 7z archive using multi-core solid block zero-copy pipeline.
     public func extractSevenZipParallel(
         archivePath: String,
         destinationDir: String,
@@ -54,7 +61,7 @@ public final class NativeSevenZipEngine: @unchecked Sendable {
         )
     }
     
-    /// 执行 7z 归档全核多固实块 (-ms=4g) 打包压缩
+    /// Compresses input paths into 7z archive using multi-core solid block pipeline.
     public func createSevenZipParallel(
         outputPath: String,
         inputPaths: [String],

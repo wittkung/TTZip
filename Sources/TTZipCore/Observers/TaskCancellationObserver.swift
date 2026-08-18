@@ -1,12 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 任务取消感知观察者协议
+/// Task cancellation observer protocol.
 public protocol TaskCancellationObserverProtocol: AnyObject, Sendable {
     func onTaskCancelled(taskId: String)
 }
 
-/// 【3.2 观察者模式 (Observer Pattern)】任务取消感知与控制中心 (`TaskCancellationObserverCenter`)
-/// 提供跨模块异步任务取消感知、状态查询与取消广播
+/// Task cancellation notification and state registry coordinating cross-module async task abort signals.
 public final class TaskCancellationObserverCenter: @unchecked Sendable {
     public static let shared = TaskCancellationObserverCenter()
     
@@ -16,14 +22,14 @@ public final class TaskCancellationObserverCenter: @unchecked Sendable {
     
     private init() {}
     
-    /// 注册任务 ID
+    /// Registers a task ID.
     public func registerTask(_ taskId: String) {
         lock.lock()
         defer { lock.unlock() }
         cancelledTaskIds.remove(taskId)
     }
     
-    /// 声明任务已结束（正常完成/失败/取消善后完毕），清理该 taskId 对应的所有记录与观察者，实现自动剪枝防泄漏
+    /// Marks a task finished and clears observer bindings to prevent memory leaks.
     public func finishTask(_ taskId: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -31,7 +37,7 @@ public final class TaskCancellationObserverCenter: @unchecked Sendable {
         observers.removeValue(forKey: taskId)
     }
     
-    /// 请求取消指定任务，并向该任务的观察者广播取消事件
+    /// Requests cancellation for a specific task and broadcasts to attached observers.
     public func cancelTask(_ taskId: String) {
         lock.lock()
         cancelledTaskIds.insert(taskId)
@@ -51,14 +57,14 @@ public final class TaskCancellationObserverCenter: @unchecked Sendable {
         }
     }
     
-    /// 检查指定任务是否已请求取消
+    /// Queries whether a task has been cancelled.
     public func isTaskCancelled(_ taskId: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         return cancelledTaskIds.contains(taskId)
     }
     
-    /// 添加任务取消监听器
+    /// Adds cancellation observer for a specific task.
     public func addObserver(
         _ observer: TaskCancellationObserverProtocol,
         forTask taskId: String,
@@ -78,7 +84,7 @@ public final class TaskCancellationObserverCenter: @unchecked Sendable {
         observers[taskId] = list
     }
     
-    /// 移除任务取消监听器
+    /// Removes cancellation observer for a specific task.
     public func removeObserver(_ observer: TaskCancellationObserverProtocol, forTask taskId: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -93,7 +99,7 @@ public final class TaskCancellationObserverCenter: @unchecked Sendable {
         }
     }
     
-    /// 剪枝清理所有已出作用域自动销毁的失效观察者及空 task 映射
+    /// Prunes dead observer wrappers.
     public func prune() {
         lock.lock()
         defer { lock.unlock() }
@@ -108,14 +114,12 @@ public final class TaskCancellationObserverCenter: @unchecked Sendable {
         }
     }
     
-    /// 当前已注册观察者的任务 ID 映射数量
     public var registeredObserverTaskCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return observers.keys.count
     }
     
-    /// 获取指定任务的活动观察者数量
     public func observerCount(forTask taskId: String) -> Int {
         lock.lock()
         defer { lock.unlock() }
@@ -129,7 +133,6 @@ public final class TaskCancellationObserverCenter: @unchecked Sendable {
         return valid.count
     }
     
-    /// 清空所有状态
     public func reset() {
         lock.lock()
         defer { lock.unlock() }

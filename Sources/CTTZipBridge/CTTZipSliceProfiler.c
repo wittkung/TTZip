@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipSliceProfiler.h"
 #include "include/CTTZipBridge.h"
 #include <stdio.h>
@@ -105,9 +112,9 @@ void ttzip_slice_print_report(const char* pipeline_name) {
         grand_total_nsec += atomic_load(&g_slices[i].total_nsec);
     }
     
-    ttzip_log_c(1, "\n⏱️  [TTZip AOP Pipeline Slice Report] :: %s\n", pipeline_name ? pipeline_name : "General");
+    ttzip_log_c(1, "\n[TTZip AOP Pipeline Slice Report] :: %s\n", pipeline_name ? pipeline_name : "General");
     ttzip_log_c(1, "========================================================================\n");
-    ttzip_log_c(1, " %-35s │ %-10s │ %-10s │ %-8s\n", "Pipeline Stage (Slice)", "Time (ms)", "Calls", "Ratio");
+    ttzip_log_c(1, " %-35s | %-10s | %-10s | %-8s\n", "Pipeline Stage (Slice)", "Time (ms)", "Calls", "Ratio");
     ttzip_log_c(1, "------------------------------------------------------------------------\n");
     
     for (int i = 0; i < num; i++) {
@@ -116,7 +123,7 @@ void ttzip_slice_print_report(const char* pipeline_name) {
         double ms = (double)nsec / 1000000.0;
         double ratio = grand_total_nsec > 0 ? ((double)nsec / (double)grand_total_nsec) * 100.0 : 0.0;
         
-        ttzip_log_c(1, " %-35s │ %8.3f ms │ %10u │ %6.1f%%\n",
+        ttzip_log_c(1, " %-35s | %8.3f ms | %10u | %6.1f%%\n",
                 g_slices[i].name, ms, calls, ratio);
     }
     ttzip_log_c(1, "========================================================================\n");

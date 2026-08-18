@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AVFoundation
 import TTZipCore
@@ -16,10 +23,9 @@ public struct UnifiedAudioPlayerView: View {
     @State private var volume: Double = 1.0
     @State private var isMuted: Bool = false
     
-    // 深度音频硬件参数
-    @State private var audioBitrate: String = "分析中..."
+    @State private var audioBitrate: String = "Analyzing..."
     @State private var audioSampleRate: String = "44.1 kHz"
-    @State private var audioChannels: String = "立体声"
+    @State private var audioChannels: String = "Stereo"
     @State private var fileSizeFormatted: String = ""
     
     public init(url: URL, fileName: String) {
@@ -34,9 +40,7 @@ public struct UnifiedAudioPlayerView: View {
     public var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(spacing: 20) {
-                // 1. 黑胶大碟与动效发光光环 (Luminous Vinyl Disc)
                 ZStack {
-                    // 后置柔和绿/金交织气泡光晕
                     Circle()
                         .fill(
                             RadialGradient(
@@ -52,7 +56,6 @@ public struct UnifiedAudioPlayerView: View {
                         .frame(width: 190, height: 190)
                         .blur(radius: isPlaying ? 12 : 6)
                     
-                    // 黑胶大碟主体
                     ZStack {
                         Circle()
                             .fill(
@@ -65,7 +68,6 @@ public struct UnifiedAudioPlayerView: View {
                             .frame(width: 146, height: 146)
                             .shadow(color: Color.black.opacity(0.45), radius: 10, x: 0, y: 6)
                         
-                        // 唱片同心纹理沟槽
                         Circle()
                             .stroke(Color.white.opacity(0.08), lineWidth: 1.5)
                             .frame(width: 124, height: 124)
@@ -76,7 +78,6 @@ public struct UnifiedAudioPlayerView: View {
                             .stroke(TTZipTheme.kintsugiGold.opacity(0.3), lineWidth: 1)
                             .frame(width: 80, height: 80)
                         
-                        // 唱片金边中央圆标
                         ZStack {
                             Circle()
                                 .fill(
@@ -98,7 +99,6 @@ public struct UnifiedAudioPlayerView: View {
                 }
                 .padding(.top, 12)
                 
-                // 2. 音频标题与 HIFI 格式徽章
                 VStack(spacing: 6) {
                     Text(fileName)
                         .font(.system(size: 14, weight: .bold))
@@ -117,7 +117,7 @@ public struct UnifiedAudioPlayerView: View {
                             .clipShape(Capsule())
                             .overlay(Capsule().strokeBorder(TTZipTheme.bambooGreen.opacity(0.3), lineWidth: 0.8))
                         
-                        if !audioBitrate.contains("分析") {
+                        if !audioBitrate.contains("Analyzing") {
                             Text(audioBitrate)
                                 .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(TTZipTheme.kintsugiGold)
@@ -130,11 +130,9 @@ public struct UnifiedAudioPlayerView: View {
                     }
                 }
                 
-                // 3. 动态音频等化器频谱图谱 (AudioWaveformVisualizerView)
                 AudioWaveformVisualizerView(isPlaying: isPlaying, barCount: 28)
                     .padding(.horizontal, 18)
                 
-                // 4. 进度调控与时间轴
                 VStack(spacing: 6) {
                     Slider(value: $currentTime, in: 0...max(duration, 0.01)) { editing in
                         isEditingSlider = editing
@@ -157,7 +155,6 @@ public struct UnifiedAudioPlayerView: View {
                 }
                 .padding(.horizontal, 20)
                 
-                // 5. 播放控制按键行 (快退 / 播放暂停 / 快进 / 音量控制)
                 VStack(spacing: 14) {
                     HStack(spacing: 32) {
                         Button {
@@ -168,7 +165,7 @@ public struct UnifiedAudioPlayerView: View {
                                 .foregroundStyle(.primary)
                         }
                         .buttonStyle(.plain)
-                        .help("后退 15 秒")
+                        .help("Rewind 15 seconds")
                         
                         Button {
                             togglePlayPause()
@@ -201,10 +198,9 @@ public struct UnifiedAudioPlayerView: View {
                                 .foregroundStyle(.primary)
                         }
                         .buttonStyle(.plain)
-                        .help("前进 15 秒")
+                        .help("Forward 15 seconds")
                     }
                     
-                    // 音量控制器
                     HStack(spacing: 10) {
                         Button {
                             isMuted.toggle()
@@ -232,24 +228,23 @@ public struct UnifiedAudioPlayerView: View {
                     .clipShape(Capsule())
                 }
                 
-                // 6. Bento 深度音频硬件参数信息卡片
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("音频规格参数 (Audio Specs)", systemImage: "waveform.circle.fill")
+                    Label("Audio Specs", systemImage: "waveform.circle.fill")
                         .font(.system(size: 11.5, weight: .bold, design: .serif))
                         .foregroundStyle(TTZipTheme.kintsugiGold)
                     
                     Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
                         GridRow {
-                            audioMetaTag(title: "编码格式", value: formatBadge)
-                            audioMetaTag(title: "采样质量", value: audioSampleRate)
+                            audioMetaTag(title: "Format", value: formatBadge)
+                            audioMetaTag(title: "Sample Rate", value: audioSampleRate)
                         }
                         GridRow {
-                            audioMetaTag(title: "平均码率", value: audioBitrate)
-                            audioMetaTag(title: "声道配置", value: audioChannels)
+                            audioMetaTag(title: "Bitrate", value: audioBitrate)
+                            audioMetaTag(title: "Channels", value: audioChannels)
                         }
                         GridRow {
-                            audioMetaTag(title: "文件体积", value: fileSizeFormatted.isEmpty ? "--" : fileSizeFormatted)
-                            audioMetaTag(title: "总时长", value: formatTime(duration))
+                            audioMetaTag(title: "File Size", value: fileSizeFormatted.isEmpty ? "--" : fileSizeFormatted)
+                            audioMetaTag(title: "Duration", value: formatTime(duration))
                         }
                     }
                 }
@@ -322,7 +317,7 @@ public struct UnifiedAudioPlayerView: View {
         Task.detached(priority: .userInitiated) {
             var br = "256 kbps"
             var sr = "44.1 kHz"
-            var ch = "立体声"
+            var ch = "Stereo"
             
             if let tracks = try? await asset.load(.tracks) {
                 for track in tracks {
@@ -339,11 +334,11 @@ public struct UnifiedAudioPlayerView: View {
                             }
                             let channels = basic.pointee.mChannelsPerFrame
                             if channels == 1 {
-                                ch = "单声道"
+                                ch = "Mono"
                             } else if channels == 2 {
-                                ch = "双声道立体声"
+                                ch = "Stereo"
                             } else if channels > 2 {
-                                ch = "\(channels) 声道环绕"
+                                ch = "\(channels) Channels Surround"
                             }
                         }
                     }

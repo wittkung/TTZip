@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
@@ -25,23 +32,23 @@ public struct PresetEditorCardView: View {
     public var body: some View {
         VStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 14) {
-                Label("分卷切割规格 (Volume Splitting)", systemImage: "scissors")
+                Label("Volume Splitting", systemImage: "scissors")
                     .font(.system(size: 13, weight: .bold, design: .serif))
                     .foregroundStyle(TTZipTheme.kintsugiGold)
                 
                 HStack(spacing: 12) {
-                    Text("分卷大小")
+                    Text("Volume Size")
                         .font(.system(size: 11.5, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: 75, alignment: .trailing)
+                        .frame(width: 85, alignment: .trailing)
                     
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            splitVolumeTile(bytes: nil, label: "不分卷")
-                            splitVolumeTile(bytes: 25 * 1024 * 1024, label: "25 MB (邮件限额)")
-                            splitVolumeTile(bytes: 100 * 1024 * 1024, label: "100 MB (网盘限额)")
+                            splitVolumeTile(bytes: nil, label: "No Split")
+                            splitVolumeTile(bytes: 25 * 1024 * 1024, label: "25 MB (Email)")
+                            splitVolumeTile(bytes: 100 * 1024 * 1024, label: "100 MB (Cloud)")
                             splitVolumeTile(bytes: 4 * 1024 * 1024 * 1024, label: "4 GB (FAT32)")
-                            splitVolumeTile(bytes: 20 * 1024 * 1024 * 1024, label: "20 GB (大文件)")
+                            splitVolumeTile(bytes: 20 * 1024 * 1024 * 1024, label: "20 GB (Large)")
                         }
                     }
                 }
@@ -55,7 +62,7 @@ public struct PresetEditorCardView: View {
             )
             
             VStack(alignment: .leading, spacing: 14) {
-                Label("杂质清理与过滤规则", systemImage: "shield.checkerboard")
+                Label("File Filtering Rules", systemImage: "shield.checkerboard")
                     .font(.system(size: 13, weight: .bold, design: .serif))
                     .foregroundStyle(TTZipTheme.bambooGreen)
                 
@@ -65,7 +72,7 @@ public struct PresetEditorCardView: View {
                             Image(systemName: "trash.circle")
                                 .font(.system(size: 12))
                                 .foregroundStyle(TTZipTheme.bambooGreen)
-                            Text("自动过滤 Mac 系统杂质文件 (.DS_Store / __MACOSX 缓存)")
+                            Text("Filter macOS system junk (.DS_Store / __MACOSX cache)")
                                 .font(.system(size: 11.5))
                         }
                     }
@@ -76,7 +83,7 @@ public struct PresetEditorCardView: View {
                             Image(systemName: "folder.badge.gearshape")
                                 .font(.system(size: 12))
                                 .foregroundStyle(TTZipTheme.bambooGreen)
-                            Text("自动过滤 .git 源码版本控制目录")
+                            Text("Filter .git version control directory")
                                 .font(.system(size: 11.5))
                         }
                     }

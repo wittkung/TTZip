@@ -1,9 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CryptoKit
 import CTTZipBridge
 
-/// Apple Silicon 硬件加速标准加密分卷引擎 (支持 7z 标准分卷 `.7z.001` 与 Zip64 AES-256 分卷 `.zip.001`, `.z01`)
-/// 生成的加密分卷 100% 可被 7-Zip, Bandizip, WinRAR, Keka, macOS Archive Utility 识别并解密 (100% 进程内纯原生 C 驱动，零 Subprocess)
+/// Hardware-accelerated encrypted multi-volume archive engine (7z `.7z.001` and ZIP `.zip.001`).
+///
+/// Output volumes are 100% compliant with standard 7-Zip, Bandizip, WinRAR, Keka, and macOS Archive Utility.
 public final class NativeParallelEncryptedSplitEngine: @unchecked Sendable {
     public init() {}
     
@@ -12,7 +20,7 @@ public final class NativeParallelEncryptedSplitEngine: @unchecked Sendable {
         case zip = "zip"
     }
     
-    /// 创建标准通用可解密分卷包 (100% 进程内纯原生 C 驱动)
+    /// Creates standard encrypted multi-volume split archives (100% in-process C execution).
     public func createStandardEncryptedSplitVolume(
         format: SplitFormat = .sevenZip,
         sourcePaths: [String],
@@ -64,12 +72,12 @@ public final class NativeParallelEncryptedSplitEngine: @unchecked Sendable {
         
         progressHandler?(0.7)
         
-        // 进程内极速切片
+        // In-process slicing
         try ArchiveWriter.sliceArchiveIfNeeded(archivePath: primaryOutputPath, splitSizeBytes: splitVolumeSizeBytes)
         
         progressHandler?(1.0)
         
-        // 检索并返回所有已创建的标准分卷文件列表
+        // Retrieve generated volume list
         let fm = FileManager.default
         let allFiles = (try? fm.contentsOfDirectory(atPath: outputDir)) ?? []
         let generatedVolumes = allFiles.filter { file in

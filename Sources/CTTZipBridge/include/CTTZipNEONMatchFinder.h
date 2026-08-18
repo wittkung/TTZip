@@ -1,9 +1,22 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file CTTZipNEONMatchFinder.h
+ * @brief High-speed NEON vector match length finder.
+ */
+
 #ifndef CTTZipNEONMatchFinder_h
 #define CTTZipNEONMatchFinder_h
 
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <string.h>
 
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
 #include <arm_neon.h>

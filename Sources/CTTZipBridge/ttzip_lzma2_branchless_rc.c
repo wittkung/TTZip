@@ -1,5 +1,14 @@
-// ttzip_lzma2_branchless_rc.c
-// TTZip 7Z ARM64 无分支 Range Coder 解码加速器
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_lzma2_branchless_rc.c
+ * @brief TTZip 7Z ARM64 branchless Range Coder decompression accelerator.
+ */
 
 #include "include/ttzip_lzma2_branchless_rc.h"
 #include <string.h>
@@ -15,7 +24,7 @@ void ttzip_lzma_rc_init(ttzip_lzma_rc_state_t* rc, const uint8_t* in_buf, size_t
     rc->in_limit = in_buf + in_size;
     rc->corrupt = 0;
 
-    // LZMA RC 初始加载 5 字节
+    // LZMA RC initial 5-byte load
     rc->code = ((uint32_t)in_buf[1] << 24) |
                ((uint32_t)in_buf[2] << 16) |
                ((uint32_t)in_buf[3] << 8) |

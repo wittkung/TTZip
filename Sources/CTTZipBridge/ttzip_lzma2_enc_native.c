@@ -1,5 +1,14 @@
-// ttzip_lzma2_enc_native.c
-// TTZip 原生进程内多核并行 LZMA2 编码器 (基于 liblzma Public Domain API + GCD + ARM NEON 零块加速)
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_lzma2_enc_native.c
+ * @brief Native in-process multi-core parallel LZMA2 encoder (liblzma + GCD + NEON).
+ */
 
 #include "include/ttzip_lzma2_enc_native.h"
 #include "include/ttzip_lzma2_fast_encoder.h"
@@ -72,7 +81,6 @@ static inline void ttzip_lzma2_cleanup_blocks(ttzip_lzma2_block_task_t* blocks, 
         }
     }
 }
-
 
 static int get_p_core_count(void) {
     int count = 0;
@@ -430,7 +438,6 @@ int ttzip_create_7z_lzma2_native_c(
     }
 
     if (has_password) {
-        // Pad compressed data to AES block boundary (16 bytes)
         size_t padded_len = (total_compressed_len + 15) & ~(size_t)15;
         encrypted_buf = (uint8_t*)malloc(padded_len);
         if (!encrypted_buf) {
@@ -441,7 +448,6 @@ int ttzip_create_7z_lzma2_native_c(
         if (padded_len > total_compressed_len) {
             memset(encrypted_buf + total_compressed_len, 0, padded_len - total_compressed_len);
         }
-        // Concatenate all blocks into contiguous buffer
         size_t off = 0;
         for (size_t b = 0; b < num_blocks; b++) {
             if (blocks[b].pack_size > 0) {
@@ -449,7 +455,6 @@ int ttzip_create_7z_lzma2_native_c(
                 off += blocks[b].pack_size;
             }
         }
-        // Encrypt in-place with ARMv8/NEON accelerated AES
         ttzip_aes256_cbc_encrypt(crypto_session.aes_key, crypto_session.aes_iv, encrypted_buf, padded_len, encrypted_buf);
         encrypted_len = padded_len;
     }

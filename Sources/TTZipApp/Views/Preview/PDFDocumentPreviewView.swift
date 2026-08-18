@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AppKit
 import PDFKit
@@ -5,9 +12,9 @@ import QuickLookUI
 import TTZipCore
 
 public enum PDFLayoutMode: String, CaseIterable, Identifiable {
-    case singleFullWidth = "单页全宽"
-    case twoPages = "双页并排"
-    case threePages = "三页平铺"
+    case singleFullWidth = "Single Page"
+    case twoPages = "Two Pages"
+    case threePages = "Three Pages"
     
     public var id: String { rawValue }
     
@@ -99,7 +106,7 @@ public struct PDFThreePageTileGridView: View {
             } else {
                 VStack {
                     Spacer()
-                    ProgressView("解析三页平铺画布中...")
+                    ProgressView("Rendering layout...")
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -144,7 +151,7 @@ public struct PDFPageThumbnailCard: View {
                     .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
             )
             
-            Text("第 \(pageIndex) 页")
+            Text("Page \(pageIndex)")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
         }

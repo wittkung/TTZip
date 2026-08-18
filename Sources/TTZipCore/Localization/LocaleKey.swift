@@ -1,14 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 本地化 Key 统一协议
+/// Unified protocol for strongly-typed localization keys.
 public protocol LocaleKeyProtocol: Sendable {
     var rawKey: String { get }
 }
 
-/// 强类型命名空间化本地化 Key
+/// Strongly-typed namespaced localization keys.
 public enum L10n {
     
-    // MARK: - 通用 Actions & States
+    // MARK: - Actions & States
     public enum Common: String, LocaleKeyProtocol, CaseIterable {
         case cancel = "common.cancel"
         case ok = "common.ok"
@@ -26,7 +33,7 @@ public enum L10n {
         public var rawKey: String { rawValue }
     }
     
-    // MARK: - 压缩与解压操作 (Archive)
+    // MARK: - Compression and Extraction
     public enum Archive: String, LocaleKeyProtocol, CaseIterable {
         case compress = "archive.compress"
         case extract = "archive.extract"
@@ -48,7 +55,7 @@ public enum L10n {
         public var rawKey: String { rawValue }
     }
     
-    // MARK: - 命令行 (CLI)
+    // MARK: - CLI
     public enum CLI: String, LocaleKeyProtocol, CaseIterable {
         case usageHeader = "cli.usage_header"
         case subcommands = "cli.subcommands"
@@ -63,7 +70,7 @@ public enum L10n {
         public var rawKey: String { rawValue }
     }
     
-    // MARK: - 性能基准与度量 (Benchmark)
+    // MARK: - Benchmark Metrics
     public enum Benchmark: String, LocaleKeyProtocol, CaseIterable {
         case throughput = "benchmark.throughput"
         case compressionRatio = "benchmark.compression_ratio"
@@ -75,7 +82,7 @@ public enum L10n {
         public var rawKey: String { rawValue }
     }
     
-    // MARK: - 错误代码与多语言描述 (Errors)
+    // MARK: - Error Codes and Diagnostic Messages
     public enum Errors: String, LocaleKeyProtocol, CaseIterable {
         case fileNotFound = "error.file_not_found"
         case permissionDenied = "error.permission_denied"
@@ -89,7 +96,7 @@ public enum L10n {
         public var rawKey: String { rawValue }
     }
     
-    // MARK: - 偏好设置 (Settings)
+    // MARK: - Preferences & Settings
     public enum Settings: String, LocaleKeyProtocol, CaseIterable {
         case title = "settings.title"
         case general = "settings.general"
@@ -101,7 +108,7 @@ public enum L10n {
         public var rawKey: String { rawValue }
     }
     
-    // MARK: - 密码钥匙串 (Vault)
+    // MARK: - Password Keychain Vault
     public enum Vault: String, LocaleKeyProtocol, CaseIterable {
         case title = "vault.title"
         case unlockPrompt = "vault.unlock_prompt"
@@ -111,7 +118,7 @@ public enum L10n {
         public var rawKey: String { rawValue }
     }
     
-    /// 获取全部已定义的 Raw Keys
+    /// Returns all defined raw keys across all localization namespaces.
     public static var allRawKeys: [String] {
         var keys: [String] = []
         keys.append(contentsOf: Common.allCases.map(\.rawKey))

@@ -1,5 +1,14 @@
-// ttzip_7z_header_parser.c
-// TTZip 原生 7Z 归档头部与元数据高效零拷贝解析器
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_7z_header_parser.c
+ * @brief TTZip native 7Z archive header and metadata zero-copy parser.
+ */
 
 #include "include/ttzip_7z_header_parser.h"
 #include "include/CTTZipCommon.h"
@@ -41,7 +50,7 @@ int ttzip_7z_parse_header_metadata(
 ) {
     if (!mapped_data || file_size < 32 || !out_info) return TTZIP_ERR_INVALID_PARAM;
     memset(out_info, 0, sizeof(ttzip_7z_header_info_t));
-    out_info->primary_method_id = 0x21; // 默认 LZMA2
+    out_info->primary_method_id = 0x21; // Default LZMA2
     out_info->aes_num_cycles_power = 19;
 
     const uint8_t* sig = mapped_data;

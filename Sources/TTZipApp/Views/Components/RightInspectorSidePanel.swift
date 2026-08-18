@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import TTZipCore
 
-/// 右侧上下文 Inspector 侧栏面板 (支持 Home 与 Compress 模式)
+/// Right contextual Inspector side panel supporting Home and Compress modes.
 public struct RightInspectorSidePanel: View {
     @ObservedObject public var viewModel: AppViewState
     @Binding public var rightVerticalTopHeight: CGFloat
@@ -13,14 +20,13 @@ public struct RightInspectorSidePanel: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header 栏 - 顶部对齐高度 52pt
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("INSPECTOR")
                         .font(.system(size: 9, weight: .bold, design: .serif))
                         .tracking(2)
                         .foregroundStyle(TTZipTheme.kintsugiGold)
-                    Text(viewModel.selectedDiskItem?.isDirectory == true ? "目录全息画板" : "文件属性与预览")
+                    Text(viewModel.selectedDiskItem?.isDirectory == true ? "Directory Canvas" : "File Properties & Preview")
                         .font(.system(size: 16, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                 }
@@ -37,7 +43,7 @@ public struct RightInspectorSidePanel: View {
                             .foregroundStyle(TTZipTheme.archiveAmber)
                     }
                     .buttonStyle(.plain)
-                    .help("查看归档权威标准与合规诊断...")
+                    .help("View archive standards and compliance diagnostics...")
                 }
                 
                 if viewModel.selectedDiskItem != nil {
@@ -56,14 +62,12 @@ public struct RightInspectorSidePanel: View {
             .padding(.horizontal, 20)
             .frame(height: 52)
             
-            // 统一置顶分割线 (金缮金强调线对齐)
             Rectangle()
                 .fill(TTZipTheme.kintsugiGold)
                 .frame(height: 1.5)
             
             VStack(alignment: .leading, spacing: 0) {
                 if viewModel.activeTab == .compressWorkspace {
-                    // 1. 新建压缩包 Tab 下: 第三栏上下拆分为 2 份，支持用户手势上下拖拽调节比例
                     DiskDirectoryBrowserView(
                         rootDirectory: viewModel.currentDirectory,
                         onSelectArchive: { archivePath in
@@ -81,7 +85,6 @@ public struct RightInspectorSidePanel: View {
                     .frame(height: rightVerticalTopHeight)
                     .clipped()
                     
-                    // 可上下拖拽垂直分栏 Handle
                     ResizableHorizontalDividerHandle(
                         height: $rightVerticalTopHeight,
                         minHeight: 120,
@@ -89,7 +92,6 @@ public struct RightInspectorSidePanel: View {
                     )
                     .padding(.vertical, 2)
                     
-                    // 下半部分: 媒体预览与属性信息 (InspectorColumnView)
                     if let item = viewModel.selectedDiskItem {
                         InspectorColumnView(
                             item: item,
@@ -110,7 +112,7 @@ public struct RightInspectorSidePanel: View {
                             Image(systemName: "photo.on.rectangle.angled")
                                 .font(.system(size: 24))
                                 .foregroundStyle(.tertiary)
-                            Text("点击上方项查看媒体属性与画板")
+                            Text("Select an item above to view properties")
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -120,7 +122,6 @@ public struct RightInspectorSidePanel: View {
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                 } else {
-                    // 2. 主页与解压 (.home) 等其它 Tab 下: 右侧专注呈现“媒体浏览与细节 Inspector”
                     if let item = viewModel.selectedDiskItem {
                         InspectorColumnView(
                             item: item,
@@ -140,10 +141,10 @@ public struct RightInspectorSidePanel: View {
                             Image(systemName: "photo.on.rectangle.angled")
                                 .font(.system(size: 36))
                                 .foregroundStyle(.tertiary)
-                            Text("在中央选择文件或文件夹")
+                            Text("Select a file or folder in the explorer")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(.secondary)
-                            Text("选中文件可直接预览与查看属性")
+                            Text("Selected items can be previewed directly")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.tertiary)
                             Spacer()

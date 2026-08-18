@@ -1,16 +1,23 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档操作类型分类
+/// Archive operation type classification.
 public enum ArchiveOperationType: String, Sendable, Equatable, CaseIterable {
-    case compress = "压缩"
-    case extract = "解压"
-    case repair = "修复"
-    case batch = "批处理"
-    case recover = "密码恢复"
-    case inspect = "探索"
+    case compress = "compress"
+    case extract = "extract"
+    case repair = "repair"
+    case batch = "batch"
+    case recover = "recover"
+    case inspect = "inspect"
 }
 
-/// 归档进度观察者传递的详细进度数据包
+/// Detailed progress telemetry payload for archive operations.
 public struct ArchiveProgressInfo: Sendable, Equatable {
     public let state: ArchiveProgress.State
     public let bytesProcessed: Int64
@@ -47,7 +54,7 @@ public struct ArchiveProgressInfo: Sendable, Equatable {
         self.operationType = operationType
     }
     
-    /// 0 字节防除零与极界安全的剩余时间 (ETA) 估算工具
+    /// Calculates estimated time remaining (ETA) safely guarding against division by zero.
     public static func calculateETA(bytesProcessed: Int64, totalBytes: Int64, throughputMBs: Double) -> TimeInterval? {
         guard totalBytes > 0, bytesProcessed >= 0, totalBytes > bytesProcessed else { return nil }
         guard throughputMBs.isFinite, !throughputMBs.isNaN, throughputMBs > 0.0001 else { return nil }
@@ -58,7 +65,7 @@ public struct ArchiveProgressInfo: Sendable, Equatable {
     }
 }
 
-/// 多文件/批处理任务观察者传递的进度数据包
+/// Batch task progress telemetry payload.
 public struct BatchProgressInfo: Sendable, Equatable {
     public let completedTasks: Int
     public let totalTasks: Int
@@ -96,7 +103,7 @@ public struct BatchProgressInfo: Sendable, Equatable {
     }
 }
 
-/// 【3.2 观察者模式 (Observer Pattern)】归档进度观察者协议
+/// Archive progress observer protocol (Observer Pattern).
 public protocol ArchiveProgressObserverProtocol: AnyObject, Sendable {
     func onProgressUpdated(_ progress: ArchiveProgressInfo)
     func onBatchProgressUpdated(_ progress: BatchProgressInfo)
@@ -107,7 +114,7 @@ extension ArchiveProgressObserverProtocol {
     public func onBatchProgressUpdated(_ progress: BatchProgressInfo) {}
 }
 
-/// 系统全局事件类型
+/// Global system event types.
 public enum ArchiveEventType: String, Sendable, Equatable, Hashable, CaseIterable {
     case archiveCompleted
     case extractionFailed
@@ -117,7 +124,7 @@ public enum ArchiveEventType: String, Sendable, Equatable, Hashable, CaseIterabl
     case taskStateChanged
 }
 
-/// 系统全局事件载荷数据
+/// Global system event payloads.
 public enum ArchiveEvent: Sendable, Equatable {
     case archiveCompleted(archivePath: String, operationType: ArchiveOperationType, duration: TimeInterval, totalBytes: Int64)
     case extractionFailed(archivePath: String, error: String)
@@ -148,12 +155,12 @@ public enum ArchiveEvent: Sendable, Equatable {
     }
 }
 
-/// 【3.2 观察者模式 (Observer Pattern)】系统全局事件观察者协议
+/// Global system event observer protocol.
 public protocol ArchiveEventObserverProtocol: AnyObject, Sendable {
     func onArchiveEvent(_ event: ArchiveEvent)
 }
 
-/// 系统全局事件发布订阅中心协议
+/// Event bus protocol for subscribing and posting system events.
 public protocol ArchiveEventCenterProtocol: Sendable {
     func addObserver(
         _ observer: ArchiveEventObserverProtocol,
@@ -165,4 +172,3 @@ public protocol ArchiveEventCenterProtocol: Sendable {
     func post(event: ArchiveEvent)
     var observerCount: Int { get }
 }
-

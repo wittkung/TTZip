@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档包内文档双击编辑与监视刷回引擎 (File System Watcher & Incremental Save)
+/// In-archive live file editing and filesystem change observer engine.
 public final class FileWatcherEngine: @unchecked Sendable {
     public static let shared = FileWatcherEngine()
     
@@ -9,7 +16,7 @@ public final class FileWatcherEngine: @unchecked Sendable {
     
     private init() {}
     
-    /// 开始监视解压至临时目录的特定文件，在用户修改保存后自动感应并更新归档包
+    /// Watches an extracted temporary file for filesystem change events (`.write`, `.extend`, `.attrib`, `.rename`).
     public func watchFileForChanges(
         filePath: String,
         targetArchivePath: String,
@@ -40,6 +47,7 @@ public final class FileWatcherEngine: @unchecked Sendable {
         source.resume()
     }
     
+    /// Stops watching a specific file path.
     public func stopWatching(filePath: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -49,7 +57,7 @@ public final class FileWatcherEngine: @unchecked Sendable {
         }
     }
     
-    /// 停止所有在播监视源并释放句柄 (用于测试重置与全局清理)
+    /// Cancels all active dispatch sources and closes file descriptors.
     public func stopAllWatching() {
         lock.lock()
         let sources = Array(activeSources.values)
@@ -61,7 +69,7 @@ public final class FileWatcherEngine: @unchecked Sendable {
         }
     }
     
-    /// 重置 FileWatcherEngine 状态 (别名，统一 reset 测试重置接口)
+    /// Resets watcher engine state.
     public func reset() {
         stopAllWatching()
     }

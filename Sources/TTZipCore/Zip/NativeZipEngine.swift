@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
@@ -5,13 +12,13 @@ private final class MmapZipAccumulator: @unchecked Sendable {
     var entries: [ArchiveEntry] = []
 }
 
-/// 极速 Native ZIP 封装引擎统一门面 (底层由模块化 ZipCentralDirectoryReader / ZipParallelExtractor / ZipParallelWriter 协同构建)
+/// Unified facade for native parallel ZIP compression, decompression, and memory-mapped inspection.
 public final class NativeZipEngine: @unchecked Sendable {
     public static let shared = NativeZipEngine()
     
     private init() {}
     
-    // MARK: - 1. 零拷贝 mmap 中央目录表列举 (<1ms 秒级查表)
+    // MARK: - 1. Zero-Copy mmap Central Directory Inspection (<1ms table lookup)
     
     public func inspectZip(archivePath: String) -> [ArchiveEntry]? {
         let accumulator = MmapZipAccumulator()
@@ -43,7 +50,7 @@ public final class NativeZipEngine: @unchecked Sendable {
         return nil
     }
     
-    // MARK: - 2. 全核并发 libdeflate 极速解压引擎
+    // MARK: - 2. Multi-Core Parallel libdeflate Decompression Engine
     
     public func extractZipParallel(
         archivePath: String,
@@ -61,7 +68,7 @@ public final class NativeZipEngine: @unchecked Sendable {
         )
     }
     
-    // MARK: - 3. 全核并发 libdeflate 极速打包引擎
+    // MARK: - 3. Multi-Core Parallel libdeflate Compression Engine
     
     public func createZipParallel(
         outputPath: String,

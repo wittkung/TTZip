@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
@@ -8,7 +15,6 @@ public enum MillerColumnDirectoryScanner {
         
         await RootFolderAccessManager.shared.ensureAccess(for: dirURL, promptIfMissing: false)
         if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
-            // 接入 LazyDiskScannerIterator 执行磁盘流式扫描 (Iterator Pattern)
             let scannerIterator = LazyDiskScannerIterator(diskPath: path)
             var diskItems: [DiskItemInfo] = []
             while let entry = scannerIterator.next() {
@@ -45,7 +51,7 @@ public enum MillerColumnDirectoryScanner {
         let fetchedEntries = inspectionResult?.entries
         
         guard let entries = fetchedEntries else {
-            ArchiveEventCenter.shared.postExtractionFailed(archivePath: archivePath, error: "需要解密口令")
+            ArchiveEventCenter.shared.postExtractionFailed(archivePath: archivePath, error: "Password required")
             await MainActor.run {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("TTZipEncryptedArchivePromptRequired"),
@@ -54,25 +60,23 @@ public enum MillerColumnDirectoryScanner {
             }
             return [
                 DiskItemInfo(
-                    virtualName: "压缩包已被加密 (点击输入密码)",
+                    virtualName: "Encrypted Archive (Click to enter password)",
                     virtualURL: dirURL,
                     isDirectory: false,
                     isArchive: false,
-                    sizeText: "需要解密口令",
+                    sizeText: "Password Required",
                     rawSizeBytes: 0,
-                    kindText: "受密码保护的归档包"
+                    kindText: "Password-Protected Archive"
                 )
             ]
         }
         
-        // 运用 组合模式 (Composite Pattern) 统一层级树与子目录项列表加载
         let rootComposite = ArchiveComponentTreeBuilder.buildTree(from: entries)
         var targetComponent: ArchiveComponentProtocol = rootComposite
         
         if !subpath.isEmpty {
             let parts = subpath.components(separatedBy: "/").filter { !$0.isEmpty }
             for part in parts {
-                // O(1) 哈希查找优先，fallback 到线性扫描
                 let nextDir: ArchiveComponentProtocol?
                 if let compositeDir = targetComponent as? ArchiveCompositeDirectory {
                     let child = compositeDir.findChild(named: part)
@@ -103,7 +107,7 @@ public enum MillerColumnDirectoryScanner {
                     let factory = ArchiveEntryFlyweightFactory.shared
                     let ext = factory.internExtension((leaf.name as NSString).pathExtension)
                     let sizeText = ByteCountFormatterFlyweight.shared.string(fromByteCount: leaf.sizeBytes)
-                    let kind = factory.internPath(ext.isEmpty ? "文件" : "\(ext.uppercased()) 文件")
+                    let kind = factory.internPath(ext.isEmpty ? "File" : "\(ext.uppercased()) File")
                     return DiskItemInfo(
                         virtualName: factory.internPath(leaf.name),
                         virtualURL: virtualURL,
@@ -121,9 +125,9 @@ public enum MillerColumnDirectoryScanner {
                         virtualURL: virtualURL,
                         isDirectory: true,
                         isArchive: false,
-                        sizeText: factory.internPath("文件夹"),
+                        sizeText: factory.internPath("Folder"),
                         rawSizeBytes: composite.sizeBytes,
-                        kindText: factory.internPath("包内文件夹")
+                        kindText: factory.internPath("Archive Folder")
                     )
                 }
             )

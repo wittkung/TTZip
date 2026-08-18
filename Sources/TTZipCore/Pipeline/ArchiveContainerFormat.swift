@@ -1,8 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档容器结构格式 (负责 Entry Header 目录结构与元数据编解码)
-///
-/// 对标 libarchive `archive_format_descriptor`
+/// Archive container format defining directory structures and metadata headers.
 public enum ArchiveContainerFormat: String, Sendable, CaseIterable, Codable {
     case zip
     case sevenZip = "7z"
@@ -13,7 +18,7 @@ public enum ArchiveContainerFormat: String, Sendable, CaseIterable, Codable {
     case wim
     case raw
     
-    /// 默认主扩展名
+    /// Default primary file extension.
     public var defaultExtension: String {
         switch self {
         case .zip: return "zip"
@@ -28,9 +33,7 @@ public enum ArchiveContainerFormat: String, Sendable, CaseIterable, Codable {
     }
 }
 
-/// 流式传输与压缩转换滤镜 (负责纯字节流的编解码与算法转换)
-///
-/// 对标 libarchive `archive_read_filter` / `archive_write_filter`
+/// Stream compression and encoding filter.
 public enum ArchiveStreamFilter: String, Sendable, CaseIterable, Codable {
     case none
     case gzip
@@ -42,7 +45,7 @@ public enum ArchiveStreamFilter: String, Sendable, CaseIterable, Codable {
     case lzip
     case lrzip
     
-    /// 滤镜对应的后缀扩展名
+    /// File extension associated with stream filter.
     public var filterExtension: String? {
         switch self {
         case .none: return nil
@@ -58,7 +61,7 @@ public enum ArchiveStreamFilter: String, Sendable, CaseIterable, Codable {
     }
 }
 
-/// 容器格式与流式滤镜的正交组合实体模型
+/// Orthogonal combination of container format and stream filter.
 public struct ArchivePipelineComposition: Sendable, Codable, Equatable {
     public let container: ArchiveContainerFormat
     public let filter: ArchiveStreamFilter

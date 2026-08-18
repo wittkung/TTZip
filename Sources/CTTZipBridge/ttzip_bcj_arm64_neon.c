@@ -1,5 +1,14 @@
-// ttzip_bcj_arm64_neon.c
-// TTZip ARM64 NEON 向量化 BCJ 可执行指令跳转表过滤器
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_bcj_arm64_neon.c
+ * @brief ARM64 NEON vectorized BCJ executable branch target converter.
+ */
 
 #include "include/ttzip_bcj_arm64_neon.h"
 #include <string.h>
@@ -22,13 +31,12 @@ size_t ttzip_arm64_bcj_encode_neon(uint8_t* data, size_t size, uint32_t ip) {
         uint32x4_t v = vld1q_u32((const uint32_t*)(data + i));
         uint32x4_t match = vceqq_u32(vandq_u32(v, mask_op), pattern_b);
         
-        // 如果 4 条指令均非 B/BL 跳转指令，直接跳步 16 字节
+        // If none of the 4 instructions are B/BL jumps, skip 16 bytes
         if (vmaxvq_u32(match) == 0) {
             i += 16;
             continue;
         }
         
-        // 逐条处理命中的指令
         for (int lane = 0; lane < 4; lane++) {
             size_t pos = i + lane * 4;
             uint32_t instr;
@@ -36,7 +44,6 @@ size_t ttzip_arm64_bcj_encode_neon(uint8_t* data, size_t size, uint32_t ip) {
             if ((instr & 0x7C000000) == 0x14000000) {
                 uint32_t curr_ip = ip + (uint32_t)pos;
                 uint32_t imm26 = instr & 0x03FFFFFF;
-                // 符号扩展
                 int32_t signed_offset = (imm26 & 0x02000000) ? (int32_t)(imm26 | 0xFC000000) : (int32_t)imm26;
                 uint32_t abs_target = curr_ip + (uint32_t)(signed_offset << 2);
                 uint32_t new_imm26 = (abs_target >> 2) & 0x03FFFFFF;

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
@@ -5,24 +12,16 @@ import CTTZipBridge
 import Darwin
 #endif
 
-/// 跨平台 POSIX flock 文件锁类型
+/// Cross-platform POSIX flock advisory file lock mode.
 public enum PlatformFileLockType: Sendable {
     case exclusive
     case shared
 }
 
-/// 跨平台文件系统元数据访问与磁盘空间预分配中枢
-///
-/// 对标 libarchive `archive_read_disk` 工业模型，提供：
-/// - 单次系统调用提取全量文件元数据 (`statFile`)
-/// - 消除磁盘碎片与文件系统锁争用的物理连续空间预分配 (`preallocateDiskSpace`)
-/// - 跨平台统一的文件存在性快速检定 (`fileExists`)
-/// - 跨进程 POSIX flock 建议性文件锁 RAII 作用域封装 (`withFileLock`)
+/// Cross-platform file system metadata extraction, continuous disk space preallocation, and advisory locking subsystem.
 public enum PlatformFileSystem {
     
-    /// 跨平台 POSIX flock 建议性文件锁 RAII 作用域执行器
-    ///
-    /// 进程崩溃或异常退出时内核自动释放文件锁，彻底免疫 CI 死锁与资源争用。
+    /// Cross-platform POSIX advisory file lock RAII scope executor.
     public static func withFileLock<R: Sendable>(
         atPath lockFilePath: String,
         type: PlatformFileLockType = .exclusive,
@@ -52,11 +51,7 @@ public enum PlatformFileSystem {
         #endif
     }
     
-    /// 跨平台高效读取物理文件/目录的基础元数据属性
-    ///
-    /// - Parameter path: 目标文件或目录的绝对路径
-    /// - Returns: 强类型 ``PlatformFileAttributes`` 实体
-    /// - Throws: 路径不存在或无读取权限时抛出 `POSIXError`
+    /// Reads physical file or directory metadata attributes.
     public static func statFile(path: String) throws -> PlatformFileAttributes {
         #if os(macOS) || os(Linux)
         var statBuf = stat()
@@ -86,14 +81,7 @@ public enum PlatformFileSystem {
         #endif
     }
     
-    /// 跨平台磁盘物理空间连续预分配 (消除写入期间的文件系统碎片与 Extent 动态扩展锁)
-    ///
-    /// - Parameters:
-    ///   - filePath: 目标物理文件绝对路径
-    ///   - byteCount: 需要预分配的目标字节总大小
-    /// - Throws: 无法创建或预分配磁盘空间时抛出错误
-    ///
-    /// - Note: [APFS Optimization] macOS 上优先使用 `F_PREALLOCATE` (`F_ALLOCATECONTIG`) 申请连续块，失败时自动平滑回退至普通预分配
+    /// Preallocates contiguous physical disk space to prevent file system fragmentation and extent expansion overhead.
     public static func preallocateDiskSpace(filePath: String, byteCount: Int64) throws {
         guard byteCount > 0 else { return }
         #if os(macOS)
@@ -112,7 +100,6 @@ public enum PlatformFileSystem {
         )
         
         if fcntl(fd, F_PREALLOCATE, &fst) == -1 {
-            // 连续空间申请失败时，回退到非连续预分配
             fst.fst_flags = UInt32(F_ALLOCATEALL)
             _ = fcntl(fd, F_PREALLOCATE, &fst)
         }
@@ -128,14 +115,10 @@ public enum PlatformFileSystem {
         _ = ftruncate(fd, byteCount)
         
         #else
-        // Windows SetFileInformationByHandle 预留
         #endif
     }
     
-    /// 快速检定目标路径是否存在物理文件或目录
-    ///
-    /// - Parameter path: 待检视的路径
-    /// - Returns: 存在返回 true，不存在返回 false
+    /// Fast check for physical file existence using `access(2)`.
     @inlinable
     public static func fileExists(atPath path: String) -> Bool {
         #if os(macOS) || os(Linux)

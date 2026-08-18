@@ -1,5 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
+/// German localization string catalog (`de`).
 public enum LocaleCatalogDe {
     public static let strings: [String: String] = [
         "common.cancel": "Abbrechen",
@@ -17,8 +25,8 @@ public enum LocaleCatalogDe {
         
         "archive.compress": "Komprimieren",
         "archive.extract": "Entpacken",
-        "archive.compressing": "Komprimiere...",
-        "archive.extracting": "Entpacke...",
+        "archive.compressing": "Komprimierung läuft...",
+        "archive.extracting": "Entpacken läuft...",
         "archive.compress_success": "Archiv erfolgreich erstellt",
         "archive.extract_success": "Archiv erfolgreich entpackt",
         "archive.compress_failed": "Komprimierung fehlgeschlagen",
@@ -26,21 +34,21 @@ public enum LocaleCatalogDe {
         "archive.password_required": "Passwort erforderlich",
         "archive.incorrect_password": "Falsches Passwort",
         "archive.corrupt_data": "Archivdaten sind beschädigt",
-        "archive.unsupported_format": "Nicht unterstütztes Format",
+        "archive.unsupported_format": "Nicht unterstütztes Archivformat",
         "archive.format": "Format",
         "archive.compression_level": "Kompressionsstufe",
-        "archive.split_volume": "Teilarchiv",
+        "archive.split_volume": "Teilarchiv erstellen",
         "archive.encryption": "Verschlüsselung",
         
-        "cli.usage_header": "TTZip CLI — Hochleistungs-Archivierungs-Engine",
+        "cli.usage_header": "TTZip CLI — Hochleistungsfähige native Archivierungs-Engine",
         "cli.subcommands": "Befehle",
         "cli.global_options": "Globale Optionen",
         "cli.error_missing_arg": "Erforderliches Argument fehlt: %@",
         "cli.error_file_not_found": "Datei nicht gefunden: %@",
-        "cli.error_invalid_format": "Ungültiges Format: %@",
-        "cli.dry_run_prefix": "[TESTLAUF] Würde ausführen: %@",
-        "cli.bench_running": "Führe Benchmark für Format %@ aus (Durchlauf %d/%d)...",
-        "cli.test_summary": "Testergebnis: %d bestanden, %d fehlgeschlagen in %.2fs",
+        "cli.error_invalid_format": "Ungültiges Archivformat: %@",
+        "cli.dry_run_prefix": "[PROBELAUF] Würde ausführen: %@",
+        "cli.bench_running": "Benchmark für Format %@ wird ausgeführt (Durchlauf %d/%d)...",
+        "cli.test_summary": "Test-Zusammenfassung: %d bestanden, %d fehlgeschlagen in %.2fs",
         
         "benchmark.throughput": "Durchsatz",
         "benchmark.compression_ratio": "Kompressionsrate",
@@ -49,14 +57,14 @@ public enum LocaleCatalogDe {
         "benchmark.peak_throughput": "Spitzendurchsatz",
         "benchmark.speedup": "Beschleunigung",
         
-        "error.file_not_found": "Die Datei oder das Verzeichnis existiert nicht.",
-        "error.permission_denied": "Zugriffsberechtigung verweigert.",
+        "error.file_not_found": "Die angegebene Datei oder das Verzeichnis existiert nicht.",
+        "error.permission_denied": "Zugriff auf Pfad verweigert.",
         "error.disk_full": "Ziellaufwerk ist voll.",
-        "error.zip_slip_detected": "Zip Slip Pfadüberschreitung erkannt und blockiert.",
-        "error.corrupted_header": "Archiv-Header-Prüfung fehlgeschlagen oder beschädigt.",
-        "error.crc_mismatch": "CRC32-Prüfsummenfehler.",
-        "error.out_of_memory": "Nicht genügend Arbeitsspeicher.",
-        "error.operation_cancelled": "Vorgang durch Benutzer abgebrochen.",
+        "error.zip_slip_detected": "Zip-Slip-Pfadüberschreitungsangriff erkannt und blockiert.",
+        "error.corrupted_header": "Archivkopfzeilen-Magic-Prüfung fehlgeschlagen oder beschädigt.",
+        "error.crc_mismatch": "CRC32-Prüfsummenabweichung in extrahierten Daten.",
+        "error.out_of_memory": "Nicht genügend Speicher für Pufferreservierung.",
+        "error.operation_cancelled": "Vorgang vom Benutzer abgebrochen.",
         
         "settings.title": "Einstellungen",
         "settings.general": "Allgemein",
@@ -66,8 +74,8 @@ public enum LocaleCatalogDe {
         "settings.hardware_topology": "Hardware-Topologie",
         
         "vault.title": "Passwort-Tresor",
-        "vault.unlock_prompt": "Passwort eingeben, um den Tresor zu entsperren",
+        "vault.unlock_prompt": "Passwort zum Entsperren des Tresors eingeben",
         "vault.add_password": "Passwort hinzufügen",
-        "vault.empty_vault": "Keine Passwörter gespeichert"
+        "vault.empty_vault": "Tresor ist leer"
     ]
 }

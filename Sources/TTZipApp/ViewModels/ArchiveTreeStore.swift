@@ -1,9 +1,17 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import SwiftUI
 import TTZipCore
 
-/// 归档目录树与搜索过滤状态容器
-/// 负责后台异步构建层级树、树节点 Memoization 与防抖异步搜索匹配，确保主线程 UI 零卡顿
+/// Archive tree store and search filtering state container.
+///
+/// Handles asynchronous hierarchical tree building, tree node memoization, and debounced search matching.
 @MainActor
 public final class ArchiveTreeStore: ObservableObject {
     @Published public private(set) var rootNodes: [ArchiveTreeNode] = []
@@ -18,10 +26,7 @@ public final class ArchiveTreeStore: ObservableObject {
     
     public init() {}
     
-    /// 更新归档条目数据源并触发后台异步树构建
-    /// - Parameters:
-    ///   - entries: 扁平归档条目列表
-    ///   - force: 是否强制重新构建
+    /// Updates source entries and triggers asynchronous background tree construction.
     public func updateEntries(_ entries: [ArchiveEntry]) {
         updateEntries(entries, force: false)
     }
@@ -60,10 +65,7 @@ public final class ArchiveTreeStore: ObservableObject {
         }
     }
     
-    /// 执行带防抖 (Debounce) 的异步搜索过滤
-    /// - Parameters:
-    ///   - query: 搜索关键词
-    ///   - debounceMs: 防抖延迟毫秒数 (默认 100ms)
+    /// Executes debounced asynchronous search filtering.
     public func filter(query: String) {
         filter(query: query, debounceMs: 100)
     }
@@ -106,7 +108,7 @@ public final class ArchiveTreeStore: ObservableObject {
         }
     }
     
-    /// 清空目录树与缓存
+    /// Clears directory tree and active caches.
     public func clear() {
         activeBuildTask?.cancel()
         activeBuildTask = nil

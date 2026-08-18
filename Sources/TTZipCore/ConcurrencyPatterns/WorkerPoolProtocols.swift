@@ -1,7 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 任务优先级枚举 (Task Priority Level)
-/// 遵循 Comparable 协议，优先级顺序：.critical > .userInitiated > .utility > .background
+/// Priority tiers for concurrent worker tasks.
 public enum TaskPriorityLevel: Int, Comparable, Sendable, CaseIterable, Hashable, Codable {
     case background = 1
     case utility = 2
@@ -13,17 +19,19 @@ public enum TaskPriorityLevel: Int, Comparable, Sendable, CaseIterable, Hashable
     }
 }
 
-/// 归档并发任务单元规范接口
+/// Interface protocol for executable concurrent work items.
 public protocol ArchiveWorkItemProtocol: Sendable {
-    /// 任务唯一标识符
+    /// Unique work item identifier.
     var itemID: String { get }
-    /// 任务优先级
+    
+    /// Priority classification.
     var priority: TaskPriorityLevel { get }
-    /// 执行任务主体
+    
+    /// Executes the unit of work.
     func execute() async throws -> any Sendable
 }
 
-/// 标准可执行任务单元结构体
+/// Standard concrete implementation of `ArchiveWorkItemProtocol`.
 public struct ArchiveWorkItem: ArchiveWorkItemProtocol {
     public let itemID: String
     public let priority: TaskPriorityLevel
@@ -44,7 +52,7 @@ public struct ArchiveWorkItem: ArchiveWorkItemProtocol {
     }
 }
 
-/// 线程池与调度器生命周期状态
+/// Lifecycle states for worker pools and schedulers.
 public enum WorkerPoolState: String, Sendable, Equatable, Hashable, Codable {
     case idle
     case running

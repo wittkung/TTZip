@@ -1,5 +1,14 @@
-// ttzip_lzma2_dec_native.c
-// TTZip 原生进程内多核并行 LZMA2 解码器 (基于 liblzma + ARM NEON)
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_lzma2_dec_native.c
+ * @brief TTZip native in-process multi-core parallel LZMA2 decoder (liblzma + ARM NEON).
+ */
 
 #include "include/ttzip_lzma2_dec_native.h"
 #include <string.h>
@@ -10,7 +19,6 @@
 #include <arm_neon.h>
 #endif
 
-// ARM NEON 向量化 Match Copy (128-bit 指令块 64 字节循环展开高速拷贝)
 static inline void ttzip_neon_copy_match(uint8_t *dst, const uint8_t *src, size_t len) {
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
     while (len >= 64) {
@@ -106,7 +114,7 @@ int ttzip_lzma2_decode_block_native(
         return -1;
     }
 
-    // ⚡ 极速旁路：多块非压缩子块 (0x01 / 0x02) NEON 向量展开流式解码
+    // Multi-block uncompressed chunk (0x01 / 0x02) NEON vectorized bypass
     size_t scan_src_pos = 0;
     size_t scan_dst_pos = 0;
     bool all_uncompressed = true;
@@ -142,7 +150,7 @@ int ttzip_lzma2_decode_block_native(
         return 0;
     }
 
-    // 备用纯 C / NEON 逻辑帧解析器
+    // Fallback frame parser
     size_t src_pos = 0;
     size_t dst_pos = 0;
 
@@ -162,7 +170,6 @@ int ttzip_lzma2_decode_block_native(
             src_pos += chunk_size;
             dst_pos += chunk_size;
         } else if (control >= 0x80) {
-            // Range-coded chunk cannot be copied directly as plaintext
             return -2;
         } else {
             break;

@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 【3.5 状态模式 (State Pattern)】归档任务状态异常定义
+/// Archive task state transition error definitions.
 public enum ArchiveStateError: Error, LocalizedError, Equatable {
     case invalidTransition(from: String, action: String)
     case taskAlreadyCompleted
@@ -9,16 +16,16 @@ public enum ArchiveStateError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .invalidTransition(let from, let action):
-            return "非法状态转换: 无法在 '\(from)' 状态下执行 '\(action)' 操作"
+            return "Invalid state transition: cannot perform '\(action)' from '\(from)' state."
         case .taskAlreadyCompleted:
-            return "任务已处于完成终态，无法重置或修改"
+            return "Task is already in completed terminal state."
         case .taskAlreadyFailed(let reason):
-            return "任务已处于失败终态 (\(reason))，无法重置或修改"
+            return "Task is already in failed terminal state (\(reason))."
         }
     }
 }
 
-/// 归档任务运行指标与统计数据
+/// Archive task metrics and throughput measurements.
 public struct TaskMetrics: Sendable, Equatable {
     public var startTime: Date?
     public var endTime: Date?
@@ -34,7 +41,7 @@ public struct TaskMetrics: Sendable, Equatable {
         return max(0, end.timeIntervalSince(start) - cleanPause)
     }
     
-    /// 进度完成比例 (0.0 ... 1.0)，防除零及超越保护
+    /// Progress completion fraction (0.0 ... 1.0) with zero-division safeguard.
     public var progressFraction: Double {
         guard totalBytes > 0 else { return 0.0 }
         let raw = Double(processedBytes) / Double(totalBytes)
@@ -58,32 +65,32 @@ public struct TaskMetrics: Sendable, Equatable {
     }
 }
 
-/// 【3.5 状态模式 (State Pattern)】归档任务状态抽象接口
+/// Archive task state abstract interface protocol (State Pattern).
 public protocol ArchiveTaskStateProtocol: Sendable {
-    /// 状态名称描述
+    /// Human-readable state name.
     var stateName: String { get }
     
-    /// 当前状态下是否可暂停
+    /// Whether task can be paused in this state.
     var canPause: Bool { get }
     
-    /// 当前状态下是否可恢复/续传
+    /// Whether task can be resumed in this state.
     var canResume: Bool { get }
     
-    /// 当前状态下是否可取消
+    /// Whether task can be cancelled in this state.
     var canCancel: Bool { get }
     
-    /// 触发暂停操作
+    /// Triggers pause action.
     func pause(context: ArchiveTaskContext) throws
     
-    /// 触发恢复操作
+    /// Triggers resume action.
     func resume(context: ArchiveTaskContext) throws
     
-    /// 触发取消操作
+    /// Triggers cancel action.
     func cancel(context: ArchiveTaskContext) throws
     
-    /// 触发失败终止操作
+    /// Triggers failure termination.
     func fail(context: ArchiveTaskContext, error: Error) throws
     
-    /// 触发完成终态操作
+    /// Triggers completion terminal state.
     func complete(context: ArchiveTaskContext) throws
 }

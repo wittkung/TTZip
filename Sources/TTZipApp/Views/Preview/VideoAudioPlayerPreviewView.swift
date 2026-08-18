@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AVFoundation
 import AVKit
 import TTZipCore
 
-/// 共享视频播放器状态调度中心 (保证小屏/真全屏切换时 100% 进度无缝接续，声音视频绝不上演中断复位)
+/// Shared video player state store.
 @MainActor
 public final class SharedVideoPlayerStore: ObservableObject {
     @Published public var player: AVPlayer?
@@ -82,7 +89,7 @@ public final class SharedVideoPlayerStore: ObservableObject {
     }
 }
 
-/// 顶级原彩视频播放器 (基于 AVPlayerLayer 纯 GPU 硬件渲染，零延迟响应播放/暂停，进度跨全屏无缝接续)
+/// Unified video player view based on AVPlayerLayer GPU acceleration.
 public struct UnifiedVideoPlayerView: View {
     public let url: URL
     
@@ -264,5 +271,3 @@ public struct AVPlayerLayerContainerView: NSViewRepresentable {
         }
     }
 }
-
-

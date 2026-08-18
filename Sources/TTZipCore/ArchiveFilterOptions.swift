@@ -1,14 +1,29 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档与解压过滤选择结构
+/// Filter and entry exclusion rules for archive creation and extraction.
 public struct ArchiveFilterOptions: Sendable, Equatable {
+    /// Glob patterns to exclude.
     public var excludePatterns: [String]
+    /// Glob patterns to include exclusively.
     public var includePatterns: [String]
+    /// Number of leading path directory components to strip on extraction.
     public var stripComponents: Int
+    /// Automatically ignore VCS repository metadata (`.git`, `.svn`, `.hg`).
     public var excludeVCS: Bool
+    /// Automatically exclude AppleDouble (`._*`) and `.DS_Store` metadata artifacts.
     public var noMacMetadata: Bool
+    /// Extract files directly into destination root without creating directories.
     public var flattenPaths: Bool
+    /// Path to file containing newline or NUL-separated path list.
     public var filesFromPath: String?
+    /// Whether `--files-from` list uses NUL delimiter (`\0`).
     public var nullDelimiter: Bool
     
     // MARK: - Backwards Compatibility Aliases
@@ -66,20 +81,19 @@ public struct ArchiveFilterOptions: Sendable, Equatable {
     public static let preserveAll = ArchiveFilterOptions(excludePatterns: [], includePatterns: [], stripComponents: 0, excludeVCS: false, noMacMetadata: false)
 }
 
-// MARK: - PrototypeCopyable 原型模式扩展
+// MARK: - PrototypeCopyable Prototype Pattern Extension
 extension ArchiveFilterOptions: PrototypeCopyable {
-    /// 原型模式默认无差异快照克隆
+    /// Creates an independent snapshot clone of this configuration.
     public func clone() -> ArchiveFilterOptions {
         return clone(mutate: { _ in })
     }
     
-    /// 特化快照变异克隆 API (Prototype Copy with Inout Mutation)
-    /// - Parameter mutate: 在独立副本上施加修改闭包
-    /// - Returns: 变更后的 ArchiveFilterOptions 独立快照
+    /// Prototype copy with inout mutation closure.
+    /// - Parameter mutate: Mutation block applied to the clone.
+    /// - Returns: Mutated independent snapshot.
     public func clone(mutate: (inout ArchiveFilterOptions) -> Void = { _ in }) -> ArchiveFilterOptions {
         var copy = self
         mutate(&copy)
         return copy
     }
 }
-

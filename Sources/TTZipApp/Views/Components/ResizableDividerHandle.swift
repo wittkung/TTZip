@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 
-/// 侧边栏及分栏可拖拽 Handle 控件
+/// Draggable vertical and horizontal divider handle controls.
 public struct ResizableDividerHandle: View {
     public var onDragStart: (() -> Void)? = nil
     public let onDragChanged: (CGFloat) -> Void

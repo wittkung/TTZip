@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
 private final class WeakBox: @unchecked Sendable {
@@ -7,7 +14,7 @@ private final class WeakBox: @unchecked Sendable {
     }
 }
 
-/// 弱引用观察者包装器，彻底消除循环引用与内存泄露隐患
+/// Weak observer wrapper preventing retain cycles and memory leaks in observer registries.
 public final class WeakObserverWrapper: @unchecked Sendable {
     public weak var observer: AnyObject?
     public let dispatchQueue: DispatchQueue?
@@ -21,7 +28,7 @@ public final class WeakObserverWrapper: @unchecked Sendable {
         return observer != nil
     }
     
-    /// 在指定队列或当前线程安全分发回调
+    /// Safely invokes closure on target observer on configured queue.
     public func invoke<Observer>(_ closure: @escaping (Observer) -> Void) {
         if let queue = dispatchQueue {
             let box = WeakBox(observer)

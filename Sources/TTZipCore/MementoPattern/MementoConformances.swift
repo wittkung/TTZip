@@ -1,11 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - 【PasswordRecoveryEngine】发起人协议符合性
+// MARK: - PasswordRecoveryEngine Originator Conformance
 
 extension PasswordRecoveryEngine: ArchiveOriginatorProtocol {
     public typealias Memento = TaskCheckpointMemento
     
-    /// 创建当前密码恢复引擎的任务断点快照 (TaskCheckpointMemento)
+    /// Creates default checkpoint snapshot for password recovery engine.
     public func createMemento() -> TaskCheckpointMemento {
         return TaskCheckpointMemento(
             taskID: UUID(),
@@ -19,7 +26,7 @@ extension PasswordRecoveryEngine: ArchiveOriginatorProtocol {
         )
     }
     
-    /// 根据给定的任务参数构建并创建精准的断点快照
+    /// Creates parametrized checkpoint snapshot for password recovery engine.
     public func createMemento(
         taskID: UUID,
         taskName: String,
@@ -42,8 +49,8 @@ extension PasswordRecoveryEngine: ArchiveOriginatorProtocol {
         )
     }
     
-    /// 从断点快照中还原恢复密码恢复引擎状态
+    /// Restores password recovery engine state from checkpoint snapshot.
     public func restoreMemento(_ memento: TaskCheckpointMemento) {
-        // 恢复断点状态信息 (例如记录最新 checkpointOffset 及进度)
+        // Restores checkpoint state offsets and metrics
     }
 }

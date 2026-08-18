@@ -1,5 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
+/// Japanese localization string catalog (`ja`).
 public enum LocaleCatalogJa {
     public static let strings: [String: String] = [
         "common.cancel": "キャンセル",
@@ -30,17 +38,17 @@ public enum LocaleCatalogJa {
         "archive.format": "形式",
         "archive.compression_level": "圧縮レベル",
         "archive.split_volume": "分割圧縮",
-        "archive.encryption": "暗号化保護",
+        "archive.encryption": "暗号化",
         
-        "cli.usage_header": "TTZip CLI — 高性能ネイティブアーカイブエンジン",
-        "cli.subcommands": "サブコマンド",
+        "cli.usage_header": "TTZip CLI — 高性能ネイティブアーカイブ・圧縮エンジン",
+        "cli.subcommands": "コマンド一覧",
         "cli.global_options": "グローバルオプション",
-        "cli.error_missing_arg": "必要な引数が不足しています: %@",
+        "cli.error_missing_arg": "必須引数が不足しています: %@",
         "cli.error_file_not_found": "ファイルが見つかりません: %@",
-        "cli.error_invalid_format": "無効なアーカイブ形式: %@",
-        "cli.dry_run_prefix": "[シミュレーション] 実行予定操作: %@",
-        "cli.bench_running": "形式 %@ のベンチマークを実行中 (パス %d/%d)...",
-        "cli.test_summary": "テスト結果: %d 件成功, %d 件失敗 (%.2fs)",
+        "cli.error_invalid_format": "無効なアーカイブ形式です: %@",
+        "cli.dry_run_prefix": "[ドライラン] 実行予定の操作: %@",
+        "cli.bench_running": "フォーマット %@ のベンチマークを実行中 (パス %d/%d)...",
+        "cli.test_summary": "テスト結果: %d 件成功, %d 件失敗 (所要時間 %.2fs)",
         
         "benchmark.throughput": "スループット",
         "benchmark.compression_ratio": "圧縮率",
@@ -50,9 +58,9 @@ public enum LocaleCatalogJa {
         "benchmark.speedup": "高速化率",
         
         "error.file_not_found": "指定されたファイルまたはディレクトリが存在しません。",
-        "error.permission_denied": "アクセス権限が拒否されました。",
-        "error.disk_full": "ディスク容量が不足しています。",
-        "error.zip_slip_detected": "Zip Slip パストラバーサル攻撃を検知し遮断しました。",
+        "error.permission_denied": "パスへのアクセス権限がありません。",
+        "error.disk_full": "ディスクの空き容量が不足しています。",
+        "error.zip_slip_detected": "Zip Slip ディレクトリトラバーサル攻撃を検出し遮断しました。",
         "error.corrupted_header": "アーカイブヘッダーの Magic チェックに失敗したか破損しています。",
         "error.crc_mismatch": "解凍データの CRC32 チェックサムが一致しません。",
         "error.out_of_memory": "メモリ割り当て上限を超過しました。",
@@ -63,11 +71,11 @@ public enum LocaleCatalogJa {
         "settings.language": "言語",
         "settings.byte_units": "サイズ単位",
         "settings.license_status": "ライセンス状態",
-        "settings.hardware_topology": "Apple Silicon ハードウェア構成",
+        "settings.hardware_topology": "Apple Silicon ハードウェアアクセラレーション",
         
         "vault.title": "パスワード保管庫",
-        "vault.unlock_prompt": "保管庫を解除するためのパスワードを入力してください",
+        "vault.unlock_prompt": "保管庫のロックを解除するパスワードを入力",
         "vault.add_password": "パスワードを追加",
-        "vault.empty_vault": "保管されたパスワードはありません"
+        "vault.empty_vault": "保存されたパスワードはありません"
     ]
 }

@@ -1,6 +1,12 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档元数据缓存键结构
 private struct InspectionCacheKey: Hashable, Equatable, Sendable {
     let archivePath: String
     let password: String?
@@ -9,9 +15,9 @@ private struct InspectionCacheKey: Hashable, Equatable, Sendable {
     let fileSize: Int64
 }
 
-/// 【2.7 代理模式 (Proxy Pattern)】缓存代理 (Cache Proxy)
-/// `ArchiveInspectionCacheProxy` 为高频调用的 `inspectArchive` 与目录树扫描建立热内存缓存代理
-/// 结合 ReadWriteLockCache 实现 POSIX 读写锁保护的高并发 O(1) LRU 缓存，避免重复读盘与 C 库重解析
+/// Thread-safe in-memory cache proxy for archive inspection and metadata browsing (Proxy Pattern).
+///
+/// Uses `ReadWriteLockCache` with POSIX read-write lock synchronization to achieve O(1) concurrent cache hits without redundant disk I/O.
 public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacading, @unchecked Sendable {
     public static let shared = ArchiveInspectionCacheProxy()
     
@@ -56,8 +62,6 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
         self.cache = ReadWriteLockCache(policy: .lru(maxEntries: maxEntries))
     }
     
-    // MARK: - 辅助：构建磁盘文件特征 Cache Key
-    
     private func makeCacheKey(archivePath: String, password: String?, autoVaultUnlock: Bool) -> InspectionCacheKey {
         let fm = FileManager.default
         let attrs = try? fm.attributesOfItem(atPath: archivePath)
@@ -72,7 +76,7 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
         )
     }
     
-    // MARK: - 1. 缓存代理主入口 inspectArchive (Cache Proxy Entrance)
+    // MARK: - Inspection Cache Entry Point
     
     public func inspectArchive(
         archivePath: String,
@@ -88,14 +92,12 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
         
         statsLock.withWriteLock { _missCount += 1 }
         
-        // 缓存未命中，调用真实目标引擎解析
         let result = try await targetEngine.inspectArchive(
             archivePath: archivePath,
             password: password,
             autoVaultUnlock: autoVaultUnlock
         )
         
-        // 乐观并发校验：在调用 targetEngine.inspectArchive 期间，磁盘文件是否被并发 Task 修改
         let keyAfter = makeCacheKey(archivePath: archivePath, password: password, autoVaultUnlock: autoVaultUnlock)
         
         if keyBefore == keyAfter {
@@ -106,7 +108,7 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
         return result
     }
     
-    // MARK: - 2. ArchiveReading 协议适配 (Protocol Conformance)
+    // MARK: - ArchiveReading Protocol Conformance
     
     public func inspect(archivePath: String) async throws -> [ArchiveEntry] {
         return try await inspect(archivePath: archivePath, password: nil, candidatePasswords: nil)
@@ -121,14 +123,14 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
         return result.entries
     }
     
-    // MARK: - 3. 缓存失效与清理 API
+    // MARK: - Cache Invalidation
     
-    /// 手动清空指定路径的缓存记录 (文件修改/删除时使用)
+    /// Invalidates cache entries matching specified archive path.
     public func invalidate(archivePath: String) {
         cache.removeAll { $0.archivePath == archivePath }
     }
     
-    /// 清空全部热内存缓存
+    /// Clears all cached inspection metadata.
     public func clearCache() {
         cache.removeAll()
         statsLock.withWriteLock {
@@ -137,7 +139,7 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
         }
     }
     
-    // MARK: - 4. 其他门面透传方法
+    // MARK: - Engine Delegation
     
     public func quickCompress(
         inputs: [String],
@@ -150,7 +152,6 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
         advancedOptions: ArchiveAdvancedOptions? = nil,
         progress: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) async throws -> ArchiveOperationResult {
-        // 压缩生成新文件可能覆盖旧输出包，操作前后双重失效相关缓存，杜绝并发竞争残留脏数据
         invalidate(archivePath: outputPath)
         defer { invalidate(archivePath: outputPath) }
         return try await targetEngine.quickCompress(

@@ -1,0 +1,1190 @@
+{
+  "zip_6_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808650929.034128,
+    "levelRaw" : 6,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "zip",
+    "isEncrypted" : false,
+    "peakExtractMBs" : 11765.1095860923,
+    "peakCompressMBs" : 152.39184715888393
+  },
+  "zip_6_true_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808650929.034124,
+    "peakExtractMBs" : 2091.44652645457,
+    "isEncrypted" : true,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "levelRaw" : 6,
+    "peakCompressMBs" : 2303.325592303516,
+    "formatRaw" : "zip"
+  },
+  "dmg_6_true_高熵物理Payload (100MB)" : {
+    "formatRaw" : "dmg",
+    "peakCompressMBs" : 3298.7604953226064,
+    "peakExtractMBs" : 6284.30180721655,
+    "isEncrypted" : true,
+    "lastUpdated" : 808601352.34228,
+    "levelRaw" : 6,
+    "dimensionName" : "高熵物理Payload (100MB)"
+  },
+  "lzip_6_false_海量小文件 (10MB\/100文件)" : {
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "lzip",
+    "lastUpdated" : 808601352.342236,
+    "peakCompressMBs" : 891.418781419237,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 101.68112571631052,
+    "levelRaw" : 6
+  },
+  "lz4_1_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808601352.342274,
+    "peakExtractMBs" : 666.4965247659984,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "lz4",
+    "peakCompressMBs" : 5358.984973815763,
+    "levelRaw" : 1,
+    "isEncrypted" : false
+  },
+  "tar.gz_1_false_海量小文件 (10MB\/100文件)" : {
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "tar.gz",
+    "lastUpdated" : 808601638.240072,
+    "peakCompressMBs" : 3714.204082462433,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 1146.7999126731952,
+    "levelRaw" : 1
+  },
+  "tar_1_false_500MB 大文件数据块 (500MB)" : {
+    "formatRaw" : "tar",
+    "lastUpdated" : 808601352.34229,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "levelRaw" : 1,
+    "isEncrypted" : false,
+    "peakCompressMBs" : 6377.134142379603,
+    "peakExtractMBs" : 10310.066647610862
+  },
+  "7z_1_false_拟真日志文本 (10MB)" : {
+    "formatRaw" : "7z",
+    "peakCompressMBs" : 3423.5275938830105,
+    "peakExtractMBs" : 6497.6154841533535,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601638.240084,
+    "levelRaw" : 1,
+    "dimensionName" : "拟真日志文本 (10MB)"
+  },
+  "wim_1_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601638.24008,
+    "peakExtractMBs" : 1543.6726287297795,
+    "isEncrypted" : false,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 3326.6148773769896,
+    "formatRaw" : "wim"
+  },
+  "tar.zst_6_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808608370.374153,
+    "levelRaw" : 6,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "tar.zst",
+    "isEncrypted" : false,
+    "peakExtractMBs" : 4673.261150067098,
+    "peakCompressMBs" : 5377.23546620154
+  },
+  "tar.bz2_6_false_海量小文件 (10MB\/100文件)" : {
+    "formatRaw" : "tar.bz2",
+    "peakCompressMBs" : 111.3230643090239,
+    "peakExtractMBs" : 215.889961782847,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601638.240074,
+    "levelRaw" : 6,
+    "dimensionName" : "海量小文件 (10MB\/100文件)"
+  },
+  "zip_6_true_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808650929.034128,
+    "peakExtractMBs" : 2451.020441483652,
+    "isEncrypted" : true,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "levelRaw" : 6,
+    "peakCompressMBs" : 146.03949113565994,
+    "formatRaw" : "zip"
+  },
+  "tar.xz_1_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601638.240074,
+    "levelRaw" : 1,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "tar.xz",
+    "isEncrypted" : false,
+    "peakExtractMBs" : 102.56067038828724,
+    "peakCompressMBs" : 1762.9261358336212
+  },
+  "zip_1_false_500MB 大文件数据块 (500MB)" : {
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "formatRaw" : "zip",
+    "lastUpdated" : 808650929.034129,
+    "peakCompressMBs" : 1894.4085111998527,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 10502.03209877758,
+    "levelRaw" : 1
+  },
+  "lrzip_6_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808601352.342277,
+    "levelRaw" : 6,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "lrzip",
+    "isEncrypted" : false,
+    "peakExtractMBs" : 608.2378216605597,
+    "peakCompressMBs" : 119.81683599459646
+  },
+  "tar_6_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808604486.782224,
+    "peakExtractMBs" : 9064.607858701294,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "tar",
+    "peakCompressMBs" : 6052.932965011554,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "zip_1_true_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808650929.034125,
+    "levelRaw" : 1,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "zip",
+    "isEncrypted" : true,
+    "peakExtractMBs" : 5428.071515415742,
+    "peakCompressMBs" : 1728.0343218355388
+  },
+  "zip_1_true_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808650929.034122,
+    "peakExtractMBs" : 2083.937092072724,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "zip",
+    "peakCompressMBs" : 2369.9509570065634,
+    "levelRaw" : 1,
+    "isEncrypted" : true
+  },
+  "dmg_6_true_500MB 大文件数据块 (500MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "dmg",
+    "isEncrypted" : true,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "lastUpdated" : 808608370.374185,
+    "peakCompressMBs" : 4222.161703345736,
+    "peakExtractMBs" : 6376.202310390482
+  },
+  "dmg_6_false_高熵物理Payload (100MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "dmg",
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "lastUpdated" : 808604486.782231,
+    "peakCompressMBs" : 3719.609634258955,
+    "peakExtractMBs" : 7197.588817874932
+  },
+  "aar_6_false_海量小文件 (10MB\/100文件)" : {
+    "formatRaw" : "aar",
+    "peakCompressMBs" : 2073.5837170375407,
+    "peakExtractMBs" : 2062.223270311166,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601638.24008,
+    "levelRaw" : 6,
+    "dimensionName" : "海量小文件 (10MB\/100文件)"
+  },
+  "lzip_1_false_高熵物理Payload (100MB)" : {
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "lzip",
+    "lastUpdated" : 808507293.280146,
+    "peakCompressMBs" : 111.86244349925924,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 626.9667819076151,
+    "levelRaw" : 1
+  },
+  "brotli_1_false_500MB 大文件数据块 (500MB)" : {
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "formatRaw" : "brotli",
+    "lastUpdated" : 808604486.782244,
+    "peakCompressMBs" : 1278.0248215758575,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 1894.9541636658034,
+    "levelRaw" : 1
+  },
+  "lrzip_1_false_500MB 大文件数据块 (500MB)" : {
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "formatRaw" : "lrzip",
+    "lastUpdated" : 808507293.280164,
+    "peakCompressMBs" : 5051.8296687815055,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 1073.9355396871972,
+    "levelRaw" : 1
+  },
+  "tar.gz_1_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808608370.374154,
+    "peakExtractMBs" : 5694.112337140684,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "tar.gz",
+    "peakCompressMBs" : 2160.39102298835,
+    "levelRaw" : 1,
+    "isEncrypted" : false
+  },
+  "7z_1_true_高熵物理Payload (100MB)" : {
+    "levelRaw" : 1,
+    "formatRaw" : "7z",
+    "isEncrypted" : true,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "lastUpdated" : 808608370.374149,
+    "peakCompressMBs" : 1403.8880713062636,
+    "peakExtractMBs" : 5982.859104907593
+  },
+  "tar.bz2_6_false_高熵物理Payload (100MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "tar.bz2",
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "lastUpdated" : 808601352.34227,
+    "peakCompressMBs" : 240.8509504845492,
+    "peakExtractMBs" : 42.495509864513
+  },
+  "lzip_1_false_海量小文件 (10MB\/100文件)" : {
+    "formatRaw" : "lzip",
+    "lastUpdated" : 808601352.342235,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "levelRaw" : 1,
+    "isEncrypted" : false,
+    "peakCompressMBs" : 1515.3852761385267,
+    "peakExtractMBs" : 105.3149136104047
+  },
+  "tar.xz_6_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601638.240075,
+    "peakExtractMBs" : 100.85533787257016,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "tar.xz",
+    "peakCompressMBs" : 1009.3227380518313,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "dmg_1_true_拟真日志文本 (10MB)" : {
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "dmg",
+    "lastUpdated" : 808608370.374147,
+    "peakCompressMBs" : 2903.4895620855273,
+    "isEncrypted" : true,
+    "peakExtractMBs" : 5355.750719456185,
+    "levelRaw" : 1
+  },
+  "7z_1_true_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601638.24007,
+    "peakExtractMBs" : 927.7345417837552,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "7z",
+    "peakCompressMBs" : 1805.1765972337264,
+    "levelRaw" : 1,
+    "isEncrypted" : true
+  },
+  "brotli_6_false_500MB 大文件数据块 (500MB)" : {
+    "formatRaw" : "brotli",
+    "peakCompressMBs" : 1278.501800663089,
+    "peakExtractMBs" : 1935.8173312691717,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601352.342294,
+    "levelRaw" : 6,
+    "dimensionName" : "500MB 大文件数据块 (500MB)"
+  },
+  "wim_6_false_高熵物理Payload (100MB)" : {
+    "formatRaw" : "wim",
+    "peakCompressMBs" : 6049.408530950728,
+    "peakExtractMBs" : 9029.413292848178,
+    "isEncrypted" : false,
+    "lastUpdated" : 808604486.782229,
+    "levelRaw" : 6,
+    "dimensionName" : "高熵物理Payload (100MB)"
+  },
+  "7z_6_true_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808509226.830505,
+    "peakExtractMBs" : 1277.8884463479349,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "7z",
+    "peakCompressMBs" : 582.629677980062,
+    "levelRaw" : 6,
+    "isEncrypted" : true
+  },
+  "wim_6_true_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601638.240082,
+    "levelRaw" : 6,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "wim",
+    "isEncrypted" : true,
+    "peakExtractMBs" : 1539.7281599359644,
+    "peakCompressMBs" : 3396.1980534234663
+  },
+  "tar_1_false_高熵物理Payload (100MB)" : {
+    "levelRaw" : 1,
+    "formatRaw" : "tar",
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "lastUpdated" : 808604486.782223,
+    "peakCompressMBs" : 6109.668569365189,
+    "peakExtractMBs" : 9334.707598218607
+  },
+  "tar.gz_1_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808601352.342251,
+    "levelRaw" : 1,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "tar.gz",
+    "isEncrypted" : false,
+    "peakExtractMBs" : 5634.934550290227,
+    "peakCompressMBs" : 6881.453130302858
+  },
+  "lzip_1_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808509226.830511,
+    "peakExtractMBs" : 100.98558170113748,
+    "isEncrypted" : false,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 1716.8228846093702,
+    "formatRaw" : "lzip"
+  },
+  "dmg_6_true_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601352.342245,
+    "levelRaw" : 6,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "dmg",
+    "isEncrypted" : true,
+    "peakExtractMBs" : 1166.267278570608,
+    "peakCompressMBs" : 1850.1771897716424
+  },
+  "7z_1_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808608370.374148,
+    "peakExtractMBs" : 7275.328802900492,
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 5622.30744369982,
+    "formatRaw" : "7z"
+  },
+  "lrzip_1_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808601352.342276,
+    "peakExtractMBs" : 621.3844808308972,
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 114.10263389674179,
+    "formatRaw" : "lrzip"
+  },
+  "7z_1_true_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808508450.815611,
+    "levelRaw" : 1,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "7z",
+    "isEncrypted" : true,
+    "peakExtractMBs" : 1380.0212812025748,
+    "peakCompressMBs" : 1708.6510263040884
+  },
+  "lrzip_6_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601352.342239,
+    "peakExtractMBs" : 102.44387282777889,
+    "isEncrypted" : false,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "levelRaw" : 6,
+    "peakCompressMBs" : 939.9353472441559,
+    "formatRaw" : "lrzip"
+  },
+  "aar_1_false_海量小文件 (10MB\/100文件)" : {
+    "levelRaw" : 1,
+    "formatRaw" : "aar",
+    "isEncrypted" : false,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "lastUpdated" : 808601638.24008,
+    "peakCompressMBs" : 2047.686736956451,
+    "peakExtractMBs" : 2021.5787000280648
+  },
+  "lz4_6_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808601352.342293,
+    "peakExtractMBs" : 2694.238907544511,
+    "isEncrypted" : false,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "levelRaw" : 6,
+    "peakCompressMBs" : 18448.624480702703,
+    "formatRaw" : "lz4"
+  },
+  "brotli_1_false_高熵物理Payload (100MB)" : {
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "brotli",
+    "lastUpdated" : 808604486.782227,
+    "peakCompressMBs" : 1195.7514934966352,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 1434.8051434925642,
+    "levelRaw" : 1
+  },
+  "tar.bz2_6_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808601352.342253,
+    "peakExtractMBs" : 278.4201694593408,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "tar.bz2",
+    "peakCompressMBs" : 108.27156708290599,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "tar_6_false_500MB 大文件数据块 (500MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "tar",
+    "isEncrypted" : false,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "lastUpdated" : 808601352.342291,
+    "peakCompressMBs" : 6605.4706638540565,
+    "peakExtractMBs" : 10585.128253273986
+  },
+  "dmg_1_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601638.240082,
+    "peakExtractMBs" : 1146.4014957137583,
+    "isEncrypted" : false,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 1842.334548488311,
+    "formatRaw" : "dmg"
+  },
+  "tar.bz2_1_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808608370.374173,
+    "formatRaw" : "tar.bz2",
+    "peakExtractMBs" : 2106.986449788964,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "peakCompressMBs" : 2786.677729617103,
+    "levelRaw" : 1,
+    "isEncrypted" : false
+  },
+  "dmg_1_true_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601352.342244,
+    "formatRaw" : "dmg",
+    "peakExtractMBs" : 1191.627404155047,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "peakCompressMBs" : 1834.7597132133124,
+    "levelRaw" : 1,
+    "isEncrypted" : true
+  },
+  "wim_1_false_拟真日志文本 (10MB)" : {
+    "levelRaw" : 1,
+    "formatRaw" : "wim",
+    "isEncrypted" : false,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "lastUpdated" : 808601352.34226,
+    "peakCompressMBs" : 5767.657963721091,
+    "peakExtractMBs" : 9120.972620542914
+  },
+  "tar.zst_1_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808604486.782235,
+    "peakExtractMBs" : 5028.9436657703045,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "formatRaw" : "tar.zst",
+    "peakCompressMBs" : 25660.380574362076,
+    "levelRaw" : 1,
+    "isEncrypted" : false
+  },
+  "7z_6_false_海量小文件 (10MB\/100文件)" : {
+    "formatRaw" : "7z",
+    "lastUpdated" : 808601638.24007,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "levelRaw" : 6,
+    "isEncrypted" : false,
+    "peakCompressMBs" : 635.8811670777628,
+    "peakExtractMBs" : 1581.4067141784465
+  },
+  "dmg_6_false_500MB 大文件数据块 (500MB)" : {
+    "formatRaw" : "dmg",
+    "peakCompressMBs" : 4269.149982894494,
+    "peakExtractMBs" : 6307.808432804852,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601352.342298,
+    "levelRaw" : 6,
+    "dimensionName" : "500MB 大文件数据块 (500MB)"
+  },
+  "wim_6_false_拟真日志文本 (10MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "wim",
+    "isEncrypted" : false,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "lastUpdated" : 808509226.830514,
+    "peakCompressMBs" : 6054.390365369178,
+    "peakExtractMBs" : 9188.887480650841
+  },
+  "zip_1_false_高熵物理Payload (100MB)" : {
+    "levelRaw" : 1,
+    "formatRaw" : "zip",
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "lastUpdated" : 808601352.342265,
+    "peakCompressMBs" : 194.46124148089714,
+    "peakExtractMBs" : 10389.790398957442
+  },
+  "brotli_6_false_海量小文件 (10MB\/100文件)" : {
+    "formatRaw" : "brotli",
+    "peakCompressMBs" : 995.0302558126432,
+    "peakExtractMBs" : 1237.8844446043274,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601352.342238,
+    "levelRaw" : 6,
+    "dimensionName" : "海量小文件 (10MB\/100文件)"
+  },
+  "dmg_1_true_500MB 大文件数据块 (500MB)" : {
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "formatRaw" : "dmg",
+    "lastUpdated" : 808601638.24012,
+    "peakCompressMBs" : 4174.567906722224,
+    "isEncrypted" : true,
+    "peakExtractMBs" : 7709.074936882119,
+    "levelRaw" : 1
+  },
+  "7z_1_true_500MB 大文件数据块 (500MB)" : {
+    "formatRaw" : "7z",
+    "peakCompressMBs" : 5611.743137133436,
+    "peakExtractMBs" : 8528.396717396497,
+    "isEncrypted" : true,
+    "lastUpdated" : 808601352.342281,
+    "levelRaw" : 1,
+    "dimensionName" : "500MB 大文件数据块 (500MB)"
+  },
+  "tar.gz_6_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808601352.342252,
+    "peakExtractMBs" : 6046.750057129652,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "tar.gz",
+    "peakCompressMBs" : 5933.522734448263,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "tar_6_false_拟真日志文本 (10MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "tar",
+    "isEncrypted" : false,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "lastUpdated" : 808509226.83051,
+    "peakCompressMBs" : 5764.78920949712,
+    "peakExtractMBs" : 8709.807748194316
+  },
+  "lzip_6_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808601352.342292,
+    "formatRaw" : "lzip",
+    "peakExtractMBs" : 1106.985335869839,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "peakCompressMBs" : 2779.383642736396,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "wim_1_true_海量小文件 (10MB\/100文件)" : {
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "wim",
+    "lastUpdated" : 808601638.240081,
+    "peakCompressMBs" : 3365.151287171825,
+    "isEncrypted" : true,
+    "peakExtractMBs" : 1552.4712662878674,
+    "levelRaw" : 1
+  },
+  "zip_6_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808650929.034126,
+    "peakExtractMBs" : 8281.491577877445,
+    "isEncrypted" : false,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "levelRaw" : 6,
+    "peakCompressMBs" : 1376.7666781635025,
+    "formatRaw" : "zip"
+  },
+  "tar.gz_6_false_高熵物理Payload (100MB)" : {
+    "formatRaw" : "tar.gz",
+    "peakCompressMBs" : 1759.9398073875248,
+    "peakExtractMBs" : 5271.041336201358,
+    "isEncrypted" : false,
+    "lastUpdated" : 808608370.374154,
+    "levelRaw" : 6,
+    "dimensionName" : "高熵物理Payload (100MB)"
+  },
+  "tar.zst_1_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808601352.34225,
+    "peakExtractMBs" : 6462.608581413238,
+    "isEncrypted" : false,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 11398.303925754237,
+    "formatRaw" : "tar.zst"
+  },
+  "dmg_1_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808601638.240119,
+    "peakExtractMBs" : 6903.764972383042,
+    "isEncrypted" : false,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 4218.64980743986,
+    "formatRaw" : "dmg"
+  },
+  "tar_1_false_海量小文件 (10MB\/100文件)" : {
+    "formatRaw" : "tar",
+    "peakCompressMBs" : 3299.542790523299,
+    "peakExtractMBs" : 1559.9375563050405,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601638.240075,
+    "levelRaw" : 1,
+    "dimensionName" : "海量小文件 (10MB\/100文件)"
+  },
+  "iso_1_false_海量小文件 (10MB\/100文件)" : {
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "iso",
+    "lastUpdated" : 808608370.37413,
+    "peakCompressMBs" : 1794.164310173983,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 1161.7368568030731,
+    "levelRaw" : 1
+  },
+  "7z_6_false_高熵物理Payload (100MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "7z",
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "lastUpdated" : 808608370.374149,
+    "peakCompressMBs" : 5725.737175277574,
+    "peakExtractMBs" : 7469.631232541669
+  },
+  "tar.bz2_6_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808601352.342288,
+    "peakExtractMBs" : 2120.9672455047803,
+    "isEncrypted" : false,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "levelRaw" : 6,
+    "peakCompressMBs" : 2821.793842024744,
+    "formatRaw" : "tar.bz2"
+  },
+  "dmg_6_true_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808601638.240095,
+    "levelRaw" : 6,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "dmg",
+    "isEncrypted" : true,
+    "peakExtractMBs" : 5313.628205140085,
+    "peakCompressMBs" : 2742.105162487328
+  },
+  "zip_1_true_500MB 大文件数据块 (500MB)" : {
+    "formatRaw" : "zip",
+    "peakCompressMBs" : 1925.2474544744769,
+    "peakExtractMBs" : 11297.296839059802,
+    "isEncrypted" : true,
+    "lastUpdated" : 808650929.03413,
+    "levelRaw" : 1,
+    "dimensionName" : "500MB 大文件数据块 (500MB)"
+  },
+  "lz4_1_false_拟真日志文本 (10MB)" : {
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "lz4",
+    "lastUpdated" : 808507725.306134,
+    "peakCompressMBs" : 6476.691010299035,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 107.55742651983873,
+    "levelRaw" : 1
+  },
+  "lz4_6_false_拟真日志文本 (10MB)" : {
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "lz4",
+    "lastUpdated" : 808506928.466604,
+    "peakCompressMBs" : 6550.839017319469,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 107.4390163606881,
+    "levelRaw" : 6
+  },
+  "zip_1_false_拟真日志文本 (10MB)" : {
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "zip",
+    "lastUpdated" : 808650929.034124,
+    "peakCompressMBs" : 1910.7918359613407,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 8144.078112280159,
+    "levelRaw" : 1
+  },
+  "iso_6_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601352.342246,
+    "peakExtractMBs" : 1206.0797433509115,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "iso",
+    "peakCompressMBs" : 1874.0242762270104,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "lz4_6_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808601352.342275,
+    "peakExtractMBs" : 656.7515424367041,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "lz4",
+    "peakCompressMBs" : 1429.5414734940357,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "7z_6_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808601352.342247,
+    "peakExtractMBs" : 3876.4703422611733,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "7z",
+    "peakCompressMBs" : 581.0696264625931,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "wim_6_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808509226.830539,
+    "peakExtractMBs" : 11988.059879595308,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "formatRaw" : "wim",
+    "peakCompressMBs" : 7107.804670903506,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "zip_6_false_500MB 大文件数据块 (500MB)" : {
+    "formatRaw" : "zip",
+    "peakCompressMBs" : 1276.1655139171414,
+    "peakExtractMBs" : 13100.937263196853,
+    "isEncrypted" : false,
+    "lastUpdated" : 808650929.03413,
+    "levelRaw" : 6,
+    "dimensionName" : "500MB 大文件数据块 (500MB)"
+  },
+  "tar.bz2_1_false_高熵物理Payload (100MB)" : {
+    "levelRaw" : 1,
+    "formatRaw" : "tar.bz2",
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "lastUpdated" : 808608370.374155,
+    "peakCompressMBs" : 238.38122470712585,
+    "peakExtractMBs" : 42.70672823712165
+  },
+  "7z_6_false_500MB 大文件数据块 (500MB)" : {
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "formatRaw" : "7z",
+    "lastUpdated" : 808601352.342282,
+    "peakCompressMBs" : 5113.334938904951,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 9628.654894288378,
+    "levelRaw" : 6
+  },
+  "dmg_1_false_拟真日志文本 (10MB)" : {
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "dmg",
+    "lastUpdated" : 808601352.342261,
+    "peakCompressMBs" : 2897.269747425973,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 5804.223146098089,
+    "levelRaw" : 1
+  },
+  "7z_1_false_海量小文件 (10MB\/100文件)" : {
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "7z",
+    "lastUpdated" : 808601638.240059,
+    "peakCompressMBs" : 3040.250650200877,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 1875.5722869187193,
+    "levelRaw" : 1
+  },
+  "dmg_6_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808601352.342262,
+    "peakExtractMBs" : 5466.3013459851945,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "dmg",
+    "peakCompressMBs" : 2897.050377593392,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "tar.zst_6_false_拟真日志文本 (10MB)" : {
+    "formatRaw" : "tar.zst",
+    "lastUpdated" : 808601352.342251,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "levelRaw" : 6,
+    "isEncrypted" : false,
+    "peakCompressMBs" : 6887.647860034865,
+    "peakExtractMBs" : 6474.173256971654
+  },
+  "tar.bz2_1_false_拟真日志文本 (10MB)" : {
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "tar.bz2",
+    "lastUpdated" : 808601352.342252,
+    "peakCompressMBs" : 107.15729038009385,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 279.36475891319196,
+    "levelRaw" : 1
+  },
+  "zip_6_true_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808650929.034126,
+    "levelRaw" : 6,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "zip",
+    "isEncrypted" : true,
+    "peakExtractMBs" : 5838.670363872078,
+    "peakCompressMBs" : 1268.6386852184257
+  },
+  "brotli_1_false_拟真日志文本 (10MB)" : {
+    "formatRaw" : "brotli",
+    "peakCompressMBs" : 1132.805187939144,
+    "peakExtractMBs" : 1608.2151151179023,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601352.342258,
+    "levelRaw" : 1,
+    "dimensionName" : "拟真日志文本 (10MB)"
+  },
+  "tar.xz_1_false_高熵物理Payload (100MB)" : {
+    "levelRaw" : 1,
+    "formatRaw" : "tar.xz",
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "lastUpdated" : 808601352.34227,
+    "peakCompressMBs" : 113.2437691483472,
+    "peakExtractMBs" : 631.4755845714711
+  },
+  "7z_6_true_海量小文件 (10MB\/100文件)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "7z",
+    "isEncrypted" : true,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "lastUpdated" : 808601352.342226,
+    "peakCompressMBs" : 627.50193422643,
+    "peakExtractMBs" : 862.6628025429652
+  },
+  "tar.gz_6_false_500MB 大文件数据块 (500MB)" : {
+    "formatRaw" : "tar.gz",
+    "peakCompressMBs" : 14377.714556192408,
+    "peakExtractMBs" : 3198.260147528978,
+    "isEncrypted" : false,
+    "lastUpdated" : 808509226.830532,
+    "levelRaw" : 6,
+    "dimensionName" : "500MB 大文件数据块 (500MB)"
+  },
+  "lzip_6_false_高熵物理Payload (100MB)" : {
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "lzip",
+    "lastUpdated" : 808601352.342274,
+    "peakCompressMBs" : 120.03487012419583,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 610.2527034198141,
+    "levelRaw" : 6
+  },
+  "tar.xz_6_false_高熵物理Payload (100MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "tar.xz",
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "lastUpdated" : 808601352.342271,
+    "peakCompressMBs" : 119.5769129467529,
+    "peakExtractMBs" : 615.1417135671873
+  },
+  "dmg_6_false_海量小文件 (10MB\/100文件)" : {
+    "formatRaw" : "dmg",
+    "lastUpdated" : 808601352.342244,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "levelRaw" : 6,
+    "isEncrypted" : false,
+    "peakCompressMBs" : 1876.1302080995808,
+    "peakExtractMBs" : 1177.7128218015812
+  },
+  "lrzip_1_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601352.342238,
+    "peakExtractMBs" : 104.63107930263455,
+    "isEncrypted" : false,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 1535.089445910972,
+    "formatRaw" : "lrzip"
+  },
+  "wim_1_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808601352.342277,
+    "peakExtractMBs" : 8954.822847861342,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "wim",
+    "peakCompressMBs" : 6067.961168313089,
+    "levelRaw" : 1,
+    "isEncrypted" : false
+  },
+  "lz4_1_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808601352.342293,
+    "peakExtractMBs" : 2694.4566945046668,
+    "isEncrypted" : false,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 18360.583522340487,
+    "formatRaw" : "lz4"
+  },
+  "lrzip_1_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808507293.280135,
+    "levelRaw" : 1,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "lrzip",
+    "isEncrypted" : false,
+    "peakExtractMBs" : 100.33715828619907,
+    "peakCompressMBs" : 1822.9526749796937
+  },
+  "lrzip_6_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808601352.342296,
+    "formatRaw" : "lrzip",
+    "peakExtractMBs" : 1085.5395190562303,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "peakCompressMBs" : 2765.5071220173954,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "lzip_1_false_500MB 大文件数据块 (500MB)" : {
+    "levelRaw" : 1,
+    "formatRaw" : "lzip",
+    "isEncrypted" : false,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "lastUpdated" : 808601352.342292,
+    "peakCompressMBs" : 5102.316323722565,
+    "peakExtractMBs" : 1104.558115645984
+  },
+  "dmg_1_true_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808601638.240106,
+    "formatRaw" : "dmg",
+    "peakExtractMBs" : 6313.529894688784,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "peakCompressMBs" : 3254.418202621681,
+    "levelRaw" : 1,
+    "isEncrypted" : true
+  },
+  "7z_1_false_500MB 大文件数据块 (500MB)" : {
+    "formatRaw" : "7z",
+    "peakCompressMBs" : 5550.251978964842,
+    "peakExtractMBs" : 9483.137380636475,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601352.342281,
+    "levelRaw" : 1,
+    "dimensionName" : "500MB 大文件数据块 (500MB)"
+  },
+  "tar_6_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601638.240076,
+    "formatRaw" : "tar",
+    "peakExtractMBs" : 1612.9890229641271,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "peakCompressMBs" : 3345.0425365009496,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "tar.bz2_1_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601352.342231,
+    "peakExtractMBs" : 217.29975854460503,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "tar.bz2",
+    "peakCompressMBs" : 112.2784708393112,
+    "levelRaw" : 1,
+    "isEncrypted" : false
+  },
+  "tar.xz_6_false_500MB 大文件数据块 (500MB)" : {
+    "formatRaw" : "tar.xz",
+    "peakCompressMBs" : 2767.873659957114,
+    "peakExtractMBs" : 1104.4885770067128,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601352.342289,
+    "levelRaw" : 6,
+    "dimensionName" : "500MB 大文件数据块 (500MB)"
+  },
+  "brotli_6_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808604486.782227,
+    "peakExtractMBs" : 1442.4021760013193,
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "levelRaw" : 6,
+    "peakCompressMBs" : 1197.3568326469658,
+    "formatRaw" : "brotli"
+  },
+  "tar.zst_6_false_500MB 大文件数据块 (500MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "tar.zst",
+    "isEncrypted" : false,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "lastUpdated" : 808608370.374171,
+    "peakCompressMBs" : 23489.2497580958,
+    "peakExtractMBs" : 5871.96186857011
+  },
+  "tar_1_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808601352.342254,
+    "peakExtractMBs" : 8609.534300824946,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "tar",
+    "peakCompressMBs" : 5615.1855988887355,
+    "levelRaw" : 1,
+    "isEncrypted" : false
+  },
+  "tar.xz_6_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808508812.82095,
+    "peakExtractMBs" : 96.70595502143136,
+    "isEncrypted" : false,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "levelRaw" : 6,
+    "peakCompressMBs" : 1110.362796432966,
+    "formatRaw" : "tar.xz"
+  },
+  "brotli_6_false_拟真日志文本 (10MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "brotli",
+    "isEncrypted" : false,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "lastUpdated" : 808608370.374144,
+    "peakCompressMBs" : 1152.2574538505544,
+    "peakExtractMBs" : 1640.7539796892277
+  },
+  "7z_6_true_500MB 大文件数据块 (500MB)" : {
+    "formatRaw" : "7z",
+    "peakCompressMBs" : 5111.06340378718,
+    "peakExtractMBs" : 8642.450998609916,
+    "isEncrypted" : true,
+    "lastUpdated" : 808601352.342282,
+    "levelRaw" : 6,
+    "dimensionName" : "500MB 大文件数据块 (500MB)"
+  },
+  "zip_1_true_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808650929.034127,
+    "levelRaw" : 1,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "zip",
+    "isEncrypted" : true,
+    "peakExtractMBs" : 2413.811831267483,
+    "peakCompressMBs" : 185.1977031408477
+  },
+  "tar.gz_1_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808601352.342286,
+    "peakExtractMBs" : 3209.7628135816976,
+    "isEncrypted" : false,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 15988.786515162497,
+    "formatRaw" : "tar.gz"
+  },
+  "tar.zst_1_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808601638.240098,
+    "peakExtractMBs" : 4498.627919558432,
+    "isEncrypted" : false,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 5290.177232509975,
+    "formatRaw" : "tar.zst"
+  },
+  "tar.xz_1_false_500MB 大文件数据块 (500MB)" : {
+    "lastUpdated" : 808601352.342289,
+    "peakExtractMBs" : 1109.3458130540748,
+    "isEncrypted" : false,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "levelRaw" : 1,
+    "peakCompressMBs" : 5122.688398181989,
+    "formatRaw" : "tar.xz"
+  },
+  "tar.gz_6_false_海量小文件 (10MB\/100文件)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "tar.gz",
+    "isEncrypted" : false,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "lastUpdated" : 808608370.374115,
+    "peakCompressMBs" : 3461.7732659286835,
+    "peakExtractMBs" : 1195.5779734795165
+  },
+  "lz4_1_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601638.240077,
+    "formatRaw" : "lz4",
+    "peakExtractMBs" : 108.48384256851354,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "peakCompressMBs" : 3440.455358529678,
+    "levelRaw" : 1,
+    "isEncrypted" : false
+  },
+  "zip_6_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808650929.034123,
+    "peakExtractMBs" : 2515.1850102665962,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "zip",
+    "peakCompressMBs" : 6841.516619878282,
+    "levelRaw" : 6,
+    "isEncrypted" : false
+  },
+  "lzip_6_false_拟真日志文本 (10MB)" : {
+    "lastUpdated" : 808508450.815618,
+    "peakExtractMBs" : 98.25539854656385,
+    "isEncrypted" : false,
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "levelRaw" : 6,
+    "peakCompressMBs" : 975.5121776328956,
+    "formatRaw" : "lzip"
+  },
+  "zip_1_false_海量小文件 (10MB\/100文件)" : {
+    "formatRaw" : "zip",
+    "peakCompressMBs" : 7356.492317675141,
+    "peakExtractMBs" : 2437.6108050723406,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601638.240071,
+    "levelRaw" : 1,
+    "dimensionName" : "海量小文件 (10MB\/100文件)"
+  },
+  "7z_6_true_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808608370.37415,
+    "peakExtractMBs" : 5565.798208926753,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "7z",
+    "peakCompressMBs" : 1394.6579944754303,
+    "levelRaw" : 6,
+    "isEncrypted" : true
+  },
+  "dmg_1_false_高熵物理Payload (100MB)" : {
+    "lastUpdated" : 808601352.342279,
+    "levelRaw" : 1,
+    "dimensionName" : "高熵物理Payload (100MB)",
+    "formatRaw" : "dmg",
+    "isEncrypted" : false,
+    "peakExtractMBs" : 6414.316756486951,
+    "peakCompressMBs" : 3411.887277376632
+  },
+  "lz4_6_false_海量小文件 (10MB\/100文件)" : {
+    "formatRaw" : "lz4",
+    "lastUpdated" : 808601638.240078,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "levelRaw" : 6,
+    "isEncrypted" : false,
+    "peakCompressMBs" : 3488.666490918205,
+    "peakExtractMBs" : 109.41303612646746
+  },
+  "brotli_1_false_海量小文件 (10MB\/100文件)" : {
+    "lastUpdated" : 808601352.342237,
+    "peakExtractMBs" : 1256.523498746418,
+    "dimensionName" : "海量小文件 (10MB\/100文件)",
+    "formatRaw" : "brotli",
+    "peakCompressMBs" : 1000.1285447474348,
+    "levelRaw" : 1,
+    "isEncrypted" : false
+  },
+  "lrzip_6_false_拟真日志文本 (10MB)" : {
+    "dimensionName" : "拟真日志文本 (10MB)",
+    "formatRaw" : "lrzip",
+    "lastUpdated" : 808509226.830514,
+    "peakCompressMBs" : 989.0117646155633,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 98.64894957617338,
+    "levelRaw" : 6
+  },
+  "wim_1_false_500MB 大文件数据块 (500MB)" : {
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "formatRaw" : "wim",
+    "lastUpdated" : 808509226.830539,
+    "peakCompressMBs" : 6898.569762046472,
+    "isEncrypted" : false,
+    "peakExtractMBs" : 11514.955537053438,
+    "levelRaw" : 1
+  },
+  "tar.xz_1_false_拟真日志文本 (10MB)" : {
+    "formatRaw" : "tar.xz",
+    "peakCompressMBs" : 2232.6584061336985,
+    "peakExtractMBs" : 100.45466630242264,
+    "isEncrypted" : false,
+    "lastUpdated" : 808508812.820949,
+    "levelRaw" : 1,
+    "dimensionName" : "拟真日志文本 (10MB)"
+  },
+  "wim_6_false_海量小文件 (10MB\/100文件)" : {
+    "formatRaw" : "wim",
+    "peakCompressMBs" : 3328.799717286919,
+    "peakExtractMBs" : 1537.776022793906,
+    "isEncrypted" : false,
+    "lastUpdated" : 808601638.240081,
+    "levelRaw" : 6,
+    "dimensionName" : "海量小文件 (10MB\/100文件)"
+  },
+  "zip_6_true_500MB 大文件数据块 (500MB)" : {
+    "levelRaw" : 6,
+    "formatRaw" : "zip",
+    "isEncrypted" : true,
+    "dimensionName" : "500MB 大文件数据块 (500MB)",
+    "lastUpdated" : 808650929.034131,
+    "peakCompressMBs" : 1275.5720300143512,
+    "peakExtractMBs" : 12950.655842535398
+  }
+}

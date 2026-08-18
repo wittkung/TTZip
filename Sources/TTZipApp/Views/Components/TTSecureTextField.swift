@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 
-/// 兼容 macOS TSM (中文输入法) 的非阻塞密码输入框
-/// 彻底规避原生 `SecureField` 在 Popover/Sheet 中导致的 TSM 死锁问题
+/// Non-blocking password text field compatible with macOS Text Service Manager (TSM).
+/// Avoids native `SecureField` IME deadlock in Popovers/Sheets.
 public struct TTSecureTextField: View {
     public let title: String
     @Binding public var text: String
@@ -30,7 +37,6 @@ public struct TTSecureTextField: View {
                 ))
                 .textFieldStyle(.plain)
                 .overlay(
-                    // 真实接收按键事件与粘贴的透明层
                     TextField(title, text: $text)
                         .textFieldStyle(.plain)
                         .opacity(0.011)
@@ -45,7 +51,7 @@ public struct TTSecureTextField: View {
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            .help(isRevealed ? "隐藏密码" : "显示密码")
+            .help(isRevealed ? "Hide password" : "Show password")
         }
     }
 }

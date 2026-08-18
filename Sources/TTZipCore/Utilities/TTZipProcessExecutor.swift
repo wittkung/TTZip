@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import QuartzCore
 @_exported import CTTZipBridge
 
-/// TTZip 统一高优先级底线 CLI 与进程调度器 (彻底保证 C 字符串生命周期安全)
+/// High-priority subprocess execution manager ensuring memory and pointer lifetime safety.
 public enum TTZipProcessExecutor {
     
     @inline(__always)

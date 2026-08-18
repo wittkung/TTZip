@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 #include "include/CTTZipBridge.h"
 #include "include/ttzip_lzma2_enc_native.h"
 #include <spawn.h>
@@ -271,7 +278,7 @@ int ttzip_spawn_7zz_extract(
     closedir(d);
 
     if (!has_files) {
-        ttzip_log_c(3, "🚨 [TTZip C 引擎错误] 7zz 解压进程成功退出(0)，但目标解压目录无有效文件产出: %s\n", destination_dir);
+        ttzip_log_c(3, "[TTZip C Engine] 7zz extraction process exited cleanly, but destination directory contains no files: %s\n", destination_dir);
         return -102;
     }
     return 0;
@@ -365,13 +372,13 @@ int ttzip_spawn_7zz_compress_in_dir(
     int ret = ttzip_core_posix_spawn_fast(bin_path, (const char* const*)argv, actual_working_dir);
     free(argv);
     if (ret != 0) {
-        ttzip_log_c(3, "🚨 [TTZip C] posix_spawn failed ret=%d, bin_path='%s'\n", ret, bin_path ? bin_path : "NULL");
+        ttzip_log_c(3, "[TTZip C] posix_spawn failed ret=%d, bin_path='%s'\n", ret, bin_path ? bin_path : "NULL");
         return ret;
     }
 
     struct stat st;
     if (stat(output_archive_path, &st) != 0 || st.st_size == 0) {
-        ttzip_log_c(3, "🚨 [TTZip C 引擎错误] 7zz 打包进程成功退出(0)，但生成的压缩包不存在或大小为 0 字节: %s\n", output_archive_path);
+        ttzip_log_c(3, "[TTZip C Engine] 7zz compression process exited cleanly, but output archive is missing or empty: %s\n", output_archive_path);
         return -103;
     }
     return 0;

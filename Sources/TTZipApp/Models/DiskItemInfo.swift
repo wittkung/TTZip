@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import TTZipCore
 
@@ -47,8 +54,9 @@ public struct DiskItemInfo: Identifiable, Hashable, Equatable, Sendable {
             self.kindText = factory.internPath(rawKind)
         } else {
             self.rawSizeBytes = 0
-            self.sizeText = factory.internPath("文件夹")
-            self.kindText = factory.internPath("文件夹")
+            let folderText = "Folder"
+            self.sizeText = factory.internPath(folderText)
+            self.kindText = factory.internPath(folderText)
         }
     }
     

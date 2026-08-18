@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档任务历史记录领域实体模型 (Domain Model)
+/// Archive task history record domain entity model.
 public struct ArchiveTaskRecord: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public var commandName: String
@@ -29,65 +36,66 @@ public struct ArchiveTaskRecord: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-/// 密码库实体模型类型别名
+/// Type alias for vault password entry domain entity.
 public typealias VaultPasswordEntry = PasswordVaultEntry
 
-/// 通用仓储泛型接口 Protocol (Generic Repository Pattern)
-/// 规范化实体模型的 CRUD 数据存取流程，解耦领域实体与底层持久化介质
+/// Generic repository interface protocol (Repository Pattern).
+///
+/// Decouples business logic and domain entities from persistence engines and DTO schemas.
 public protocol ArchiveRepositoryProtocol<DomainModel>: Sendable where DomainModel: Identifiable, DomainModel: Sendable {
     associatedtype DomainModel
     
-    /// 根据 ID 检索单个实体模型
+    /// Fetches single domain entity by identifier.
     func fetch(id: DomainModel.ID) throws -> DomainModel?
     
-    /// 检索所有实体模型列表
+    /// Fetches all domain entities.
     func fetchAll() throws -> [DomainModel]
     
-    /// 保存或更新单个实体模型
+    /// Saves or updates domain entity.
     func save(_ entity: DomainModel) throws
     
-    /// 根据 ID 删除单个实体模型
+    /// Deletes domain entity by identifier.
     func delete(id: DomainModel.ID) throws
     
-    /// 删除所有实体模型
+    /// Deletes all domain entities.
     func deleteAll() throws
 }
 
-/// 预设特化仓储协议 Protocol
+/// Specialized repository protocol for compression presets.
 public protocol ArchivePresetRepositoryProtocol: ArchiveRepositoryProtocol where DomainModel == CompressionPreset {
-    /// 按预设名称精确或模糊匹配查找
+    /// Queries preset by name.
     func fetchByName(_ name: String) throws -> CompressionPreset?
     
-    /// 重置还原为系统默认预设方案
+    /// Resets presets to built-in system defaults.
     func resetToDefaults() throws
     
-    /// 基于原型模式克隆衍生全新预设方案
+    /// Duplicates an existing preset.
     func duplicate(id: UUID, newName: String?) throws -> CompressionPreset?
 }
 
-/// 密码库安全特化仓储协议 Protocol
+/// Specialized repository protocol for password vault credentials.
 public protocol PasswordVaultRepositoryProtocol: ArchiveRepositoryProtocol where DomainModel == PasswordVaultEntry {
-    /// 按安全分类检索口令条目
+    /// Queries password entries matching category.
     func search(category: String) throws -> [PasswordVaultEntry]
     
-    /// 增加并更新口令使用频率与最近使用时间戳
+    /// Records usage timestamp and counter for credential entry.
     func recordUsage(id: UUID) throws
     
-    /// 主口令当前解锁状态
+    /// Whether vault is currently unlocked.
     var isUnlocked: Bool { get }
     
-    /// 使用主口令解锁密码库
+    /// Unlocks vault using master credential.
     func unlock(masterPassword: String) throws -> Bool
     
-    /// 锁定密码库（抹除内存高敏口令）
+    /// Locks vault and wipes plaintext secrets from memory.
     func lock()
 }
 
-/// 归档历史记录特化仓储协议 Protocol
+/// Specialized repository protocol for execution history records.
 public protocol ArchiveHistoryRepositoryProtocol: ArchiveRepositoryProtocol where DomainModel == ArchiveTaskRecord {
-    /// 获取按时间降序排列的前 N 条历史执行记录
+    /// Fetches recent records ordered by timestamp descending.
     func fetchRecent(limit: Int) throws -> [ArchiveTaskRecord]
     
-    /// 按执行成功/失败状态过滤历史记录
+    /// Filters history records by success flag.
     func fetchByStatus(isSuccess: Bool) throws -> [ArchiveTaskRecord]
 }

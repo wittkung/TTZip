@@ -1,11 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-// MARK: - SubprocessExecutor: Safe Asynchronous Subprocess Execution & Pipe Draining Service
-
+/// Safe asynchronous subprocess execution and pipe draining service.
 public final class SubprocessExecutor: Sendable {
     public static let shared = SubprocessExecutor()
     private init() {}
     
+    /// Synchronously executes a subprocess streaming stdout/stderr line-by-line.
     public func executeProcess(
         executablePath: String,
         arguments: [String],
@@ -41,6 +48,7 @@ public final class SubprocessExecutor: Sendable {
         return process.terminationStatus
     }
     
+    /// Asynchronously executes a subprocess and returns exit code and captured text output.
     public func executeAsync(
         executablePath: String,
         arguments: [String],
@@ -71,5 +79,4 @@ public final class SubprocessExecutor: Sendable {
             }
         }
     }
-
 }

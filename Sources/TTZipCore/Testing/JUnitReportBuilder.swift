@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 兼容 Jenkins / GitHub Actions / GitLab CI 的 JUnit XML 报告构建器
+/// JUnit XML test report builder compatible with Jenkins, GitHub Actions, and GitLab CI.
 public enum JUnitReportBuilder {
     
-    /// 将测试会话数据转换为标准 JUnit XML 字符串
+    /// Converts test session data into standard JUnit XML format.
     public static func buildXML(from report: TestSessionReport) -> String {
         var xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         xml += "<testsuites name=\"TTZipTests\" tests=\"\(report.totalTests)\" failures=\"\(report.failedTests)\" errors=\"0\" time=\"\(String(format: "%.3f", report.totalDurationSeconds))\">\n"

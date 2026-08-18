@@ -1,14 +1,16 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 
-/// 归档正交解耦管道组合器
-///
-/// 对标 libarchive Bidder Pipeline 架构，实现：
-/// - 容器格式与压缩滤镜的任意正交映射与推导
-/// - 高性能 Fast-Path 旁路识别 (ZIP 并行直通、7Z 原生 SIMD、TAR.ZST Direct I/O)
-/// - 从文件名后缀自动解析正交组合 `(container, filter)`
+/// Pipeline compositor synthesizing orthogonal combinations of containers and stream filters.
 public enum ArchivePipelineCompositor: Sendable {
     
-    /// 将容器格式与流式滤镜合成为完整的归档管道描述
+    /// Composes container and stream filter into pipeline configuration.
     public static func compose(
         container: ArchiveContainerFormat,
         filter: ArchiveStreamFilter = .none
@@ -26,11 +28,11 @@ public enum ArchivePipelineCompositor: Sendable {
         )
     }
     
-    /// 从文件路径解析推导其容器格式与压缩滤镜
+    /// Decomposes file path suffix into container format and stream filter.
     public static func decompose(filePath: String) -> ArchivePipelineComposition {
         let lower = filePath.lowercased()
         
-        // 1. 复合复合后缀匹配 (例: .tar.gz, .tar.zst)
+        // 1. Compound extension matching
         if lower.hasSuffix(".tar.gz") || lower.hasSuffix(".tgz") {
             return compose(container: .tar, filter: .gzip)
         }
@@ -56,7 +58,7 @@ public enum ArchivePipelineCompositor: Sendable {
             return compose(container: .tar, filter: .lrzip)
         }
         
-        // 2. 单后缀容器匹配
+        // 2. Single container extension matching
         if lower.hasSuffix(".zip") || lower.hasSuffix(".zipx") {
             return compose(container: .zip, filter: .none)
         }
@@ -79,7 +81,7 @@ public enum ArchivePipelineCompositor: Sendable {
             return compose(container: .wim, filter: .none)
         }
         
-        // 3. 裸流式压缩文件匹配
+        // 3. Raw stream filter matching
         if lower.hasSuffix(".gz") {
             return compose(container: .raw, filter: .gzip)
         }
@@ -105,11 +107,10 @@ public enum ArchivePipelineCompositor: Sendable {
             return compose(container: .raw, filter: .lrzip)
         }
         
-        // 默认回退
         return compose(container: .zip, filter: .none)
     }
     
-    /// 判定给定的正交组合是否支持极致 Fast-Path 旁路直通
+    /// Determines whether combination supports native hardware-accelerated Fast-Path bypass.
     @inlinable
     public static func isFastPathSupported(
         container: ArchiveContainerFormat,
@@ -125,7 +126,7 @@ public enum ArchivePipelineCompositor: Sendable {
         case (.tar, .none):
             return true // ttzip_create_tar_direct_c
         default:
-            return false // 通用流式 Pipeline
+            return false
         }
     }
     

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import SwiftUI
 import AppKit
 import TTZipCore
@@ -9,7 +16,7 @@ extension Notification.Name {
     public static let archiveExplorerMoveRight = Notification.Name("archiveExplorerMoveRight")
 }
 
-/// 专为 NSOutlineView 优化的 AppKit 自定义单元格 (支持干净的复用与 AutoLayout 约束初始化)
+/// Custom table cell view optimized for NSOutlineView.
 public final class ArchiveNodeTableCellView: NSTableCellView {
     public let iconView = NSImageView()
     public let nameLabel = NSTextField(labelWithString: "")
@@ -57,7 +64,7 @@ public final class ArchiveNodeTableCellView: NSTableCellView {
     }
 }
 
-/// macOS 原生 NSOutlineView 代表器 (与 macOS Finder 列表视图 100% 一致，支持瞬间 0ms 展开与原生折叠动画)
+/// Native macOS NSOutlineView representable matching Finder list view hierarchy.
 public struct NativeArchiveOutlineView: NSViewRepresentable {
     let nodes: [ArchiveTreeNode]
     @Binding var selectedPath: String?
@@ -73,7 +80,6 @@ public struct NativeArchiveOutlineView: NSViewRepresentable {
         self.onSelectFile = onSelectFile
     }
     
-    /// 结合 DepthFirstTreeIterator 与 ArchiveComponentTreeBuilder (组合与迭代器模式) 遍历节点
     public func traverseAllNodesDFS() -> [ArchiveEntry] {
         let rootComposite = ArchiveCompositeDirectory(name: "root", path: "", children: nodes.map { $0.toComponent() })
         let iterator = DepthFirstTreeIterator(root: rootComposite, order: .preOrder)
@@ -84,7 +90,6 @@ public struct NativeArchiveOutlineView: NSViewRepresentable {
         return results
     }
     
-    /// 使用 TreeRendererVisitor 访问者模式生成极美观的 ASCII 目录树预览文本
     public func renderTreePreview(includeSize: Bool = false) -> String {
         let rootComposite = ArchiveCompositeDirectory(name: "Archive", path: "", children: nodes.map { $0.toComponent() })
         let visitor = TreeRendererVisitor(includeSize: includeSize)
@@ -171,7 +176,6 @@ public struct NativeArchiveOutlineView: NSViewRepresentable {
             if let obs = moveRightObserver { NotificationCenter.default.removeObserver(obs) }
         }
         
-        // MARK: - NSOutlineViewDataSource
         public func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
             if item == nil {
                 return parent.nodes.count
@@ -199,9 +203,6 @@ public struct NativeArchiveOutlineView: NSViewRepresentable {
             return false
         }
         
-        // MARK: - NSOutlineViewDelegate
-        
-        /// 展开设置动画时长 0ms (瞬间显示)，收起设置 0.18s (macOS 原生平滑折叠动画)
         public func outlineViewItemWillExpand(_ notification: Notification) {
             NSAnimationContext.current.duration = 0.0
         }
@@ -291,20 +292,20 @@ public struct NativeArchiveOutlineView: NSViewRepresentable {
         outlineView.rowHeight = 24
         
         let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
-        nameColumn.title = "文件名"
+        nameColumn.title = "Name"
         nameColumn.minWidth = 240
         nameColumn.width = 340
         outlineView.addTableColumn(nameColumn)
         outlineView.outlineTableColumn = nameColumn
         
         let sizeColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("size"))
-        sizeColumn.title = "大小"
+        sizeColumn.title = "Size"
         sizeColumn.minWidth = 80
         sizeColumn.width = 100
         outlineView.addTableColumn(sizeColumn)
         
         let encodingColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("encoding"))
-        encodingColumn.title = "编码解析"
+        encodingColumn.title = "Encoding"
         encodingColumn.minWidth = 80
         encodingColumn.width = 100
         outlineView.addTableColumn(encodingColumn)
@@ -340,7 +341,6 @@ public struct NativeArchiveOutlineView: NSViewRepresentable {
                 outlineView.reloadData()
             }
             
-            // Sync selection from SwiftUI to NSOutlineView
             if let selectedPath = selectedPath {
                 var foundRow = -1
                 for i in 0..<outlineView.numberOfRows {

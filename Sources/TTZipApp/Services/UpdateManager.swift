@@ -1,8 +1,15 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import Combine
 
 #if MAS_BUILD
-/// Mac App Store (MAS) 沙盒构建：更新由 App Store 系统托管，禁用 Sparkle
+/// Mac App Store (MAS) sandbox build: updates managed by App Store.
 @MainActor
 public final class UpdateManager: ObservableObject {
     public static let shared = UpdateManager()
@@ -12,11 +19,11 @@ public final class UpdateManager: ObservableObject {
     private init() {}
     
     public func checkForUpdates() {
-        // MAS 构建版由 Mac App Store 统一管理升级
+        // Managed by Mac App Store
     }
 }
 #else
-/// Direct 独立分发渠道：集成 Sparkle 2.0 自动更新框架
+/// Direct independent distribution channel: integrates Sparkle 2.0 automatic updater.
 import Sparkle
 
 @MainActor

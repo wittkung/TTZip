@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 import Foundation
 import CTTZipBridge
 
@@ -19,7 +26,7 @@ extension ArchiveWriter {
         ))
     }
 
-    /// 同步创建归档内部方法
+    /// Internal synchronous archive creation implementation.
     internal func createArchiveInternal(
         outputPath: String,
         format: ArchiveCompressionFormat,
@@ -35,7 +42,7 @@ extension ArchiveWriter {
     ) throws {
         hardwareTuner.boostCurrentThreadPriority()
             
-        // 1. 7z 快速路径 (无分卷切片时优先调度)
+        // 1. 7z fast path
         if format == .sevenZip {
             let success = try SevenZipParallelWriter.shared.createArchive(
                 outputPath: outputPath,
@@ -48,12 +55,12 @@ extension ArchiveWriter {
                 if let splitBytes = splitVolumeSizeBytes, splitBytes > 0 {
                     try ArchiveWriter.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
                 }
-                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "7z 极速打包完成", progressHandler: progressHandler)
+                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "7z compression completed", progressHandler: progressHandler)
                 return
             }
         }
             
-        // 1. 原生 Level 0 Store 直通模式 (16MB SIMD 页对齐 Direct I/O 零拷贝，打满 SSD/RAM 总线)
+        // 1. Level 0 Store Direct I/O Route (16MB SIMD page-aligned zero-copy)
         // 🔒 API CONTRACT: ZIP Store Dispatch Route (Hand-tuned Zero-Copy Pipeline)
         // SEE: .agents/rules/zip-engine-freeze.md
         if format == .zip && level == .store && (password == nil || password!.isEmpty) && (splitVolumeSizeBytes == nil || splitVolumeSizeBytes == 0) {
@@ -65,12 +72,12 @@ extension ArchiveWriter {
                 progressHandler: progressHandler
             )
             if success {
-                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "原生 Store 零拷贝直通打包完成", progressHandler: progressHandler)
+                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "Store zero-copy archive created", progressHandler: progressHandler)
                 return
             }
         }
         
-        // 2. 原生 ZIP 打包压缩引擎 (libdeflate + mmap + NEON CRC32 + 多核并发)
+        // 2. Native ZIP multi-threaded parallel compression engine (libdeflate + mmap + NEON CRC32)
         // 🔒 API CONTRACT: ZIP Parallel Compression Engine Route
         // SEE: .agents/rules/zip-engine-freeze.md
         if format == .zip && (splitVolumeSizeBytes == nil || splitVolumeSizeBytes == 0) {
@@ -86,12 +93,12 @@ extension ArchiveWriter {
                 }
             }
             if res == 0 {
-                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "原生 C 极速 ZIP 打包完成", progressHandler: progressHandler)
+                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "ZIP archive created", progressHandler: progressHandler)
                 return
             }
         }
         
-        // 2. 原生 ZST 流引擎 (RFC 8878 libzstd 硬件帧流)
+        // 2. Native ZST streaming engine
         if format == .zst, let srcPath = inputPaths.first {
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: srcPath, isDirectory: &isDir), !isDir.boolValue {
@@ -103,13 +110,13 @@ extension ArchiveWriter {
                     progressHandler: progressHandler
                 )
                 if success {
-                    notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "原生 ZST 压缩完成", progressHandler: progressHandler)
+                    notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "ZST compression completed", progressHandler: progressHandler)
                     return
                 }
             }
         }
 
-        // 4. 原生 C 内存层直通引擎 (针对 <50MB 小容量 TAR 归档包)
+        // 4. Native in-memory C streaming engine for small TAR archives (<50MB)
         let hasDirectoryInput = inputPaths.contains { p in
             var isDir: ObjCBool = false
             return FileManager.default.fileExists(atPath: p, isDirectory: &isDir) && isDir.boolValue
@@ -151,14 +158,14 @@ extension ArchiveWriter {
                     state: .completed,
                     bytesProcessed: totalBytes,
                     totalBytes: totalBytes,
-                    currentFileName: "原生 C 语言极速归档完成",
+                    currentFileName: "Archive created",
                     throughputMBs: throughput
                 ))
                 return
             }
         }
         
-        // 3. 针对 7z / zip 分卷切割模式 (100% 进程内纯原生打包与切片)
+        // 3. Split multi-volume creation mode
         if (format == .sevenZip || format == .zip) && (splitVolumeSizeBytes != nil && splitVolumeSizeBytes! > 0) {
             let splitBytes = splitVolumeSizeBytes!
             if format == .sevenZip {
@@ -171,7 +178,7 @@ extension ArchiveWriter {
                 )) ?? false
                 if success {
                     try? Self.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
-                    notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "7z 极速分卷打包完成", progressHandler: progressHandler)
+                    notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "7z multi-volume archive created", progressHandler: progressHandler)
                     return
                 }
             } else {
@@ -188,18 +195,18 @@ extension ArchiveWriter {
                 }
                 if res == 0 {
                     try? Self.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
-                    notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "ZIP 极速分卷打包完成", progressHandler: progressHandler)
+                    notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "ZIP multi-volume archive created", progressHandler: progressHandler)
                     return
                 }
             }
         }
         
-        // 针对 特殊系统级格式直通驱动 (Apple Archive, DMG, ISO, WIM - 100% In-Process)
+        // Formats: Apple Archive, DMG, ISO, WIM
         if format == .aar, let firstInput = inputPaths.first {
             if let ok = try? NativeAppleArchiveEngine.shared.compress(sourcePath: firstInput, outputPath: outputPath), ok {
                 let duration = max(0.001, Date().timeIntervalSince(startTime))
                 let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "Apple Archive 硬件极速打包完成", throughputMBs: throughput))
+                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "Apple Archive created", throughputMBs: throughput))
                 return
             }
         }
@@ -211,7 +218,7 @@ extension ArchiveWriter {
             if res == 0 {
                 let duration = max(0.001, Date().timeIntervalSince(startTime))
                 let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-                let msg = format == .dmg ? "DMG 磁盘映像打包完成" : "ISO 光盘映像生成完成"
+                let msg = format == .dmg ? "DMG disk image created" : "ISO disk image created"
                 progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: msg, throughputMBs: throughput))
                 return
             }
@@ -224,7 +231,7 @@ extension ArchiveWriter {
             if res == 0 {
                 let duration = max(0.001, Date().timeIntervalSince(startTime))
                 let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "WIM 极速打包完成", throughputMBs: throughput))
+                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "WIM archive created", throughputMBs: throughput))
                 return
             }
         }
@@ -270,12 +277,12 @@ extension ArchiveWriter {
                 }
                 let duration = max(0.001, Date().timeIntervalSince(startTime))
                 let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "原生 C 引擎打包完成", throughputMBs: throughput))
+                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "Archive created", throughputMBs: throughput))
                 return
             }
         }
         
-        // 默认全能 C-Bridge 递归打包器 fallback
+        // Fallback writer
         let monitorBox = StateBoxBool(true)
         let monitorTask = Task {
             let start = Date()
@@ -331,7 +338,7 @@ extension ArchiveWriter {
             state: .completed,
             bytesProcessed: totalBytes,
             totalBytes: totalBytes,
-            currentFileName: "压缩完成",
+            currentFileName: "Compression completed",
             throughputMBs: throughput
         ))
     }
