@@ -1,19 +1,19 @@
-# PR Description: Modernize CMake, Fix AArch64 yield spinlock, and resolve modern Clang __is_pod / __builtin_trap compatibility
+# PR Description: Modernize CMake, Fix ARM/AArch64 yield spinlock, and resolve modern Clang __is_pod / __builtin_debugtrap compatibility
 
 **Target Repository**: `richgel999/lzham_codec`  
 **Target Branch**: `master`  
 **Working Branch**: `fix/modern-toolchain-and-arm64-compat`  
 **Commit Sequence (Modular & Bisect-Friendly)**:  
-1. `e5fe197` - `cmake: modernize root minimum version and clean subproject hierarchy`  
-2. `cfb073f` - `clang: use __is_pod intrinsic and __builtin_trap for modern compilers`  
-3. `a299b3b` - `arm64: use yield mnemonic for AArch64 spinlock back-off`  
-4. `d9c3e76` - `platform: use os_unfair_lock on macOS 10.12+ and snprintf in test app`  
+1. `0b2d5f3` - `cmake: modernize root minimum version and clean subproject hierarchy`  
+2. `de08bae` - `clang: use __is_pod intrinsic and __builtin_debugtrap for modern compilers`  
+3. `e059e3f` - `arm: use yield mnemonic for ARM/AArch64 spinlock back-off`  
+4. `1a8b506` - `platform: use os_unfair_lock on macOS 10.12+ and snprintf in test app`  
 
 ---
 
 ### Summary
 
-This PR synthesizes and unifies several historically reported community compatibility issues into a clean, modular, bisect-friendly commit sequence. It addresses modern toolchain build failures and compiler deprecation warnings across macOS (AppleClang 15/16+ on Apple Silicon), Linux (GCC 11-14 / Clang 16-19), and AArch64/ARM64 systems, allowing LZHAM to build out of the box with modern CMake.
+This PR synthesizes and unifies several historically reported community compatibility issues into a clean, modular, bisect-friendly commit sequence. It addresses modern toolchain build failures and compiler deprecation warnings across macOS (AppleClang 15/16+ on Apple Silicon), Linux (GCC 11-14 / Clang 16-19), and ARM/AArch64 systems, allowing LZHAM to build out of the box with modern CMake.
 
 Fixes #26
 Fixes #29
@@ -46,11 +46,11 @@ This PR respectfully integrates and validates all these community findings into 
    - Modern libc++ does not expose `std::__is_pod<T>::__value` as an unqualified identifier.
    - Using the compiler intrinsic `__is_pod(T)` maintains 100% backward compatibility with C++98/03 while eliminating deprecation warnings and removal errors introduced in C++20 for `std::is_pod`. Resolves compilation errors across modern AppleClang, LLVM, and GCC.
 
-3. **AArch64 Spinlock Mnemonic (Fixes #31)**:  
-   On ARM64/AArch64 targets, `pause` is not a recognized assembly mnemonic. Replacing `pause` with `yield` when compiled for AArch64 (`__aarch64__` / `__arm64__`) allows spinlocks in `lzham_yield_processor()` to function properly without assembler errors.
+3. **ARM / AArch64 Spinlock Mnemonic (Fixes #31)**:  
+   On ARM targets (32-bit ARMv7 and 64-bit AArch64), `pause` is not a valid assembly instruction. Emitting `yield` when compiled for ARM architectures (`__aarch64__`, `__arm64__`, `_M_ARM64`, `__arm__`, `_M_ARM`, `__ARM_ARCH_7A__`) provides proper CPU spinlock back-off without assembler errors.
 
 4. **POSIX / Modern Debug Trap**:  
-   Modern Clang and GCC on macOS/POSIX deprecate legacy 32-bit `__asm {int 3}` in favor of the standard compiler intrinsic `__builtin_trap()` for `lzham_debug_break()`.
+   Replaced legacy 32-bit `__asm {int 3}` with `__builtin_debugtrap()` (on Clang) to trigger recoverable debugger breakpoints, with `__asm__ volatile("int $3")` (on GCC x86) and `__builtin_trap()` as safe fallbacks.
 
 5. **macOS Deprecated Lock & String Safety**:  
    - Replaced deprecated `OSSpinLock` with `os_unfair_lock` from `<os/lock.h>` on macOS to prevent thread priority inversion. Maintains deployment target compatibility (macOS 10.12+ via `AvailabilityMacros.h` guard, falling back to legacy `OSSpinLock` for older targets).
@@ -62,8 +62,8 @@ This PR respectfully integrates and validates all these community findings into 
 ### Changes by Commit
 
 - **Commit 1 (`cmake`)**: `CMakeLists.txt` & subprojects: set root `cmake_minimum_required(VERSION 3.5)`, enabled `project(lzham)`, and removed redundant subproject declarations.
-- **Commit 2 (`clang`)**: `lzhamdecomp/lzham_traits.h` (unified `__is_pod(T)`) & `lzhamdecomp/lzham_platform.cpp` (`__builtin_trap()`).
-- **Commit 3 (`arm64`)**: `lzhamdecomp/lzham_platform.h` (emitted `yield` assembly instruction on `__aarch64__` / `__arm64__`).
+- **Commit 2 (`clang`)**: `lzhamdecomp/lzham_traits.h` (unified `__is_pod(T)`) & `lzhamdecomp/lzham_platform.cpp` (`__builtin_debugtrap()`).
+- **Commit 3 (`arm`)**: `lzhamdecomp/lzham_platform.h` (emitted `yield` assembly instruction on ARM / AArch64).
 - **Commit 4 (`platform`)**: `lzhamcomp/lzham_pthreads_threading.h` (`os_unfair_lock` on macOS 10.12+) & `lzhamtest/lzhamtest.cpp` (`snprintf`).
 
 ---
