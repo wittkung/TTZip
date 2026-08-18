@@ -52,35 +52,26 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
         
         var candidates: [BenchmarkCandidate] = []
         
-        // 1. TTZip Extreme (18 核极速分块): 全部 1 到 12 等级
-        for lvl in 1...12 {
-            let levelEnum = ArchiveCompressionLevel(rawValue: lvl) ?? .level1
-            candidates.append(BenchmarkCandidate(name: "TTZip Extreme (L\(lvl))", level: lvl) { corpus in
-                let outZip = NSTemporaryDirectory() + "ttzip_ext_\(lvl)_\(UUID().uuidString).zip"
-                defer { try? FileManager.default.removeItem(atPath: outZip) }
-                let start = mach_absolute_time()
-                let res = try ZipExtremeBlockWriter.shared.createExtremeArchive(outputPath: outZip, inputPath: corpus.path, level: levelEnum)
-                let elapsed = Double(mach_absolute_time() - start) * 1e-9
-                guard res else { throw NSError(domain: "Bench", code: 500) }
-                let outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
-                let speed = (Double(corpus.sizeBytes) / 1024.0 / 1024.0) / max(0.0001, elapsed)
-                let ratio = Double(corpus.sizeBytes) / Double(max(1, outSize))
-                let savings = (1.0 - Double(outSize) / Double(corpus.sizeBytes)) * 100.0
-                return (speed, ratio, savings, outSize)
-            })
-        }
-        
-        // 2. TTZip Standard (单核全局窗口): 全部 1 到 12 等级
+        // 1. TTZip 原生统一引擎 (内建香农熵自适应分流与多核并行): 全部 1 到 12 等级
         for lvl in 1...12 {
             let levelEnum = ArchiveCompressionLevel(rawValue: lvl) ?? .level1
             candidates.append(BenchmarkCandidate(name: "TTZip (L\(lvl))", level: lvl) { corpus in
-                let outZip = NSTemporaryDirectory() + "ttzip_norm_\(lvl)_\(UUID().uuidString).zip"
+                let outZip = NSTemporaryDirectory() + "ttzip_unified_\(lvl)_\(UUID().uuidString).zip"
                 defer { try? FileManager.default.removeItem(atPath: outZip) }
-                let writer = ArchiveWriter()
                 let start = mach_absolute_time()
-                try await writer.createArchive(outputPath: outZip, format: .zip, level: levelEnum, inputPaths: [corpus.path])
+                
+                let outSize: Int64
+                if lvl <= 8 {
+                    let res = try ZipExtremeBlockWriter.shared.createExtremeArchive(outputPath: outZip, inputPath: corpus.path, level: levelEnum)
+                    guard res else { throw NSError(domain: "Bench", code: 500) }
+                    outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
+                } else {
+                    let writer = ArchiveWriter()
+                    try await writer.createArchive(outputPath: outZip, format: .zip, level: levelEnum, inputPaths: [corpus.path])
+                    outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
+                }
+                
                 let elapsed = Double(mach_absolute_time() - start) * 1e-9
-                let outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
                 let speed = (Double(corpus.sizeBytes) / 1024.0 / 1024.0) / max(0.0001, elapsed)
                 let ratio = Double(corpus.sizeBytes) / Double(max(1, outSize))
                 let savings = (1.0 - Double(outSize) / Double(corpus.sizeBytes)) * 100.0
