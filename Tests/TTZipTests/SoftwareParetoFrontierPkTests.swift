@@ -161,16 +161,29 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
             }
         }
 
+        // TTZip LZ4 (Tier 4: In-Memory / High-IOPS)
+        let ttLz4Path = tempDir.appendingPathComponent("ttzip_real.lz4").path
+        let t0_ttlz4 = CACurrentMediaTime()
+        try writer.createArchiveSync(outputPath: ttLz4Path, format: .lz4, level: .level1, inputPaths: [realSamplePath])
+        let ttLz4Dur = max(1e-6, CACurrentMediaTime() - t0_ttlz4)
+        let ttLz4Sz = (try? FileManager.default.attributesOfItem(atPath: ttLz4Path)[.size] as? Int64) ?? 0
+        let ttLz4Savings = (1.0 - (Double(ttLz4Sz) / Double(payloadBytes))) * 100.0
+        let ttLz4Speed = payloadMB / ttLz4Dur
+        softwarePoints.append(ParetoPoint(id: "ttzip_lz4_l1", algorithm: "TTZip (LZ4 Fast)", level: 1, throughputMBs: ttLz4Speed, spaceSavingsPct: ttLz4Savings, compressedBytes: ttLz4Sz, uncompressedBytes: payloadBytes))
+
         // 4. 计算软件级帕累托前沿
         var points = softwarePoints
         let paretoResult = ParetoFrontierCalculator.shared.computeParetoFrontier(points: &points)
 
-        // 5. 导出真实高清 PNG 图片 (保存到本地工件目录供用户直接查看，不上传 Git)
+        // 5. 计算 4-Tier 格式矩阵综合效能评分 (Base-1000 GMean Index)
+        let compositeReports = FormatMatrixScorer.computeCompositeScore(points: softwarePoints)
+
+        // 6. 导出真实高清 PNG 图片 (保存到本地工件目录供用户直接查看，不上传 Git)
         let artifactPngPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/software_pareto_pk.png"
         let localPngPath = "docs/benchmarks/software_pareto_pk.png"
         let localSvgPath = "docs/benchmarks/software_pareto_pk.svg"
 
-        let chartTitle = "TTZip vs. 7-Zip vs. Apple Native (真实语料 enwik8 100MB 软件 PK)"
+        let chartTitle = "TTZip vs. 7-Zip vs. Apple Native (4-Tier 格式矩阵软件 PK)"
 
         try RasterParetoPlotter.shared.exportPNG(
             result: paretoResult,
@@ -189,11 +202,16 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         )
 
         print("\n========================================================================")
-        print("🏆 真实语料 100MB enwik8 软件级 PK 帕累托图表已生成:")
+        print("🏆 真实语料 100MB enwik8 软件级 PK 4-Tier 帕累托图表已生成:")
         print("   图片路径: \(artifactPngPath)")
         print("------------------------------------------------------------------------")
         for p in paretoResult.allPoints {
             print(String(format: "• %-26@ | 压缩速度: %7.1f MB/s | 空间节省: %5.1f%% | 状态: %@", p.algorithm, p.throughputMBs, p.spaceSavingsPct, p.isParetoOptimal ? "👑 帕累托前沿最优" : "⚪ 被支配"))
+        }
+        print("------------------------------------------------------------------------")
+        print("📊 4-Tier 综合效能评分 (Base-1000 加权几何平均指数):")
+        for rep in compositeReports {
+            print(String(format: "• %-16@ | 综合评分: %6.1f pts | GMean 吞吐: %7.1f MB/s | PEI 指数: %.2f", rep.softwareName, rep.compositeScore, rep.geometricMeanThroughputMBs, rep.paretoEfficiencyIndex))
         }
         print("========================================================================\n")
     }

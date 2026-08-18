@@ -176,20 +176,23 @@ public final class SVGParetoPlotter: @unchecked Sendable {
             } else if fam == .appleNative {
                 cleanName = "apple-ditto-zip"
             } else if fam == .ttzip {
+                let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
                 if p.algorithm.contains("TAR.ZST") {
-                    cleanName = "ttzip-tar-zst (4,197 MB/s)"
+                    cleanName = "ttzip-tar-zst (\(speedStr))"
+                } else if p.algorithm.contains("LZ4") {
+                    cleanName = "ttzip-lz4 (\(speedStr))"
                 } else if p.algorithm.contains("ZIP Fast") {
-                    cleanName = "ttzip-zip-l1 (1,438 MB/s)"
+                    cleanName = "ttzip-zip-l1 (\(speedStr))"
                 } else if p.algorithm.contains("ZIP Normal") {
-                    cleanName = "ttzip-zip-l6 (1,058 MB/s)"
+                    cleanName = "ttzip-zip-l6 (\(speedStr))"
                 } else {
-                    cleanName = "ttzip-7z-l1 (2,445 MB/s)"
+                    cleanName = "ttzip-7z-l1 (\(speedStr))"
                 }
             } else {
                 cleanName = p.algorithm.lowercased()
             }
 
-            let isHeroPill = fam.isHero && (p.algorithm.contains("TAR.ZST") || p.algorithm.contains("ZIP Fast") || p.algorithm.contains("7Z Fast"))
+            let isHeroPill = fam.isHero && (p.algorithm.contains("TAR.ZST") || p.algorithm.contains("ZIP Fast") || p.algorithm.contains("7Z Fast") || p.algorithm.contains("LZ4"))
             let isHeroNormal = fam.isHero && !isHeroPill
 
             if isHeroPill {
