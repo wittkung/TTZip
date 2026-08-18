@@ -33,8 +33,8 @@
 
 | PR 方案 | 本地 Worktree 路径 | 分支名称 | Commit SHA | 变更文件 | 物理验证结果 |
 | :--- | :--- | :--- | :---: | :--- | :--- |
-| **PR 1: Universal Binary 宏冲突修复** | `Vendor/worktrees/snappy/fix-darwin-universal-binary` | `fix/darwin-universal-binary-arch-macros` | `79bacc8` | `cmake/config.h.in` | • `lipo` 验证包含 `x86_64` 与 `arm64`<br>• `otool` 验证 ARM64 切片包含 `tbl.16b`<br>• `ctest` 100% 通过 (5.37s) |
-| **PR 2: 畸变边界测试套件** | `Vendor/worktrees/snappy/test-malformed-stream-boundary` | `test/malformed-stream-boundary-exhaustion` | `01d0bd3` | `snappy_unittest.cc` | • `Snappy.MalformedStreamBoundaryExhaustion` 100% 通过 (50ms)<br>• 全量 GTest 100% 通过 |
+| **PR 1: Universal Binary 宏冲突修复** | `Vendor/worktrees/snappy/fix-darwin-universal-binary` | `fix/darwin-universal-binary-arch-macros` | `1d982e1` | `cmake/config.h.in` | • `lipo` 验证包含 `x86_64` 与 `arm64`<br>• `otool` 验证 ARM64 切片包含 `tbl.16b`<br>• `ctest` 100% 通过 (5.37s) |
+| **PR 2: 畸变边界测试套件** | `Vendor/worktrees/snappy/test-malformed-stream-boundary` | `test/malformed-stream-boundary-exhaustion` | `7bfb441` | `snappy_unittest.cc` | • `Snappy.MalformedStreamBoundaryExhaustion` 100% 通过 (50ms)<br>• 全量 GTest 100% 通过 |
 
 ---
 
