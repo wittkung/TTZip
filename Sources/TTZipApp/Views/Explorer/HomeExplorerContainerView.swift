@@ -51,18 +51,28 @@ public struct HomeExplorerContainerView: View {
                 .buttonStyle(.plain)
                 .help("Grant root access to parent directory to browse without sandbox prompts")
                 
-                HStack(spacing: 4) {
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(TTZipTheme.bambooGreen)
-                    Text(viewModel.currentDirectory.lastPathComponent.isEmpty ? "/" : viewModel.currentDirectory.lastPathComponent)
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundStyle(TTZipTheme.bambooGreen)
+                Button(action: {
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                    // Trigger global location focus (Cmd+L)
+                    if let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command], timestamp: 0, windowNumber: 0, context: nil, characters: "l", charactersIgnoringModifiers: "l", isARepeat: false, keyCode: 37) {
+                        NSApp.sendEvent(event)
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(TTZipTheme.bambooGreen)
+                        Text(viewModel.currentDirectory.lastPathComponent.isEmpty ? "/" : viewModel.currentDirectory.lastPathComponent)
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundStyle(TTZipTheme.bambooGreen)
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 3.5)
+                    .background(TTZipTheme.bambooGreen.opacity(0.12))
+                    .clipShape(Capsule())
                 }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 3.5)
-                .background(TTZipTheme.bambooGreen.opacity(0.12))
-                .clipShape(Capsule())
+                .buttonStyle(.plain)
+                .help("Current directory (Click or press ⌘L / ⇧⌘G to navigate by path)")
             }
             .padding(.horizontal, 20)
             .frame(height: 52)

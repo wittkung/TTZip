@@ -10,13 +10,13 @@ import XCTest
 
 final class CorpusOrchestratorTests: XCTestCase {
     
-    // MARK: - 1. 5-Tier 自动发现测试
+    // MARK: - 1. 6-Tier 自动发现测试 (含真实 4K MOV 视频与音频)
     
-    func testFiveTierCorpusDiscovery() {
+    func testSixTierCorpusDiscovery() {
         let orchestrator = CorpusOrchestrator.shared
         let allTiers = BenchmarkTierCategory.allCases
         
-        XCTAssertEqual(allTiers.count, 5, "必须严格包含 5 大评测分级")
+        XCTAssertEqual(allTiers.count, 6, "必须严格包含 6 大评测分级")
         
         for tier in allTiers {
             let items = orchestrator.items(for: tier)
@@ -27,6 +27,16 @@ final class CorpusOrchestratorTests: XCTestCase {
                 XCTAssertGreaterThan(item.sizeBytes, 0, "语料文件大小必须大于 0 字节")
             }
         }
+        
+        // 验证 SHA-256 密码学指纹生成
+        let fingerprints = orchestrator.computeDatasetFingerprints()
+        XCTAssertFalse(fingerprints.isEmpty, "全量数据集必须成功生成密码学指纹")
+        for fp in fingerprints {
+            XCTAssertEqual(fp.sha256Hex.count, 64, "SHA-256 哈希值必须为 64 位十六进制字符")
+        }
+        
+        let merkleRoot = orchestrator.currentDatasetMerkleRoot()
+        XCTAssertEqual(merkleRoot.count, 64, "Merkle Root 必须为有效 64 位 SHA-256 哈希")
     }
     
     // MARK: - 2. POSIX mmap 零拷贝映射与生命周期测试

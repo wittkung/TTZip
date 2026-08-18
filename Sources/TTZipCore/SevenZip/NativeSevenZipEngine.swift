@@ -6,6 +6,36 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
+
+private final class SevenZipEntryAccumulator: @unchecked Sendable {
+    var entries: [ArchiveEntry] = []
+}
+
+private func nativeSevenZipEntryCallback(
+    context: UnsafeMutableRawPointer?,
+    cPathname: UnsafePointer<CChar>?,
+    size: Int64,
+    isDir: Bool
+) {
+    guard let context = context, let cPathname = cPathname else { return }
+    let acc = Unmanaged<SevenZipEntryAccumulator>.fromOpaque(context).takeUnretainedValue()
+    let rawLen = strlen(cPathname)
+    let pathData = Data(bytes: cPathname, count: rawLen)
+    let sanitizedPath = CharsetDetector.sanitizeFilename(bytes: pathData)
+    let lastComp = (sanitizedPath as NSString).lastPathComponent
+    if lastComp.hasPrefix("._") || lastComp == ".DS_Store" {
+        return
+    }
+    let entry = ArchiveEntry(
+        path: sanitizedPath,
+        uncompressedSize: size,
+        isDirectory: isDir,
+        detectedEncoding: "UTF-8",
+        isEncrypted: false
+    )
+    acc.entries.append(entry)
+}
 
 /// Unified facade for 7z native parallel compression and decompression operations.
 public final class NativeSevenZipEngine: @unchecked Sendable {
@@ -13,35 +43,22 @@ public final class NativeSevenZipEngine: @unchecked Sendable {
     
     private init() {}
     
-    /// Parses 7z archive header and returns entry descriptors.
+    /// Parses 7z archive header via zero-copy mmap and returns entry descriptors.
     public func inspectSevenZip(archivePath: String, password: String? = nil) -> [ArchiveEntry]? {
-        let fd = open(archivePath, O_RDONLY)
-        if fd < 0 { return nil }
-        defer { close(fd) }
+        let accumulator = SevenZipEntryAccumulator()
+        let contextPtr = Unmanaged.passUnretained(accumulator).toOpaque()
         
-        var st = stat()
-        if fstat(fd, &st) != 0 || st.st_size < 32 { return nil }
-        let fileSize = size_t(st.st_size)
-        
-        guard let mapped = mmap(nil, fileSize, PROT_READ, MAP_SHARED, fd, 0), mapped != MAP_FAILED else {
-            return nil
-        }
-        let bytePtr = mapped.assumingMemoryBound(to: UInt8.self)
-        defer { munmap(mapped, fileSize) }
-        
-        guard let descriptors = SevenZipHeaderReader.shared.readDescriptors(from: bytePtr, fileSize: fileSize) else {
-            return nil
+        let status = withExtendedLifetime(accumulator) {
+            CUnsafeBufferAdapter.withCString(archivePath) { cPath in
+                guard let cPath = cPath else { return Int32(-1) }
+                return ttzip_native_inspect_archive(cPath, contextPtr, nativeSevenZipEntryCallback)
+            }
         }
         
-        return descriptors.map { desc in
-            ArchiveEntry(
-                path: desc.path,
-                uncompressedSize: desc.uncompressedSize,
-                isDirectory: desc.isDirectory,
-                detectedEncoding: "UTF-8",
-                modificationDate: Date()
-            )
+        if status == 0 && !accumulator.entries.isEmpty {
+            return accumulator.entries
         }
+        return nil
     }
     
     /// Extracts 7z archive using multi-core solid block zero-copy pipeline.

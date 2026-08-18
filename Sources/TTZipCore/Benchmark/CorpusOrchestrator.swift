@@ -66,13 +66,33 @@ public final class CorpusOrchestrator: @unchecked Sendable {
         return discovered
     }
     
-    /// 获取全部 5 大 Tier 语料项集合
+    /// 获取全部 6 大 Tier 语料项集合
     public func allItems() -> [BenchmarkTierCategory: [CorpusItem]] {
         var result: [BenchmarkTierCategory: [CorpusItem]] = [:]
         for tier in BenchmarkTierCategory.allCases {
             result[tier] = items(for: tier)
         }
         return result
+    }
+    
+    /// 计算全量数据集的密码学指纹清单
+    public func computeDatasetFingerprints() -> [CorpusDataFingerprint] {
+        var fingerprints: [CorpusDataFingerprint] = []
+        let all = allItems()
+        for (_, tierItems) in all {
+            for item in tierItems {
+                if let fp = CorpusFingerprintManager.shared.computeFingerprint(for: item) {
+                    fingerprints.append(fp)
+                }
+            }
+        }
+        return fingerprints
+    }
+    
+    /// 获取当前全量数据集的 Merkle Root 哈希摘要
+    public func currentDatasetMerkleRoot() -> String {
+        let all = allItems().flatMap { $0.value }
+        return CorpusFingerprintManager.shared.computeDatasetMerkleRoot(items: all)
     }
     
     // MARK: - 2. 内存映射与热路径零分配 (Zero-Copy mmap)
@@ -183,6 +203,37 @@ public final class CorpusOrchestrator: @unchecked Sendable {
                     if FileManager.default.fileExists(atPath: p) {
                         let sz = (try? FileManager.default.attributesOfItem(atPath: p)[.size] as? Int64) ?? 0
                         items.append(CorpusItem(id: "silesia_\(name)", name: "Silesia \(name)", tier: tier, path: p, sizeBytes: sz))
+                    }
+                }
+            }
+            
+        case .tier6Media:
+            // 真实 4K HEVC 视频与未压缩音频样本 (绝对禁止合成数据)
+            let videoCandidates = [
+                "/System/Library/Desktop Pictures/.wallpapers/Sonoma/Sonoma Graphic Dark Portrait.mov",
+                "/System/Library/Desktop Pictures/.wallpapers/Sonoma/Sonoma Graphic Dark Landscape.mov",
+                "/System/Library/Desktop Pictures/.wallpapers/Tahoe Day/Tahoe Day.mov"
+            ]
+            for vPath in videoCandidates {
+                if FileManager.default.fileExists(atPath: vPath) {
+                    let sz = (try? FileManager.default.attributesOfItem(atPath: vPath)[.size] as? Int64) ?? 0
+                    if sz > 0 {
+                        items.append(CorpusItem(id: "real_sonoma_4k_video", name: "Sonoma 4K HEVC Video (53MB)", tier: tier, path: vPath, sizeBytes: sz))
+                        break
+                    }
+                }
+            }
+            
+            let audioCandidates = [
+                "/System/Library/PrivateFrameworks/Slideshows.framework/Versions/A/Resources/Content/Audio/Flipup.m4a",
+                "/Library/Audio/Apple Loops/Apple/09 Disco Funk/Disco Delight Slap Bass.caf"
+            ]
+            for aPath in audioCandidates {
+                if FileManager.default.fileExists(atPath: aPath) {
+                    let sz = (try? FileManager.default.attributesOfItem(atPath: aPath)[.size] as? Int64) ?? 0
+                    if sz > 0 {
+                        items.append(CorpusItem(id: "real_apple_audio", name: "Apple Native Audio (\(sz / 1024 / 1024)MB)", tier: tier, path: aPath, sizeBytes: sz))
+                        break
                     }
                 }
             }

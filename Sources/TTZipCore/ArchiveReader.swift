@@ -212,6 +212,12 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                 }
             }
             
+            if (lower.hasSuffix(".7z") || lower.hasSuffix(".7z.001")), password == nil || password?.isEmpty == true {
+                if let fastEntries = NativeSevenZipEngine.shared.inspectSevenZip(archivePath: targetInspectPath), !fastEntries.isEmpty {
+                    return fastEntries
+                }
+            }
+            
             if let entries = performCInspect(password) {
                 return entries
             }

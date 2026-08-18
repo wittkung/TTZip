@@ -82,6 +82,67 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
                     ))
                 }
             }
+
+            // 3. Google Zopfli (18-Core 图论最短路径穷举 Deflate 极限)
+            let outPathZopfli = tempDir.appendingPathComponent("zopfli_mc.zip").path
+            let pZ = Process()
+            pZ.executableURL = URL(fileURLWithPath: pigzPath)
+            pZ.arguments = ["-K", "-11", "-p", "18", "-q", "-c", realSamplePath]
+            let pipeZ = Pipe()
+            pZ.standardOutput = pipeZ
+            let t0Z = CACurrentMediaTime()
+            try? pZ.run()
+            let dataZ = pipeZ.fileHandleForReading.readDataToEndOfFile()
+            pZ.waitUntilExit()
+            let durZ = max(1e-6, CACurrentMediaTime() - t0Z)
+            try? dataZ.write(to: URL(fileURLWithPath: outPathZopfli))
+            let szZ = Int64(dataZ.count)
+            if szZ > 0 {
+                let savings = (1.0 - Double(szZ) / Double(payloadBytes)) * 100.0
+                let speed = payloadMB / durZ
+                zipPoints.append(ParetoPoint(
+                    id: "google_zopfli_mc",
+                    algorithm: "Google Zopfli (18-Core)",
+                    level: 11,
+                    throughputMBs: speed,
+                    spaceSavingsPct: savings,
+                    compressedBytes: szZ,
+                    uncompressedBytes: payloadBytes
+                ))
+            }
+        }
+
+        // 4. AdvanceCOMP (advzip -4 极限迭代重压)
+        let advzipPath = "/opt/homebrew/bin/advzip"
+        if FileManager.default.fileExists(atPath: advzipPath) {
+            let advOut = tempDir.appendingPathComponent("advzip_mc.zip").path
+            let initialZip = Process()
+            initialZip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+            initialZip.arguments = ["-1", "-q", advOut, realSamplePath]
+            try? initialZip.run()
+            initialZip.waitUntilExit()
+
+            let pAdv = Process()
+            pAdv.executableURL = URL(fileURLWithPath: advzipPath)
+            pAdv.arguments = ["-z", "-4", "-i", "1", advOut]
+            let t0Adv = CACurrentMediaTime()
+            try? pAdv.run()
+            pAdv.waitUntilExit()
+            let durAdv = max(1e-6, CACurrentMediaTime() - t0Adv)
+            let szAdv = (try? FileManager.default.attributesOfItem(atPath: advOut)[.size] as? Int64) ?? 0
+            if szAdv > 0 {
+                let savings = (1.0 - Double(szAdv) / Double(payloadBytes)) * 100.0
+                let speed = payloadMB / durAdv
+                zipPoints.append(ParetoPoint(
+                    id: "advzip_mc",
+                    algorithm: "AdvanceCOMP (advzip -4)",
+                    level: 4,
+                    throughputMBs: speed,
+                    spaceSavingsPct: savings,
+                    compressedBytes: szAdv,
+                    uncompressedBytes: payloadBytes
+                ))
+            }
         }
 
         // 3. 计算多核帕累托前沿并输出图表

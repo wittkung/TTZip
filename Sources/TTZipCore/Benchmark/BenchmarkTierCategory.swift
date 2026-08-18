@@ -24,14 +24,18 @@ public enum BenchmarkTierCategory: String, Codable, Sendable, CaseIterable {
     /// Tier 5: 科学计算与医学密集矩阵 (mr, x-ray, sao) - 考验 SIMD 字节重排与差分滤波
     case tier5DenseMatrix = "Tier 5: Dense Matrix & Sensors"
     
+    /// Tier 6: 真实多媒体音视频 (Sonoma 4K HEVC .mov, Apple Loops .caf/.m4a) - 考验香农高熵快速探测与零拷贝直通
+    case tier6Media = "Tier 6: Real Video & Audio"
+    
     /// 标准学术与工业界加权权重
     public var defaultWeight: Double {
         switch self {
-        case .tier1Text: return 0.25
-        case .tier2Binary: return 0.20
-        case .tier3Structured: return 0.20
+        case .tier1Text: return 0.20
+        case .tier2Binary: return 0.15
+        case .tier3Structured: return 0.15
         case .tier4SourceTree: return 0.20
         case .tier5DenseMatrix: return 0.15
+        case .tier6Media: return 0.15
         }
     }
     
@@ -48,6 +52,8 @@ public enum BenchmarkTierCategory: String, Codable, Sendable, CaseIterable {
             return "Multi-level directory trees with hundreds of small files testing VFS traversal and concurrency."
         case .tier5DenseMatrix:
             return "16/32-bit DICOM MRI, X-ray and astronomical float matrices testing Byte-Shuffle and Delta filters."
+        case .tier6Media:
+            return "Real-world 4K HEVC video and uncompressed audio testing Shannon entropy prober and Direct Store bypass."
         }
     }
 }

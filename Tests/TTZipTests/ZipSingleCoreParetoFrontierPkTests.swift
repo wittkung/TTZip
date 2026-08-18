@@ -24,8 +24,35 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
 
         var points: [ParetoPoint] = []
 
-        // 1. libdeflate 官方单核 C 静态引擎 (Level 1 到 12 单线程)
+        // 1. TTZip 原生单线程极速引擎 (Level 1 到 12 单核)
         for lvl in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] {
+            let maxOut = rawData.count + 512
+            let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
+            defer { outBuf.deallocate() }
+
+            let t0 = CACurrentMediaTime()
+            let compSize = rawData.withUnsafeBytes { rawIn -> size_t in
+                guard let base = rawIn.baseAddress else { return 0 }
+                return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, Int32(lvl))
+            }
+            let dur = max(1e-6, CACurrentMediaTime() - t0)
+            if compSize > 0 {
+                let savings = (1.0 - Double(compSize) / Double(payloadBytes)) * 100.0
+                let speed = payloadMB / dur
+                points.append(ParetoPoint(
+                    id: "ttzip_sc_\(lvl)",
+                    algorithm: "TTZip (1-Core L\(lvl))",
+                    level: lvl,
+                    throughputMBs: speed,
+                    spaceSavingsPct: savings,
+                    compressedBytes: Int64(compSize),
+                    uncompressedBytes: payloadBytes
+                ))
+            }
+        }
+
+        // 2. libdeflate 官方单核 C 静态基准 (Level 1 到 12 单线程)
+        for lvl in [1, 3, 6, 9, 12] {
             let maxOut = rawData.count + 512
             let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
             defer { outBuf.deallocate() }

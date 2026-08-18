@@ -129,7 +129,7 @@ public struct MainView: View {
                     HStack {
                         Spacer().frame(width: 60)
                         Spacer()
-                        LiquidGlassSearchBar(searchQuery: $searchQuery, searchService: searchService)
+                        LiquidGlassOmnibar(searchQuery: $searchQuery, searchService: searchService, viewModel: viewModel)
                         Spacer()
                         Spacer().frame(width: 60)
                     }

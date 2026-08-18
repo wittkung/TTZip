@@ -52,4 +52,33 @@ final class ArchiveEncryptionIntrospectionTests: XCTestCase {
         let tier = try await reader.probeEncryption(archivePath: fixturePath)
         XCTAssertEqual(tier, .headerAndData, "RAR5 archive with encrypted filenames must be identified as .headerAndData")
     }
+    
+    func testSevenZipZeroCopyInspectionSpeedAndAccuracy() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_7z_inspect_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(atPath: tempDir.path, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        let fileA = tempDir.appendingPathComponent("fileA.txt")
+        let fileB = tempDir.appendingPathComponent("fileB.txt")
+        try "Content of file A".write(to: fileA, atomically: true, encoding: .utf8)
+        try "Content of file B with more data 123456789".write(to: fileB, atomically: true, encoding: .utf8)
+        
+        let out7z = tempDir.appendingPathComponent("test_archive.7z").path
+        let success = try SevenZipEngine.shared.createArchive(
+            outputPath: out7z,
+            inputPaths: [fileA.path, fileB.path],
+            level: .fast
+        )
+        XCTAssertTrue(success, "7z archive creation must succeed")
+        
+        let reader = ArchiveReader()
+        let t0 = CFAbsoluteTimeGetCurrent()
+        let entries = try await reader.inspect(archivePath: out7z)
+        let elapsedMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000.0
+        
+        XCTAssertEqual(entries.count, 2, "Must return exactly 2 entries")
+        XCTAssertTrue(entries.contains(where: { $0.path.contains("fileA.txt") }))
+        XCTAssertTrue(entries.contains(where: { $0.path.contains("fileB.txt") }))
+        XCTAssertLessThan(elapsedMs, 15.0, "Zero-copy inspection must complete in < 15ms (actual: \(elapsedMs)ms)")
+    }
 }
