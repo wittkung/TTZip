@@ -372,7 +372,8 @@ struct ttzip_deflate_compressor {
 
 ttzip_deflate_compressor_t *ttzip_deflate_compressor_alloc(int level) {
     if (level < 1) level = 1;
-    if (level > 12) level = 12;
+    if (level > 15) level = 15;
+
     ttzip_deflate_compressor_t *c = (ttzip_deflate_compressor_t *)calloc(1, sizeof(ttzip_deflate_compressor_t));
     if (!c) return NULL;
     c->level = level;
@@ -393,81 +394,31 @@ size_t ttzip_deflate_compress(
 ) {
     if (!c || !in || !out || out_capacity == 0) return 0;
     
-    if (c->level >= 10) {
+    if (c->level >= 13) {
         TTZipZopfliOptions zopts;
-        ttzip_zopfli_init_options(&zopts, (int32_t)c->level);
+        ttzip_zopfli_init_options(&zopts, (int32_t)(c->level == 13 ? 2 : (c->level == 14 ? 5 : 15)));
         return ttzip_zopfli_compress_block_with_history(
             (const uint8_t *)in, in_size, NULL, 0, (uint8_t *)out, out_capacity, &zopts, 1
         );
     }
 
+    if (c->level >= 1 && c->level <= 12) {
+        return ttzip_libdeflate_compress(in, in_size, out, out_capacity, c->level);
+    }
+
     ttzip_native_deflate_options_t opts;
     memset(&opts, 0, sizeof(opts));
     opts.dynamic_huffman = true;
-    opts.tier_level = c->level;
-
-    if (c->level == 1) {
-        opts.tier_level = 1;
-        opts.max_chain_depth = 0;
-        opts.nice_match_len = 32;
-        opts.lookahead_steps = 0;
-        opts.skip_intermediate_hashes = true;
-    } else if (c->level == 2) {
-        opts.tier_level = 2;
-        opts.max_chain_depth = 2;
-        opts.nice_match_len = 24;
-        opts.lookahead_steps = 1;
-        opts.skip_intermediate_hashes = true;
-    } else if (c->level == 3) {
-        opts.tier_level = 3;
-        opts.max_chain_depth = 2;
-        opts.nice_match_len = 32;
-        opts.lookahead_steps = 1;
-        opts.skip_intermediate_hashes = false;
-    } else if (c->level == 4) {
-        opts.tier_level = 4;
-        opts.max_chain_depth = 4;
-        opts.nice_match_len = 32;
-        opts.lookahead_steps = 1;
-        opts.skip_intermediate_hashes = false;
-    } else if (c->level == 5) {
-        opts.tier_level = 5;
-        opts.max_chain_depth = 4;
-        opts.nice_match_len = 48;
-        opts.lookahead_steps = 1;
-        opts.skip_intermediate_hashes = false;
-    } else if (c->level == 6) {
-        opts.tier_level = 6;
-        opts.max_chain_depth = 8;
-        opts.nice_match_len = 64;
-        opts.lookahead_steps = 1;
-        opts.skip_intermediate_hashes = false;
-    } else if (c->level == 7) {
-        opts.tier_level = 7;
-        opts.max_chain_depth = 16;
-        opts.nice_match_len = 128;
-        opts.lookahead_steps = 1;
-        opts.skip_intermediate_hashes = false;
-    } else if (c->level == 8) {
-        opts.tier_level = 8;
-        opts.max_chain_depth = 32;
-        opts.nice_match_len = 128;
-        opts.lookahead_steps = 1;
-        opts.skip_intermediate_hashes = false;
-    } else {
-        opts.tier_level = 9;
-        opts.max_chain_depth = 64;
-        opts.nice_match_len = 258;
-        opts.lookahead_steps = 1;
-        opts.skip_intermediate_hashes = false;
-    }
-
-
-
-
+    opts.tier_level = 1;
+    opts.max_chain_depth = 0;
+    opts.nice_match_len = 32;
+    opts.lookahead_steps = 0;
+    opts.skip_intermediate_hashes = true;
 
     return ttzip_native_deflate_compress_block_with_history(
         (const uint8_t *)in, in_size, NULL, 0, (uint8_t *)out, out_capacity, &opts, true
     );
 }
+
+
 

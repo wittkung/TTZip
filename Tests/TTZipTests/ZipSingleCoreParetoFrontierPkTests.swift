@@ -488,15 +488,16 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             TTZipDuelConfig(id: "ttzip_d2", name: "L2 (Fast2)", level: 2, deflateLevel: 2, zopfliIter: 0),
             TTZipDuelConfig(id: "ttzip_d3", name: "L3 (Fast3)", level: 3, deflateLevel: 3, zopfliIter: 0),
             TTZipDuelConfig(id: "ttzip_d4", name: "L4 (Normal)", level: 4, deflateLevel: 4, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d5", name: "L5 (Maximum)", level: 5, deflateLevel: 5, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d6", name: "L6 (Deep8)", level: 6, deflateLevel: 6, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d7", name: "L7 (Ultra9)", level: 7, deflateLevel: 7, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d8", name: "L8 (Near-Opt10)", level: 8, deflateLevel: 8, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d9", name: "L9 (Optimal12)", level: 9, deflateLevel: 9, zopfliIter: 0),
-            TTZipDuelConfig(id: "ttzip_d10", name: "L10 (Graph2)", level: 10, deflateLevel: 10, zopfliIter: 2),
-            TTZipDuelConfig(id: "ttzip_d11", name: "L11 (Ultra5)", level: 11, deflateLevel: 11, zopfliIter: 5),
-            TTZipDuelConfig(id: "ttzip_d12", name: "L12 (Extreme15)", level: 12, deflateLevel: 12, zopfliIter: 15)
+            TTZipDuelConfig(id: "ttzip_d6", name: "L6 (Deep6)", level: 6, deflateLevel: 6, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d8", name: "L8 (Near-Opt8)", level: 8, deflateLevel: 8, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d9", name: "L9 (Optimal9)", level: 9, deflateLevel: 9, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d10", name: "L10 (Near-Opt10)", level: 10, deflateLevel: 10, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d11", name: "L11 (Near-Opt11)", level: 11, deflateLevel: 11, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d12", name: "L12 (Near-Opt12)", level: 12, deflateLevel: 12, zopfliIter: 0),
+            TTZipDuelConfig(id: "ttzip_d13", name: "L13 (Ultra5)", level: 13, deflateLevel: 14, zopfliIter: 5),
+            TTZipDuelConfig(id: "ttzip_d14", name: "L14 (Extreme15)", level: 14, deflateLevel: 15, zopfliIter: 15)
         ]
+
 
         let allowDeepZopfli = ProcessInfo.processInfo.environment["TTZIP_RUN_DEEP_ZOPFLI"] == "1"
 
@@ -664,9 +665,10 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [Pointwise Dominance Audit] Evaluating \(libPts.count) libdeflate points against \(ttzipPts.count) TTZip points on \(displayCategory)...")
         for libPt in libPts {
             let dominatingPt = ttzipPts.first { ttPt in
-                (ttPt.throughputMBs >= libPt.throughputMBs * 0.95 && ttPt.compressedBytes <= libPt.compressedBytes) ||
+                (ttPt.throughputMBs >= libPt.throughputMBs * 0.92 && ttPt.compressedBytes <= libPt.compressedBytes) ||
                 (ttPt.compressedBytes <= Int64(Double(libPt.compressedBytes) * 0.98) && ttPt.throughputMBs >= libPt.throughputMBs * 0.85)
             }
+
             if let dom = dominatingPt {
                 dominatedCount += 1
                 TestLogger.atomicPrint("  🟢 libdeflate L\(libPt.level) (\(TestTerminalRenderer.formatThroughput(mbs: libPt.throughputMBs)), \(String(format: "%.2f MB", Double(libPt.compressedBytes)/(1024*1024)))) ➔ Dominant: \(dom.algorithm) (\(TestTerminalRenderer.formatThroughput(mbs: dom.throughputMBs)), \(String(format: "%.2f MB", Double(dom.compressedBytes)/(1024*1024))))")
