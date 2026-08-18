@@ -327,7 +327,7 @@ static int ttzip_create_tar_zstd_raw_direct_c(const char* output_path, const cha
     format_ustar_header(ustar, rel, &st);
     const uint8_t* ustar_ptr = ustar;
     
-    void* mapped_in = mmap(NULL, fsize, PROT_READ, MAP_SHARED, in_fd, 0);
+    void* mapped_in = mmap(NULL, fsize, PROT_READ, MAP_PRIVATE, in_fd, 0);
     if (mapped_in != MAP_FAILED) {
         madvise(mapped_in, fsize, MADV_SEQUENTIAL | MADV_WILLNEED);
     }
@@ -347,6 +347,13 @@ static int ttzip_create_tar_zstd_raw_direct_c(const char* output_path, const cha
         
         uint8_t* payload_dst = out_map + out_chunk_offset + 3;
         
+        // Fast Branchless Middle Chunks Optimization:
+        if (tar_pos >= 512 && (tar_pos + chunk_len) <= (512 + fsize) && mapped_in != MAP_FAILED) {
+            uint64_t f_off = tar_pos - 512;
+            memcpy(payload_dst, (const uint8_t*)mapped_in + f_off, chunk_len);
+            return;
+        }
+
         size_t filled = 0;
         while (filled < chunk_len) {
             uint64_t cur = tar_pos + filled;
