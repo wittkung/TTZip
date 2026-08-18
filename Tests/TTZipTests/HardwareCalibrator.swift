@@ -27,7 +27,12 @@ public final class HardwareCalibrator: @unchecked Sendable {
     }
     
     private func makeKey(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel, isEncrypted: Bool) -> String {
-        return "\(format.rawValue)_\(level.rawValue)_\(isEncrypted)"
+        #if DEBUG
+        let mode = "debug"
+        #else
+        let mode = "release"
+        #endif
+        return "\(mode)_\(format.rawValue)_\(level.rawValue)_\(isEncrypted)"
     }
     
     /// 、 、 (MB/s)

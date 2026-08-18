@@ -16,10 +16,11 @@ final class PerformanceRegressionGuardTests: XCTestCase {
         let isEncrypted: Bool
     }
     
+    // Historical peak floor tolerance (Debug: 80% adaptation / Release: strictly 90%)
     #if DEBUG
-    private static let floorRatio: Double = 0.70
-    #else
     private static let floorRatio: Double = 0.80
+    #else
+    private static let floorRatio: Double = 0.90
     #endif
     
     func testTopFormatsDynamicScenarioPerformanceFloor() async throws {
