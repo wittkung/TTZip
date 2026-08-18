@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "ttzip_deflate_bitstream.h"
+#include "../include/CTTZipDeflateEngine.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,16 +43,7 @@ typedef struct {
 } ttzip_huffman_codes_t;
 
 /**
- * @brief Deflate symbol frequency histogram.
- */
-typedef struct {
-    uint32_t litlen[TTZIP_DEFLATE_NUM_LITLEN_SYMS + 2]; /**< Literal (0..255), EOB (256), and Length (257..285) counts. */
-    uint32_t offset[TTZIP_DEFLATE_NUM_OFFSET_SYMS + 2]; /**< Distance slot (0..29) counts. */
-} ttzip_symbol_freqs_t;
-
-/**
  * @brief Returns the process-wide immutable singleton for static RFC 1951 Huffman codes.
- *
  * @return Pointer to pre-initialized static Huffman code table.
  */
 const ttzip_huffman_codes_t *ttzip_get_static_huffman_codes(void);
@@ -85,6 +77,17 @@ void ttzip_write_dynamic_huffman_header(ttzip_bitstream_t *bs,
                                         unsigned num_litlen_syms,
                                         const uint8_t *lens_offset,
                                         unsigned num_offset_syms);
+
+/**
+ * @brief Fast exact bit-cost evaluator between static and dynamic Huffman encodings.
+ */
+bool ttzip_eval_huffman_bit_costs(
+    const ttzip_symbol_freqs_t *freqs,
+    const uint8_t *dynamic_lens_litlen,
+    const uint8_t *dynamic_lens_offset,
+    uint64_t *out_static_bits,
+    uint64_t *out_dynamic_bits
+);
 
 #ifdef __cplusplus
 }

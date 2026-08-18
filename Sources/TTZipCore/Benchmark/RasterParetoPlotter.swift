@@ -84,7 +84,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let plotH = height - marginTop - marginBottom
 
         // =========================================================================
-        // 2. 通用算法驱动的自适应多维坐标聚类与自动空隙折叠引擎 (Dynamic Cluster Fold Engine)
+        // 2. 通用算法驱动的自适应多维坐标引擎 (Adaptive Universal Coordinate Engine)
         // =========================================================================
         let allSizes = result.allPoints.map { p -> Double in
             if p.compressedBytes > 0 {
@@ -95,148 +95,48 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         }.sorted()
         let allSpeeds = result.allPoints.map { $0.throughputMBs }.sorted()
 
-        // 2.1 Y 轴对数空间空隙自动探测
-        struct AxisFold1D: Sendable {
-            let isFolded: Bool
-            let lowerClusterMin: Double
-            let lowerClusterMax: Double
-            let upperClusterMin: Double
-            let upperClusterMax: Double
-            let breakLabel: String
-        }
+        let rawMinSize = allSizes.first ?? 2.8
+        let rawMaxSize = allSizes.last ?? 4.2
 
-        func detectYAxisFold(speeds: [Double]) -> AxisFold1D {
-            guard speeds.count >= 4 else {
-                return AxisFold1D(isFolded: false, lowerClusterMin: speeds.first ?? 1.0, lowerClusterMax: speeds.first ?? 1.0, upperClusterMin: speeds.last ?? 1000.0, upperClusterMax: speeds.last ?? 1000.0, breakLabel: "")
-            }
-            let logVals = speeds.map { log10(max(1e-4, $0)) }
-            var maxGap: Double = 0.0
-            var splitIdx: Int = -1
-            for i in 0..<(logVals.count - 1) {
-                let gap = logVals[i + 1] - logVals[i]
-                if gap > maxGap {
-                    maxGap = gap
-                    splitIdx = i
-                }
-            }
-            let totalLogSpan = logVals.last! - logVals.first!
-            // 当最大无数据空隙超过总对数跨度的 30% 时，算法自适应激活折叠
-            if totalLogSpan > 0 && (maxGap / totalLogSpan) >= 0.30 && splitIdx >= 0 {
-                let lowMax = speeds[splitIdx]
-                let highMin = speeds[splitIdx + 1]
-                let lowBoundMin = max(0.1, speeds.first! * 0.70)
-                let lowBoundMax = lowMax * 1.35
-                let highBoundMin = highMin * 0.80
-                let highBoundMax = speeds.last! * 1.15
-                let label = String(format: "≈ [ %.1f MB/s ~ %.0f MB/s 闲置空隙自适应折叠 (Auto Axis Break) ] ≈", lowBoundMax, highBoundMin)
-                return AxisFold1D(isFolded: true, lowerClusterMin: lowBoundMin, lowerClusterMax: lowBoundMax, upperClusterMin: highBoundMin, upperClusterMax: highBoundMax, breakLabel: label)
-            }
-            return AxisFold1D(isFolded: false, lowerClusterMin: speeds.first ?? 1.0, lowerClusterMax: speeds.first ?? 1.0, upperClusterMin: speeds.last ?? 1000.0, upperClusterMax: speeds.last ?? 1000.0, breakLabel: "")
-        }
+        // 探测是否存在隔离的 Store 未压缩端点 (例如全量压缩在 3MB，但 Store 在 100MB)
+        let hasIsolatedStore = rawMaxSize >= 50.0 && rawMinSize <= 20.0 && (rawMaxSize - (allSizes.dropLast().last ?? rawMinSize)) > 20.0
 
-        func detectXAxisFold(sizes: [Double]) -> AxisFold1D {
-            guard sizes.count >= 4 else {
-                return AxisFold1D(isFolded: false, lowerClusterMin: sizes.first ?? 2.0, lowerClusterMax: sizes.first ?? 2.0, upperClusterMin: sizes.last ?? 6.0, upperClusterMax: sizes.last ?? 6.0, breakLabel: "")
-            }
-            var maxGap: Double = 0.0
-            var splitIdx: Int = -1
-            for i in 0..<(sizes.count - 1) {
-                let gap = sizes[i + 1] - sizes[i]
-                if gap > maxGap {
-                    maxGap = gap
-                    splitIdx = i
-                }
-            }
-            let totalSpan = sizes.last! - sizes.first!
-            if totalSpan > 20.0 && (maxGap / totalSpan) >= 0.35 && splitIdx >= 0 {
-                let lowMax = sizes[splitIdx]
-                let highMin = sizes[splitIdx + 1]
-                let lowBoundMin = max(1.0, sizes.first! - 0.15)
-                let lowBoundMax = lowMax + 0.15
-                let highBoundMin = highMin - 1.0
-                let highBoundMax = sizes.last! + 1.0
-                let label = String(format: "≈ [ %.1f MB ~ %.0f MB 闲置空隙自适应折叠 (Auto Axis Break) ] ≈", lowBoundMax, highMin)
-                return AxisFold1D(isFolded: true, lowerClusterMin: lowBoundMin, lowerClusterMax: lowBoundMax, upperClusterMin: highBoundMin, upperClusterMax: highBoundMax, breakLabel: label)
-            }
-            return AxisFold1D(isFolded: false, lowerClusterMin: sizes.first ?? 2.0, lowerClusterMax: sizes.first ?? 2.0, upperClusterMin: sizes.last ?? 6.0, upperClusterMax: sizes.last ?? 6.0, breakLabel: "")
-        }
+        let activeSizes = hasIsolatedStore ? Array(allSizes.dropLast()) : allSizes
+        let compMin = activeSizes.first ?? rawMinSize
+        let compMax = activeSizes.last ?? rawMaxSize
 
-        let yFold = detectYAxisFold(speeds: allSpeeds)
-        let xFold = detectXAxisFold(sizes: allSizes)
+        let compSpan = max(1e-4, compMax - compMin)
+        let xMargin = max(0.015, compSpan * 0.12)
+        let xDomainMin = max(0.001, compMin - xMargin)
+        let xDomainMax = compMax + xMargin
 
         func mapX(_ savingsVal: Double) -> CGFloat {
             let sizeMB = 100.0 * (1.0 - savingsVal / 100.0)
-            if xFold.isFolded {
-                if savingsVal <= 5.0 {
-                    return marginLeft
+            if hasIsolatedStore {
+                if sizeMB >= 50.0 {
+                    return marginLeft + 0.03 * plotW
                 }
-                // 自适应 3 段弹性展开算法 (充分展开右侧密集高压战场并拉开 L1 与 L2 间距)
-                if sizeMB >= 3.90 {
-                    let norm = (5.00 - sizeMB) / max(1e-4, 5.00 - 3.90)
-                    return marginLeft + CGFloat(0.05 + max(0.0, min(1.0, norm)) * 0.25) * plotW
-                } else if sizeMB >= 3.10 {
-                    let norm = (3.90 - sizeMB) / max(1e-4, 3.90 - 3.10)
-                    return marginLeft + CGFloat(0.30 + max(0.0, min(1.0, norm)) * 0.42) * plotW
-                } else {
-                    let norm = (3.10 - sizeMB) / max(1e-4, 3.10 - 2.80)
-                    return marginLeft + CGFloat(0.72 + max(0.0, min(1.0, norm)) * 0.26) * plotW
-                }
+                let norm = (xDomainMax - sizeMB) / max(1e-4, xDomainMax - xDomainMin)
+                return marginLeft + (CGFloat(0.12) + CGFloat(max(0.0, min(1.0, norm))) * 0.86) * plotW
             } else {
-                let minDomain = max(1.0, (allSizes.first ?? 2.8) - 0.12)
-                let maxDomain = (allSizes.last ?? 4.2) + 0.12
-                let norm = (maxDomain - sizeMB) / max(1e-4, maxDomain - minDomain)
+                let norm = (xDomainMax - sizeMB) / max(1e-4, xDomainMax - xDomainMin)
                 return marginLeft + CGFloat(max(0.0, min(1.0, norm))) * plotW
             }
         }
 
-        let maxObservedSpeed = allSpeeds.last ?? 16000.0
-        let hasUltraFastStore = maxObservedSpeed > 2500.0
+        // Y 轴完全通用对数坐标映射
+        let rawMinSpeed = max(0.1, allSpeeds.first ?? 0.3)
+        let rawMaxSpeed = max(10.0, allSpeeds.last ?? 1000.0)
+
+        let logMin = floor(log10(rawMinSpeed * 0.75))
+        let logMax = ceil(log10(rawMaxSpeed * 1.25))
+        let logSpan = max(1.0, logMax - logMin)
 
         func mapY(_ speedVal: Double) -> CGFloat {
-            let v = max(0.3, speedVal)
-            if hasUltraFastStore {
-                let h0: CGFloat = 0.25  // 0.5 ~ 50 MB/s
-                let h1: CGFloat = 0.55  // 50 ~ 2500 MB/s
-                let h2: CGFloat = 0.20  // 2500 ~ 16000 MB/s
-                
-                if v <= 50.0 {
-                    let logMin = log10(0.5)
-                    let logMax = log10(50.0)
-                    let logV = log10(v)
-                    let norm = (logV - logMin) / (logMax - logMin)
-                    return marginBottom + CGFloat(max(0.0, min(1.0, norm))) * h0 * plotH
-                } else if v <= 2500.0 {
-                    let logMin = log10(50.0)
-                    let logMax = log10(2500.0)
-                    let logV = log10(v)
-                    let norm = (logV - logMin) / (logMax - logMin)
-                    return marginBottom + (h0 + CGFloat(max(0.0, min(1.0, norm))) * h1) * plotH
-                } else {
-                    let logMin = log10(2500.0)
-                    let logMax = log10(16000.0)
-                    let logV = log10(min(16000.0, v))
-                    let norm = (logV - logMin) / (logMax - logMin)
-                    return marginBottom + ((h0 + h1) + CGFloat(max(0.0, min(1.0, norm))) * h2) * plotH
-                }
-            } else {
-                // 纯压缩图 (无 Store 模式，速度 0.3 ~ 2000 MB/s): 纵轴全画幅 2 段自适应展开
-                let h0: CGFloat = 0.32  // 0.3 ~ 50 MB/s (占 32%)
-                let h1: CGFloat = 0.68  // 50 ~ 2000 MB/s (占 68% 宽裕高度)
-                let topCap = max(1800.0, maxObservedSpeed * 1.15)
-                if v <= 50.0 {
-                    let logMin = log10(0.3)
-                    let logMax = log10(50.0)
-                    let logV = log10(v)
-                    let norm = (logV - logMin) / (logMax - logMin)
-                    return marginBottom + CGFloat(max(0.0, min(1.0, norm))) * h0 * plotH
-                } else {
-                    let logMin = log10(50.0)
-                    let logMax = log10(topCap)
-                    let logV = log10(min(topCap, v))
-                    let norm = (logV - logMin) / (logMax - logMin)
-                    return marginBottom + (h0 + CGFloat(max(0.0, min(1.0, norm))) * h1) * plotH
-                }
-            }
+            let v = max(pow(10.0, logMin), speedVal)
+            let logV = log10(v)
+            let norm = (logV - logMin) / logSpan
+            return marginBottom + CGFloat(max(0.0, min(1.0, norm))) * plotH
         }
 
         // 3. 绘制极淡水平网格线与 Y 轴刻度
@@ -244,29 +144,40 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let axisLineColor = CGColor(red: 148/255.0, green: 163/255.0, blue: 184/255.0, alpha: 1.0)
         let axisTextColor = NSColor(calibratedRed: 100/255.0, green: 116/255.0, blue: 139/255.0, alpha: 1.0)
 
-        let allYTicksCandidate: [(val: Double, label: String)] = [
+        let standardYTicks: [(val: Double, label: String)] = [
+            (0.1, "0.1 MB/s"),
+            (0.2, "0.2 MB/s"),
             (0.5, "0.5 MB/s"),
             (1.0, "1.0 MB/s"),
+            (2.0, "2.0 MB/s"),
             (5.0, "5.0 MB/s"),
-            (10.0, "10.0 MB/s"),
-            (50.0, "50.0 MB/s"),
-            (100.0, "100.0 MB/s"),
-            (250.0, "250.0 MB/s"),
-            (500.0, "500.0 MB/s"),
-            (750.0, "750.0 MB/s"),
-            (1000.0, "1000.0 MB/s"),
-            (1500.0, "1500.0 MB/s"),
-            (2000.0, "2000.0 MB/s"),
-            (5000.0, "5000.0 MB/s"),
-            (10000.0, "10000.0 MB/s"),
-            (15000.0, "15000.0 MB/s")
+            (10.0, "10 MB/s"),
+            (20.0, "20 MB/s"),
+            (50.0, "50 MB/s"),
+            (100.0, "100 MB/s"),
+            (200.0, "200 MB/s"),
+            (500.0, "500 MB/s"),
+            (1000.0, "1.0 GB/s"),
+            (2000.0, "2.0 GB/s"),
+            (5000.0, "5.0 GB/s"),
+            (10000.0, "10.0 GB/s"),
+            (20000.0, "20.0 GB/s")
         ]
-        let candidateYTicks: [(val: Double, label: String)] = allYTicksCandidate.filter {
-            $0.val >= (allSpeeds.first ?? 0.3) * 0.7 && $0.val <= (allSpeeds.last ?? 16000.0) * 1.20
+
+        var activeYTicks: [(val: Double, label: String, canvasY: CGFloat)] = []
+        var lastY: CGFloat = -1000.0
+        for tick in standardYTicks {
+            if tick.val >= pow(10.0, logMin) * 0.95 && tick.val <= pow(10.0, logMax) * 1.05 {
+                let y = mapY(tick.val)
+                if y - lastY >= 26.0 {
+                    activeYTicks.append((tick.val, tick.label, y))
+                    lastY = y
+                }
+            }
         }
 
-        for tick in candidateYTicks {
-            let y = mapY(tick.val)
+        for tick in activeYTicks {
+            let y = tick.canvasY
             ctx.setStrokeColor(gridColor)
             ctx.setLineWidth(1.0)
             ctx.strokeLineSegments(between: [CGPoint(x: marginLeft, y: y), CGPoint(x: marginLeft + plotW, y: y)])
@@ -289,21 +200,26 @@ public final class RasterParetoPlotter: @unchecked Sendable {
 
         // 3.1 绘制 X 轴自适应物理文件大小 (MB) 刻度与短刻度线
         var candidateSizeTicks: [Double] = []
-        if xFold.isFolded {
+        if hasIsolatedStore {
             candidateSizeTicks.append(100.0)
-            let compCandidate: [Double] = [4.8, 4.4, 4.0, 3.6, 3.4, 3.2, 3.0, 2.95]
-            for sz in compCandidate where sz >= xFold.lowerClusterMin && sz <= xFold.lowerClusterMax {
-                candidateSizeTicks.append(sz)
+        }
+
+        let targetTickCount = 7
+        let rawStep = compSpan / Double(targetTickCount - 1)
+        let stepMagnitude = pow(10.0, floor(log10(max(1e-6, rawStep))))
+        let residual = rawStep / stepMagnitude
+        let niceStep: Double
+        if residual <= 1.5 { niceStep = 1.0 * stepMagnitude }
+        else if residual <= 3.5 { niceStep = 2.0 * stepMagnitude }
+        else if residual <= 7.5 { niceStep = 5.0 * stepMagnitude }
+        else { niceStep = 10.0 * stepMagnitude }
+
+        var tickVal = ceil(xDomainMin / niceStep) * niceStep
+        while tickVal <= xDomainMax + (niceStep * 0.01) {
+            if tickVal >= xDomainMin && tickVal <= xDomainMax {
+                candidateSizeTicks.append(tickVal)
             }
-        } else {
-            let minVal = allSizes.first ?? 2.8
-            let maxVal = allSizes.last ?? 4.2
-            let step = (maxVal - minVal) <= 3.0 ? 0.2 : 0.5
-            var v = ((minVal - 0.05) * 5.0).rounded() / 5.0
-            while v <= maxVal + 0.15 {
-                candidateSizeTicks.append(v)
-                v += step
-            }
+            tickVal += niceStep
         }
 
         struct MappedTick {
@@ -316,17 +232,27 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         for sizeMB in candidateSizeTicks {
             let savingsVal = 100.0 * (1.0 - sizeMB / 100.0)
             let x = mapX(savingsVal)
-            let lbl = sizeMB >= 50.0 ? String(format: "%.0f MB (Store)", sizeMB) : String(format: "%.2f MB", sizeMB)
+            let lbl: String
+            if sizeMB >= 50.0 && hasIsolatedStore {
+                lbl = String(format: "%.0f MB (Store)", sizeMB)
+            } else if niceStep < 0.02 {
+                lbl = String(format: "%.3f MB", sizeMB)
+            } else if niceStep < 0.2 {
+                lbl = String(format: "%.2f MB", sizeMB)
+            } else if niceStep < 2.0 {
+                lbl = String(format: "%.1f MB", sizeMB)
+            } else {
+                lbl = String(format: "%.0f MB", sizeMB)
+            }
             mappedTicks.append(MappedTick(sizeMB: sizeMB, canvasX: x, label: lbl))
         }
 
-        // 按画布 X 从左到右递增排序
         mappedTicks.sort { $0.canvasX < $1.canvasX }
 
         var activeXTicks: [MappedTick] = []
         var lastTickCanvasX: CGFloat = -1000.0
         for tick in mappedTicks {
-            if tick.canvasX - lastTickCanvasX >= 48.0 {
+            if tick.canvasX - lastTickCanvasX >= 44.0 {
                 activeXTicks.append(tick)
                 lastTickCanvasX = tick.canvasX
             }
@@ -359,30 +285,12 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         // 绘制 X 轴实线
         ctx.strokeLineSegments(between: [CGPoint(x: marginLeft, y: marginBottom), CGPoint(x: marginLeft + plotW, y: marginBottom)])
 
-        // 3.3 专业学术级坐标轴折叠断裂标记 (Axis Break Slashes // on Coordinate Lines)
-        let slashW: CGFloat = 8.0
-        let slashH: CGFloat = 8.0
-        let slashGap: CGFloat = 4.0
-
-        // 纵轴折叠双斜杠 (Y-Axis Break //)
-        if yFold.isFolded {
-            let breakY = marginBottom + CGFloat(0.48) * plotH
-            ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
-            ctx.fill(CGRect(x: marginLeft - 6, y: breakY - 10, width: 12, height: 20))
-
-            ctx.setStrokeColor(axisLineColor)
-            ctx.setLineWidth(1.8)
-            ctx.strokeLineSegments(between: [
-                CGPoint(x: marginLeft - slashW/2, y: breakY - slashGap - slashH/2),
-                CGPoint(x: marginLeft + slashW/2, y: breakY - slashGap + slashH/2),
-                CGPoint(x: marginLeft - slashW/2, y: breakY + slashGap - slashH/2),
-                CGPoint(x: marginLeft + slashW/2, y: breakY + slashGap + slashH/2)
-            ])
-        }
-
-        // 横轴折叠双斜杠 (X-Axis Break //)
-        if xFold.isFolded {
-            let breakX = marginLeft + CGFloat(0.035) * plotW
+        // 3.3 若存在 Store 孤立点，绘制 X 轴折叠断裂标记
+        if hasIsolatedStore {
+            let slashW: CGFloat = 8.0
+            let slashH: CGFloat = 8.0
+            let slashGap: CGFloat = 4.0
+            let breakX = marginLeft + CGFloat(0.07) * plotW
             ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
             ctx.fill(CGRect(x: breakX - 10, y: marginBottom - 6, width: 20, height: 12))
 
@@ -507,6 +415,8 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 } else {
                     cleanName = "pigz-\(p.level)"
                 }
+            } else if fam == .libdeflate {
+                cleanName = "libdeflate L\(p.level)"
             } else if fam == .appleNative {
                 if p.algorithm.contains("ditto") {
                     cleanName = "ditto"
@@ -623,14 +533,14 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                         (cx + 10, cy - h - 10),          // Bottom-Right
                         (cx - w - 10, cy - h - 10)       // Bottom-Left
                     ]
-                case .sevenZip, .appleNative:
+                case .sevenZip, .appleNative, .libdeflate:
                     candidateSlots = [
                         (cx - w - 12, cy - h / 2),       // Left-Center
                         (cx - w - 10, cy + 10),          // Top-Left
                         (cx - w - 10, cy - h - 10),      // Bottom-Left
-                        (cx - w / 2, cy - h - 12),       // Bottom-Center
+                        (cx - w / 2, cy + 12),           // Top-Center
                         (cx + 12, cy - h / 2),           // Right-Center
-                        (cx - w / 2, cy + 12)            // Top-Center
+                        (cx - w / 2, cy - h - 12)        // Bottom-Center
                     ]
                 default:
                     candidateSlots = [

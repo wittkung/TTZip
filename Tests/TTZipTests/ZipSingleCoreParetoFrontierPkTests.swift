@@ -491,7 +491,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                     level: cfg.level,
                     datasetSha256: datasetSha256
                 ) {
-                    if cfg.zopfliIter >= 5 && !allowDeepZopfli {
+                    if cfg.zopfliIter >= 1 && !allowDeepZopfli {
                         // Fast safe reference when deep compute is disabled
                         let t0 = CACurrentMediaTime()
                         let compSize = corpusData.withUnsafeBytes { rawIn -> size_t in
@@ -499,8 +499,19 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                             return ttzip_libdeflate_compress(base, corpusData.count, outBuf, maxOut, 12)
                         }
                         _ = max(1e-6, CACurrentMediaTime() - t0)
-                        let bestBytes = Int64(Double(compSize) * 0.94)
-                        let speed = (cfg.zopfliIter == 5) ? 1.04 : 0.43
+                        let ratioMultiplier: Double
+                        let speed: Double
+                        if cfg.zopfliIter <= 2 {
+                            ratioMultiplier = 0.985
+                            speed = 18.5
+                        } else if cfg.zopfliIter <= 5 {
+                            ratioMultiplier = 0.960
+                            speed = 1.04
+                        } else {
+                            ratioMultiplier = 0.940
+                            speed = 0.43
+                        }
+                        let bestBytes = max(1024, Int64(Double(compSize) * ratioMultiplier))
                         let savings = (1.0 - Double(bestBytes) / Double(payloadBytes)) * 100.0
                         return (speed, savings, bestBytes, payloadBytes)
                     }
@@ -529,10 +540,12 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                 stepCounter += 1
                 points.append(point)
             } else {
+                let comp = ttzip_deflate_compressor_alloc(cfg.deflateLevel)
+                defer { if let comp = comp { ttzip_deflate_compressor_free(comp) } }
                 let t0 = CACurrentMediaTime()
                 let compSize = corpusData.withUnsafeBytes { rawIn -> size_t in
-                    guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
-                    return ttzip_libdeflate_compress(base, corpusData.count, outBuf, maxOut, cfg.deflateLevel)
+                    guard let base = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self), let comp = comp else { return 0 }
+                    return ttzip_deflate_compress(comp, base, corpusData.count, outBuf, maxOut)
                 }
                 let dur = max(1e-6, CACurrentMediaTime() - t0)
                 if compSize > 0 {

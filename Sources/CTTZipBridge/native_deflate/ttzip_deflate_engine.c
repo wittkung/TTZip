@@ -210,15 +210,22 @@ size_t ttzip_native_deflate_compress_block_with_history(
             use_dynamic = false;
         }
 
-        if (use_dynamic) {
-            uint8_t lens_litlen[288];
-            uint32_t codewords_litlen[288];
-            uint8_t lens_offset[32];
-            uint32_t codewords_offset[32];
+        uint8_t lens_litlen[288];
+        uint32_t codewords_litlen[288];
+        uint8_t lens_offset[32];
+        uint32_t codewords_offset[32];
 
+        if (use_dynamic) {
             ttzip_build_canonical_huffman_tree(freqs.litlen, 286, TTZIP_DEFLATE_MAX_CODEWORD_LEN, lens_litlen, codewords_litlen);
             ttzip_build_canonical_huffman_tree(freqs.offset, 30, TTZIP_DEFLATE_MAX_CODEWORD_LEN, lens_offset, codewords_offset);
 
+            uint64_t static_bits = 0, dynamic_bits = 0;
+            if (ttzip_eval_huffman_bit_costs(&freqs, lens_litlen, lens_offset, &static_bits, &dynamic_bits)) {
+                use_dynamic = false;
+            }
+        }
+
+        if (use_dynamic) {
             uint32_t bfinal_bit = chunk_is_final ? 1 : 0;
             ttzip_bs_write_bits(&bs, bfinal_bit | (2 << 1), 3);
             ttzip_write_dynamic_huffman_header(&bs, lens_litlen, 286, lens_offset, 30);
@@ -362,7 +369,6 @@ size_t ttzip_native_deflate_compress_block_with_history(
 
 struct ttzip_deflate_compressor {
     int level;
-    struct libdeflate_compressor *fallback_comp;
 };
 
 ttzip_deflate_compressor_t *ttzip_deflate_compressor_alloc(int level) {
@@ -371,15 +377,11 @@ ttzip_deflate_compressor_t *ttzip_deflate_compressor_alloc(int level) {
     ttzip_deflate_compressor_t *c = (ttzip_deflate_compressor_t *)calloc(1, sizeof(ttzip_deflate_compressor_t));
     if (!c) return NULL;
     c->level = level;
-    c->fallback_comp = libdeflate_alloc_compressor(level);
     return c;
 }
 
 void ttzip_deflate_compressor_free(ttzip_deflate_compressor_t *c) {
     if (!c) return;
-    if (c->fallback_comp) {
-        libdeflate_free_compressor(c->fallback_comp);
-    }
     free(c);
 }
 
@@ -392,26 +394,39 @@ size_t ttzip_deflate_compress(
 ) {
     if (!c || !in || !out || out_capacity == 0) return 0;
     
-    if (c->level <= 2) {
-        ttzip_native_deflate_options_t opts;
-        memset(&opts, 0, sizeof(opts));
-        opts.dynamic_huffman = true;
-        opts.tier_level = c->level;
+    ttzip_native_deflate_options_t opts;
+    memset(&opts, 0, sizeof(opts));
+    opts.dynamic_huffman = true;
+    opts.tier_level = c->level;
+
+    if (c->level == 1) {
+        opts.max_chain_depth = 1;
+        opts.nice_match_len = 16;
+        opts.lookahead_steps = 0;
+        opts.skip_intermediate_hashes = true;
+    } else if (c->level == 2) {
         opts.max_chain_depth = 2;
         opts.nice_match_len = 32;
         opts.lookahead_steps = 0;
         opts.skip_intermediate_hashes = true;
-
-        size_t written = ttzip_native_deflate_compress_block_with_history(
-            (const uint8_t *)in, in_size, NULL, 0, (uint8_t *)out, out_capacity, &opts, true
-        );
-        if (written > 0) {
-            return written;
-        }
+    } else if (c->level == 3) {
+        opts.max_chain_depth = 4;
+        opts.nice_match_len = 32;
+        opts.lookahead_steps = 1;
+        opts.skip_intermediate_hashes = false;
+    } else if (c->level <= 6) {
+        opts.max_chain_depth = 16;
+        opts.nice_match_len = 65;
+        opts.lookahead_steps = 2;
+        opts.skip_intermediate_hashes = false;
+    } else {
+        opts.max_chain_depth = 32;
+        opts.nice_match_len = 128;
+        opts.lookahead_steps = 2;
+        opts.skip_intermediate_hashes = false;
     }
 
-    if (c->fallback_comp) {
-        return libdeflate_deflate_compress(c->fallback_comp, in, in_size, out, out_capacity);
-    }
-    return 0;
+    return ttzip_native_deflate_compress_block_with_history(
+        (const uint8_t *)in, in_size, NULL, 0, (uint8_t *)out, out_capacity, &opts, true
+    );
 }

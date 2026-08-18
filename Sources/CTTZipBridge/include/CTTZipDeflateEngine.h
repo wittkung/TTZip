@@ -87,6 +87,27 @@ int ttzip_deflate_decompress(
     size_t *actual_out_size
 );
 
+typedef struct {
+    uint32_t litlen[288];
+    uint32_t offset[32];
+} ttzip_symbol_freqs_t;
+
+void ttzip_build_canonical_huffman_tree(
+    const uint32_t *freqs,
+    unsigned num_syms,
+    unsigned max_codeword_len,
+    uint8_t *lens_out,
+    uint32_t *codewords_out
+);
+
+bool ttzip_eval_huffman_bit_costs(
+    const ttzip_symbol_freqs_t *freqs,
+    const uint8_t *dynamic_lens_litlen,
+    const uint8_t *dynamic_lens_offset,
+    uint64_t *out_static_bits,
+    uint64_t *out_dynamic_bits
+);
+
 #ifdef __cplusplus
 }
 #endif

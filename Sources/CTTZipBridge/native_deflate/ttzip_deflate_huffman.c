@@ -238,3 +238,45 @@ void ttzip_write_dynamic_huffman_header(ttzip_bitstream_t *bs,
         }
     }
 }
+
+bool ttzip_eval_huffman_bit_costs(
+    const ttzip_symbol_freqs_t *freqs,
+    const uint8_t *dynamic_lens_litlen,
+    const uint8_t *dynamic_lens_offset,
+    uint64_t *out_static_bits,
+    uint64_t *out_dynamic_bits
+) {
+    if (!freqs) return false;
+
+    uint64_t static_bits = 0;
+    for (int i = 0; i <= 143; i++) static_bits += (uint64_t)freqs->litlen[i] * 8;
+    for (int i = 144; i <= 255; i++) static_bits += (uint64_t)freqs->litlen[i] * 9;
+    for (int i = 256; i <= 279; i++) static_bits += (uint64_t)freqs->litlen[i] * 7;
+    for (int i = 280; i <= 285; i++) static_bits += (uint64_t)freqs->litlen[i] * 8;
+
+    for (int i = 0; i < 30; i++) static_bits += (uint64_t)freqs->offset[i] * 5;
+
+    uint64_t dynamic_bits = 0;
+    if (dynamic_lens_litlen) {
+        for (int i = 0; i < 286; i++) {
+            if (freqs->litlen[i] > 0) {
+                dynamic_bits += (uint64_t)freqs->litlen[i] * dynamic_lens_litlen[i];
+            }
+        }
+    }
+    if (dynamic_lens_offset) {
+        for (int i = 0; i < 30; i++) {
+            if (freqs->offset[i] > 0) {
+                dynamic_bits += (uint64_t)freqs->offset[i] * dynamic_lens_offset[i];
+            }
+        }
+    }
+
+    dynamic_bits += 280;
+
+    if (out_static_bits) *out_static_bits = static_bits;
+    if (out_dynamic_bits) *out_dynamic_bits = dynamic_bits;
+
+    return static_bits <= dynamic_bits;
+}
+
