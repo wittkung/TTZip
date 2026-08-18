@@ -37,13 +37,15 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
 
         var zipPoints: [ParetoPoint] = []
 
-        // 1. TTZip 全谱系真·帕累托 8 大黄金档位 (直接基于 ZipCompressionProfile 强类型驱动)
+        // 1. TTZip 全谱系真·帕累托 8 大黄金档位 (Tier 0..5 永远实时实测，Tier 6/7 默认按需缓存，支持 TTZIP_BENCH_ALL_LIVE=1 强制全量重跑)
         let datasetSha256 = fp?.sha256Hex ?? "unknown"
+        let forceLiveAll = (ProcessInfo.processInfo.environment["TTZIP_BENCH_ALL_LIVE"] == "1" ||
+                            ProcessInfo.processInfo.environment["TTZIP_FORCE_BENCH_RERUN"] == "1")
 
         for (tierIdx, profile) in ZipCompressionProfile.allProfiles.enumerated() {
-            if tierIdx >= 6 {
-                // Tier 6 (Ultra Zopfli) 与 Tier 7 (Extreme Peak) 执行深度图论与多轮块切分，单次耗时达数分钟
-                // 接入持久化缓存：未改动代码时 0.001s 加载，改动代码或设置 TTZIP_FORCE_BENCH_RERUN=1 时现场重跑
+            if tierIdx >= 6 && !forceLiveAll {
+                // Tier 6 (Ultra Zopfli) 与 Tier 7 (Extreme Peak) 默认复用基准缓存 (0.001s 加载)
+                // 如需强制现场重跑，设置环境变量 TTZIP_BENCH_ALL_LIVE=1 或 TTZIP_FORCE_BENCH_RERUN=1
                 let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
                     toolId: "ttzip_mc_\(tierIdx)",
                     algorithm: "TTZip \(tierIdx) (\(profile.name))",
