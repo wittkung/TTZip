@@ -93,7 +93,7 @@ final class XCTestPerformanceMeasureTests: XCTestCase {
                 try await writer.createArchive(
                     outputPath: outArchive,
                     format: .zip,
-                    level: .level3,
+                    level: .level2,
                     inputPaths: [logFileURL.path]
                 )
                 XCTAssertTrue(FileManager.default.fileExists(atPath: outArchive))

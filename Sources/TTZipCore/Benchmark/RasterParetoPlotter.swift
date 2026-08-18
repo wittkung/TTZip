@@ -415,25 +415,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             }
         }
 
-        // 6.1 绘制 TTZip Hero 半透明演进光晕带 (DeepSWE Ribbon Beam - 纯直折线，全域连贯)
-        for traj in trajectories where traj.family.isHero {
-            let pts = traj.points.map { CGPoint(x: mapX($0.spaceSavingsPct), y: mapY($0.throughputMBs)) }
-            if pts.count >= 2 {
-                let ribbonPath = CGMutablePath()
-                ribbonPath.move(to: pts[0])
-                for i in 1..<pts.count {
-                    ribbonPath.addLine(to: pts[i])
-                }
-                ctx.setStrokeColor(CGColor(red: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 0.16))
-                ctx.setLineWidth(CGFloat(traj.family.haloRibbonWidth))
-                ctx.setLineCap(.round)
-                ctx.setLineJoin(.round)
-                ctx.addPath(ribbonPath)
-                ctx.strokePath()
-            }
-        }
-
-        // 6.2 绘制各软件家族主实线轨迹 (纯直折线，全域连贯)
+        // 6. 绘制各软件家族主实线轨迹 (纯直折线，全域连贯)
         for traj in trajectories {
             let pts = traj.points.map { CGPoint(x: mapX($0.spaceSavingsPct), y: mapY($0.throughputMBs)) }
             guard pts.count >= 2 else { continue }
@@ -446,7 +428,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
 
             let strokeColor = NSColor(hexString: traj.family.brandColorHex) ?? NSColor.darkGray
             ctx.setStrokeColor(strokeColor.cgColor)
-            ctx.setLineWidth(CGFloat(traj.family.lineWidth))
+            ctx.setLineWidth(CGFloat(traj.family.isHero ? 2.5 : traj.family.lineWidth))
             ctx.setLineCap(.round)
             ctx.setLineJoin(.round)
             ctx.addPath(polylinePath)

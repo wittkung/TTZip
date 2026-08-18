@@ -91,15 +91,13 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                     } else if profile.level == .level1 {
                         return ttzip_native_deflate_compress_chunk_with_history(base, rawData.count, nil, 0, outBuf, maxOut, 1, 1)
                     } else if profile.level == .level2 {
-                        return ttzip_native_deflate_compress_chunk_with_history(base, rawData.count, nil, 0, outBuf, maxOut, 3, 1)
-                    } else if profile.level == .level3 {
                         return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 6)
-                    } else if profile.level == .level4 {
+                    } else if profile.level == .level3 {
                         return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 12)
                     } else {
-                        guard let comp = ttzip_deflate_compressor_alloc(Int32(profile.deflateLevel)) else { return 0 }
-                        defer { ttzip_deflate_compressor_free(comp) }
-                        return ttzip_deflate_compress(comp, base, rawData.count, outBuf, maxOut)
+                        var zopts = TTZipZopfliOptions()
+                        ttzip_zopfli_init_options(&zopts, Int32(tierIdx))
+                        return ttzip_zopfli_compress_block_with_history(base, rawData.count, nil, 0, outBuf, maxOut, &zopts, 1)
                     }
                 }
                 let dur = max(1e-6, CACurrentMediaTime() - t0)

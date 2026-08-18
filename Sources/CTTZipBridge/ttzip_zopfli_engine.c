@@ -95,17 +95,17 @@ __attribute__((unused)) static inline uint8_t ttzip_get_dist_code(uint32_t dist)
 void ttzip_zopfli_init_options(TTZipZopfliOptions *options, int level) {
     if (!options) return;
     options->compression_level = level;
-    if (level <= 4) {
+    if (level <= 3) {
         options->num_iterations = 0;
         options->block_splitting = 0;
         options->max_block_splits = 0;
         options->early_exit_threshold = 0.0001;
-    } else if (level == 5) {
+    } else if (level == 4) {
         options->num_iterations = 2;
         options->block_splitting = 0;
         options->max_block_splits = 0;
         options->early_exit_threshold = 0.0001;
-    } else if (level == 6) {
+    } else if (level == 5) {
         options->num_iterations = 5;
         options->block_splitting = 0;
         options->max_block_splits = 0;
@@ -178,8 +178,8 @@ size_t ttzip_zopfli_compress_block_with_history(
 
     /* Fast path (num_iterations <= 1): Dispatch to 100% native in-process Deflate or libdeflate */
     if (!options || options->num_iterations <= 1) {
-        if (target_level == 3 || target_level == 6) {
-            /* Tier 3 (Maximum): Fast Deflate level 6 with sync-flush */
+        if (target_level == 2 || target_level == 6) {
+            /* Tier 2 (Maximum): Fast Deflate level 6 with sync-flush */
             size_t c_len = ttzip_libdeflate_compress(in, in_size, out, out_capacity, 6);
             if (c_len > 0) {
                 if (!is_final && c_len + 4 <= out_capacity) {
@@ -190,8 +190,8 @@ size_t ttzip_zopfli_compress_block_with_history(
                 }
                 return c_len;
             }
-        } else if (target_level == 4 || target_level == 9 || target_level == 12) {
-            /* Tier 4 (High Compression): Near-Optimal Deflate level 12 with sync-flush */
+        } else if (target_level == 3 || target_level == 9 || target_level == 12) {
+            /* Tier 3 (High Compression): Near-Optimal Deflate level 12 with sync-flush */
             size_t c_len = ttzip_libdeflate_compress(in, in_size, out, out_capacity, 12);
             if (c_len > 0) {
                 if (!is_final && c_len + 4 <= out_capacity) {
@@ -204,7 +204,7 @@ size_t ttzip_zopfli_compress_block_with_history(
             }
         }
 
-        int tier = (target_level <= 1 ? 1 : (target_level == 2 ? 3 : 4));
+        int tier = (target_level <= 1 ? 1 : 3);
 
         return ttzip_native_deflate_compress_chunk_with_history(
             in, in_size, history, history_size, out, out_capacity, tier, is_final

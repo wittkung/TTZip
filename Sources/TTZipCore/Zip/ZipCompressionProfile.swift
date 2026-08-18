@@ -68,7 +68,7 @@ public struct ZipCompressionProfile: Sendable, Equatable, Identifiable {
     }
 }
 
-// MARK: - The 8 Golden Standard Presets
+// MARK: - The 7 Golden Standard Presets
 
 extension ZipCompressionProfile {
     
@@ -98,24 +98,11 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 5000.0
     )
     
-    /// Tier 2: Normal (Fast-Lazy 3-byte + 4-byte dual candidate match finder, throughput >= 4500 MB/s).
-    public static let normal = ZipCompressionProfile(
-        id: "zip_tier_2_normal",
-        name: "Normal (2)",
-        level: .level2,
-        deflateLevel: 2,
-        zopfliIterations: 0,
-        blockSplitting: false,
-        maxBlockSplits: 0,
-        earlyExitThreshold: 0.0001,
-        targetThroughputFloorMBs: 4500.0
-    )
-    
-    /// Tier 3: Maximum (Deep pattern matching Deflate Level 6 with Sync-Flush, throughput >= 2500 MB/s).
+    /// Tier 2: Maximum (Deep pattern matching Deflate Level 6 with Sync-Flush, throughput >= 2500 MB/s).
     public static let maximum = ZipCompressionProfile(
-        id: "zip_tier_3_maximum",
-        name: "Maximum (3)",
-        level: .level3,
+        id: "zip_tier_2_maximum",
+        name: "Maximum (2)",
+        level: .level2,
         deflateLevel: 6,
         zopfliIterations: 0,
         blockSplitting: false,
@@ -124,11 +111,11 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 2500.0
     )
     
-    /// Tier 4: High Compression (Near-Optimal DP Deflate Level 12, bridging the 210x speed cliff, throughput >= 150 MB/s).
+    /// Tier 3: High Compression (Near-Optimal DP Deflate Level 12, bridging the 210x speed cliff, throughput >= 150 MB/s).
     public static let high = ZipCompressionProfile(
-        id: "zip_tier_4_high",
-        name: "High (4)",
-        level: .level4,
+        id: "zip_tier_3_high",
+        name: "High (3)",
+        level: .level3,
         deflateLevel: 12,
         zopfliIterations: 0,
         blockSplitting: false,
@@ -137,11 +124,11 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 150.0
     )
     
-    /// Tier 5: Graph Fast (Lightweight 2-pass shortest-path DAG match parser, throughput >= 20 MB/s).
+    /// Tier 4: Graph Fast (Lightweight 2-pass shortest-path DAG match parser, throughput >= 20 MB/s).
     public static let graphFast = ZipCompressionProfile(
-        id: "zip_tier_5_graph_fast",
-        name: "Graph Fast (5)",
-        level: .level5,
+        id: "zip_tier_4_graph_fast",
+        name: "Graph Fast (4)",
+        level: .level4,
         deflateLevel: 12,
         zopfliIterations: 2,
         blockSplitting: false,
@@ -150,11 +137,11 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 20.0
     )
     
-    /// Tier 6: Ultra Zopfli (In-process global shortest-path DAG parser, 5 iterations, throughput >= 4.0 MB/s).
+    /// Tier 5: Ultra Zopfli (In-process global shortest-path DAG parser, 5 iterations, throughput >= 4.0 MB/s).
     public static let ultraZopfli = ZipCompressionProfile(
-        id: "zip_tier_6_ultra_zopfli",
-        name: "Ultra Zopfli (6)",
-        level: .level6,
+        id: "zip_tier_5_ultra_zopfli",
+        name: "Ultra Zopfli (5)",
+        level: .level5,
         deflateLevel: 12,
         zopfliIterations: 5,
         blockSplitting: false,
@@ -163,11 +150,11 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 4.0
     )
     
-    /// Tier 7: Extreme Peak (15 iterations iterative re-balancing & optimal dynamic block splitting, throughput >= 0.25 MB/s).
+    /// Tier 6: Extreme Peak (15 iterations iterative re-balancing & optimal dynamic block splitting, throughput >= 0.25 MB/s).
     public static let extremePeak = ZipCompressionProfile(
-        id: "zip_tier_7_extreme_peak",
-        name: "Extreme Peak (7)",
-        level: .level7,
+        id: "zip_tier_6_extreme_peak",
+        name: "Extreme Peak (6)",
+        level: .level6,
         deflateLevel: 12,
         zopfliIterations: 15,
         blockSplitting: true,
@@ -176,14 +163,14 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 0.25
     )
     
-    /// Backward compatibility alias for legacy code references.
-    public static let fastPlus = normal
+    /// Backward compatibility aliases for legacy code references.
+    public static let normal = maximum
+    public static let fastPlus = fast
     
-    /// Complete set of all 8 golden standard compression profiles.
+    /// Complete set of all 7 golden standard compression profiles.
     public static let allProfiles: [ZipCompressionProfile] = [
         .store,
         .fast,
-        .normal,
         .maximum,
         .high,
         .graphFast,
@@ -204,16 +191,14 @@ extension ZipCompressionProfile {
         case .fast5, .fast4, .fast3, .fast2, .fast1, .level1:
             return .fast
         case .level2:
-            return .normal
-        case .level3:
             return .maximum
-        case .level4:
+        case .level3:
             return .high
-        case .level5:
+        case .level4:
             return .graphFast
-        case .level6:
+        case .level5:
             return .ultraZopfli
-        case .level7, .level8, .level9, .level10, .level11, .level12, .level13, .level14, .level15, .level16, .level17, .level18, .level19, .level20, .level21, .level22:
+        case .level6, .level7, .level8, .level9, .level10, .level11, .level12, .level13, .level14, .level15, .level16, .level17, .level18, .level19, .level20, .level21, .level22:
             return .extremePeak
         }
     }
