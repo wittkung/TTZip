@@ -282,7 +282,3 @@ uint32_t ttzip_adler32_fast(uint32_t adler, const uint8_t *data, size_t len) {
 #endif
 }
 
-uint32_t ttzip_crc32_fast(uint32_t crc, const uint8_t *data, size_t len) {
-    if (data == NULL || len == 0) return crc;
-    return libdeflate_crc32(crc, data, len);
-}
