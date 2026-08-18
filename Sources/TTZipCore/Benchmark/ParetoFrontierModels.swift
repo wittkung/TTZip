@@ -188,12 +188,14 @@ public struct ScenarioRecommendation: Codable, Sendable, Equatable {
 /// 软件家族品牌定义
 public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendable {
     case ttzip         = "TTZip"
-    case ttzipExtreme  = "TTZip Extreme"
+    case zstd          = "Zstandard (Meta)"
+    case lz4           = "LZ4 (Yann Collet)"
+    case xz            = "XZ (LZMA2)"
+    case brotli        = "Brotli (Google)"
     case sevenZip      = "7-Zip"
+    case pigz          = "pigz"
     case appleNative   = "Apple Native"
     case keka          = "Keka"
-    case theUnarchiver = "The Unarchiver"
-    case openSource    = "OpenSource CLI"
     case other         = "Other"
 
     public var id: String { rawValue }
@@ -201,19 +203,21 @@ public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendabl
     /// 品牌主视觉色 (HEX)
     public var brandColorHex: String {
         switch self {
-        case .ttzip:         return "#2563EB" // Royal Blue (Hero Normal)
-        case .ttzipExtreme:  return "#0284C7" // Electric Ocean Blue (Hero Extreme)
+        case .ttzip:         return "#2563EB" // Royal Blue (Hero)
+        case .zstd:          return "#6366F1" // Electric Indigo
+        case .lz4:           return "#06B6D4" // Cyan
+        case .xz:            return "#8B5CF6" // Violet
+        case .brotli:        return "#EC4899" // Hot Pink
         case .sevenZip:      return "#D97706" // Amber / Warm Bronze
+        case .pigz:          return "#059669" // Emerald Green
         case .appleNative:   return "#DC2626" // Crimson Red
         case .keka:          return "#0D9488" // Teal / Jade
-        case .theUnarchiver: return "#9333EA" // Purple
-        case .openSource:    return "#059669" // Emerald Green
         case .other:         return "#64748B" // Slate
         }
     }
 
     /// 是否作为 Hero 软件渲染演进光晕带与突出药丸徽章
-    public var isHero: Bool { self == .ttzip || self == .ttzipExtreme }
+    public var isHero: Bool { self == .ttzip }
 
     /// 主轨迹线条宽度
     public var lineWidth: Double { isHero ? 2.8 : 2.2 }
@@ -240,20 +244,24 @@ public struct SoftwareFamilyTrajectory: Sendable, Identifiable {
 public struct SoftwareFamilyClassifier: Sendable {
     public static func classify(algorithm: String) -> SoftwareFamily {
         let lower = algorithm.lowercased()
-        if lower.contains("ttzip extreme") || lower.contains("ttz-extreme") || (lower.contains("extreme") && lower.contains("ttzip")) {
-            return .ttzipExtreme
-        } else if lower.contains("ttzip") || lower.contains("ttz") {
+        if lower.contains("ttzip") || lower.contains("ttz") {
             return .ttzip
+        } else if lower.contains("zstd") {
+            return .zstd
+        } else if lower.contains("lz4") {
+            return .lz4
+        } else if lower.contains("brotli") {
+            return .brotli
+        } else if lower.contains("xz") || lower.contains("pixz") {
+            return .xz
+        } else if lower.contains("pigz") {
+            return .pigz
         } else if lower.contains("7-zip") || lower.contains("7zip") || lower.contains("7zz") || lower.contains("p7zip") {
             return .sevenZip
         } else if lower.contains("apple") || lower.contains("ditto") || lower.contains("bom") || lower.contains("archive utility") {
             return .appleNative
         } else if lower.contains("keka") {
             return .keka
-        } else if lower.contains("unar") || lower.contains("unarchiver") {
-            return .theUnarchiver
-        } else if lower.contains("zstd") || lower.contains("lz4") || lower.contains("pigz") {
-            return .openSource
         } else {
             return .other
         }

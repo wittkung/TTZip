@@ -207,7 +207,7 @@ public final class SVGParetoPlotter: @unchecked Sendable {
                     .replacingOccurrences(of: ")", with: "")
                     .lowercased()
                     .replacingOccurrences(of: " ", with: "-")
-            } else if fam == .openSource {
+            } else if fam == .pigz {
                 cleanName = p.algorithm.replacingOccurrences(of: "pigz (ZIP ", with: "pigz-")
                     .replacingOccurrences(of: ")", with: "")
                     .lowercased()

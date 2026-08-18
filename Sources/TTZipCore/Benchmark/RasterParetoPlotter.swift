@@ -294,19 +294,12 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let cy = mapY(p.throughputMBs)
             let fam = SoftwareFamilyClassifier.classify(algorithm: p.algorithm)
 
-            let isFlagshipEndpoint = (fam == .ttzipExtreme && p.level == 1) || (fam == .ttzip && (p.level == 1 || p.level == 12)) || (p.algorithm == "TTZip (ZIP Fast)" || p.algorithm == "TTZip (ZIP Ultra)")
+            let isFlagshipEndpoint = (fam == .ttzip && (p.level == 1 || p.level == 12)) || (p.algorithm == "TTZip (ZIP Fast)" || p.algorithm == "TTZip (ZIP Ultra)")
             let isHeroPill = isFlagshipEndpoint
             let isHeroNormal = fam.isHero && !isHeroPill
 
             let cleanName: String
-            if fam == .ttzipExtreme {
-                let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
-                if p.level == 1 {
-                    cleanName = "ttzip-extreme-l1 (\(speedStr))"
-                } else {
-                    cleanName = "L\(p.level)"
-                }
-            } else if fam == .ttzip {
+            if fam == .ttzip {
                 let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
                 if p.level == 1 {
                     cleanName = "ttzip-l1 (\(speedStr))"
@@ -315,9 +308,17 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 } else {
                     cleanName = "L\(p.level)"
                 }
+            } else if fam == .zstd {
+                cleanName = "zstd-\(p.level)"
+            } else if fam == .lz4 {
+                cleanName = "lz4-\(p.level)"
+            } else if fam == .xz {
+                cleanName = "xz-\(p.level)"
+            } else if fam == .brotli {
+                cleanName = "brotli-\(p.level)"
             } else if fam == .sevenZip {
                 cleanName = "mx=\(p.level)"
-            } else if fam == .openSource {
+            } else if fam == .pigz {
                 cleanName = "pigz-\(p.level)"
             } else if fam == .appleNative {
                 if p.algorithm.contains("ditto") {
@@ -339,25 +340,14 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 font = NSFont.systemFont(ofSize: 12, weight: .bold)
                 textColor = NSColor.white
                 isCapsule = true
-                if fam == .ttzipExtreme {
-                    bgCol = NSColor(calibratedRed: 2/255.0, green: 132/255.0, blue: 199/255.0, alpha: 1.0)
-                } else {
-                    bgCol = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
-                }
+                bgCol = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
                 borderCol = nil
             } else if isHeroNormal {
                 font = NSFont.systemFont(ofSize: 10, weight: .bold)
-                if fam == .ttzipExtreme {
-                    textColor = NSColor(calibratedRed: 2/255.0, green: 132/255.0, blue: 199/255.0, alpha: 1.0)
-                    isCapsule = true
-                    bgCol = NSColor(calibratedRed: 240/255.0, green: 249/255.0, blue: 255/255.0, alpha: 0.95)
-                    borderCol = NSColor(calibratedRed: 186/255.0, green: 230/255.0, blue: 253/255.0, alpha: 1.0)
-                } else {
-                    textColor = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
-                    isCapsule = true
-                    bgCol = NSColor(calibratedRed: 239/255.0, green: 246/255.0, blue: 255/255.0, alpha: 0.95)
-                    borderCol = NSColor(calibratedRed: 191/255.0, green: 219/255.0, blue: 254/255.0, alpha: 1.0)
-                }
+                textColor = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
+                isCapsule = true
+                bgCol = NSColor(calibratedRed: 239/255.0, green: 246/255.0, blue: 255/255.0, alpha: 0.95)
+                borderCol = NSColor(calibratedRed: 191/255.0, green: 219/255.0, blue: 254/255.0, alpha: 1.0)
             } else {
                 font = NSFont.systemFont(ofSize: 10, weight: .semibold)
                 let brandHex = fam.brandColorHex
@@ -405,15 +395,8 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let fam = SoftwareFamilyClassifier.classify(algorithm: item.point.algorithm)
 
             // 绘制散点
-            if fam == .ttzip {
+            if fam.isHero {
                 ctx.setFillColor(CGColor(red: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0))
-                ctx.setStrokeColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
-                ctx.setLineWidth(2.5)
-                let dotRect = CGRect(x: cx - 6, y: cy - 6, width: 12, height: 12)
-                ctx.fillEllipse(in: dotRect)
-                ctx.strokeEllipse(in: dotRect)
-            } else if fam == .ttzipExtreme {
-                ctx.setFillColor(CGColor(red: 2/255.0, green: 132/255.0, blue: 199/255.0, alpha: 1.0))
                 ctx.setStrokeColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
                 ctx.setLineWidth(2.5)
                 let dotRect = CGRect(x: cx - 6, y: cy - 6, width: 12, height: 12)
@@ -431,17 +414,6 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let h = item.pillHeight
             let candidateSlots: [(x: CGFloat, y: CGFloat)]
             switch fam {
-            case .ttzipExtreme:
-                candidateSlots = [
-                    (cx - w / 2, cy + 12),           // Top-Center
-                    (cx + 12, cy - h / 2),           // Right
-                    (cx + 10, cy + 10),              // Top-Right
-                    (cx - w - 12, cy - h / 2),       // Left
-                    (cx - w - 10, cy + 10),          // Top-Left
-                    (cx - w / 2, cy - h - 12),       // Bottom-Center
-                    (cx + 10, cy - h - 10),          // Bottom-Right
-                    (cx - w - 10, cy - h - 10)       // Bottom-Left
-                ]
             case .ttzip:
                 candidateSlots = [
                     (cx - w / 2, cy - h - 12),       // Bottom-Center
@@ -453,7 +425,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                     (cx + 10, cy + 10),              // Top-Right
                     (cx - w - 10, cy + 10)           // Top-Left
                 ]
-            case .openSource:
+            case .pigz, .zstd, .lz4, .xz, .brotli:
                 candidateSlots = [
                     (cx - w / 2, cy - h - 12),       // Bottom-Center
                     (cx + 12, cy - h / 2),           // Right
@@ -500,7 +472,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             }
 
             // 若所有候选槽位均被占用且不是端点 Flagship 卡片，则隐藏文字标签（保留曲线上的散点），彻底杜绝文字堆叠
-            let isFlagshipEndpoint = (fam == .ttzipExtreme && item.point.level == 1) || (fam == .ttzip && (item.point.level == 1 || item.point.level == 12))
+            let isFlagshipEndpoint = (fam == .ttzip && (item.point.level == 1 || item.point.level == 12))
             if !foundSlot && !isFlagshipEndpoint {
                 continue
             }

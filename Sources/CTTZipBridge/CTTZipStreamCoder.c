@@ -325,8 +325,9 @@ void ttzip_deflate_stream_free(ttzip_deflate_stream_state_t* state) {
         free(strm);
         state->internal_state = NULL;
     }
-    state->magic = 0; // Invariant-First: invalidate magic before zeroing
+    state->magic = TTZIP_POISON_FREE; // Invariant-First: invalidate magic before zeroing
     memset(state, 0, sizeof(*state));
+    state->magic = TTZIP_POISON_FREE;
 }
 
 int ttzip_inflate_stream_init(ttzip_deflate_stream_state_t* state, int window_bits) {
@@ -392,8 +393,9 @@ void ttzip_inflate_stream_free(ttzip_deflate_stream_state_t* state) {
         free(strm);
         state->internal_state = NULL;
     }
-    state->magic = 0;
+    state->magic = TTZIP_POISON_FREE;
     memset(state, 0, sizeof(*state));
+    state->magic = TTZIP_POISON_FREE;
 }
 
 void ttzip_destroy_stream_coder(ttzip_stream_coder_t* coder) {
