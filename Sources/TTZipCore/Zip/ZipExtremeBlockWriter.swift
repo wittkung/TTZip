@@ -66,7 +66,9 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         } else {
             // 2. 基于熵与缓存拓扑的自适应分块多核并发压缩 (18 核心饱和调度)
             let adaptiveSize = ttzip_calculate_adaptive_block_size(entropyVal, rawData.count)
-            let actualBlockSize = blockSize > 0 ? max(65536, blockSize) : (adaptiveSize > 0 ? adaptiveSize : 524288)
+            let levelChunkMultiplier: Int = level.rawValue >= 9 ? 4 : (level.rawValue >= 6 ? 2 : 1)
+            let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : (adaptiveSize > 0 ? adaptiveSize : 524288)
+            let actualBlockSize = min(rawData.count, max(65536, baseBlockSize * levelChunkMultiplier))
             let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
             let libdeflateLevel = Int32(min(12, max(1, level.rawValue)))
             
