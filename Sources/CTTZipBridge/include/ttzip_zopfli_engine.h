@@ -28,7 +28,7 @@ typedef struct {
 /// 默认选项初始化
 void ttzip_zopfli_init_options(TTZipZopfliOptions *options, int level);
 
-/// 进程内无锁分块最优 Deflate 压缩 (带跨块 32KB 历史字典预热)
+/// 进程内无锁分块最优 Deflate 压缩 (带跨块 32KB 历史字典预热与 RFC 1951 流式对齐)
 ///
 /// @param in 待压缩数据块
 /// @param in_size 待压缩数据字节数
@@ -37,6 +37,7 @@ void ttzip_zopfli_init_options(TTZipZopfliOptions *options, int level);
 /// @param out 压缩输出缓冲区
 /// @param out_capacity 输出缓冲区容量
 /// @param options 压缩选项
+/// @param is_final 是否为 Deflate 终末分块 (1=输出 BFINAL=1, 0=输出 BFINAL=0 并追加 SYNC_FLUSH 对齐)
 /// @return 实际压缩后的字节数；若无法压缩或空间不足返回 0
 size_t ttzip_zopfli_compress_block_with_history(
     const uint8_t *in,
@@ -45,8 +46,10 @@ size_t ttzip_zopfli_compress_block_with_history(
     size_t history_size,
     uint8_t *out,
     size_t out_capacity,
-    const TTZipZopfliOptions *options
+    const TTZipZopfliOptions *options,
+    int is_final
 );
+
 
 #ifdef __cplusplus
 }

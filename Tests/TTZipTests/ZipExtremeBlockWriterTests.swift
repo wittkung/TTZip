@@ -130,4 +130,69 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         proc.waitUntilExit()
         XCTAssertEqual(proc.terminationStatus, 0)
     }
+    
+    func testZopfliTier6AndTier7CompressionAndSystemUnzip() throws {
+
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_zopfli_test_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        let samplePath = tempDir.appendingPathComponent("sample_zopfli.txt").path
+        let sampleSize = 1024 * 1024 // 1 MB
+        var sampleData = Data(capacity: sampleSize)
+        let pattern = "Google Zopfli Algorithm Deep Architecture Analysis & Multi-Pass Squeeze DP in TTZip 2026\n".data(using: .utf8)!
+        while sampleData.count < sampleSize {
+            sampleData.append(pattern)
+        }
+        sampleData = sampleData.prefix(sampleSize)
+        try sampleData.write(to: URL(fileURLWithPath: samplePath))
+        
+        // Test Tier 6 (Ultra Zopfli)
+        let outZip6 = tempDir.appendingPathComponent("zopfli_tier6.zip").path
+        let ok6 = try ZipExtremeBlockWriter.shared.createExtremeArchive(
+            outputPath: outZip6,
+            inputPath: samplePath,
+            profile: .ultraZopfli,
+            blockSize: 256 * 1024
+        )
+        XCTAssertTrue(ok6)
+        
+        let proc6 = Process()
+        proc6.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        proc6.arguments = ["-t", outZip6]
+        let pipe6 = Pipe()
+        proc6.standardOutput = pipe6
+        proc6.standardError = pipe6
+        try proc6.run()
+        proc6.waitUntilExit()
+        let outData6 = pipe6.fileHandleForReading.readDataToEndOfFile()
+        let outStr6 = String(data: outData6, encoding: .utf8) ?? ""
+        print("🔍 Tier 6 unzip -t:\n\(outStr6)")
+        XCTAssertEqual(proc6.terminationStatus, 0, "System unzip verification failed on Tier 6 Zopfli: \(outStr6)")
+        
+        // Test Tier 7 (Extreme Peak)
+        let outZip7 = tempDir.appendingPathComponent("zopfli_tier7.zip").path
+        let ok7 = try ZipExtremeBlockWriter.shared.createExtremeArchive(
+            outputPath: outZip7,
+            inputPath: samplePath,
+            profile: .extremePeak,
+            blockSize: 256 * 1024
+        )
+        XCTAssertTrue(ok7)
+        
+        let proc7 = Process()
+        proc7.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        proc7.arguments = ["-t", outZip7]
+        let pipe7 = Pipe()
+        proc7.standardOutput = pipe7
+        proc7.standardError = pipe7
+        try proc7.run()
+        proc7.waitUntilExit()
+        let outData7 = pipe7.fileHandleForReading.readDataToEndOfFile()
+        let outStr7 = String(data: outData7, encoding: .utf8) ?? ""
+        print("🔍 Tier 7 unzip -t:\n\(outStr7)")
+        XCTAssertEqual(proc7.terminationStatus, 0, "System unzip verification failed on Tier 7 Zopfli: \(outStr7)")
+
+    }
 }
+

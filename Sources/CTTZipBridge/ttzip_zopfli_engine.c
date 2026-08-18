@@ -118,6 +118,9 @@ void ttzip_zopfli_init_options(TTZipZopfliOptions *options, int level) {
     }
 }
 
+#include "zopfli/deflate.h"
+#include "zopfli/zopfli.h"
+
 size_t ttzip_zopfli_compress_block_with_history(
     const uint8_t *in,
     size_t in_size,
@@ -125,7 +128,8 @@ size_t ttzip_zopfli_compress_block_with_history(
     size_t history_size,
     uint8_t *out,
     size_t out_capacity,
-    const TTZipZopfliOptions *options
+    const TTZipZopfliOptions *options,
+    int is_final
 ) {
     if (!in || in_size == 0 || !out || out_capacity == 0) {
         return 0;
@@ -136,11 +140,62 @@ size_t ttzip_zopfli_compress_block_with_history(
         target_level = options->compression_level;
     }
 
-    // 针对高速档位 (Level 1..10) 直接直通 libdeflate
+    // 针对高速档位 (Level 1..10) 或单轮迭代：直通 libdeflate
     if (!options || options->num_iterations <= 1 || target_level <= 10) {
         return ttzip_libdeflate_compress(in, in_size, out, out_capacity, target_level);
     }
 
-    // 针对 Level 12 极限重压：调用 libdeflate Level 12 极速近最优图论基准
-    return ttzip_libdeflate_compress(in, in_size, out, out_capacity, 12);
+    // 针对 Level 6 (5 轮) 与 Level 7 (15 轮 + 块切分) 极限重压：调用 Google Zopfli 官方多轮迭代 Squeeze 引擎
+    ZopfliOptions zopt;
+    ZopfliInitOptions(&zopt);
+    zopt.numiterations = options->num_iterations;
+    zopt.blocksplitting = options->block_splitting;
+    zopt.blocksplittingmax = options->max_block_splits > 0 ? options->max_block_splits : 15;
+    zopt.verbose = 0;
+    zopt.verbose_more = 0;
+
+    size_t hist_len = (history && history_size > 0) ? (history_size > 32768 ? 32768 : history_size) : 0;
+    const uint8_t *hist_ptr = hist_len > 0 ? (history + history_size - hist_len) : NULL;
+
+    unsigned char *zout = NULL;
+    size_t zoutsize = 0;
+    unsigned char bp = 0;
+
+    if (hist_len > 0) {
+        size_t total_buf_size = hist_len + in_size;
+        uint8_t *combined = (uint8_t *)malloc(total_buf_size);
+        if (!combined) {
+            return ttzip_libdeflate_compress(in, in_size, out, out_capacity, 12);
+        }
+        memcpy(combined, hist_ptr, hist_len);
+        memcpy(combined + hist_len, in, in_size);
+
+        // ZopfliDeflatePart: btype=2 (Dynamic Huffman)
+        ZopfliDeflatePart(&zopt, 2, is_final, combined, hist_len, total_buf_size, &bp, &zout, &zoutsize);
+        free(combined);
+    } else {
+        ZopfliDeflatePart(&zopt, 2, is_final, in, 0, in_size, &bp, &zout, &zoutsize);
+    }
+
+    if (!is_final && zout && zoutsize > 0) {
+        // 追加 RFC 1951 严格的 Z_SYNC_FLUSH (BFINAL=0, BTYPE=00, 0x00 0x00 0xFF 0xFF)
+        ZopfliAddSyncFlushBlock(&bp, &zout, &zoutsize);
+    }
+
+
+    if (!zout || zoutsize == 0) {
+        if (zout) free(zout);
+        return ttzip_libdeflate_compress(in, in_size, out, out_capacity, 12);
+    }
+
+    if (zoutsize > out_capacity) {
+        free(zout);
+        return 0;
+    }
+
+    memcpy(out, zout, zoutsize);
+    free(zout);
+    return zoutsize;
 }
+
+

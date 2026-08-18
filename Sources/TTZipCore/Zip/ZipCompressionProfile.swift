@@ -147,18 +147,19 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 400.0
     )
     
-    /// Tier 6: Ultra Zopfli (100% 进程内全局 DAG 最短路径穷举，libdeflate L12 / 10 轮 Zopfli，吞吐 >= 2.5 MB/s)
+    /// Tier 6: Ultra Zopfli (100% 进程内全局 DAG 最短路径穷举，5 轮 Zopfli 迭代，吞吐 >= 4.0 MB/s)
     public static let ultraZopfli = ZipCompressionProfile(
         id: "zip_tier_6_ultra_zopfli",
         name: "Ultra Zopfli (6)",
         level: .level6,
         deflateLevel: 12,
-        zopfliIterations: 10,
+        zopfliIterations: 5,
         blockSplitting: false,
         maxBlockSplits: 0,
         earlyExitThreshold: 0.0001,
-        targetThroughputFloorMBs: 2.5
+        targetThroughputFloorMBs: 4.0
     )
+
     
     /// Tier 7: Extreme Peak (15 轮迭代重平衡与局部熵变最优块切分，超越 advzip -4，吞吐 >= 0.25 MB/s)
     public static let extremePeak = ZipCompressionProfile(
