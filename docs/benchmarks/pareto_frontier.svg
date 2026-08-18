@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="100%" height="100%">
+  <defs>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --card-bg: #f8fafc;
+        --grid-major: #cbd5e1;
+        --grid-minor: #f1f5f9;
+        --axis: #475569;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        --pareto-line: #d97706;
+        --pareto-fill: rgba(217, 119, 6, 0.12);
+        --pt-pareto: #f59e0b;
+        --pt-regular: #3b82f6;
+        --tooltip-bg: rgba(15, 23, 42, 0.95);
+        --tooltip-text: #ffffff;
+        --tooltip-border: #d97706;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f172a;
+          --card-bg: #1e293b;
+          --grid-major: #334155;
+          --grid-minor: #1e293b;
+          --axis: #94a3b8;
+          --text-main: #f8fafc;
+          --text-muted: #94a3b8;
+          --pareto-line: #fbbf24;
+          --pareto-fill: rgba(251, 191, 36, 0.15);
+          --pt-pareto: #fbbf24;
+          --pt-regular: #60a5fa;
+          --tooltip-bg: rgba(30, 41, 59, 0.98);
+          --tooltip-text: #ffffff;
+          --tooltip-border: #fbbf24;
+        }
+      }
+      text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif; }
+      .tooltip-box {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease-in-out;
+      }
+      .point-node:hover .tooltip-box, .point-node:focus .tooltip-box {
+        opacity: 1;
+      }
+      .point-node:hover circle {
+        r: 8;
+        stroke: var(--text-main);
+        stroke-width: 2.5px;
+      }
+    </style>
+    <linearGradient id="paretoGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--pareto-line)" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="var(--pareto-line)" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="100%" height="100%" fill="var(--bg)"/>
+  <rect x="80" y="70" width="830" height="460" fill="var(--card-bg)" rx="8"/>
+  <text x="80" y="38" font-size="20" font-weight="700" fill="var(--text-main)">TTZip Compression Pareto Frontier Analysis</text>
+  <text x="80" y="56" font-size="12" fill="var(--text-muted)">Evaluated 8 points · 3 Pareto-optimal configurations · Apple Silicon M-Series Native</text>
+  <line x1="80" y1="530.0" x2="910" y2="530.0" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="68" y="534.0" text-anchor="end" font-size="11" fill="var(--text-muted)">0%</text>
+  <line x1="80" y1="438.0" x2="910" y2="438.0" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="68" y="442.0" text-anchor="end" font-size="11" fill="var(--text-muted)">20%</text>
+  <line x1="80" y1="346.0" x2="910" y2="346.0" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="68" y="350.0" text-anchor="end" font-size="11" fill="var(--text-muted)">40%</text>
+  <line x1="80" y1="254.0" x2="910" y2="254.0" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="68" y="258.0" text-anchor="end" font-size="11" fill="var(--text-muted)">60%</text>
+  <line x1="80" y1="162.0" x2="910" y2="162.0" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="68" y="166.0" text-anchor="end" font-size="11" fill="var(--text-muted)">80%</text>
+  <line x1="80" y1="70.0" x2="910" y2="70.0" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="68" y="74.0" text-anchor="end" font-size="11" fill="var(--text-muted)">100%</text>
+  <line x1="80.0" y1="70" x2="80.0" y2="530" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="80.0" y="550" text-anchor="middle" font-size="11" fill="var(--text-muted)">10 MB/s</text>
+  <line x1="287.5" y1="70" x2="287.5" y2="530" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="287.5" y="550" text-anchor="middle" font-size="11" fill="var(--text-muted)">100 MB/s</text>
+  <line x1="495.0" y1="70" x2="495.0" y2="530" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="495.0" y="550" text-anchor="middle" font-size="11" fill="var(--text-muted)">1K MB/s</text>
+  <line x1="702.5" y1="70" x2="702.5" y2="530" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="702.5" y="550" text-anchor="middle" font-size="11" fill="var(--text-muted)">10K MB/s</text>
+  <line x1="910.0" y1="70" x2="910.0" y2="530" stroke="var(--grid-major)" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="910.0" y="550" text-anchor="middle" font-size="11" fill="var(--text-muted)">100K MB/s</text>
+  <path d="M 418.0 148.5 L 591.2 148.7 L 615.5 163.1  L 615.5 530.0 L 418.0 530.0 Z" fill="url(#paretoGrad)"/>
+  <path d="M 418.0 148.5 L 591.2 148.7 L 615.5 163.1 " stroke="var(--pareto-line)" stroke-width="2.5" stroke-dasharray="6,4" fill="none"/>
+  <g class="point-node" tabindex="0">
+    <circle cx="615.5" cy="163.1" r="6.5" fill="var(--pt-pareto)" stroke="var(--bg)" stroke-width="2.0" cursor="pointer"/>
+    <title>LZ4 L6 - 3807.8 MB/s · 79.8% 节省 (👑 帕累托最优 (Rank 1))</title>
+    <g class="tooltip-box" transform="translate(615.5, 151.1)">
+      <rect x="-80" y="-56" width="160" height="50" rx="6" fill="var(--tooltip-bg)" stroke="var(--tooltip-border)" stroke-width="1.2"/>
+      <text x="0" y="-38" text-anchor="middle" font-size="11" font-weight="700" fill="var(--tooltip-text)">LZ4 L6</text>
+      <text x="0" y="-24" text-anchor="middle" font-size="10" fill="var(--tooltip-text)">3807.8 MB/s · 79.8% 节省</text>
+      <text x="0" y="-12" text-anchor="middle" font-size="9" fill="var(--pareto-line)">👑 帕累托最优 (Rank 1)</text>
+    </g>
+  </g>
+  <g class="point-node" tabindex="0">
+    <circle cx="612.7" cy="163.1" r="4.5" fill="var(--pt-regular)" stroke="var(--bg)" stroke-width="1.0" cursor="pointer"/>
+    <title>LZ4 L1 - 3689.9 MB/s · 79.8% 节省 (Rank 2)</title>
+    <g class="tooltip-box" transform="translate(612.7, 151.1)">
+      <rect x="-80" y="-56" width="160" height="50" rx="6" fill="var(--tooltip-bg)" stroke="var(--tooltip-border)" stroke-width="1.2"/>
+      <text x="0" y="-38" text-anchor="middle" font-size="11" font-weight="700" fill="var(--tooltip-text)">LZ4 L1</text>
+      <text x="0" y="-24" text-anchor="middle" font-size="10" fill="var(--tooltip-text)">3689.9 MB/s · 79.8% 节省</text>
+      <text x="0" y="-12" text-anchor="middle" font-size="9" fill="var(--pareto-line)">Rank 2</text>
+    </g>
+  </g>
+  <g class="point-node" tabindex="0">
+    <circle cx="591.2" cy="148.7" r="6.5" fill="var(--pt-pareto)" stroke="var(--bg)" stroke-width="2.0" cursor="pointer"/>
+    <title>Zstandard L1 - 2907.9 MB/s · 82.9% 节省 (👑 帕累托最优 (Rank 1))</title>
+    <g class="tooltip-box" transform="translate(591.2, 136.7)">
+      <rect x="-80" y="-56" width="160" height="50" rx="6" fill="var(--tooltip-bg)" stroke="var(--tooltip-border)" stroke-width="1.2"/>
+      <text x="0" y="-38" text-anchor="middle" font-size="11" font-weight="700" fill="var(--tooltip-text)">Zstandard L1</text>
+      <text x="0" y="-24" text-anchor="middle" font-size="10" fill="var(--tooltip-text)">2907.9 MB/s · 82.9% 节省</text>
+      <text x="0" y="-12" text-anchor="middle" font-size="9" fill="var(--pareto-line)">👑 帕累托最优 (Rank 1)</text>
+    </g>
+  </g>
+  <g class="point-node" tabindex="0">
+    <circle cx="506.8" cy="151.5" r="4.5" fill="var(--pt-regular)" stroke="var(--bg)" stroke-width="1.0" cursor="pointer"/>
+    <title>ZIP-Deflate L1 - 1140.5 MB/s · 82.3% 节省 (Rank 2)</title>
+    <g class="tooltip-box" transform="translate(506.8, 139.5)">
+      <rect x="-80" y="-56" width="160" height="50" rx="6" fill="var(--tooltip-bg)" stroke="var(--tooltip-border)" stroke-width="1.2"/>
+      <text x="0" y="-38" text-anchor="middle" font-size="11" font-weight="700" fill="var(--tooltip-text)">ZIP-Deflate L1</text>
+      <text x="0" y="-24" text-anchor="middle" font-size="10" fill="var(--tooltip-text)">1140.5 MB/s · 82.3% 节省</text>
+      <text x="0" y="-12" text-anchor="middle" font-size="9" fill="var(--pareto-line)">Rank 2</text>
+    </g>
+  </g>
+  <g class="point-node" tabindex="0">
+    <circle cx="480.1" cy="151.4" r="4.5" fill="var(--pt-regular)" stroke="var(--bg)" stroke-width="1.0" cursor="pointer"/>
+    <title>ZIP-Deflate L6 - 847.8 MB/s · 82.3% 节省 (Rank 2)</title>
+    <g class="tooltip-box" transform="translate(480.1, 139.4)">
+      <rect x="-80" y="-56" width="160" height="50" rx="6" fill="var(--tooltip-bg)" stroke="var(--tooltip-border)" stroke-width="1.2"/>
+      <text x="0" y="-38" text-anchor="middle" font-size="11" font-weight="700" fill="var(--tooltip-text)">ZIP-Deflate L6</text>
+      <text x="0" y="-24" text-anchor="middle" font-size="10" fill="var(--tooltip-text)">847.8 MB/s · 82.3% 节省</text>
+      <text x="0" y="-12" text-anchor="middle" font-size="9" fill="var(--pareto-line)">Rank 2</text>
+    </g>
+  </g>
+  <g class="point-node" tabindex="0">
+    <circle cx="418.0" cy="148.5" r="6.5" fill="var(--pt-pareto)" stroke="var(--bg)" stroke-width="2.0" cursor="pointer"/>
+    <title>Zstandard L6 - 425.3 MB/s · 82.9% 节省 (👑 帕累托最优 (Rank 1))</title>
+    <g class="tooltip-box" transform="translate(418.0, 136.5)">
+      <rect x="-80" y="-56" width="160" height="50" rx="6" fill="var(--tooltip-bg)" stroke="var(--tooltip-border)" stroke-width="1.2"/>
+      <text x="0" y="-38" text-anchor="middle" font-size="11" font-weight="700" fill="var(--tooltip-text)">Zstandard L6</text>
+      <text x="0" y="-24" text-anchor="middle" font-size="10" fill="var(--tooltip-text)">425.3 MB/s · 82.9% 节省</text>
+      <text x="0" y="-12" text-anchor="middle" font-size="9" fill="var(--pareto-line)">👑 帕累托最优 (Rank 1)</text>
+    </g>
+  </g>
+  <g class="point-node" tabindex="0">
+    <circle cx="282.0" cy="150.7" r="4.5" fill="var(--pt-regular)" stroke="var(--bg)" stroke-width="1.0" cursor="pointer"/>
+    <title>7Z-LZMA2 L1 - 94.1 MB/s · 82.5% 节省 (Rank 2)</title>
+    <g class="tooltip-box" transform="translate(282.0, 138.7)">
+      <rect x="-80" y="-56" width="160" height="50" rx="6" fill="var(--tooltip-bg)" stroke="var(--tooltip-border)" stroke-width="1.2"/>
+      <text x="0" y="-38" text-anchor="middle" font-size="11" font-weight="700" fill="var(--tooltip-text)">7Z-LZMA2 L1</text>
+      <text x="0" y="-24" text-anchor="middle" font-size="10" fill="var(--tooltip-text)">94.1 MB/s · 82.5% 节省</text>
+      <text x="0" y="-12" text-anchor="middle" font-size="9" fill="var(--pareto-line)">Rank 2</text>
+    </g>
+  </g>
+  <g class="point-node" tabindex="0">
+    <circle cx="276.9" cy="151.2" r="4.5" fill="var(--pt-regular)" stroke="var(--bg)" stroke-width="1.0" cursor="pointer"/>
+    <title>7Z-LZMA2 L6 - 88.9 MB/s · 82.3% 节省 (Rank 3)</title>
+    <g class="tooltip-box" transform="translate(276.9, 139.2)">
+      <rect x="-80" y="-56" width="160" height="50" rx="6" fill="var(--tooltip-bg)" stroke="var(--tooltip-border)" stroke-width="1.2"/>
+      <text x="0" y="-38" text-anchor="middle" font-size="11" font-weight="700" fill="var(--tooltip-text)">7Z-LZMA2 L6</text>
+      <text x="0" y="-24" text-anchor="middle" font-size="10" fill="var(--tooltip-text)">88.9 MB/s · 82.3% 节省</text>
+      <text x="0" y="-12" text-anchor="middle" font-size="9" fill="var(--pareto-line)">Rank 3</text>
+    </g>
+  </g>
+  <text x="495" y="582" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-main)">吞吐速率 Throughput (MB/s, Log10)</text>
+  <text x="24" y="300" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-main)" transform="rotate(-90, 24, 300)">空间节省率 Space Savings (%)</text>
+</svg>

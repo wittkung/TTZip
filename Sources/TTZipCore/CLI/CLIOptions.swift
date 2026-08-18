@@ -200,6 +200,9 @@ public struct CLIOptions: Sendable {
     /// Output path for standalone SVG vector graphic chart (`--svg-out`).
     public var svgOutPath: String? = nil
     
+    /// Output path for high-resolution raster PNG image chart (`--png-out`, `--image-out`).
+    public var pngOutPath: String? = nil
+    
     /// Enable CPU thermal state monitoring and DVFS cooldown pauses (`--thermal-guard`).
     public var thermalGuard: Bool = false
     

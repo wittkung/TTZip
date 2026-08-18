@@ -133,8 +133,9 @@ public final class TerminalParetoPlotter: @unchecked Sendable {
 
         for p in result.frontierPoints {
             let crown = p.isOnConvexEnvelope ? "👑 (Convex Winner)" : "⭐ (Frontier)"
-            let line = String(format: "║  • %-16s | %2d | %8.1f MB/s | %5.1f%% 节省 | %@ ",
-                              p.algorithm, p.level, p.throughputMBs, p.spaceSavingsPct, crown)
+            let algoPadded = p.algorithm.padding(toLength: 16, withPad: " ", startingAt: 0)
+            let line = String(format: "║  • %@ | %2d | %8.1f MB/s | %5.1f%% 节省 | %@ ",
+                              algoPadded, p.level, p.throughputMBs, p.spaceSavingsPct, crown)
             out += line.padding(toLength: 85, withPad: " ", startingAt: 0) + "║\n"
         }
 

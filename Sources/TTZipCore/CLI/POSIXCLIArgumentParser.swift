@@ -102,6 +102,11 @@ public enum POSIXCLIArgumentParser {
                         options.svgOutPath = v
                         if inlineValue == nil { i += 1 }
                     }
+                case "png-out", "png", "image-out", "image", "img":
+                    if let v = inlineValue ?? (i + 1 < args.count ? args[i + 1] : nil) {
+                        options.pngOutPath = v
+                        if inlineValue == nil { i += 1 }
+                    }
                 case "thermal-guard", "thermal":
                     options.thermalGuard = true
                 case "transfer-sheet", "transfer":

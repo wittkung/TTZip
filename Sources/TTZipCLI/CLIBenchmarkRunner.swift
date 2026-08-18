@@ -265,12 +265,23 @@ public enum CLIBenchmarkRunner {
             }
 
             print("\n╔═ 🎯 TTZip Smart Codec Scenario Recommendation ═════════════════════════════════════╗")
-            print(String(format: "║ Scenario:              %-60s║", recommendation.scenario))
-            print(String(format: "║ Shannon Entropy:       %-60s║", String(format: "%.3f bits/byte", recommendation.measuredEntropy)))
-            print(String(format: "║ Trial Compressibility: %-60s║", String(format: "%.1f%% (Trial Ratio: %.3f)", (1.0 - recommendation.trialCompressibilityRatio) * 100.0, recommendation.trialCompressibilityRatio)))
-            print(String(format: "║ Recommended Codec:     %-60s║", "\(recommendation.recommendedAlgorithm) Level \(recommendation.recommendedLevel)"))
-            print(String(format: "║ Projected Speed:       %-60s║", String(format: "%.1f MB/s (Est. Savings: %.1f%%)", recommendation.projectedThroughputMBs, recommendation.projectedSpaceSavingsPct)))
-            print(String(format: "║ Probe Analysis Time:   %-60s║", String(format: "%.3f ms", recommendation.probeDurationMs)))
+            let scPadded = recommendation.scenario.padding(toLength: 60, withPad: " ", startingAt: 0)
+            print("║ Scenario:              \(scPadded)║")
+            
+            let entStr = String(format: "%.3f bits/byte", recommendation.measuredEntropy).padding(toLength: 60, withPad: " ", startingAt: 0)
+            print("║ Shannon Entropy:       \(entStr)║")
+            
+            let compStr = String(format: "%.1f%% (Trial Ratio: %.3f)", (1.0 - recommendation.trialCompressibilityRatio) * 100.0, recommendation.trialCompressibilityRatio).padding(toLength: 60, withPad: " ", startingAt: 0)
+            print("║ Trial Compressibility: \(compStr)║")
+            
+            let codecStr = "\(recommendation.recommendedAlgorithm) Level \(recommendation.recommendedLevel)".padding(toLength: 60, withPad: " ", startingAt: 0)
+            print("║ Recommended Codec:     \(codecStr)║")
+            
+            let speedStr = String(format: "%.1f MB/s (Est. Savings: %.1f%%)", recommendation.projectedThroughputMBs, recommendation.projectedSpaceSavingsPct).padding(toLength: 60, withPad: " ", startingAt: 0)
+            print("║ Projected Speed:       \(speedStr)║")
+            
+            let timeStr = String(format: "%.3f ms", recommendation.probeDurationMs).padding(toLength: 60, withPad: " ", startingAt: 0)
+            print("║ Probe Analysis Time:   \(timeStr)║")
             print("╠════════════════════════════════════════════════════════════════════════════════════╣")
             print("║ 💡 Rationale:                                                                      ║")
             let wrappedRationale = "║  " + recommendation.rationale.padding(toLength: 82, withPad: " ", startingAt: 0) + "║"
@@ -326,19 +337,26 @@ public enum CLIBenchmarkRunner {
 
             print("\n" + engine.generateTurboBenchTable(report: report))
 
-            // 2. 帕累托最优前沿分析与渲染
+            // 2. 帕累托最优前沿分析与真实图像文件导出 (PNG / SVG)
             let paretoResult = ParetoFrontierCalculator.shared.calculateFrontier(from: report.results)
 
-            if options.pareto || options.plot || options.svgOutPath != nil {
-                if options.plot || options.pareto {
-                    let plotStr = TerminalParetoPlotter.shared.renderTerminalPlot(result: paretoResult)
-                    print("\n" + plotStr)
-                }
+            if let pngPath = options.pngOutPath {
+                try RasterParetoPlotter.shared.exportPNG(result: paretoResult, to: pngPath)
+                print("🖼️  High-resolution PNG Pareto chart exported: \(pngPath)")
+            }
 
-                if let svgPath = options.svgOutPath {
-                    try SVGParetoPlotter.shared.exportSVG(result: paretoResult, to: svgPath)
-                    print("📈 Interactive SVG Pareto chart exported: \(svgPath)")
-                }
+            if let svgPath = options.svgOutPath {
+                try SVGParetoPlotter.shared.exportSVG(result: paretoResult, to: svgPath)
+                print("📈 Interactive SVG Pareto chart exported: \(svgPath)")
+            }
+
+            if (options.pareto || options.plot) && options.pngOutPath == nil && options.svgOutPath == nil {
+                let defaultPng = "docs/benchmarks/pareto_frontier.png"
+                let defaultSvg = "docs/benchmarks/pareto_frontier.svg"
+                try? RasterParetoPlotter.shared.exportPNG(result: paretoResult, to: defaultPng)
+                try? SVGParetoPlotter.shared.exportSVG(result: paretoResult, to: defaultSvg)
+                print("🖼️  High-resolution Pareto graphic image generated: \(defaultPng)")
+                print("📈 Interactive SVG vector graphic generated: \(defaultSvg)")
             }
 
             // 3. 物理传输介质端到端耗时投影表

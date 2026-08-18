@@ -11,10 +11,12 @@ import XCTest
 final class SmartCodecSelectorTests: XCTestCase {
 
     func testHighEntropyDataSelection() {
-        // Generate pseudo-random high entropy data (64KB)
+        // Generate pseudo-random high entropy data (64KB) with 64-bit state (period 2^64)
         var randomData = [UInt8](repeating: 0, count: 65536)
+        var state: UInt64 = 0x853c49e6748fea9b
         for i in 0..<65536 {
-            randomData[i] = UInt8((i * 1103515245 + 12345) & 0xFF)
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            randomData[i] = UInt8((state >> 32) & 0xFF)
         }
 
         let recommendation = SmartCodecSelector.shared.recommend(
