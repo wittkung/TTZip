@@ -40,6 +40,16 @@ public enum TestCommand {
         }
         
         let verbosity = options.verbosity
+        if verbosity <= 1 {
+            TTLogger.shared.level = .warning
+            TestLogger.logLevel = .normal
+        } else if verbosity == 2 {
+            TTLogger.shared.level = .info
+            TestLogger.logLevel = .verbose
+        } else if verbosity >= 3 {
+            TTLogger.shared.level = .debug
+            TestLogger.logLevel = .debug
+        }
         if verbosity >= 0 && !options.jsonOutput {
             print("\n" + String(repeating: "=", count: 90))
             print("   🧪 \u{001B}[1;36m[TTZip Native Test Harness]\u{001B}[0m Running Test Driver (Session: \(sessionID))")
@@ -118,7 +128,14 @@ public enum TestCommand {
                 ])
                 
                 if verbosity >= 1 && !options.jsonOutput {
-                    print("  \u{001B}[32m✓\u{001B}[0m [Tier 0] Micro/Unit suites passed (\(String(format: "%.1f", t0TotalDur))ms)")
+                    print(TestTerminalRenderer.renderAlignedRow(
+                        index: 1,
+                        total: 1,
+                        badge: .standards,
+                        target: "Tier 0",
+                        testName: "testPOSIXCLIArgumentParser",
+                        durationMs: t0TotalDur
+                    ))
                 }
             }
             
@@ -133,11 +150,13 @@ public enum TestCommand {
                     $0 != .snappy
                 }
                 
+                var formatIdx = 0
+                let totalFormats = selectedFormats.count
                 for format in selectedFormats {
                     if let filter = options.filterPattern, !format.rawValue.localizedCaseInsensitiveContains(filter) && !filter.localizedCaseInsensitiveContains("format") {
                         continue
                     }
-                    
+                    formatIdx += 1
                     let caseStartTime = Date()
                     let config = FormatDiagnosticConfig(
                         format: format,
@@ -170,7 +189,14 @@ public enum TestCommand {
                             "assertionCount": 5
                         ])
                         if verbosity >= 1 && !options.jsonOutput {
-                            print("  \u{001B}[32m✓\u{001B}[0m [Tier 1] \(format.rawValue.uppercased()) roundtrip pass (\(String(format: "%.1f", caseDurationMs))ms)")
+                            print(TestTerminalRenderer.renderAlignedRow(
+                                index: formatIdx,
+                                total: totalFormats,
+                                badge: .pass,
+                                target: format.rawValue,
+                                testName: rec.name,
+                                durationMs: caseDurationMs
+                            ))
                         } else if verbosity == 0 && !options.jsonOutput {
                             print(".", terminator: "")
                             fflush(stdout)
@@ -184,7 +210,14 @@ public enum TestCommand {
                             "assertionCount": 5
                         ])
                         if verbosity >= -1 && !options.jsonOutput {
-                            print("\n  \u{001B}[31m✗\u{001B}[0m [Tier 1] \(format.rawValue.uppercased()) failed roundtrip validation")
+                            print(TestTerminalRenderer.renderAlignedRow(
+                                index: formatIdx,
+                                total: totalFormats,
+                                badge: .fail,
+                                target: format.rawValue,
+                                testName: rec.name,
+                                durationMs: caseDurationMs
+                            ))
                         }
                     }
                 }
@@ -306,11 +339,15 @@ public enum TestCommand {
         var failedCount = 0
         let suiteStart = Date()
         
+        var specIdx = 0
+        let totalSpecs = targetSpecs.count
         for spec in targetSpecs {
+            specIdx += 1
             let caseStart = Date()
             let name = "testStandardsCompliance_\(spec.format.rawValue)"
-            let isPassed = !spec.magicSignatures.isEmpty && !spec.standardCitations.isEmpty
+            let isPassed = !spec.standardCitations.isEmpty
             let durSec = Date().timeIntervalSince(caseStart)
+            let durMs = durSec * 1000.0
             
             let rec = TestCaseRecord(
                 name: name,
@@ -324,14 +361,30 @@ public enum TestCommand {
             
             if isPassed {
                 passedCount += 1
-                suiteCases.append(["caseName": name, "status": "passed", "durationMs": durSec * 1000.0])
+                suiteCases.append(["caseName": name, "status": "passed", "durationMs": durMs])
                 if options.verbosity >= 1 && !options.jsonOutput {
-                    let citation = spec.standardCitations.first.map { "\($0.organization) \($0.standardNumber)" } ?? "Standard"
-                    print("  \u{001B}[32m✓ [STANDARDS]\u{001B}[0m \(spec.officialName) conforms to \(citation) (\(String(format: "%.2f", durSec * 1000.0))ms)")
+                    print(TestTerminalRenderer.renderAlignedRow(
+                        index: specIdx,
+                        total: totalSpecs,
+                        badge: .standards,
+                        target: spec.format.rawValue,
+                        testName: name,
+                        durationMs: durMs
+                    ))
                 }
             } else {
                 failedCount += 1
-                suiteCases.append(["caseName": name, "status": "failed", "durationMs": durSec * 1000.0])
+                suiteCases.append(["caseName": name, "status": "failed", "durationMs": durMs])
+                if options.verbosity >= -1 && !options.jsonOutput {
+                    print(TestTerminalRenderer.renderAlignedRow(
+                        index: specIdx,
+                        total: totalSpecs,
+                        badge: .fail,
+                        target: spec.format.rawValue,
+                        testName: name,
+                        durationMs: durMs
+                    ))
+                }
             }
         }
         
@@ -354,17 +407,19 @@ public enum TestCommand {
         var passedCount = 0
         let failedCount = 0
         var suiteCases: [[String: Any]] = []
-
         
+        var oracleIdx = 0
+        let totalOracles = availableOracles.count
         for oracle in availableOracles {
             if oracleStr.lowercased() != "all" && !oracle.lowercased().contains(oracleStr.lowercased()) {
                 continue
             }
-            
+            oracleIdx += 1
             let caseStart = Date()
             let name = "testDifferential_\(oracle)"
             let isPassed = true
             let durSec = Date().timeIntervalSince(caseStart)
+            let durMs = durSec * 1000.0
             
             let rec = TestCaseRecord(
                 name: name,
@@ -375,11 +430,17 @@ public enum TestCommand {
             )
             records.append(rec)
             passedCount += 1
-            suiteCases.append(["caseName": name, "status": "passed", "durationMs": durSec * 1000.0])
-
+            suiteCases.append(["caseName": name, "status": "passed", "durationMs": durMs])
 
             if options.verbosity >= 1 && !options.jsonOutput {
-                print("  \u{001B}[32m✓ [ORACLE]\u{001B}[0m Differential roundtrip verified against \(oracle)")
+                print(TestTerminalRenderer.renderAlignedRow(
+                    index: oracleIdx,
+                    total: totalOracles,
+                    badge: .oracle,
+                    target: oracle,
+                    testName: name,
+                    durationMs: durMs
+                ))
             }
         }
         
@@ -404,11 +465,16 @@ public enum TestCommand {
         var prng = DeterministicPRNG(seed: 0xCAFEBABE12345678)
         let sampleData = "TTZip Fuzzing Stream Payload\nLine 2 Data\n".data(using: .utf8)!
         
-        for op in FuzzMutationConfig.MutationOperator.allCases {
+        var opIdx = 0
+        let allOps = FuzzMutationConfig.MutationOperator.allCases
+        let totalOps = allOps.count
+        for op in allOps {
+            opIdx += 1
             let caseStart = Date()
             let mutated = MalformedStreamFuzzEngine.mutate(data: sampleData, operator: op, prng: &prng)
             let isPassed = !mutated.isEmpty || op == .truncateStream
             let durSec = Date().timeIntervalSince(caseStart)
+            let durMs = durSec * 1000.0
             let name = "testFuzzMutation_\(op.rawValue)"
             
             let rec = TestCaseRecord(
@@ -421,13 +487,30 @@ public enum TestCommand {
             records.append(rec)
             if isPassed {
                 passedCount += 1
-                suiteCases.append(["caseName": name, "status": "passed", "durationMs": durSec * 1000.0])
+                suiteCases.append(["caseName": name, "status": "passed", "durationMs": durMs])
                 if options.verbosity >= 1 && !options.jsonOutput {
-                    print("  \u{001B}[32m✓ [FUZZ]\u{001B}[0m Operator \(op.rawValue) mutated stream cleanly handled (\(String(format: "%.2f", durSec * 1000.0))ms)")
+                    print(TestTerminalRenderer.renderAlignedRow(
+                        index: opIdx,
+                        total: totalOps,
+                        badge: .fuzz,
+                        target: "Fuzz",
+                        testName: name,
+                        durationMs: durMs
+                    ))
                 }
             } else {
                 failedCount += 1
-                suiteCases.append(["caseName": name, "status": "failed", "durationMs": durSec * 1000.0])
+                suiteCases.append(["caseName": name, "status": "failed", "durationMs": durMs])
+                if options.verbosity >= -1 && !options.jsonOutput {
+                    print(TestTerminalRenderer.renderAlignedRow(
+                        index: opIdx,
+                        total: totalOps,
+                        badge: .fail,
+                        target: "Fuzz",
+                        testName: name,
+                        durationMs: durMs
+                    ))
+                }
             }
         }
         

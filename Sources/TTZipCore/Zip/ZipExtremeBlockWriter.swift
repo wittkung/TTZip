@@ -42,7 +42,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         inputPath: String,
         level: ArchiveCompressionLevel = .fastest,
         customProfile: ZipCompressionProfile? = nil,
-        blockSize: Int = 0 // 0 = 基于香农熵与硬件缓存自适应推导
+        blockSize: Int = 0 // 0 = Adaptive derivation based on Shannon entropy & CPU cache
     ) throws -> Bool {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: inputPath) else { return false }
@@ -58,7 +58,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         
         let activeProfile = customProfile ?? level.zipProfile
         
-        // 0. 香农熵与试探可压缩性快速探测 (Microsecond SIMD Prober)
+        // 0. Shannon entropy and microsecond SIMD compressibility probe
         var entropyVal: Double = 0.0
         var estimatedRatio: Double = 1.0
         let routingMethod: Int32 = rawData.withUnsafeBytes { rawIn -> Int32 in
@@ -69,7 +69,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         let isDirectStore = (routingMethod == 0 || activeProfile.deflateLevel == 0 || level == .store)
         let compressionMethod: UInt16 = isDirectStore ? 0 : 8
         
-        // 1. 计算全局 CRC-32 (使用 Apple NEON SIMD 硬件指令)
+        // 1. Compute global CRC-32 using Apple Silicon NEON SIMD hardware instructions
         let totalCrc32: UInt32 = rawData.withUnsafeBytes { ptr -> UInt32 in
             guard let base = ptr.baseAddress else { return 0 }
             return ttzip_compute_buffer_crc32(base, rawData.count)
@@ -79,11 +79,11 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         let totalCompressedBytes: Int64
         
         if isDirectStore {
-            // Direct Store (Method 0): 高熵数据零拷贝直通！
+            // Direct Store (Method 0): Zero-copy direct pass-through for incompressible data
             compressedPayload = rawData
             totalCompressedBytes = uncompressedBytes
         } else {
-            // Tier 1..7: 18 核心饱和分块并发压缩 (18-Core Multi-Block Parallel Deflate + RFC 1951 Sync Flush)
+            // Tier 1..7: Multi-core parallel block Deflate with RFC 1951 sync flush boundaries
             let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : max(1024 * 1024, (rawData.count + 17) / 18)
             let actualBlockSize = min(rawData.count, max(65536, baseBlockSize))
             let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
@@ -160,7 +160,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
 
 
         
-        // 4. 构建标准 PKWARE ZIP 容器 (Local File Header + Central Directory + EOCD)
+        // 4. Construct standard PKWARE ZIP container (Local File Header + Central Directory + EOCD)
         let fileName = URL(fileURLWithPath: inputPath).lastPathComponent
         guard let nameData = fileName.data(using: .utf8) else { return false }
         let nameLen = UInt16(nameData.count)

@@ -9,14 +9,19 @@ import XCTest
 import QuartzCore
 @testable import TTZipCore
 
+/// Pure ZIP / Deflate software-level Pareto benchmark PK test suite across competing tools.
 final class SoftwareParetoFrontierPkTests: XCTestCase {
     
+    /// Evaluates multi-software ZIP compression Pareto frontier (TTZip vs. pigz vs. libdeflate vs. Zopfli vs. advzip).
     func testSoftwareVsSoftwareParetoFrontier() async throws {
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            throw XCTSkip("Benchmark test requires TTZIP_RUN_BENCHMARKS=1")
+        }
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_real_zip_pk_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
-        // 1. 定位真实样本：使用 100MB enwik8.xml 标准测试语料；若不存在则回退至源码树
+        // 1. Locate benchmark fixture: enwik8.xml standard test corpus or fallback to source tree.
         let enwik8Path = "/Users/kevintung/Library/Caches/com.ttzip.tests/fixtures/enwik8.xml"
         let realSamplePath: String
         if FileManager.default.fileExists(atPath: enwik8Path) {
@@ -34,51 +39,12 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         }
         let payloadMB = Double(payloadBytes) / (1024.0 * 1024.0)
 
-        print("📂 纯 ZIP 格式基准评测真实样本: \(realSamplePath) (大小: \(String(format: "%.2f MB", payloadMB)))")
+        TTLogger.debug("📂 ZIP format benchmark sample: \(realSamplePath) (size: \(String(format: "%.2f MB", payloadMB)))")
 
         var zipPoints: [ParetoPoint] = []
 
-        // Helper: 运行外部 CLI 软件进程
-        func runProcess(_ exe: String, _ args: [String]) -> Double {
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: exe)
-            p.arguments = args
-            let t0 = CACurrentMediaTime()
-            do {
-                try p.run()
-                p.waitUntilExit()
-                let t1 = CACurrentMediaTime()
-                return max(1e-6, t1 - t0)
-            } catch {
-                return 999.0
-            }
-        }
-
-        // Helper: 运行外部 CLI 软件进程 (支持标准输出重定向写入文件)
-        func runProcessRedirect(_ exe: String, _ args: [String], outPath: String) -> Double {
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: exe)
-            p.arguments = args
-            FileManager.default.createFile(atPath: outPath, contents: nil)
-            guard let fileHandle = FileHandle(forWritingAtPath: outPath) else { return 999.0 }
-            p.standardOutput = fileHandle
-            let t0 = CACurrentMediaTime()
-            do {
-                try p.run()
-                p.waitUntilExit()
-                try? fileHandle.close()
-                let t1 = CACurrentMediaTime()
-                return max(1e-6, t1 - t0)
-            } catch {
-                try? fileHandle.close()
-                return 999.0
-            }
-        }
-
-        let writer = ArchiveEngineFactory.makeWriter()
-
         // =========================================================================
-        // 1. TTZip 统一旗舰引擎 (全部 1 到 12 级，内建自适应分流与 18 核多块并发)
+        // 1. TTZip Unified Engine (Levels 1 to 12)
         // =========================================================================
         let asyncWriter = ArchiveWriter()
         for lvl in 1...12 {
@@ -104,7 +70,7 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         }
 
         // ==============================================
-        // 2. libdeflate 官方 C 原生引擎 (单核 SIMD 极限基准)
+        // 2. libdeflate Native C Engine (Single-Core SIMD)
         // ==============================================
         let rawData = try Data(contentsOf: URL(fileURLWithPath: realSamplePath))
         for lvl in [1, 3, 6, 9, 12] {
@@ -133,7 +99,7 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         }
 
         // ==============================================
-        // 3. pigz 多线程 Deflate (Mark Adler 官方多核极速引擎)
+        // 3. pigz Parallel Deflate (Mark Adler Multi-Threaded Engine)
         // ==============================================
         let pigzPath = "/opt/homebrew/bin/pigz"
         if FileManager.default.fileExists(atPath: pigzPath) {
@@ -170,7 +136,7 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
             }
 
             // ==============================================
-            // 4. Google Zopfli (图论最短路径穷举 Deflate 极限, 18-Core Multi-Threaded)
+            // 4. Google Zopfli (Exhaustive Deflate Optimizer)
             // ==============================================
             let outPathZopfli = tempDir.appendingPathComponent("zopfli.zip").path
             let pZopfli = Process()
@@ -201,7 +167,7 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         }
 
         // ==============================================
-        // 5. AdvanceCOMP (advzip -4 极限迭代优化)
+        // 5. AdvanceCOMP (advzip -4 Iterative Optimizer)
         // ==============================================
         let advzipPath = "/opt/homebrew/bin/advzip"
         if FileManager.default.fileExists(atPath: advzipPath) {
@@ -236,7 +202,7 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         }
 
         // =========================================================================
-        // 6. 生成 100% 纯净的 ZIP 专属帕累托 PK 图表
+        // 6. Generate Pure ZIP Pareto PK Plots
         // =========================================================================
         let artifactPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/pareto_pk_zip.png"
         let docsPath = "docs/benchmarks/pareto_pk_zip.png"
@@ -256,13 +222,13 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
             title: title
         )
 
-        print("\n========================================================================")
-        print("🏆 100% 纯 ZIP 格式 100MB enwik8 软件级 PK 专属图表已生成:")
-        print("   • ZIP 图表: \(artifactPath)")
-        print("------------------------------------------------------------------------")
+        TTLogger.debug("\n========================================================================")
+        TTLogger.debug("🏆 Pure ZIP 100MB enwik8 Software PK Chart Generated:")
+        TTLogger.debug("   • ZIP Chart: \(artifactPath)")
+        TTLogger.debug("------------------------------------------------------------------------")
         for p in zipPoints {
-            print(String(format: "• %-28@ | 压缩速度: %7.1f MB/s | 空间节省: %5.1f%% | 体积: %7lld 字节", p.algorithm, p.throughputMBs, p.spaceSavingsPct, p.compressedBytes))
+            TTLogger.debug(String(format: "• %-28@ | Speed: %7.1f MB/s | Space Sav: %5.1f%% | Size: %7lld bytes", p.algorithm, p.throughputMBs, p.spaceSavingsPct, p.compressedBytes))
         }
-        print("========================================================================\n")
+        TTLogger.debug("========================================================================\n")
     }
 }

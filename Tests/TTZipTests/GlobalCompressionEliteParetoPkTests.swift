@@ -9,21 +9,26 @@ import XCTest
 @testable import TTZipCore
 import CTTZipBridge
 
-/// 全球顶级压缩引擎全景帕累托大 PK 测试套件 (Global Elite Compression Pareto PK)
+/// Global Elite Compression Engine Pareto PK Benchmark Suite.
 ///
-/// 包含全球最强压缩算法与体系：
-/// 1. TTZip (原生 12 级统一智能引擎)
+/// Evaluates state-of-the-art compression algorithms and suites:
+/// 1. TTZip (Native 12-level unified intelligent engine)
 /// 2. Zstandard (Meta, Yann Collet -T0 -1..-19)
-/// 3. LZ4 (Yann Collet 极速王者 -1..-12)
-/// 4. XZ / LZMA2 (多核高压 -T0 -1..-9)
-/// 5. Google Brotli (Web文本压缩比王者 -q 1..-11)
+/// 3. LZ4 (Yann Collet high-speed codec -1..-12)
+/// 4. XZ / LZMA2 (Multi-core high compression -T0 -1..-9)
+/// 5. Google Brotli (Web text compression ratio leader -q 1..-11)
 /// 6. 7-Zip ARM64 (Igor Pavlov 26.02 -mx=1..9)
-/// 7. pigz (Mark Adler 并发 Deflate -1..-9)
+/// 7. pigz (Mark Adler parallel Deflate -1..-9)
 /// 8. Apple Native (macOS Archive Utility ditto & zip)
 final class GlobalCompressionEliteParetoPkTests: XCTestCase {
     
+    /// Executes the full-spectrum global elite compression Pareto benchmark.
     func testGlobalEliteCompressionParetoPk() async throws {
-        // 1. 加载标准 100MB Wikipedia (enwik8) 语料库
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            throw XCTSkip("Benchmark test requires TTZIP_RUN_BENCHMARKS=1")
+        }
+        
+        // 1. Load standard 100MB Wikipedia (enwik8) corpus.
         let corpusPath = try EnwikFixtureCacheManager.obtainCorpusPath(named: "enwik8", allowSyntheticFallback: true)
         let attrs = try FileManager.default.attributesOfItem(atPath: corpusPath)
         let totalBytes = (attrs[.size] as? Int64) ?? 100_000_000
@@ -37,7 +42,7 @@ final class GlobalCompressionEliteParetoPkTests: XCTestCase {
         
         var candidates: [BenchmarkCandidate] = []
         
-        // --- 1. TTZip 原生统一引擎 (Level 1 到 12) ---
+        // --- 1. TTZip Native Unified Engine (Levels 1 to 12) ---
         for lvl in 1...12 {
             let levelEnum = ArchiveCompressionLevel(rawValue: lvl) ?? .level1
             candidates.append(BenchmarkCandidate(name: "TTZip (L\(lvl))", level: lvl) {
@@ -163,7 +168,7 @@ final class GlobalCompressionEliteParetoPkTests: XCTestCase {
             })
         }
         
-        // --- 7. pigz (-1 到 -9) ---
+        // --- 7. pigz (Levels 1 to 9) ---
         for lvl in 1...9 {
             candidates.append(BenchmarkCandidate(name: "pigz (-\(lvl))", level: lvl) {
                 let outGz = NSTemporaryDirectory() + "pigz_elite_\(lvl)_\(UUID().uuidString).gz"
@@ -187,7 +192,7 @@ final class GlobalCompressionEliteParetoPkTests: XCTestCase {
             })
         }
         
-        // --- 8. Apple Native (zip -1 到 -9, ditto) ---
+        // --- 8. Apple Native (zip -1, -6, -9) ---
         for lvl in [1, 6, 9] {
             candidates.append(BenchmarkCandidate(name: "Apple Native (zip -\(lvl))", level: lvl) {
                 let outZip = NSTemporaryDirectory() + "apple_elite_\(lvl)_\(UUID().uuidString).zip"
@@ -208,18 +213,18 @@ final class GlobalCompressionEliteParetoPkTests: XCTestCase {
             })
         }
         
-        print("========================================================================================================================")
-        print("🌐  全球顶级压缩引擎全景帕累托实测 (Global Elite Compression Pareto PK)")
-        print("========================================================================================================================")
-        print(String(format: "%-30@ | %-16@ | %-12@ | %-12@ | %-16@", "Algorithm/Software", "Compression MB/s", "Ratio", "Space Sav%", "Archive Size"))
-        print("------------------------------------------------------------------------------------------------------------------------")
+        TTLogger.debug("========================================================================================================================")
+        TTLogger.debug("🌐  Global Elite Compression Pareto Benchmark (Global Elite Compression Pareto PK)")
+        TTLogger.debug("========================================================================================================================")
+        TTLogger.debug(String(format: "%-30@ | %-16@ | %-12@ | %-12@ | %-16@", "Algorithm/Software", "Compression MB/s", "Ratio", "Space Sav%", "Archive Size"))
+        TTLogger.debug("------------------------------------------------------------------------------------------------------------------------")
         
         var plotPoints: [ParetoPoint] = []
         
         for cand in candidates {
             let (speed, ratio, savings, outSize) = try await cand.run()
             let sizeMB = Double(outSize) / 1024.0 / 1024.0
-            print(String(
+            TTLogger.debug(String(
                 format: "%-30@ | %13.1f MB/s | %10.2fx | %10.1f%% | %11.2f MB",
                 cand.name as NSString,
                 speed,
@@ -238,9 +243,9 @@ final class GlobalCompressionEliteParetoPkTests: XCTestCase {
                 uncompressedBytes: totalBytes
             ))
         }
-        print("========================================================================================================================\n")
+        TTLogger.debug("========================================================================================================================\n")
         
-        // 生成帕累托结果
+        // Compute Pareto frontier result.
         let pResult = ParetoFrontierResult(
             totalPointsEvaluated: plotPoints.count,
             frontierPoints: plotPoints.filter { $0.isParetoOptimal },
@@ -256,7 +261,7 @@ final class GlobalCompressionEliteParetoPkTests: XCTestCase {
             height: 1440,
             title: "Global Elite Compression Pareto PK (TTZip vs. zstd vs. lz4 vs. xz vs. brotli vs. 7-Zip vs. pigz)"
         )
-        print("🏆 全球顶级压缩全景帕累托图已生成: \(artifactPath)")
+        TTLogger.debug("🏆 Global elite compression Pareto chart generated: \(artifactPath)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPath))
     }
 }

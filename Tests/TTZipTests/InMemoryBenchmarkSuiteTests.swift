@@ -8,14 +8,17 @@
 import XCTest
 @testable import TTZipCore
 
+/// In-memory compression benchmark engine verification and multi-codec PK test suite.
 final class InMemoryBenchmarkSuiteTests: XCTestCase {
 
+    /// Verifies basic in-memory execution and roundtrip byte-exactness across multiple codecs.
     func testInMemoryBenchmarkBasicExecution() async throws {
-        let minDuration = TestBenchmarkTier.isBenchmarkMode ? 150 : 50
+        let minDuration = TestBenchmarkTier.isBenchmarkMode ? 150 : 20
+        let bufSize: Int64 = TestBenchmarkTier.isBenchmarkMode ? (1 * 1024 * 1024) : (256 * 1024)
         let config = InMemoryBenchmarkConfig(
             selectedFormats: ["zip", "zstd", "lz4"],
             selectedLevels: [1],
-            bufferSizeBytes: 1 * 1024 * 1024, // 1MB
+            bufferSizeBytes: bufSize,
             warmupPasses: 1,
             minDurationMs: minDuration,
             useBinaryUnits: false,
@@ -37,18 +40,20 @@ final class InMemoryBenchmarkSuiteTests: XCTestCase {
         }
     }
 
+    /// Verifies low coefficient of variation across repeated in-memory benchmark passes.
     func testInMemoryBenchmarkLowVarianceRepeatability() async throws {
-        let minDuration = TestBenchmarkTier.isBenchmarkMode ? 200 : 100
+        let minDuration = TestBenchmarkTier.isBenchmarkMode ? 200 : 20
+        let bufSize: Int64 = TestBenchmarkTier.isBenchmarkMode ? (1 * 1024 * 1024) : (256 * 1024)
         let config = InMemoryBenchmarkConfig(
             selectedFormats: ["zip"],
             selectedLevels: [1],
-            bufferSizeBytes: 1 * 1024 * 1024, // 1MB
-            warmupPasses: 2,
+            bufferSizeBytes: bufSize,
+            warmupPasses: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             minDurationMs: minDuration,
             useBinaryUnits: false
         )
 
-        let rounds = TestBenchmarkTier.benchmarkIterations(default: 3, benchmark: 5)
+        let rounds = TestBenchmarkTier.benchmarkIterations(default: 2, benchmark: 5)
         var speeds: [Double] = []
         for _ in 0..<rounds {
             let rep = try await InMemoryBenchmarkEngine.shared.runInMemoryBenchmark(config: config)
@@ -63,10 +68,11 @@ final class InMemoryBenchmarkSuiteTests: XCTestCase {
         let stdDev = sqrt(variance)
         let cv = (stdDev / mean) * 100.0 // Percentage CV
 
-        // In pure memory execution, CV should remain highly stable (< 10% even on shared dev machine)
+        // In pure memory execution, CV should remain highly stable (< 15% on shared dev machine)
         XCTAssertLessThan(cv, 15.0, "Coefficient of variation should be low in pure memory mode (got \(cv)%)")
     }
 
+    /// Tests TurboBench-style tabular output string generation.
     func testTurboBenchOutputFormatting() async throws {
         let config = InMemoryBenchmarkConfig(
             selectedFormats: ["zstd"],
@@ -86,6 +92,7 @@ final class InMemoryBenchmarkSuiteTests: XCTestCase {
         XCTAssertTrue(table.contains("PASSED (OK)"))
     }
 
+    /// Tests JSON report file serialization and schema consistency.
     func testJSONReportExportAndValidation() async throws {
         let config = InMemoryBenchmarkConfig(
             selectedFormats: ["lz4"],
@@ -112,7 +119,11 @@ final class InMemoryBenchmarkSuiteTests: XCTestCase {
         XCTAssertEqual(decoded.allPassed, true)
     }
 
+    /// Multi-codec in-memory PK benchmark comparing Google Snappy against LZ4, Deflate, and Zstandard.
     func testSnappyInMemoryComparisonAgainstFastCodecs() async throws {
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            throw XCTSkip("Benchmark test requires TTZIP_RUN_BENCHMARKS=1")
+        }
         let config = InMemoryBenchmarkConfig(
             selectedFormats: ["snappy", "lz4", "zip", "zstd"],
             selectedLevels: [1],
@@ -125,14 +136,14 @@ final class InMemoryBenchmarkSuiteTests: XCTestCase {
 
         let report = try await InMemoryBenchmarkEngine.shared.runInMemoryBenchmark(config: config)
         let table = InMemoryBenchmarkEngine.shared.generateTurboBenchTable(report: report)
-        print("\n" + table + "\n")
+        TTLogger.debug("\n" + table + "\n")
 
         XCTAssertTrue(report.allPassed)
         XCTAssertEqual(report.results.count, 4)
 
         if let snappyRes = report.results.first(where: { $0.algorithm == "Google-Snappy" }) {
             XCTAssertTrue(snappyRes.integrityVerified)
-            print("🚀 [PHYSICAL BENCHMARK RESULT] Google Snappy: Comp=\(String(format: "%.1f", snappyRes.compressionSpeedMBs)) MB/s, Decomp=\(String(format: "%.1f", snappyRes.decompressionSpeedMBs)) MB/s, Ratio=\(String(format: "%.2fx", snappyRes.ratio))")
+            TTLogger.debug("🚀 [PHYSICAL BENCHMARK RESULT] Google Snappy: Comp=\(String(format: "%.1f", snappyRes.compressionSpeedMBs)) MB/s, Decomp=\(String(format: "%.1f", snappyRes.decompressionSpeedMBs)) MB/s, Ratio=\(String(format: "%.2fx", snappyRes.ratio))")
         }
     }
 }

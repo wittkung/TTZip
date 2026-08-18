@@ -34,6 +34,7 @@ public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
     public static func runExhaustiveMatrix(
         selectedFormats: [ArchiveCompressionFormat]? = nil,
         selectedLevels: [ArchiveCompressionLevel]? = nil,
+        isQuickTest: Bool = false,
         progressHandler: (@Sendable (String) -> Void)? = nil
     ) async throws -> [ExhaustiveBenchmarkRow] {
         let cacheDir = FileManager.default.temporaryDirectory.appendingPathComponent("TTZipExhaustiveDatasetCache")
@@ -93,12 +94,13 @@ public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
         let formats: [ArchiveCompressionFormat] = selectedFormats ?? [.zip, .sevenZip, .zst, .tarGz, .tarZst]
         let levels: [ArchiveCompressionLevel] = selectedLevels ?? ArchiveCompressionLevel.allCases
 
-        let payloads: [(name: String, path: String, bytes: Int64, sha: String?)] = [
+        let allPayloads: [(name: String, path: String, bytes: Int64, sha: String?)] = [
             ("Small Files (10MB/100 files)", dim1Dir.path, Self.getFolderBytes(dim1Dir.path), nil),
             ("Log Text (10MB)", dim2LogFile.path, (try? FileManager.default.attributesOfItem(atPath: dim2LogFile.path)[.size] as? Int64) ?? 0, nil),
             ("High-Entropy Binary (100MB)", dim3EntropyFile.path, (try? FileManager.default.attributesOfItem(atPath: dim3EntropyFile.path)[.size] as? Int64) ?? 0, srcSha256),
             ("Huge File (5GB)", dim4HugeFile.path, 5 * 1024 * 1024 * 1024, nil)
         ]
+        let payloads = isQuickTest ? Array(allPayloads.prefix(1)) : allPayloads
 
         let writer = ArchiveEngineFactory.makeWriter()
         let extractor = ArchiveEngineFactory.makeExtractor()

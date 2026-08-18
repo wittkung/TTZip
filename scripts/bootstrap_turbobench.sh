@@ -1,4 +1,10 @@
 #!/bin/bash
+# SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+#
+# Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+# All rights reserved.
+#
+# TTZip: High-performance native archiving and compression engine for macOS.
 # ==============================================================================
 # scripts/bootstrap_turbobench.sh
 # 一键自动拉取并构建 powturbo/TurboBench 纯内存基准测试工具

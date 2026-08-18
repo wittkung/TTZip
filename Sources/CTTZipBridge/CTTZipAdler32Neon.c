@@ -18,15 +18,15 @@
 #define TTZIP_MIN(a, b) ((a) < (b) ? (a) : (b))
 
 /* ============================================================================
- * 1. 标量 Fallback 算法 (4 字节代数展开 + 5552 字节延迟取模)
+ * 1. Scalar Fallback Algorithm (4-byte loop unrolling + 5552-byte deferred modulo)
  *
- * 数学证明 (Proof of NMAX = 5552):
- * 设块长度 M = 4K。在每个 4 字节迭代中：
- *   Δs1 = p0 + p1 + p2 + p3
- *   Δs2 = 4*s1_old + 4*p0 + 3*p1 + 2*p2 + p3
- * 在最坏输入条件 (d_i = 255, s1_0 = s2_0 = 65520) 下：
+ * Mathematical Proof (Proof of NMAX = 5552):
+ * Let chunk length be M = 4K. In every 4-byte iteration:
+ *   delta_s1 = p0 + p1 + p2 + p3
+ *   delta_s2 = 4*s1_old + 4*p0 + 3*p1 + 2*p2 + p3
+ * Under worst-case input conditions (d_i = 255, s1_0 = s2_0 = 65520):
  *   s2(M) = [255*M^2 + 386610*M + 131040] / 2 <= UINT32_MAX
- * 解得 M <= 5552.41。取 M = 5552 时 s2(5552) = 4,294,690,200 < 2^32-1，保证绝不溢出。
+ * Yielding M <= 5552.41. Choosing M = 5552 guarantees s2(5552) = 4,294,690,200 < 2^32-1.
  * ============================================================================ */
 #define TTZIP_ADLER32_SCALAR_CHUNK(s1, s2, p, n)                            \
 do {                                                                        \
@@ -54,7 +54,7 @@ do {                                                                        \
     (s2) %= TTZIP_ADLER32_DIVISOR;                                          \
 } while (0)
 
-static inline uint32_t ttzip_adler32_scalar(uint32_t adler, const uint8_t *p, size_t len) {
+static inline __attribute__((unused)) uint32_t ttzip_adler32_scalar(uint32_t adler, const uint8_t *p, size_t len) {
     uint32_t s1 = adler & 0xFFFFU;
     uint32_t s2 = adler >> 16;
 
@@ -67,7 +67,7 @@ static inline uint32_t ttzip_adler32_scalar(uint32_t adler, const uint8_t *p, si
 }
 
 /* ============================================================================
- * 2. ARM64 NEON & DotProd 实现 (Apple Silicon 25~30+ GB/s)
+ * 2. ARM64 NEON & DotProd Implementation (Apple Silicon 25~30+ GB/s)
  * ============================================================================ */
 #if defined(__ARM_NEON) || defined(__aarch64__)
 #include <arm_neon.h>
@@ -171,7 +171,7 @@ static uint32_t ttzip_adler32_neon_dotprod(uint32_t adler, const uint8_t *p, siz
 }
 #endif // DOTPROD
 
-static uint32_t ttzip_adler32_neon_baseline(uint32_t adler, const uint8_t *p, size_t len) {
+static __attribute__((unused)) uint32_t ttzip_adler32_neon_baseline(uint32_t adler, const uint8_t *p, size_t len) {
     static const uint16_t __attribute__((aligned(16))) mults[64] = {
         64, 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49,
         48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33,
@@ -264,7 +264,7 @@ static uint32_t ttzip_adler32_neon_baseline(uint32_t adler, const uint8_t *p, si
 #endif // ARM_NEON
 
 /* ============================================================================
- * 3. 统一跨平台对外 API 入口 (T005)
+ * 3. Unified Cross-Platform Public Entrypoint
  * ============================================================================ */
 uint32_t ttzip_adler32_fast(uint32_t adler, const uint8_t *data, size_t len) {
     if (data == NULL || len == 0) {

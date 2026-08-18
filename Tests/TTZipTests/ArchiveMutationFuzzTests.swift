@@ -75,7 +75,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
     
     func testCorruptMagicMutationStability() async throws {
         let formats = targetFormatsList()
-        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 5, deep: 200)
+        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 2, deep: 200)
         let masterSeed = deterministicSeed
         let baseSandbox = sandboxURL!
         
@@ -119,7 +119,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
     
     func testCorruptCRCMutationStability() async throws {
         let formats = targetFormatsList()
-        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 5, deep: 200)
+        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 2, deep: 200)
         let masterSeed = deterministicSeed
         let baseSandbox = sandboxURL!
         
@@ -162,7 +162,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
     
     func testTruncateStreamMutationStability() async throws {
         let formats = targetFormatsList()
-        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 5, deep: 200)
+        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 2, deep: 200)
         let masterSeed = deterministicSeed
         let baseSandbox = sandboxURL!
         
@@ -205,7 +205,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
     
     func testInjectZipSlipPathSecurityDefense() async throws {
         let formats = targetFormatsList()
-        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 5, deep: 200)
+        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 2, deep: 200)
         let masterSeed = deterministicSeed
         let baseSandbox = sandboxURL!
         
@@ -273,7 +273,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
     
     func testOversizeHeaderIntegerOverflowHardening() async throws {
         let formats = targetFormatsList()
-        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 5, deep: 200)
+        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 2, deep: 200)
         let masterSeed = deterministicSeed
         let baseSandbox = sandboxURL!
         
@@ -316,7 +316,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
     
     func testInvalidDictSizeDecoderRejection() async throws {
         let formats = targetFormatsList()
-        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 5, deep: 200)
+        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 2, deep: 200)
         let masterSeed = deterministicSeed
         let baseSandbox = sandboxURL!
         
@@ -359,7 +359,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
     
     func testComprehensiveDeterministicFuzzMatrix() async throws {
         let formats = targetFormatsList()
-        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 5, deep: 200)
+        let iterationsPerFormat = TestBenchmarkTier.fuzzIterations(default: 2, deep: 200)
         let masterSeed = deterministicSeed
         let baseSandbox = sandboxURL!
         

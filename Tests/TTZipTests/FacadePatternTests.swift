@@ -8,6 +8,7 @@
 import XCTest
 @testable import TTZipCore
 
+/// Mock password vault manager used for facade unit testing.
 final class TestPasswordVaultManager: PasswordVaultManaging, @unchecked Sendable {
     var autoUnlockArchives: Bool = true
     var entries: [PasswordVaultEntry]
@@ -18,6 +19,7 @@ final class TestPasswordVaultManager: PasswordVaultManaging, @unchecked Sendable
     func recordUsage(id: UUID) {}
 }
 
+/// Test suite validating the Facade design pattern implementations across the TTZip engine.
 final class FacadePatternTests: XCTestCase {
     var sandbox: IsolatedTempSandbox!
     
@@ -34,6 +36,7 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 1. TTZipEngineFacade Single-API Compress & Extract Tests
     
+    /// Tests quickCompress and quickExtract facade methods for roundtrip fidelity.
     func testTTZipEngineFacadeQuickCompressAndQuickExtract() async throws {
         let inputDir = try sandbox.createSubdirectory("inputs")
         let file1 = inputDir.appendingPathComponent("document.txt")
@@ -45,7 +48,7 @@ final class FacadePatternTests: XCTestCase {
         let archivePath = sandbox.fileURL(named: "facade_quick.zip").path
         let destDir = sandbox.fileURL(named: "facade_extracted").path
         
-        // 1. API
+        // 1. Quick compress via facade
         let compressResult = try await TTZipEngineFacade.shared.quickCompress(
             inputs: [file1.path, file2.path],
             outputPath: archivePath,
@@ -57,7 +60,7 @@ final class FacadePatternTests: XCTestCase {
         XCTAssertGreaterThan(compressResult.compressedBytes, 0)
         XCTAssertGreaterThan(compressResult.durationSeconds, 0)
         
-        // 2. API
+        // 2. Quick extract via facade
         let extractResult = try await TTZipEngineFacade.shared.quickExtract(
             archivePath: archivePath,
             destinationDir: destDir,
@@ -80,6 +83,7 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 2. TTZipEngineFacade Inspect Archive Test
     
+    /// Tests inspectArchive facade method and security report generation.
     func testTTZipEngineFacadeInspectArchive() async throws {
         let inputDir = try sandbox.createSubdirectory("inspect_inputs")
         let file1 = inputDir.appendingPathComponent("hello.swift")
@@ -105,6 +109,7 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 3. TTZipEngineFacade Auto Password Vault Unlock Test
     
+    /// Tests automatic password unlocking via password vault manager integration.
     func testTTZipEngineFacadeAutoVaultUnlock() async throws {
         let inputDir = try sandbox.createSubdirectory("vault_inputs")
         let file1 = inputDir.appendingPathComponent("secret.txt")
@@ -114,7 +119,7 @@ final class FacadePatternTests: XCTestCase {
         let destDir = sandbox.fileURL(named: "vault_extracted").path
         let vaultPassword = "VaultSecretPwd123"
         
-        // Verify expected invariant
+        // Create encrypted archive
         _ = try await TTZipEngineFacade.shared.quickCompress(
             inputs: [file1.path],
             outputPath: archivePath,
@@ -122,16 +127,16 @@ final class FacadePatternTests: XCTestCase {
             password: vaultPassword
         )
         
-        // MockPasswordVault
+        // Clear cached passwords
         ArchivePasswordStore.shared.clearAll()
         
-        // Verify expected invariant
+        // Configure mock password vault
         let mockVault = TestPasswordVaultManager(entries: [
-            PasswordVaultEntry(label: "自动化测试密码", password: vaultPassword)
+            PasswordVaultEntry(label: "Automated Test Password", password: vaultPassword)
         ])
         let facade = TTZipEngineFacade(passwordVault: mockVault)
         
-        // autoVaultUnlock
+        // Extract with autoVaultUnlock enabled
         let extractResult = try await facade.quickExtract(
             archivePath: archivePath,
             destinationDir: destDir,
@@ -148,18 +153,19 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 4. TTZipEngineFacade Integrity & Repair & Recovery Tests
     
+    /// Tests verifyIntegrity and repairArchive facade methods.
     func testTTZipEngineFacadeIntegrityAndRepair() async throws {
         let sampleFile = sandbox.fileURL(named: "hash_sample.bin")
         let data = Data(repeating: 0xAB, count: 1024)
         try data.write(to: sampleFile)
         
-        // verifyIntegrity API
+        // Verify integrity API
         let hashRes = try await TTZipEngineFacade.shared.verifyIntegrity(archivePath: sampleFile.path)
         XCTAssertEqual(hashRes.filePath, sampleFile.path)
         XCTAssertFalse(hashRes.crc32.isEmpty)
         XCTAssertFalse(hashRes.sha256.isEmpty)
         
-        // repairArchive API
+        // Repair archive API
         let damagedZip = sandbox.fileURL(named: "damaged.zip").path
         let repairedZip = sandbox.fileURL(named: "repaired.zip").path
         try data.write(to: URL(fileURLWithPath: damagedZip))
@@ -170,22 +176,23 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 5. ArchiveSecurityFacade Audit & ZipSlip Defense Tests
     
+    /// Tests security auditing and path traversal / ZipSlip vulnerability defense.
     func testArchiveSecurityFacadeAuditAndZipSlipDefense() throws {
         let securityFacade = ArchiveSecurityFacade.shared
         
-        // Verify expected invariant
+        // Validate normal path
         let validPath = securityFacade.validateExtractPath(entryPath: "subfolder/file.txt", destinationDir: "/tmp/extract")
         XCTAssertTrue(validPath)
         
-        // ZipSlip ( ../)
+        // Defense against ZipSlip relative traversal
         let maliciousPath1 = securityFacade.validateExtractPath(entryPath: "../../etc/passwd", destinationDir: "/tmp/extract")
         XCTAssertFalse(maliciousPath1)
         
-        // Verify expected invariant
+        // Defense against absolute path escape
         let maliciousPath2 = securityFacade.validateExtractPath(entryPath: "/etc/shadow", destinationDir: "/tmp/extract")
         XCTAssertFalse(maliciousPath2)
         
-        // entries
+        // Validate entry scanning
         let safeEntry = ArchiveEntry(path: "docs/readme.txt", uncompressedSize: 100, isDirectory: false)
         let unsafeEntry = ArchiveEntry(path: "script.bat", uncompressedSize: 50, isDirectory: false)
         let zipSlipEntry = ArchiveEntry(path: "../../../var/log/system.log", uncompressedSize: 200, isDirectory: false)
@@ -207,10 +214,11 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 6. ArchiveBatchFacade Concurrent Processing Test
     
+    /// Tests batch compression and extraction with bounded concurrency.
     func testArchiveBatchFacadeConcurrentCompressAndExtract() async throws {
         let batchFacade = ArchiveBatchFacade.shared
         
-        // 3
+        // Build 3 batch tasks
         var compressTasks: [BatchCompressTask] = []
         var expectedArchives: [String] = []
         var expectedDestDirs: [String] = []
@@ -232,7 +240,7 @@ final class FacadePatternTests: XCTestCase {
             expectedDestDirs.append(destDir)
         }
         
-        // 1.
+        // 1. Execute batch compression
         let compressResults = await batchFacade.batchCompress(tasks: compressTasks, maxConcurrent: 2)
         XCTAssertEqual(compressResults.count, 3)
         for res in compressResults {
@@ -241,7 +249,7 @@ final class FacadePatternTests: XCTestCase {
             XCTAssertTrue(FileManager.default.fileExists(atPath: res.targetPath))
         }
         
-        // 2.
+        // 2. Prepare batch extraction tasks
         var extractTasks: [BatchExtractTask] = []
         for i in 0..<3 {
             extractTasks.append(BatchExtractTask(
@@ -250,7 +258,7 @@ final class FacadePatternTests: XCTestCase {
             ))
         }
         
-        // 3.
+        // 3. Execute batch extraction
         let extractResults = await batchFacade.batchExtract(tasks: extractTasks, maxConcurrent: 2)
         XCTAssertEqual(extractResults.count, 3)
         for res in extractResults {
@@ -262,6 +270,7 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 7. TTZipEngineFacade Single Entry Extract & Advanced Options Test
     
+    /// Tests single-entry extraction and advanced configuration options.
     func testTTZipEngineFacadeExtractSingleEntryAndAdvancedOptions() async throws {
         let inputDir = try sandbox.createSubdirectory("single_entry_inputs")
         let file1 = inputDir.appendingPathComponent("single_target.txt")
@@ -288,7 +297,7 @@ final class FacadePatternTests: XCTestCase {
         )
         XCTAssertGreaterThan(compRes.compressedBytes, 0)
         
-        // Verify expected invariant
+        // Extract single entry
         try await TTZipEngineFacade.shared.extractSingleEntry(
             archivePath: archivePath,
             entryPath: "single_target.txt",
@@ -303,8 +312,9 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 8. Facade Edge Cases & Error Handling Test
     
+    /// Tests facade error handling when encountering missing files or invalid inputs.
     func testTTZipEngineFacadeEdgeCasesAndErrorHandling() async {
-        // 1. fileNotFound
+        // 1. Non-existent archive path
         do {
             _ = try await TTZipEngineFacade.shared.quickExtract(
                 archivePath: "/non_existent_path_ttzip/fake.zip",
@@ -317,7 +327,7 @@ final class FacadePatternTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
         
-        // 2. fileNotFound
+        // 2. Empty archive path for single entry extraction
         do {
             try await TTZipEngineFacade.shared.extractSingleEntry(
                 archivePath: "",
@@ -334,6 +344,7 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 9. ArchivePasswordStore LRU Capacity & Sensitive Erasure Test
     
+    /// Tests password store LRU eviction policy and secure password removal.
     func testArchivePasswordStoreLRUAndErasure() {
         let store = ArchivePasswordStore(maxCapacity: 3)
         store.setPassword("pwd1", for: "/path/1.zip")
@@ -344,10 +355,10 @@ final class FacadePatternTests: XCTestCase {
         XCTAssertEqual(store.getPassword(for: "/path/2.zip"), "pwd2")
         XCTAssertEqual(store.getPassword(for: "/path/3.zip"), "pwd3")
         
-        // /path/1.zip LRU ， /path/2.zip
+        // Access /path/1.zip to update LRU order; oldest becomes /path/2.zip
         _ = store.getPassword(for: "/path/1.zip")
         
-        // 4 ， LRU /path/2.zip
+        // Add 4th entry; should evict /path/2.zip
         store.setPassword("pwd4", for: "/path/4.zip")
         
         XCTAssertNil(store.getPassword(for: "/path/2.zip"))
@@ -355,7 +366,7 @@ final class FacadePatternTests: XCTestCase {
         XCTAssertEqual(store.getPassword(for: "/path/3.zip"), "pwd3")
         XCTAssertEqual(store.getPassword(for: "/path/4.zip"), "pwd4")
         
-        // Verify expected invariant
+        // Remove individual entry and clear all
         store.removePassword(for: "/path/1.zip")
         XCTAssertNil(store.getPassword(for: "/path/1.zip"))
         
@@ -366,6 +377,7 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 10. ArchiveBatchFacade High Concurrency Cancellation & Exception Isolation Test
     
+    /// Tests batch processing error isolation where a single failing task does not disrupt others.
     func testArchiveBatchFacadeHighConcurrencyCancellationAndIsolation() async throws {
         let inputDir = try sandbox.createSubdirectory("batch_inputs")
         let file1 = inputDir.appendingPathComponent("batch_1.txt")
@@ -375,7 +387,6 @@ final class FacadePatternTests: XCTestCase {
         let out2 = sandbox.fileURL(named: "batch_out_2.zip").path
         
         let task1 = BatchCompressTask(inputs: [file1.path], outputPath: out1, format: .zip)
-        // Verify expected invariant
         let task2 = BatchCompressTask(inputs: ["/non_existent_path_file_ttzip.txt"], outputPath: out2, format: .zip)
         
         let batchFacade = ArchiveBatchFacade.shared
@@ -395,6 +406,7 @@ final class FacadePatternTests: XCTestCase {
     
     // MARK: - 11. Mock Facades & Protocol Extensions Decoupling Test
     
+    /// Tests mock facades and protocol decoupling extensions.
     func testMockFacadesAndProtocolDecoupling() async throws {
         // 1. MockTTZipEngineFacade & Protocol Extension
         let mockEngine: TTZipEngineFacading = MockTTZipEngineFacade()
@@ -435,6 +447,4 @@ final class FacadePatternTests: XCTestCase {
         mockBenchmark.cleanCache()
         XCTAssertTrue((mockBenchmark as? MockArchiveBenchmarkFacade)?.cleanCacheCalled == true)
     }
-
 }
-

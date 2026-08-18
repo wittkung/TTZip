@@ -43,7 +43,6 @@ final class SyntheticXmlCorpusGeneratorTests: XCTestCase {
         XCTAssertEqual(attrs.size, targetSize, "Generated file size must match target size exactly")
         
         let throughputMBs = Double(targetSize) / (1024 * 1024 * max(0.0001, elapsed))
-        print("  ⚡ [SyntheticXmlCorpusGenerator] Generated 10MB in \(String(format: "%.4f", elapsed)) s (\(String(format: "%.1f", throughputMBs)) MB/s)")
         XCTAssertGreaterThan(throughputMBs, 500.0, "Generation throughput should exceed 500 MB/s")
     }
     

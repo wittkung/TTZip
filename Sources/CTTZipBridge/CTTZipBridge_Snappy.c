@@ -333,7 +333,7 @@ int ttzip_snappy_framed_decompress(const void* input, size_t input_len, void* ou
                 return TTZIP_SNAPPY_ERR_CRC32C_MISMATCH;
             }
 
-            if (out_limit - out_p < uncomp_len) return TTZIP_SNAPPY_ERR_BUFFER_TOO_SMALL;
+            if ((size_t)(out_limit - out_p) < uncomp_len) return TTZIP_SNAPPY_ERR_BUFFER_TOO_SMALL;
             memcpy(out_p, raw_scratch, uncomp_len);
             out_p += uncomp_len;
             total_decompressed += uncomp_len;
@@ -355,12 +355,13 @@ int ttzip_snappy_framed_decompress(const void* input, size_t input_len, void* ou
                 return TTZIP_SNAPPY_ERR_CRC32C_MISMATCH;
             }
 
-            if (out_limit - out_p < raw_payload_len) return TTZIP_SNAPPY_ERR_BUFFER_TOO_SMALL;
+            if ((size_t)(out_limit - out_p) < raw_payload_len) return TTZIP_SNAPPY_ERR_BUFFER_TOO_SMALL;
             memcpy(out_p, raw_payload, raw_payload_len);
             out_p += raw_payload_len;
             total_decompressed += raw_payload_len;
             in_p += chunk_len;
         }
+
     }
 
     *output_len = total_decompressed;

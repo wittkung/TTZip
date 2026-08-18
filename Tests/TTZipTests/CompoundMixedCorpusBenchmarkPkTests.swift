@@ -9,21 +9,26 @@ import XCTest
 @testable import TTZipCore
 import CTTZipBridge
 
+/// Compound real-world mixed-modality corpus benchmark PK test suite (~250MB workspace).
 final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
     
+    /// Evaluates multi-tier compound workspace compression across TTZip, 7-Zip, pigz, and Apple native tools.
     func testCompoundMixedCorpusBenchmarkPk() async throws {
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            throw XCTSkip("Benchmark test requires TTZIP_RUN_BENCHMARKS=1")
+        }
         let orchestrator = CorpusOrchestrator.shared
         
-        // 1. 构建 250MB 真实复合多模态工程目录
+        // 1. Construct ~250MB compound mixed-modality project workspace (500+ files).
         let workspaceDir = NSTemporaryDirectory() + "compound_project_250mb_\(UUID().uuidString)"
         defer { try? FileManager.default.removeItem(atPath: workspaceDir) }
         
-        print("\n========================================================================")
-        print("🏗️  正在装载 5-Tier 复合多模态真实工程工作区 (~250MB, 500+ 文件)...")
+        TTLogger.debug("\n========================================================================")
+        TTLogger.debug("🏗️  Mounting 5-Tier compound mixed-modality project workspace (~250MB, 500+ files)...")
         let (totalBytes, totalFiles) = try orchestrator.mountCompoundMixedWorkspace(at: workspaceDir)
         let totalMB = Double(totalBytes) / 1024.0 / 1024.0
-        print("✅ 装载完成: 真实大小 \(String(format: "%.2f", totalMB)) MB, 共计 \(totalFiles) 个文件/目录")
-        print("========================================================================\n")
+        TTLogger.debug("✅ Mounting complete: actual size \(String(format: "%.2f", totalMB)) MB, \(totalFiles) files/directories")
+        TTLogger.debug("========================================================================\n")
         
         struct BenchmarkCandidate {
             let name: String
@@ -33,7 +38,7 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
         
         var candidates: [BenchmarkCandidate] = []
         
-        // 1. TTZip Multi-Level (全部 1 到 12 等级)
+        // 1. TTZip multi-level compression (Levels 1 to 12).
         for lvl in 1...12 {
             let levelEnum = ArchiveCompressionLevel(rawValue: lvl) ?? .level1
             candidates.append(BenchmarkCandidate(name: "TTZip (L\(lvl))", level: lvl) {
@@ -51,7 +56,7 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
             })
         }
         
-        // 2. 竞品矩阵 (7-Zip / pigz / Apple Native): 根据配置选择快照加速或现场实测
+        // 2. Competitor matrix (7-Zip / pigz / Apple Native): live execution or snapshot acceleration.
         if CompetitorBaselineSnapshotManager.shouldRerunCompetitors {
             let sevenZipLevels = [1, 3, 5, 7, 9]
             for mx in sevenZipLevels {
@@ -146,18 +151,18 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
             })
         }
         
-        print("========================================================================================================================")
-        print("🏛️  250MB 真实复合多模态工程打包实测 (Compound Mixed Workspace)")
-        print("========================================================================================================================")
-        print(String(format: "%-28@ | %-16@ | %-12@ | %-12@ | %-16@", "Algorithm/Software", "Compression MB/s", "Ratio", "Space Sav%", "Archive Size"))
-        print("------------------------------------------------------------------------------------------------------------------------")
+        TTLogger.debug("========================================================================================================================")
+        TTLogger.debug("🏛️  250MB Real-World Compound Workspace Benchmark (Compound Mixed Workspace)")
+        TTLogger.debug("========================================================================================================================")
+        TTLogger.debug(String(format: "%-28@ | %-16@ | %-12@ | %-12@ | %-16@", "Algorithm/Software", "Compression MB/s", "Ratio", "Space Sav%", "Archive Size"))
+        TTLogger.debug("------------------------------------------------------------------------------------------------------------------------")
         
         var plotPoints: [ParetoPoint] = []
         
         for cand in candidates {
             let (speed, ratio, savings, outSize) = try await cand.run()
             let sizeMB = Double(outSize) / 1024.0 / 1024.0
-            print(String(
+            TTLogger.debug(String(
                 format: "%-28@ | %13.1f MB/s | %10.2fx | %10.1f%% | %11.2f MB",
                 cand.name as NSString,
                 speed,
@@ -177,11 +182,11 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
             ))
         }
         
-        // 若使用快照，合并竞品实测黄金数据
+        // Merge baseline competitor golden snapshot when live rerun is disabled.
         if !CompetitorBaselineSnapshotManager.shouldRerunCompetitors {
             for comp in CompetitorBaselineSnapshotManager.compoundMixedWorkspaceCompetitors {
                 let sizeMB = Double(comp.archiveSizeBytes) / 1024.0 / 1024.0
-                print(String(
+                TTLogger.debug(String(
                     format: "%-28@ | %13.1f MB/s | %10.2fx | %10.1f%% | %11.2f MB",
                     comp.algorithm as NSString,
                     comp.throughputMBs,
@@ -201,9 +206,9 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
             }
         }
         
-        print("========================================================================================================================\n")
+        TTLogger.debug("========================================================================================================================\n")
         
-        // 渲染图表
+        // Render Pareto frontier plot artifact.
         let artifactPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/pareto_compound_mixed.png"
         let pResult = ParetoFrontierResult(
             totalPointsEvaluated: plotPoints.count,
@@ -219,7 +224,7 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
             height: 1080,
             title: "Compound Real-World Workspace Benchmark (TTZip vs. 7-Zip vs. pigz vs. Apple Native)"
         )
-        print("🏆 真实复合工程帕累托图已生成: \(artifactPath)")
+        TTLogger.debug("🏆 Real-world compound workspace Pareto chart generated: \(artifactPath)")
         
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPath))
     }

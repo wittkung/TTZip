@@ -95,18 +95,20 @@ final class Blosc2AdvancedArchitecturesTests: XCTestCase {
         defer { ttzip_prefetch_destroy(pipe) }
 
         let chunkCount = 50
-        var testPayloads: [Data] = []
+        var payloads: [Data] = []
         for i in 0..<chunkCount {
             let content = "Prefetch_Chunk_Payload_#\(i)_" + String(repeating: "DATA_\(i)_", count: 500)
-            testPayloads.append(content.data(using: .utf8)!)
+            payloads.append(content.data(using: .utf8)!)
         }
+        let testPayloads = payloads
+        nonisolated(unsafe) let sharedPipe = pipe
 
         // Producer Thread
         let producer = Thread {
             for i in 0..<chunkCount {
                 let data = testPayloads[i]
                 data.withUnsafeBytes { raw in
-                    let ret = ttzip_prefetch_commit_slot(pipe, Int64(i), raw.bindMemory(to: UInt8.self).baseAddress!, raw.count)
+                    let ret = ttzip_prefetch_commit_slot(sharedPipe, Int64(i), raw.bindMemory(to: UInt8.self).baseAddress!, raw.count)
                     XCTAssertEqual(ret, 0)
                 }
             }

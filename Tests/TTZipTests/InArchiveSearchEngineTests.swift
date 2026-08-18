@@ -8,6 +8,7 @@
 import XCTest
 @testable import TTZipCore
 
+/// Test suite validating in-archive search indexing performance and selective extraction fast-paths.
 final class InArchiveSearchEngineTests: XCTestCase {
     private var tempDirectoryURL: URL!
     
@@ -24,6 +25,7 @@ final class InArchiveSearchEngineTests: XCTestCase {
         try super.tearDownWithError()
     }
     
+    /// Tests search index construction and query performance across 100,000 entries (sub-25ms threshold).
     func test100kNodesSearchIndexPerformance() {
         let index = ArchiveSearchIndex()
         let count = 100_000
@@ -50,9 +52,10 @@ final class InArchiveSearchEngineTests: XCTestCase {
         
         XCTAssertEqual(result.matchedEntriesCount, 1)
         XCTAssertLessThanOrEqual(result.searchDurationMs, 25.0, "100k nodes search must execute in sub-25ms")
-        print("[SEARCH BENCHMARK] Scanned \(result.totalScannedEntries) items in \(String(format: "%.2f", result.searchDurationMs)) ms")
+        TTLogger.debug("[SEARCH BENCHMARK] Scanned \(result.totalScannedEntries) items in \(String(format: "%.2f", result.searchDurationMs)) ms")
     }
     
+    /// Tests selective single-entry extraction fast path from a multi-file archive.
     func testZipSelectiveExtractorFastPath() async throws {
         let file1 = tempDirectoryURL.appendingPathComponent("file1.txt").path
         let file2 = tempDirectoryURL.appendingPathComponent("target_report.txt").path

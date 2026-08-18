@@ -9,8 +9,10 @@ import XCTest
 import CTTZipBridge
 @testable import TTZipCore
 
+/// Test suite validating ARM64 RBIT-accelerated in-place canonical Huffman code generation and Kraft-McMillan limits.
 final class InPlaceHuffmanTests: XCTestCase {
 
+    /// Verifies bit reversal correctness using ARM64 RBIT instructions.
     func testInPlaceHuffman_ARM64RBIT_BitReversal_Correctness() {
         // Known bit patterns
         XCTAssertEqual(InPlaceHuffmanAdapter.bitReverse(code: 0b1, len: 1), 0b1)
@@ -20,6 +22,7 @@ final class InPlaceHuffmanTests: XCTestCase {
         XCTAssertEqual(InPlaceHuffmanAdapter.bitReverse(code: 0b101010101010101, len: 15), 0b101010101010101)
     }
 
+    /// Verifies Kraft-McMillan inequality and maximum codeword length limit (<= 15 bits) on standard 288-symbol alphabet.
     func testInPlaceHuffman_StandardAlphabet_KraftEqualityAndLengthLimit() {
         // 288 symbols litlen alphabet with realistic zip frequency distribution
         var freqs = [UInt32](repeating: 0, count: 288)
@@ -49,6 +52,7 @@ final class InPlaceHuffmanTests: XCTestCase {
         XCTAssertLessThanOrEqual(kraftSum, 1.0000000001, "Kraft-McMillan inequality must hold: sum = \(kraftSum)")
     }
 
+    /// Verifies length-limited clipping on extreme skewed symbol frequencies.
     func testInPlaceHuffman_ExtremeSkewedDistribution_LengthLimitedClipping() {
         // Fibonacci-like extreme skew trying to force tree depth > 15
         var freqs = [UInt32](repeating: 0, count: 288)
@@ -68,6 +72,7 @@ final class InPlaceHuffmanTests: XCTestCase {
         }
     }
 
+    /// Verifies canonical code generation edge cases with 1 or 2 non-zero symbols.
     func testInPlaceHuffman_EdgeCases_FewSymbols() {
         // Single symbol
         var singleFreq = [UInt32](repeating: 0, count: 288)
@@ -84,6 +89,7 @@ final class InPlaceHuffmanTests: XCTestCase {
         XCTAssertEqual(twoTable.codewordLengths[20], 1)
     }
 
+    /// Measures 288-symbol canonical Huffman tree generation latency microbenchmark.
     func testInPlaceHuffman_MicrobenchmarkLatency() {
         var freqs = [UInt32](repeating: 0, count: 288)
         for i in 0..<288 {
@@ -115,7 +121,7 @@ final class InPlaceHuffmanTests: XCTestCase {
 
         let elapsedNanos = PlatformMonotonicTimer.nowNanoseconds() - start
         let avgMicros = Double(elapsedNanos) / Double(iterations) / 1000.0
-        print("⚡ [In-Place Huffman] 288-symbol Tree Generation Average Latency: \(String(format: "%.3f", avgMicros)) μs")
+        TTLogger.debug("⚡ [In-Place Huffman] 288-symbol Tree Generation Average Latency: \(String(format: "%.3f", avgMicros)) μs")
 
         #if DEBUG
         XCTAssertLessThanOrEqual(avgMicros, 10.0, "Debug mode latency floor")

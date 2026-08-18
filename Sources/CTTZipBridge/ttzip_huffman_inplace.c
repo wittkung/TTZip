@@ -266,10 +266,16 @@ void ttzip_make_canonical_huffman_code_inplace(
         memset(codewords, 0, num_syms * sizeof(uint32_t));
         lens[sym] = 1;
         lens[dummy_sym] = 1;
-        codewords[sym] = 0;
-        codewords[dummy_sym] = 1;
+        if (sym < dummy_sym) {
+            codewords[sym] = 0;
+            codewords[dummy_sym] = 1;
+        } else {
+            codewords[dummy_sym] = 0;
+            codewords[sym] = 1;
+        }
         return;
     }
+
 
     // Phase 1: In-place two-queue tree construction
     build_tree_inplace(A, num_used_syms);

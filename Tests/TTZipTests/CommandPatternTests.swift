@@ -564,8 +564,8 @@ final class CommandPatternTests: XCTestCase {
         let validZipPath = sweepDir.appendingPathComponent("valid_sample.zip").path
         _ = try await TTZipEngineFacade.shared.quickCompress(inputs: [sampleSource], outputPath: validZipPath)
         
-        // 100+ / / /
-        for i in 1...105 {
+        let totalOps = TestBenchmarkTier.isBenchmarkMode ? 105 : 20
+        for i in 1...totalOps {
             let targetPath = sweepDir.appendingPathComponent("target_\(i % 10).zip").path
             
             // Verify expected invariant

@@ -199,6 +199,8 @@ public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendabl
     case advzip        = "advzip"
     case appleNative   = "Apple Native"
     case keka          = "Keka"
+    case ouch          = "ouch"
+    case bandizip      = "Bandizip"
     case other         = "Other"
 
     public var id: String { rawValue }
@@ -218,9 +220,12 @@ public enum SoftwareFamily: String, Codable, CaseIterable, Identifiable, Sendabl
         case .advzip:        return "#B45309" // Dark Amber
         case .appleNative:   return "#DC2626" // Crimson Red
         case .keka:          return "#0D9488" // Teal / Jade
+        case .ouch:          return "#E11D48" // Rose Red (Rust ouch)
+        case .bandizip:      return "#0284C7" // Sky Blue
         case .other:         return "#64748B" // Slate
         }
     }
+
 
     /// 是否作为 Hero 软件渲染演进光晕带与突出药丸徽章
     public var isHero: Bool { self == .ttzip }
@@ -274,9 +279,14 @@ public struct SoftwareFamilyClassifier: Sendable {
             return .appleNative
         } else if lower.contains("keka") {
             return .keka
+        } else if lower.contains("ouch") {
+            return .ouch
+        } else if lower.contains("bandizip") || lower.contains("bc") {
+            return .bandizip
         } else {
             return .other
         }
+
     }
 
     public static func groupTrajectories(from points: [ParetoPoint]) -> [SoftwareFamilyTrajectory] {

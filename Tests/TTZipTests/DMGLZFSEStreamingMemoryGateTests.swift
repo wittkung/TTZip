@@ -10,8 +10,11 @@ import XCTest
 import CTTZipBridge
 import Darwin
 
+/// Test suite verifying LZFSE streaming memory usage boundaries and decompression throughput floors.
 final class DMGLZFSEStreamingMemoryGateTests: XCTestCase {
     
+    /// Queries the current task's resident memory size in megabytes via Mach kernel APIs.
+    /// - Returns: Resident set size (RSS) in megabytes.
     private func getResidentMemoryMB() -> Double {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / 4)
@@ -26,6 +29,7 @@ final class DMGLZFSEStreamingMemoryGateTests: XCTestCase {
         return 0.0
     }
     
+    /// Tests LZFSE streaming memory consumption ceiling and verifies throughput meets the performance floor.
     func testLZFSEStreamingMemoryAndThroughputFloor() throws {
         let adapter = LzfseCAdapter.shared
         XCTAssertTrue(adapter.isAvailable)
@@ -61,7 +65,7 @@ final class DMGLZFSEStreamingMemoryGateTests: XCTestCase {
         let throughputMBs = totalMB / elapsed
         let peakRSS = getResidentMemoryMB()
         
-        print("[DMGLZFSEStreamingMemoryGateTests] Total: \(totalMB) MB, Elapsed: \(String(format: "%.3f", elapsed))s, Throughput: \(String(format: "%.2f", throughputMBs)) MB/s, RSS: \(String(format: "%.2f", peakRSS)) MB (Initial: \(String(format: "%.2f", initialRSS)) MB)")
+        TTLogger.debug("[DMGLZFSEStreamingMemoryGateTests] Total: \(totalMB) MB, Elapsed: \(String(format: "%.3f", elapsed))s, Throughput: \(String(format: "%.2f", throughputMBs)) MB/s, RSS: \(String(format: "%.2f", peakRSS)) MB (Initial: \(String(format: "%.2f", initialRSS)) MB)")
         
         // Assertions
         XCTAssertGreaterThanOrEqual(throughputMBs, 500.0, "LZFSE decompression throughput must meet baseline floor")

@@ -68,7 +68,7 @@ size_t ttzip_raw_deflate_block_compress_with_dict(
 ) {
     if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
     
-    // 若无字典注入且为单块完整流，直通高吞吐 libdeflate 原生引擎
+    // If no dictionary injection is needed and this is a single final block, fast-path to native libdeflate
     if ((!dict_ptr || dict_size == 0) && is_final) {
         return ttzip_libdeflate_compress(src, src_size, dst, dst_capacity, level);
     }
@@ -86,7 +86,7 @@ size_t ttzip_raw_deflate_block_compress_with_dict(
         if (ret != Z_OK) return 0;
     }
     
-    // 跨块 32KB 历史字典预热 (RFC 1951 Deflate 滑动窗口注入)
+    // Cross-block 32KB history dictionary warm-up (RFC 1951 Deflate sliding window injection)
     if (dict_ptr && dict_size > 0) {
         size_t effective_dict = dict_size > 32768 ? 32768 : dict_size;
         const Bytef* dict_start = ((const Bytef*)dict_ptr) + (dict_size - effective_dict);
@@ -128,7 +128,7 @@ int ttzip_probe_entropy_and_compressibility(
     size_t sample_len = (sample_limit > 0 && src_size > sample_limit) ? sample_limit : src_size;
     if (sample_len > 4096) sample_len = 4096;
     
-    // 1. 256-bin 栈上直方图 (Zero dynamic heap allocation!)
+    // 1. 256-bin stack-allocated histogram (Zero dynamic heap allocation)
     uint32_t freq[256];
     memset(freq, 0, sizeof(freq));
     const uint8_t* p = (const uint8_t*)src;
@@ -136,7 +136,7 @@ int ttzip_probe_entropy_and_compressibility(
         freq[p[i]]++;
     }
     
-    // 2. 计算香农信息熵 H = -sum(p_i * log2(p_i))
+    // 2. Compute Shannon information entropy H = -sum(p_i * log2(p_i))
     double entropy = 0.0;
     double inv_sample = 1.0 / (double)sample_len;
     for (int i = 0; i < 256; i++) {
@@ -148,7 +148,7 @@ int ttzip_probe_entropy_and_compressibility(
     
     if (entropy_out) *entropy_out = entropy;
     
-    // 3. 超轻量试探压缩
+    // 3. Lightweight exploratory test compression
     double estimated_ratio = 1.0;
     if (entropy >= 7.35) {
         uint8_t probe_dst[2048];

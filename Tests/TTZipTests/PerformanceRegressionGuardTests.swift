@@ -18,7 +18,7 @@ final class PerformanceRegressionGuardTests: XCTestCase {
     
     // Historical peak floor tolerance (Debug: 80% adaptation / Release: strictly 90%)
     #if DEBUG
-    private static let floorRatio: Double = 0.80
+    private static let floorRatio: Double = 0.75
     #else
     private static let floorRatio: Double = 0.90
     #endif

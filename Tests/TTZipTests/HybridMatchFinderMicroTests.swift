@@ -5,17 +5,16 @@
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
-// Tests/TTZipTests/HybridMatchFinderMicroTests.swift
-// TTZip Hybrid SWAR/NEON Match Finder Micro-Architecture Tests & Benchmarks
-
 import XCTest
 import CTTZipBridge
 @testable import TTZipCore
 
+/// Test suite validating the hybrid SWAR / ARM64 NEON match finder micro-architecture and double-fast table algorithms.
 final class HybridMatchFinderMicroTests: XCTestCase {
 
     // MARK: - 1. Exhaustive Prefix Match Length Correctness (0 to 273 Bytes)
 
+    /// Validates match length accuracy across an exhaustive sweep from 0 to 273 bytes with boundary checks.
     func testPrefixMatchLengthSweepFrom0To273() throws {
         let maxTestLength = 300
         var baseBuffer = [UInt8](repeating: 0x41, count: maxTestLength) // 'A'
@@ -72,6 +71,7 @@ final class HybridMatchFinderMicroTests: XCTestCase {
 
     // MARK: - 2. Edge Cases & Boundary Clamping
 
+    /// Validates zero-length, short length (<8B), and null pointer boundary handling.
     func testEdgeCasesAndBoundsSafety() {
         let buf1: [UInt8] = [1, 2, 3, 4, 5, 6, 7, 8]
         let buf2: [UInt8] = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -99,6 +99,7 @@ final class HybridMatchFinderMicroTests: XCTestCase {
 
     // MARK: - 3. Unaligned Memory Pointers
 
+    /// Validates match finder behavior across various unaligned memory offsets.
     func testUnalignedPointerAccess() {
         let bufferSize = 1024
         var masterBuffer = [UInt8](repeating: 0, count: bufferSize)
@@ -136,11 +137,8 @@ final class HybridMatchFinderMicroTests: XCTestCase {
 
     // MARK: - 4. Contract Compliance Verification
 
+    /// Verifies that output match lengths comply with JSON schema contract bounds.
     func testContractComplianceAgainstJsonSchema() {
-        // Contract properties:
-        // input: src0_offset >= 0, src1_offset >= 0, max_len in [0, 273], nice_len in [3, 273]
-        // result: match_length in [0, 273], dispatch_path in ["swar_gpr", "neon_vector", "scalar_tail"]
-
         let testPattern: [UInt8] = Array(repeating: 0x55, count: 512)
         testPattern.withUnsafeBytes { raw in
             let ptr = raw.baseAddress!.assumingMemoryBound(to: UInt8.self)
@@ -169,6 +167,7 @@ final class HybridMatchFinderMicroTests: XCTestCase {
 
     // MARK: - 5. Micro-Benchmark: Short Match Fast-Fail vs Long Match NEON Unrolling
 
+    /// Benchmarks short match fast-fail throughput against long match NEON vector unrolling.
     func testMicroBenchmarkHybridMatcherPerformance() {
         let iterations = 2_000_000
 
@@ -210,17 +209,17 @@ final class HybridMatchFinderMicroTests: XCTestCase {
         let longOpsPerSec = Double(iterations) / elapsedLong
         XCTAssertEqual(longTotalLen, UInt32(iterations * 258))
 
-        print("\n=======================================================")
-        print("  [Hybrid Match Finder Micro-Benchmark]")
-        print("  - Short Match (<8B GPR Fast-Fail):")
-        print("      * Iterations: \(iterations)")
-        print("      * Elapsed:    \(String(format: "%.4f", elapsedShort)) s")
-        print("      * Rate:       \(String(format: "%.2f", shortOpsPerSec / 1_000_000.0)) M comparisons/s")
-        print("  - Long Match (258B NEON Vector Unroll):")
-        print("      * Iterations: \(iterations)")
-        print("      * Elapsed:    \(String(format: "%.4f", elapsedLong)) s")
-        print("      * Rate:       \(String(format: "%.2f", longOpsPerSec / 1_000_000.0)) M comparisons/s")
-        print("=======================================================\n")
+        TTLogger.debug("\n=======================================================")
+        TTLogger.debug("  [Hybrid Match Finder Micro-Benchmark]")
+        TTLogger.debug("  - Short Match (<8B GPR Fast-Fail):")
+        TTLogger.debug("      * Iterations: \(iterations)")
+        TTLogger.debug("      * Elapsed:    \(String(format: "%.4f", elapsedShort)) s")
+        TTLogger.debug("      * Rate:       \(String(format: "%.2f", shortOpsPerSec / 1_000_000.0)) M comparisons/s")
+        TTLogger.debug("  - Long Match (258B NEON Vector Unroll):")
+        TTLogger.debug("      * Iterations: \(iterations)")
+        TTLogger.debug("      * Elapsed:    \(String(format: "%.4f", elapsedLong)) s")
+        TTLogger.debug("      * Rate:       \(String(format: "%.2f", longOpsPerSec / 1_000_000.0)) M comparisons/s")
+        TTLogger.debug("=======================================================\n")
 
         #if DEBUG
         XCTAssertGreaterThan(shortOpsPerSec, 10_000_000.0, "Short match fast-fail rate in Debug must exceed 10M ops/s")
@@ -233,6 +232,7 @@ final class HybridMatchFinderMicroTests: XCTestCase {
 
     // MARK: - 6. Double-Fast Dual-Table Match Finder Verification
 
+    /// Validates the double-fast dual-table match finder initialization, match extraction, and zero-allocation workspace mode.
     func testDoubleFastDualTableMatchFinder() throws {
         // Create repeated pattern data: "0123456789ABCDEF" repeated
         let pattern: [UInt8] = Array("0123456789ABCDEF0123456789ABCDEF".utf8)

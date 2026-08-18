@@ -34,7 +34,7 @@ int ttzip_core_posix_spawn_fast(
     const char* working_dir
 );
 
-static void split_input_path(const char* input_dir, char* dir_path, size_t dir_len, char* file_name, size_t file_len) {
+__attribute__((unused)) static void split_input_path(const char* input_dir, char* dir_path, size_t dir_len, char* file_name, size_t file_len) {
     strncpy(dir_path, input_dir, dir_len);
     dir_path[dir_len - 1] = '\0';
     
@@ -253,12 +253,11 @@ int ttzip_extract_archive_advanced(
     
     struct archive_entry* entry;
     int r;
-    int entry_count = 0;
     int success_count = 0;
     while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK) {
         const char* pathname = archive_entry_pathname(entry);
         if (!pathname || pathname[0] == '\0') continue;
-        entry_count++;
+
         
         if (skip_mac_junk) {
             const char* last_slash = strrchr(pathname, '/');

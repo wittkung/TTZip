@@ -9,8 +9,10 @@ import XCTest
 import CTTZipBridge
 @testable import TTZipCore
 
+/// Test suite validating Blosc2-style BitGrooming precision quantization and filter synergy.
 final class Blosc2BitGroomingTests: XCTestCase {
 
+    /// Validates BitGrooming numerical accuracy within bounded relative error and compression synergy with BitShuffle and Deflate.
     func testBitGroomingAccuracyAndCompressionSynergy() throws {
         let count = 16384 // 64KB floats
         var rawFloats = [Float](repeating: 0, count: count)
@@ -57,7 +59,7 @@ final class Blosc2BitGroomingTests: XCTestCase {
         let rawRatio = Double(rawBytes.count) / Double(rawDeflate.count)
         let groomedRatio = Double(rawBytes.count) / Double(groomedBitShuffleDeflate.count)
 
-        print(String(format: "BitGroom (NSD=3) Baseline Deflate: %d B (%.2fx) vs BitGroom+BitShuffle+Deflate: %d B (%.2fx)", rawDeflate.count, rawRatio, groomedBitShuffleDeflate.count, groomedRatio))
+        TTLogger.debug(String(format: "BitGroom (NSD=3) Baseline Deflate: %d B (%.2fx) vs BitGroom+BitShuffle+Deflate: %d B (%.2fx)", rawDeflate.count, rawRatio, groomedBitShuffleDeflate.count, groomedRatio))
         XCTAssertGreaterThan(groomedRatio, rawRatio * 2.0, "Bit-Grooming with BitShuffle must dramatically boost compression ratio")
 
         // Test 3: BitRound nearest-even rounding

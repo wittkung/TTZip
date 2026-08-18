@@ -22,10 +22,15 @@ final class CompetitorMultiModalBenchmarkTests: XCTestCase {
         let sparsePath = tempDir.appendingPathComponent("sparse_image.img").path
         let jsonPath = tempDir.appendingPathComponent("structured_log.json").path
 
-        try MultiModalDatasetGenerator.generateFloat32SensorDataset(destinationPath: floatPath, sizeBytes: 5 * 1024 * 1024)
-        try MultiModalDatasetGenerator.generateHighEntropyBinaryDataset(destinationPath: highEntropyPath, sizeBytes: 5 * 1024 * 1024)
-        try MultiModalDatasetGenerator.generateSparseExtentDataset(destinationPath: sparsePath, virtualSizeBytes: 50 * 1024 * 1024)
-        try MultiModalDatasetGenerator.generateStructuredJsonDataset(destinationPath: jsonPath, recordCount: 15000)
+        let sensorBytes = TestBenchmarkTier.isBenchmarkMode ? (5 * 1024 * 1024) : (512 * 1024)
+        let entropyBytes = TestBenchmarkTier.isBenchmarkMode ? (5 * 1024 * 1024) : (512 * 1024)
+        let sparseBytes = TestBenchmarkTier.isBenchmarkMode ? (50 * 1024 * 1024) : (5 * 1024 * 1024)
+        let jsonCount = TestBenchmarkTier.isBenchmarkMode ? 15000 : 1000
+
+        try MultiModalDatasetGenerator.generateFloat32SensorDataset(destinationPath: floatPath, sizeBytes: sensorBytes)
+        try MultiModalDatasetGenerator.generateHighEntropyBinaryDataset(destinationPath: highEntropyPath, sizeBytes: entropyBytes)
+        try MultiModalDatasetGenerator.generateSparseExtentDataset(destinationPath: sparsePath, virtualSizeBytes: Int64(sparseBytes))
+        try MultiModalDatasetGenerator.generateStructuredJsonDataset(destinationPath: jsonPath, recordCount: jsonCount)
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: floatPath))
         XCTAssertTrue(FileManager.default.fileExists(atPath: highEntropyPath))

@@ -8,6 +8,8 @@
 import XCTest
 @testable import TTZipCore
 
+/// Test suite validating gap bridging features: solid archiving, file watching,
+/// dictionary-based password recovery, password vault manager lifecycle, and Finder sync helpers.
 final class GapBridgingTests: XCTestCase {
     
     var tempDirPath: String!
@@ -26,6 +28,7 @@ final class GapBridgingTests: XCTestCase {
         try super.tearDownWithError()
     }
     
+    /// Tests solid archive creation using TAR.ZST container.
     func testSolidArchiveEngineCreation() async throws {
         let sample1 = (tempDirPath as NSString).appendingPathComponent("code1.swift")
         let sample2 = (tempDirPath as NSString).appendingPathComponent("code2.swift")
@@ -39,6 +42,7 @@ final class GapBridgingTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: solidZip))
     }
     
+    /// Tests file watcher registration and notification callback.
     func testFileWatcherEngineRegistration() {
         let sampleFile = (tempDirPath as NSString).appendingPathComponent("watch_me.txt")
         try? "Initial Content".write(toFile: sampleFile, atomically: true, encoding: .utf8)
@@ -51,6 +55,7 @@ final class GapBridgingTests: XCTestCase {
         watcher.stopWatching(filePath: sampleFile)
     }
     
+    /// Tests dictionary attack based password recovery engine.
     func testPasswordRecoveryEngine() async throws {
         let dummyZip = (tempDirPath as NSString).appendingPathComponent("dummy_pwd.zip")
         let sampleFile = (tempDirPath as NSString).appendingPathComponent("pwd_sample.txt")
@@ -67,6 +72,7 @@ final class GapBridgingTests: XCTestCase {
         XCTAssertGreaterThan(result.totalAttempts, 0)
     }
     
+    /// Tests PasswordVaultManager persistence, master password reset, and backup vault recovery.
     func testPasswordVaultManager() {
         PasswordVaultManager.shared.resetToFirstRunState()
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("VaultTest_\(UUID().uuidString)")
@@ -82,10 +88,10 @@ final class GapBridgingTests: XCTestCase {
         vault.setMasterPassword(originalMaster)
         let initialCount = vault.getEntries().count
         
-        vault.addEntry(label: "UnitTest Vault Key", password: "SecretPassword#2026", category: "测试")
+        vault.addEntry(label: "UnitTest Vault Key", password: "SecretPassword#2026", category: "Testing")
         XCTAssertEqual(vault.getEntries().count, initialCount + 1)
         
-        // ：
+        // Reopen vault from persistent disk storage
         let reopenedVault = PasswordVaultManager(
             vaultURL: tempDir.appendingPathComponent("vault.enc"),
             configURL: tempDir.appendingPathComponent("config.json"),
@@ -96,14 +102,14 @@ final class GapBridgingTests: XCTestCase {
         
         let unlockSuccess = reopenedVault.unlockVault(with: originalMaster)
         XCTAssertTrue(unlockSuccess)
-        XCTAssertEqual(reopenedVault.getEntries().count, initialCount + 1, "重启并解锁后密码库条目未能从磁盘完美恢复")
+        XCTAssertEqual(reopenedVault.getEntries().count, initialCount + 1, "Password vault entries failed to recover from disk after reopening and unlocking")
         
-        // Verify expected invariant
+        // Reset master password creating backup vault
         vault.resetMasterPassword(newMasterPassword: "NewMasterKey#2026")
         XCTAssertTrue(vault.hasBackupVault)
-        XCTAssertEqual(vault.getEntries().count, 0) // 重置后主动清空当前库
+        XCTAssertEqual(vault.getEntries().count, 0) // Vault is cleared after master password reset
         
-        // Verify expected invariant
+        // Recover from backup vault
         let recoverySuccess = vault.recoverBackupVault(withOriginalMasterPassword: originalMaster)
         XCTAssertTrue(recoverySuccess)
         XCTAssertGreaterThanOrEqual(vault.getEntries().count, 1)
@@ -117,13 +123,14 @@ final class GapBridgingTests: XCTestCase {
         vault.resetToFirstRunState()
     }
     
+    /// Tests FinderSyncHelper context menu items generation for files and directories.
     func testFinderSyncHelperContextMenu() {
         let helper = FinderSyncHelper.shared
         
         let zipURL = URL(fileURLWithPath: "/tmp/demo.zip")
         let itemsZip = helper.getContextMenuItems(selectedURLs: [zipURL])
         XCTAssertEqual(itemsZip.count, 5)
-        XCTAssertTrue(itemsZip.first?.title.contains("解压") == true)
+        XCTAssertTrue(itemsZip.first?.title.contains("解压") == true || itemsZip.first?.title.contains("Extract") == true)
         
         let folderURL = URL(fileURLWithPath: "/tmp/my_folder")
         let itemsFolder = helper.getContextMenuItems(selectedURLs: [folderURL])
@@ -131,6 +138,7 @@ final class GapBridgingTests: XCTestCase {
         XCTAssertTrue(itemsFolder.first?.title.contains("7z") == true)
     }
     
+    /// Tests recursive directory archiving with nested folder structures.
     func testDirectoryRecursiveArchiveCreation() async throws {
         let writer = ArchiveWriter()
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("TestDir_\(UUID().uuidString)")

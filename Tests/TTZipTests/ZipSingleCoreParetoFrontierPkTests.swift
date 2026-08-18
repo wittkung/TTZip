@@ -9,10 +9,14 @@ import XCTest
 import QuartzCore
 @testable import TTZipCore
 
-/// 纯 ZIP 格式【单核纯算法效率对决】基准评测套件 (严格限制单线程 1 Core / 1 Thread)
+/// Single-core algorithmic efficiency ZIP / Deflate format Pareto benchmark PK test suite (1-thread restricted).
 final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
 
+    /// Evaluates single-threaded Deflate algorithmic Pareto efficiency against libdeflate, 7-Zip, and Apple tools.
     func testZipSingleCoreParetoFrontier() async throws {
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            throw XCTSkip("Benchmark test requires TTZIP_RUN_BENCHMARKS=1")
+        }
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_singlecore_pk_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -24,7 +28,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
 
         var points: [ParetoPoint] = []
 
-        // 1. TTZip 原生单线程极速引擎 (Level 1 到 12 单核)
+        // 1. TTZip single-threaded engine (Levels 1 to 12).
         for lvl in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] {
             let maxOut = rawData.count + 512
             let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
@@ -51,7 +55,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             }
         }
 
-        // 2. libdeflate 官方单核 C 静态基准 (Level 1 到 12 单线程)
+        // 2. libdeflate single-core C baseline (Levels 1 to 12).
         for lvl in [1, 3, 6, 9, 12] {
             let maxOut = rawData.count + 512
             let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
@@ -82,7 +86,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         let fp = CorpusFingerprintManager.shared.computeFingerprint(for: corpusItem)
         let datasetSha256 = fp?.sha256Hex ?? "unknown"
 
-        // 3. 7-Zip 官方 ARM64 单线程引擎 (/opt/homebrew/bin/7zz, -tzip -mmt=1)
+        // 3. Official 7-Zip ARM64 single-threaded engine (/opt/homebrew/bin/7zz, -tzip -mmt=1).
         let sevenZipPath = "/opt/homebrew/bin/7zz"
         if FileManager.default.fileExists(atPath: sevenZipPath) {
             let configs: [(Int, String)] = [(1, "7-Zip 1-Thread (Fast)"), (3, "7-Zip 1-Thread (Fast2)"), (5, "7-Zip 1-Thread (Normal)"), (7, "7-Zip 1-Thread (Max)"), (9, "7-Zip 1-Thread (Ultra)")]
@@ -110,7 +114,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             }
         }
 
-        // 4. Apple Native 系统单线程工具链 (/usr/bin/ditto & /usr/bin/zip -1..-9)
+        // 4. Apple Native single-threaded tools (/usr/bin/ditto & /usr/bin/zip -1..-9).
         let dittoPoint = CompetitorBenchmarkCacheManager.shared.getOrRun(
             toolId: "apple_ditto_sc",
             algorithm: "Apple Native (ditto)",
@@ -155,7 +159,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             points.append(zipPoint)
         }
 
-        // 4. 计算单核帕累托前沿并输出图表 (带对数压缩比扩展)
+        // 5. Compute single-core Pareto frontier and export plot.
         let artifactPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/pareto_pk_zip_singlecore.png"
         let docsPath = "docs/benchmarks/pareto_pk_zip_singlecore.png"
         let title = "ZIP / Deflate Single-Threaded Pareto Benchmark (1-Core: libdeflate vs. 7-Zip vs. Apple)"
@@ -178,7 +182,7 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             title: title
         )
 
-        print("🏆 纯 ZIP / Deflate 单核纯算法效率对决图表已生成: \(artifactPath)")
+        TTLogger.debug("🏆 Pure ZIP / Deflate single-core Pareto chart generated: \(artifactPath)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPath))
     }
 }

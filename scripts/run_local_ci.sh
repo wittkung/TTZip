@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+#
+# Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+# All rights reserved.
+#
+# TTZip: High-performance native archiving and compression engine for macOS.
 # ==============================================================================
 # TTZip Local Industrial CI/CD Automation Pipeline
 # 对标顶级开源工程的本地全自动化质量门禁与测试中枢调度器 (零云端配额消耗)

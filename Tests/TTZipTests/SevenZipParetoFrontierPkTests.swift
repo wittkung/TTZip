@@ -9,10 +9,14 @@ import XCTest
 import QuartzCore
 @testable import TTZipCore
 
-/// 纯 7Z (LZMA2) 格式同构帕累托对标测试套件
+/// Isomorphic 7Z (LZMA2) format Pareto benchmark PK test suite (TTZip vs. official 7-Zip ARM64).
 final class SevenZipParetoFrontierPkTests: XCTestCase {
     
+    /// Evaluates same-format 7Z compression Pareto frontier against official 7-Zip CLI.
     func testSevenZipSameFormatParetoFrontier() async throws {
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            throw XCTSkip("Benchmark test requires TTZIP_RUN_BENCHMARKS=1")
+        }
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_7z_pk_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -25,7 +29,7 @@ final class SevenZipParetoFrontierPkTests: XCTestCase {
         var points: [ParetoPoint] = []
         let writer = ArchiveWriter()
         
-        // 1. TTZip 7Z 原生引擎 (Level 1 到 12, 4GB 自适应字典)
+        // 1. TTZip 7Z native engine (Levels 1 to 12).
         for lvl in [1, 3, 5, 7, 9, 12] {
             let levelEnum = ArchiveCompressionLevel(rawValue: lvl) ?? .level1
             let outPath = tempDir.appendingPathComponent("ttzip_7z_\(lvl).7z").path
@@ -48,7 +52,7 @@ final class SevenZipParetoFrontierPkTests: XCTestCase {
             }
         }
         
-        // 2. 7-Zip 官方 ARM64 引擎 (/opt/homebrew/bin/7zz, -t7z -mx=1..9 -mmt=on)
+        // 2. Official 7-Zip ARM64 engine (/opt/homebrew/bin/7zz, -t7z -mx=1..9 -mmt=on).
         let sevenZipPath = "/opt/homebrew/bin/7zz"
         if FileManager.default.fileExists(atPath: sevenZipPath) {
             for mx in [1, 3, 5, 7, 9] {
@@ -77,7 +81,7 @@ final class SevenZipParetoFrontierPkTests: XCTestCase {
             }
         }
         
-        // 3. 计算同格式帕累托前沿
+        // 3. Compute isomorphic 7Z Pareto frontier.
         var mutablePoints = points
         let paretoRes = ParetoFrontierCalculator.shared.computeParetoFrontier(points: &mutablePoints)
         
@@ -100,7 +104,7 @@ final class SevenZipParetoFrontierPkTests: XCTestCase {
             title: title
         )
         
-        print("🏆 100% 同格式 7Z 专属帕累托图已生成: \(artifactPath)")
+        TTLogger.debug("🏆 Isomorphic 7Z Pareto chart generated: \(artifactPath)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPath))
     }
 }

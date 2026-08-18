@@ -9,15 +9,17 @@ import XCTest
 import CTTZipBridge
 @testable import TTZipCore
 
+/// Micro-benchmark test suite comparing C-Blosc2 architectural optimizations against baselines.
 final class Blosc2ComparativeMicroBenchmarkTests: XCTestCase {
 
+    /// Executes comprehensive empirical benchmark comparing pre- and post-optimization throughput and compression ratios.
     func testComprehensiveOptimizationComparison() throws {
-        print("\n" + String(repeating: "=", count: 95))
-        print("📊 [Empirical Comparison] TTZip × C-Blosc2 架构优化前 vs 优化后 物理实测差分审计")
-        print(String(repeating: "=", count: 95))
+        TTLogger.debug("\n" + String(repeating: "=", count: 95))
+        TTLogger.debug("📊 [Empirical Comparison] TTZip x C-Blosc2 Architecture Optimization Differential Audit")
+        TTLogger.debug(String(repeating: "=", count: 95))
 
         // -------------------------------------------------------------
-        // 1. 浮点连续信号载荷 (Float32 Sensor Corpus 64KB)
+        // 1. Continuous Floating-Point Signal Payload (Float32 Sensor Corpus 64KB)
         // -------------------------------------------------------------
         let floatCount = 16384 // 64KB
         var floatData = [Float](repeating: 0, count: floatCount)
@@ -29,14 +31,14 @@ final class Blosc2ComparativeMicroBenchmarkTests: XCTestCase {
 
         let deflateConfig = DeflateStreamConfig(compressionLevel: 6, windowBits: -15)
         
-        // 1.1 Baseline: 原始裸 Deflate
+        // 1.1 Baseline: Raw Deflate
         let t0 = PlatformMonotonicTimer.nowNanoseconds()
         let compRaw = try DeflateStreamEngine.compress(data: rawFloatData, config: deflateConfig)
         let t1 = PlatformMonotonicTimer.nowNanoseconds()
         let rawCompTimeMs = Double(t1 - t0) / 1_000_000.0
         let rawRatio = Double(rawFloatBytes) / Double(compRaw.count)
 
-        // 1.2 Optimized: NEON 截断 + NEON BitShuffle + Deflate
+        // 1.2 Optimized: NEON Truncation + NEON BitShuffle + Deflate
         var truncFloats = [Float](repeating: 0, count: floatCount)
         var bitShufBytes = [UInt8](repeating: 0, count: rawFloatBytes)
         
@@ -62,18 +64,18 @@ final class Blosc2ComparativeMicroBenchmarkTests: XCTestCase {
         let optRatio = Double(rawFloatBytes) / Double(compOptimized.count)
         let ratioBoost = ((optRatio - rawRatio) / rawRatio) * 100.0
 
-        print(String(format: "▶ [维度 1: 科学与传感器浮点数据压缩 (Float32 64KB)]"))
-        print(String(format: "  • 优化前 (Baseline Raw Deflate L6)       : 压缩后 %6d 字节 | 压缩比: %5.2fx | 耗时: %5.2f ms", compRaw.count, rawRatio, rawCompTimeMs))
-        print(String(format: "  • 优化后 (NEON Truncate + BitShuffle + L6): 压缩后 %6d 字节 | 压缩比: %5.2fx | 耗时: %5.2f ms", compOptimized.count, optRatio, optCompTimeMs))
-        print(String(format: "  • 差分收益: 空间压缩比提升 +%.1f%% (体积削减 %.1f%%)\n", ratioBoost, (1.0 - Double(compOptimized.count)/Double(compRaw.count)) * 100.0))
+        TTLogger.debug(String(format: "▶ [Dimension 1: Scientific & Sensor Float Data Compression (Float32 64KB)]"))
+        TTLogger.debug(String(format: "  • Baseline (Raw Deflate L6)              : Size %6d B | Ratio: %5.2fx | Elapsed: %5.2f ms", compRaw.count, rawRatio, rawCompTimeMs))
+        TTLogger.debug(String(format: "  • Optimized (NEON Truncate + BitShuffle): Size %6d B | Ratio: %5.2fx | Elapsed: %5.2f ms", compOptimized.count, optRatio, optCompTimeMs))
+        TTLogger.debug(String(format: "  • Differential Gain: Compression ratio gain +%.1f%% (size reduction %.1f%%)\n", ratioBoost, (1.0 - Double(compOptimized.count)/Double(compRaw.count)) * 100.0))
 
         // -------------------------------------------------------------
-        // 2. 特殊全零与常数块旁路 (Special-Value 1MB Block)
+        // 2. Special Zero and Constant Block Bypass (Special-Value 1MB Block)
         // -------------------------------------------------------------
         let sparseSize = 1024 * 1024 // 1MB
         let zeroData = Data(count: sparseSize)
 
-        // 2.1 Baseline: 通用 Zstd 压缩与解压
+        // 2.1 Baseline: Standard Zstd Compression and Decompression
         var zstdCompBuf = Data(count: sparseSize + sparseSize / 16 + 128)
         let t4 = PlatformMonotonicTimer.nowNanoseconds()
         let zstdCSize = zeroData.withUnsafeBytes { rawIn in
@@ -94,7 +96,7 @@ final class Blosc2ComparativeMicroBenchmarkTests: XCTestCase {
         let t7 = PlatformMonotonicTimer.nowNanoseconds()
         let zstdDecThroughput = (Double(sparseSize) / (1024.0 * 1024.0)) / (Double(t7 - t6) / 1_000_000_000.0)
 
-        // 2.2 Optimized: Special-Value SWAR 探测 + dc zva 硬件总线行清零
+        // 2.2 Optimized: Special-Value SWAR Detection + Hardware Zero Fill (dc zva)
         let t8 = PlatformMonotonicTimer.nowNanoseconds()
         let specialDesc = zeroData.withUnsafeBytes { raw in
             ttzip_detect_uniform_block(raw.baseAddress!, sparseSize, 1)
@@ -110,13 +112,13 @@ final class Blosc2ComparativeMicroBenchmarkTests: XCTestCase {
         let t11 = PlatformMonotonicTimer.nowNanoseconds()
         let specialFillThroughput = (Double(sparseSize) / (1024.0 * 1024.0)) / (Double(t11 - t10) / 1_000_000_000.0)
 
-        print(String(format: "▶ [维度 2: 稀疏全零/常数块旁路 (Special-Value 1MB)]"))
-        print(String(format: "  • 优化前 (Baseline Zstd L3)           : 压缩 %6.1f MB/s | 解压 %7.1f MB/s | 存储开销: %d 字节", zstdCompThroughput, zstdDecThroughput, zstdCSize))
-        print(String(format: "  • 优化后 (SWAR Detect + dc zva Fill) : 探测 %6.1f MB/s | 解压 %7.1f MB/s | 存储开销: 0 字节 (纯头部标记)", specialDetectThroughput, specialFillThroughput))
-        print(String(format: "  • 差分收益: 解压加速比 %.1fx (直通 Apple Silicon 总线线速), 存储开销节省 100.0%%\n", specialFillThroughput / zstdDecThroughput))
+        TTLogger.debug(String(format: "▶ [Dimension 2: Sparse Zero/Constant Block Bypass (Special-Value 1MB)]"))
+        TTLogger.debug(String(format: "  • Baseline (Zstd L3)                  : Comp %6.1f MB/s | Decomp %7.1f MB/s | Storage: %d B", zstdCompThroughput, zstdDecThroughput, zstdCSize))
+        TTLogger.debug(String(format: "  • Optimized (SWAR Detect + Zero Fill): Detect %6.1f MB/s | Fill %7.1f MB/s | Storage: 0 B (Header only)", specialDetectThroughput, specialFillThroughput))
+        TTLogger.debug(String(format: "  • Differential Gain: Decompress speedup %.1fx (direct Apple Silicon bus line-rate), Storage saved 100.0%%\n", specialFillThroughput / zstdDecThroughput))
 
         // -------------------------------------------------------------
-        // 3. 结构化日志/JSON 共享字典 (SuperChunk 100KB Records)
+        // 3. Structured Log / JSON Shared Dictionary (SuperChunk 100KB Records)
         // -------------------------------------------------------------
         var schunkConfig = ttzip_schunk_config_t()
         schunkConfig.chunk_size = 64 * 1024
@@ -150,7 +152,7 @@ final class Blosc2ComparativeMicroBenchmarkTests: XCTestCase {
 
             totalRawBytes += chunkData.count
 
-            // Baseline: 独立 Zstd 压缩
+            // Baseline: Independent Zstd compression
             var noDictBuf = Data(count: chunkData.count + chunkData.count / 16 + 128)
             let noDictSz = chunkData.withUnsafeBytes { rawIn in
                 noDictBuf.withUnsafeMutableBytes { rawOut in
@@ -159,7 +161,7 @@ final class Blosc2ComparativeMicroBenchmarkTests: XCTestCase {
             }
             totalNoDictCBytes += noDictSz
 
-            // Optimized: SuperChunk 共享字典压缩
+            // Optimized: SuperChunk shared dictionary compression
             let scSz = chunkData.withUnsafeBytes { raw in
                 ttzip_schunk_append_chunk(schunk, raw.baseAddress!, chunkData.count)
             }
@@ -169,26 +171,26 @@ final class Blosc2ComparativeMicroBenchmarkTests: XCTestCase {
         let noDictRatio = Double(totalRawBytes) / Double(totalNoDictCBytes)
         let superChunkRatio = Double(totalRawBytes) / Double(totalSuperChunkCBytes)
 
-        print(String(format: "▶ [维度 3: 两级分块与帧级共享字典 (SuperChunk JSON 50KB)]"))
-        print(String(format: "  • 优化前 (Baseline 独立分块 Zstd L3) : 原始 %5d 字节 ➔ 压缩后 %5d 字节 | 压缩比: %5.2fx", totalRawBytes, totalNoDictCBytes, noDictRatio))
-        print(String(format: "  • 优化后 (SuperChunk Frame Shared Dict): 原始 %5d 字节 ➔ 压缩后 %5d 字节 | 压缩比: %5.2fx", totalRawBytes, totalSuperChunkCBytes, superChunkRatio))
-        print(String(format: "  • 差分收益: 共享字典额外带来 +%.1f%% 空间压缩增益\n", ((superChunkRatio - noDictRatio) / noDictRatio) * 100.0))
+        TTLogger.debug(String(format: "▶ [Dimension 3: Two-level Chunking and Frame Shared Dictionary (SuperChunk JSON 50KB)]"))
+        TTLogger.debug(String(format: "  • Baseline (Independent Zstd L3)     : Raw %5d B -> Comp %5d B | Ratio: %5.2fx", totalRawBytes, totalNoDictCBytes, noDictRatio))
+        TTLogger.debug(String(format: "  • Optimized (SuperChunk Shared Dict): Raw %5d B -> Comp %5d B | Ratio: %5.2fx", totalRawBytes, totalSuperChunkCBytes, superChunkRatio))
+        TTLogger.debug(String(format: "  • Differential Gain: Shared dictionary brings additional +%.1f%% compression gain\n", ((superChunkRatio - noDictRatio) / noDictRatio) * 100.0))
 
         // -------------------------------------------------------------
-        // 4. 不可压数据自适应阻断 (Heuristic Auto-Tuning 64KB Random)
+        // 4. Adaptive Fast Rejection of Incompressible Data (Heuristic Auto-Tuning 64KB Random)
         // -------------------------------------------------------------
         let randSize = 65536
         var randBytes = [UInt8](repeating: 0, count: randSize)
         for i in 0..<randSize { randBytes[i] = UInt8.random(in: 0...255) }
         let randData = Data(randBytes)
 
-        // Baseline: 盲目尝试 Deflate 压缩 (产生负压缩 + CPU 周期浪费)
+        // Baseline: Blindly attempting Deflate compression (negative compression + CPU overhead)
         let t12 = PlatformMonotonicTimer.nowNanoseconds()
         let blindComp = try DeflateStreamEngine.compress(data: randData, config: deflateConfig)
         let t13 = PlatformMonotonicTimer.nowNanoseconds()
         let blindTimeMs = Double(t13 - t12) / 1_000_000.0
 
-        // Optimized: 16KB 微采样 Shannon 熵快速拒绝 (< 1 µs)
+        // Optimized: 16KB micro-sampling Shannon entropy rapid rejection (< 1 µs)
         let t14 = PlatformMonotonicTimer.nowNanoseconds()
         let rec = randData.withUnsafeBytes { raw in
             ttzip_heuristic_eval_cascade(raw.baseAddress!, raw.count, 1, nil)
@@ -196,11 +198,11 @@ final class Blosc2ComparativeMicroBenchmarkTests: XCTestCase {
         let t15 = PlatformMonotonicTimer.nowNanoseconds()
         let tunerTimeMs = Double(t15 - t14) / 1_000_000.0
 
-        print(String(format: "▶ [维度 4: 高熵不可压数据自适应调优 (Heuristic Tuner 64KB Random)]"))
-        print(String(format: "  • 优化前 (Baseline 盲目 Deflate 压缩)   : 压缩后 %5d 字节 (体积膨胀 +%d B) | 耗时: %5.3f ms", blindComp.count, blindComp.count - randSize, blindTimeMs))
-        print(String(format: "  • 优化后 (Shannon 级联微采样自适应探测): 命中模式 [%@] ➔ 直通 DIRECT 存储 | 耗时: %5.3f ms", rec.codec == TTZIP_TUNER_CODEC_DIRECT ? "DIRECT/STORE" : "COMPRESS", tunerTimeMs))
-        print(String(format: "  • 差分收益: 耗时削减 %.1f%% (CPU 周期节省 %.1fx), 零体积膨胀\n", (1.0 - tunerTimeMs / blindTimeMs) * 100.0, blindTimeMs / max(0.0001, tunerTimeMs)))
+        TTLogger.debug(String(format: "▶ [Dimension 4: High-Entropy Incompressible Data Adaptive Tuning (Heuristic Tuner 64KB Random)]"))
+        TTLogger.debug(String(format: "  • Baseline (Blind Deflate Compression)   : Size %5d B (Expansion +%d B) | Elapsed: %5.3f ms", blindComp.count, blindComp.count - randSize, blindTimeMs))
+        TTLogger.debug(String(format: "  • Optimized (Shannon Cascade Fast-Reject): Mode [%@] -> DIRECT Store | Elapsed: %5.3f ms", rec.codec == TTZIP_TUNER_CODEC_DIRECT ? "DIRECT/STORE" : "COMPRESS", tunerTimeMs))
+        TTLogger.debug(String(format: "  • Differential Gain: Elapsed reduced %.1f%% (CPU cycles saved %.1fx), zero inflation\n", (1.0 - tunerTimeMs / blindTimeMs) * 100.0, blindTimeMs / max(0.0001, tunerTimeMs)))
 
-        print(String(repeating: "=", count: 95) + "\n")
+        TTLogger.debug(String(repeating: "=", count: 95) + "\n")
     }
 }

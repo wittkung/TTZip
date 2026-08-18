@@ -9,6 +9,7 @@ import XCTest
 import CTTZipBridge
 @testable import TTZipCore
 
+/// Comprehensive optimization audit test suite verifying zero-allocation hot paths and in-process execution across all 16 supported formats.
 final class ExhaustiveOptimizationAuditTests: XCTestCase {
 
     private func safeRemoveDirectory(at url: URL) {
@@ -21,6 +22,7 @@ final class ExhaustiveOptimizationAuditTests: XCTestCase {
         try? FileManager.default.removeItem(at: url)
     }
 
+    /// Validates zero-allocation streaming TAR write throughput and correctness.
     func testTarNativeZeroAllocationStreamingWrite() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("TTZipZeroAllocTest_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -57,6 +59,7 @@ final class ExhaustiveOptimizationAuditTests: XCTestCase {
         XCTAssertLessThan(elapsedMs, 30.0, "Zero-allocation streaming TAR write should be < 30ms")
     }
 
+    /// Audits in-process compression and decompression roundtrip across all 16 supported archive formats.
     func testAll16FormatsDirectInProcessExecution() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("TTZip16FormatAudit_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -91,7 +94,7 @@ final class ExhaustiveOptimizationAuditTests: XCTestCase {
             let outDir = tempDir.appendingPathComponent("extracted_\(ext)").path
             try FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
 
-            print("Testing format \(fmt.rawValue) [ext: \(ext)]...")
+            TTLogger.debug("Testing format \(fmt.rawValue) [ext: \(ext)]...")
 
             // Stage 1: Compress in-process
             try await writer.createArchive(

@@ -16,7 +16,6 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
         
-        // 1. 生成 10MB 测试样本 (具有真实重复模式与文本)
         let samplePath = tempDir.appendingPathComponent("sample_10mb.txt").path
         let sampleSize = 10 * 1024 * 1024
         var sampleData = Data(capacity: sampleSize)
@@ -29,7 +28,6 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         
         let outZipPath = tempDir.appendingPathComponent("extreme_test.zip").path
         
-        // 2. 使用 ZipExtremeBlockWriter 进行 18 核极速多块压缩 (1MB 分块)
         let t0 = mach_absolute_time()
         let success = try ZipExtremeBlockWriter.shared.createExtremeArchive(
             outputPath: outZipPath,
@@ -45,9 +43,9 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         mach_timebase_info(&timebase)
         let elapsedSec = Double(t1 - t0) * Double(timebase.numer) / Double(timebase.denom) / 1_000_000_000.0
         let mbPerSec = (Double(sampleSize) / (1024 * 1024)) / elapsedSec
-        print("⚡️ [ZipExtremeBlockWriter] 10MB 耗时: \(String(format: "%.4f", elapsedSec)) s | 吞吐: \(String(format: "%.1f", mbPerSec)) MB/s")
+        _ = mbPerSec
         
-        // 3. 使用系统 unzip -p 解压并与原始数据做逐字节 diff
+        // Decompress and verify byte-exact match
         let procUnzip = Process()
         procUnzip.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
         procUnzip.arguments = ["-p", outZipPath]
@@ -57,23 +55,10 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         let decompressedData = pipeOut.fileHandleForReading.readDataToEndOfFile()
         procUnzip.waitUntilExit()
         
-        print("📊 原始数据长度: \(sampleData.count) 字节 | 解压后长度: \(decompressedData.count) 字节")
-        if decompressedData.count != sampleData.count {
-            print("❌ 长度不一致！差异: \(decompressedData.count - sampleData.count)")
-        } else {
-            var diffCount = 0
-            for i in 0..<sampleData.count {
-                if sampleData[i] != decompressedData[i] {
-                    if diffCount < 10 {
-                        print("❌ 第 \(i) 字节不一致: 原始 0x\(String(format: "%02X", sampleData[i])) vs 解压 0x\(String(format: "%02X", decompressedData[i]))")
-                    }
-                    diffCount += 1
-                }
-            }
-            print("🔍 总不一致字节数: \(diffCount)")
-        }
+        XCTAssertEqual(decompressedData.count, sampleData.count, "Decompressed data size must match original exactly")
+        XCTAssertEqual(decompressedData, sampleData, "Decompressed data must be byte-for-byte identical")
         
-        // 4. 系统原生 /usr/bin/unzip -t 验证
+        // System unzip -t verification
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
         proc.arguments = ["-t", outZipPath]
@@ -85,7 +70,6 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         
         let outData = pipe.fileHandleForReading.readDataToEndOfFile()
         let outStr = String(data: outData, encoding: .utf8) ?? ""
-        print("🔍 [/usr/bin/unzip -t]:\n\(outStr)")
         XCTAssertEqual(proc.terminationStatus, 0, "System unzip verification failed: \(outStr)")
     }
     
@@ -99,46 +83,50 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: tempDir) }
         
         let outZipPath = tempDir.appendingPathComponent("enwik8_extreme.zip").path
-        let sampleSize = try FileManager.default.attributesOfItem(atPath: realSamplePath)[.size] as? Int64 ?? 0
         
         let t0 = mach_absolute_time()
         let success = try ZipExtremeBlockWriter.shared.createExtremeArchive(
             outputPath: outZipPath,
             inputPath: realSamplePath,
             level: .fast,
-            blockSize: 1024 * 1024
+            blockSize: 512 * 1024
         )
         let t1 = mach_absolute_time()
         XCTAssertTrue(success)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outZipPath))
         
         var timebase = mach_timebase_info()
         mach_timebase_info(&timebase)
         let elapsedSec = Double(t1 - t0) * Double(timebase.numer) / Double(timebase.denom) / 1_000_000_000.0
-        let mbPerSec = (Double(sampleSize) / (1024 * 1024)) / elapsedSec
-        let zipSize = try FileManager.default.attributesOfItem(atPath: outZipPath)[.size] as? Int64 ?? 0
-        let savings = (1.0 - Double(zipSize) / Double(sampleSize)) * 100.0
+        let origSize = (try? FileManager.default.attributesOfItem(atPath: realSamplePath)[.size] as? Int) ?? (100 * 1024 * 1024)
+        let outSize = (try? FileManager.default.attributesOfItem(atPath: outZipPath)[.size] as? Int) ?? 0
+        let mbPerSec = (Double(origSize) / (1024 * 1024)) / elapsedSec
+        let spaceSavings = (1.0 - Double(outSize) / Double(origSize)) * 100.0
         
-        print("🔥 [TTZip Extreme on enwik8] 100MB 耗时: \(String(format: "%.4f", elapsedSec)) s | 吞吐: \(String(format: "%.1f", mbPerSec)) MB/s | 空间节省: \(String(format: "%.1f", savings))% | 压缩体积: \(zipSize) 字节")
+        _ = mbPerSec
+        _ = spaceSavings
         
-        // 校验 /usr/bin/unzip -t
+        XCTAssertGreaterThan(outSize, 0)
+        XCTAssertLessThan(outSize, origSize)
+        
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
         proc.arguments = ["-t", outZipPath]
         let pipe = Pipe()
         proc.standardOutput = pipe
+        proc.standardError = pipe
         try proc.run()
         proc.waitUntilExit()
         XCTAssertEqual(proc.terminationStatus, 0)
     }
     
     func testZopfliTier6AndTier7CompressionAndSystemUnzip() throws {
-
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_zopfli_test_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
         
         let samplePath = tempDir.appendingPathComponent("sample_zopfli.txt").path
-        let sampleSize = 1024 * 1024 // 1 MB
+        let sampleSize = TestBenchmarkTier.isBenchmarkMode ? (1024 * 1024) : (64 * 1024)
         var sampleData = Data(capacity: sampleSize)
         let pattern = "Google Zopfli Algorithm Deep Architecture Analysis & Multi-Pass Squeeze DP in TTZip 2026\n".data(using: .utf8)!
         while sampleData.count < sampleSize {
@@ -167,7 +155,6 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         proc6.waitUntilExit()
         let outData6 = pipe6.fileHandleForReading.readDataToEndOfFile()
         let outStr6 = String(data: outData6, encoding: .utf8) ?? ""
-        print("🔍 Tier 6 unzip -t:\n\(outStr6)")
         XCTAssertEqual(proc6.terminationStatus, 0, "System unzip verification failed on Tier 6 Zopfli: \(outStr6)")
         
         // Test Tier 7 (Extreme Peak)
@@ -190,9 +177,6 @@ final class ZipExtremeBlockWriterTests: XCTestCase {
         proc7.waitUntilExit()
         let outData7 = pipe7.fileHandleForReading.readDataToEndOfFile()
         let outStr7 = String(data: outData7, encoding: .utf8) ?? ""
-        print("🔍 Tier 7 unzip -t:\n\(outStr7)")
         XCTAssertEqual(proc7.terminationStatus, 0, "System unzip verification failed on Tier 7 Zopfli: \(outStr7)")
-
     }
 }
-

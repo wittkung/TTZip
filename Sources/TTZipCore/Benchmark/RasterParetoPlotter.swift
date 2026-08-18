@@ -504,7 +504,9 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             } else if fam == .brotli {
                 cleanName = "brotli-\(p.level)"
             } else if fam == .sevenZip {
-                cleanName = p.level == 0 ? "7z-0 (Store)" : "mx=\(p.level)"
+                cleanName = p.level == 0 ? "7z-0 (Store)" : "7z-mx=\(p.level)"
+            } else if fam == .ouch {
+                cleanName = "ouch-\(p.level)"
             } else if fam == .pigz {
                 let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
                 if p.level == 0 {
@@ -523,6 +525,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             } else {
                 cleanName = p.algorithm.lowercased()
             }
+
 
             let font: NSFont
             let textColor: NSColor

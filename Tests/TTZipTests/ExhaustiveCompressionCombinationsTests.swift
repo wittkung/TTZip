@@ -56,6 +56,7 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
         let rows = try await ExhaustiveBenchmarkRunner.runExhaustiveMatrix(
             selectedFormats: [.zip],
             selectedLevels: zipLevels,
+            isQuickTest: !TestBenchmarkTier.isBenchmarkMode,
             progressHandler: { msg in
                 if msg.hasPrefix("ROW:") {
                     TTLogger.info(" " + String(msg.dropFirst(4)))

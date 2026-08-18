@@ -7,39 +7,42 @@
 
 import Foundation
 
-/// ZIP 格式强类型透明物理压缩配置模型 (ZipCompressionProfile)
-///
-/// 遵循单一真理之源（Single Source of Truth）与策略模式（Strategy Pattern）：
-/// 1. 彻底消除通用枚举层与底层 C 引擎之间的黑盒隐式 switch 转换；
-/// 2. 每一个档位的物理参数（libdeflate 等级、Zopfli 轮次、动态块切分）100% 显式声明；
-/// 3. 与底层 C 语言 `TTZipZopfliOptions` 保持 1:1 零成本结构体直通。
+/**
+ * @struct ZipCompressionProfile
+ * @brief Strongly-typed physical compression profile model for ZIP Deflate operations.
+ *
+ * Implements a Single Source of Truth and Strategy Pattern:
+ * 1. Eliminates implicit/opaque switch-case heuristics between abstract levels and C backends.
+ * 2. Explicitly specifies physical parameters (native Deflate level, Zopfli iterations, block splitting).
+ * 3. Transparently maps 1:1 with low-level C `TTZipZopfliOptions` structures.
+ */
 public struct ZipCompressionProfile: Sendable, Equatable, Identifiable {
     
-    /// 档位唯一标识符 (例如 "zip_tier_1_fast")
+    /// Unique profile identifier (e.g., "zip_tier_1_fast").
     public let id: String
     
-    /// 用户 / UI / CLI 展示名称 (例如 "Fast (1)")
+    /// User, UI, and CLI display title (e.g., "Fast (1)").
     public let name: String
     
-    /// 上层通用抽象压缩等级枚举 (.store, .level1 ... .level7)
+    /// Generic abstract compression level enum (.store, .level1 ... .level7).
     public let level: ArchiveCompressionLevel
     
-    /// libdeflate C 原生底层压缩等级 (0..12)
+    /// Low-level native C Deflate engine compression level (0..12).
     public let deflateLevel: Int32
     
-    /// 图论 / Zopfli 迭代重平衡轮次 (0..15)
+    /// Graph-theoretic / Zopfli shortest path iteration count (0..15).
     public let zopfliIterations: Int32
     
-    /// 是否启用局部香农熵动态最优块切分 (true/false)
+    /// Whether dynamic entropy-guided optimal block splitting is active.
     public let blockSplitting: Bool
     
-    /// 最大切分块数量 (0..15)
+    /// Maximum number of split blocks permitted (0..15).
     public let maxBlockSplits: Int32
     
-    /// 自适应早退收敛阈值 (0.0001 即 0.01%)
+    /// Adaptive asymptotic cost convergence threshold (e.g., 0.0001 for 0.01%).
     public let earlyExitThreshold: Double
     
-    /// Release 模式下 Apple Silicon 18 核心物理性能门禁底线 (MB/s)
+    /// Apple Silicon multi-core physical throughput floor in Release mode (MB/s).
     public let targetThroughputFloorMBs: Double
     
     public init(
@@ -65,11 +68,11 @@ public struct ZipCompressionProfile: Sendable, Equatable, Identifiable {
     }
 }
 
-// MARK: - 8 大黄金标准档位预设 (The 8 Golden Presets)
+// MARK: - The 8 Golden Standard Presets
 
 extension ZipCompressionProfile {
     
-    /// Tier 0: Direct Store (零压缩大页内存直写，吞吐 >= 6000 MB/s)
+    /// Tier 0: Direct Store (Zero-compression page aligned I/O direct write, throughput >= 6000 MB/s).
     public static let store = ZipCompressionProfile(
         id: "zip_tier_0_store",
         name: "Store (0)",
@@ -82,7 +85,7 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 6000.0
     )
     
-    /// Tier 1: Fast (极速轻量 LZ77 短匹配，libdeflate L1，吞吐 >= 6500 MB/s)
+    /// Tier 1: Fast (Ultra-fast lightweight LZ77 short match finder, throughput >= 6500 MB/s).
     public static let fast = ZipCompressionProfile(
         id: "zip_tier_1_fast",
         name: "Fast (1)",
@@ -95,7 +98,7 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 6500.0
     )
     
-    /// Tier 2: Fast+ (快速匹配增加哈希链深度，libdeflate L2，吞吐 >= 6000 MB/s)
+    /// Tier 2: Fast+ (Accelerated match finder with dual hash chains, throughput >= 6000 MB/s).
     public static let fastPlus = ZipCompressionProfile(
         id: "zip_tier_2_fast_plus",
         name: "Fast+ (2)",
@@ -108,7 +111,7 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 6000.0
     )
     
-    /// Tier 3: Normal (标准帕累托平衡档位，libdeflate L7，吞吐 >= 4500 MB/s)
+    /// Tier 3: Normal (Standard Pareto optimal trade-off preset, throughput >= 4500 MB/s).
     public static let normal = ZipCompressionProfile(
         id: "zip_tier_3_normal",
         name: "Normal (3)",
@@ -121,7 +124,7 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 4500.0
     )
     
-    /// Tier 4: Maximum (深度字典模式匹配，libdeflate L9，吞吐 >= 2500 MB/s)
+    /// Tier 4: Maximum (Deep dictionary sliding window pattern matcher, throughput >= 2500 MB/s).
     public static let maximum = ZipCompressionProfile(
         id: "zip_tier_4_maximum",
         name: "Maximum (4)",
@@ -134,7 +137,7 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 2500.0
     )
     
-    /// Tier 5: Graph Fast (轻量 2 轮 Zopfli 最短路径图论剪枝，吞吐 >= 35 MB/s)
+    /// Tier 5: Graph Fast (Lightweight 2-pass shortest-path DAG match parser, throughput >= 35 MB/s).
     public static let graphFast = ZipCompressionProfile(
         id: "zip_tier_5_graph_fast",
         name: "Graph Fast (5)",
@@ -146,9 +149,8 @@ extension ZipCompressionProfile {
         earlyExitThreshold: 0.0001,
         targetThroughputFloorMBs: 35.0
     )
-
     
-    /// Tier 6: Ultra Zopfli (100% 进程内全局 DAG 最短路径穷举，5 轮 Zopfli 迭代，吞吐 >= 4.0 MB/s)
+    /// Tier 6: Ultra Zopfli (In-process global shortest-path DAG parser, 5 iterations, throughput >= 4.0 MB/s).
     public static let ultraZopfli = ZipCompressionProfile(
         id: "zip_tier_6_ultra_zopfli",
         name: "Ultra Zopfli (6)",
@@ -160,9 +162,8 @@ extension ZipCompressionProfile {
         earlyExitThreshold: 0.0001,
         targetThroughputFloorMBs: 4.0
     )
-
     
-    /// Tier 7: Extreme Peak (15 轮迭代重平衡与局部熵变最优块切分，超越 advzip -4，吞吐 >= 0.25 MB/s)
+    /// Tier 7: Extreme Peak (15 iterations iterative re-balancing & optimal dynamic block splitting, throughput >= 0.25 MB/s).
     public static let extremePeak = ZipCompressionProfile(
         id: "zip_tier_7_extreme_peak",
         name: "Extreme Peak (7)",
@@ -175,7 +176,7 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 0.25
     )
     
-    /// 8 大黄金标准预设全集
+    /// Complete set of all 8 golden standard compression profiles.
     public static let allProfiles: [ZipCompressionProfile] = [
         .store,
         .fast,
@@ -187,7 +188,12 @@ extension ZipCompressionProfile {
         .extremePeak
     ]
     
-    /// 根据通用抽象压缩等级透明解析对应的强类型 Profile
+    /**
+     * Resolves the corresponding strongly-typed profile from an abstract compression level.
+     *
+     * @param level Abstract level enum.
+     * @return Concrete matching ZipCompressionProfile.
+     */
     public static func profile(for level: ArchiveCompressionLevel) -> ZipCompressionProfile {
         switch level {
         case .store:

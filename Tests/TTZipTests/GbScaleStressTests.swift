@@ -8,12 +8,13 @@
 import XCTest
 @testable import TTZipCore
 
+/// Test suite validating gigabyte-scale streaming compression and decompression stress benchmarks.
 final class GbScaleStressTests: XCTestCase {
     
-    /// 1.0 GB 、 ( TTZIP_BENCH_TIER=STRESS )
+    /// Benchmarks 1.0 GB large-scale streaming compression and decompression when TTZIP_BENCH_TIER=STRESS is set.
     func testOneGigabyteStreamingCompressionAndDecompression() async throws {
         guard ProcessInfo.processInfo.environment["TTZIP_BENCH_TIER"] == "STRESS" else {
-            throw XCTSkip("巨型 GB 级性能测试需设置环境变量 TTZIP_BENCH_TIER=STRESS 触发，常规 swift test 自动跳过。")
+            throw XCTSkip("Large-scale 1GB stress test requires TTZIP_BENCH_TIER=STRESS environment variable; skipped during normal swift test runs.")
         }
         
         let sandbox = try IsolatedTempSandbox(prefix: "gb_benchmark")
@@ -77,17 +78,17 @@ final class GbScaleStressTests: XCTestCase {
         let decompressSpeedMBps = actualMB / decompressDuration
         
         TTLogger.info("\n==================================================")
-        TTLogger.info("📊 TTZip 1.0 GB 极限性能基准报告:")
+        TTLogger.info("📊 TTZip 1.0 GB Large-Scale Performance Benchmark:")
         TTLogger.info("--------------------------------------------------")
-        TTLogger.info(String(format: "原始文件体积: %.2f GB (%.2f MB)", actualGB, actualMB))
-        TTLogger.info(String(format: "压缩包体积  : %.2f MB", compressedSizeBytes / (1024 * 1024)))
-        TTLogger.info(String(format: "压缩率      : %.2f%%", ratioPercent))
-        TTLogger.info(String(format: "1GB 压缩速度 : %.2f MB/s (耗时: %.3f 秒)", compressSpeedMBps, compressDuration))
-        TTLogger.info(String(format: "1GB 解压速度 : %.2f MB/s (耗时: %.3f 秒)", decompressSpeedMBps, decompressDuration))
+        TTLogger.info(String(format: "Original File Size   : %.2f GB (%.2f MB)", actualGB, actualMB))
+        TTLogger.info(String(format: "Archive File Size    : %.2f MB", compressedSizeBytes / (1024 * 1024)))
+        TTLogger.info(String(format: "Compression Ratio    : %.2f%%", ratioPercent))
+        TTLogger.info(String(format: "1GB Compress Speed   : %.2f MB/s (Duration: %.3f s)", compressSpeedMBps, compressDuration))
+        TTLogger.info(String(format: "1GB Decompress Speed : %.2f MB/s (Duration: %.3f s)", decompressSpeedMBps, decompressDuration))
         TTLogger.info("==================================================\n")
         
-        XCTAssertGreaterThan(compressSpeedMBps, 50.0, "1GB Compression Throughput应大于 50 MB/s")
-        XCTAssertGreaterThan(decompressSpeedMBps, 100.0, "1GB Decompression Throughput应大于 100 MB/s")
+        XCTAssertGreaterThan(compressSpeedMBps, 50.0, "1GB Compression Throughput must exceed 50 MB/s")
+        XCTAssertGreaterThan(decompressSpeedMBps, 100.0, "1GB Decompression Throughput must exceed 100 MB/s")
         XCTAssertTrue(fileManager.fileExists(atPath: outArchive))
     }
 }

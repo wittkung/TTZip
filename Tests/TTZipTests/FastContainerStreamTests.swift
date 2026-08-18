@@ -9,8 +9,10 @@ import XCTest
 import Compression
 @testable import TTZipCore
 
+/// Test suite validating fast container stream framing (GZIP / ZLIB) and Apple libcompression cross-validation.
 final class FastContainerStreamTests: XCTestCase {
 
+    /// Verifies GZIP container framing roundtrip and cross-validates Deflate payload with Apple libcompression.
     func testGzipContainer_RoundTrip_AndAppleGzipConsensus() {
         let sampleSize = 64 * 1024 // 64KB
         var sampleBytes = [UInt8](repeating: 0, count: sampleSize)
@@ -60,6 +62,7 @@ final class FastContainerStreamTests: XCTestCase {
         XCTAssertEqual(Data(appleDecBuffer), originalData, "Apple decompression must be 100% identical")
     }
 
+    /// Verifies ZLIB container framing roundtrip and cross-validates Deflate payload with Apple libcompression.
     func testZlibContainer_RoundTrip_AndAppleZlibConsensus() {
         let sampleSize = 64 * 1024 // 64KB
         var sampleBytes = [UInt8](repeating: 0, count: sampleSize)
@@ -108,15 +111,16 @@ final class FastContainerStreamTests: XCTestCase {
         XCTAssertEqual(Data(appleDecBuffer), originalData, "Apple decompression must be 100% identical")
     }
 
+    /// Measures container framing throughput floor for fast GZIP compression.
     func testContainer_ThroughputFloor() {
-        let payloadSize = 10 * 1024 * 1024 // 10MB
+        let payloadSize = TestBenchmarkTier.isBenchmarkMode ? (10 * 1024 * 1024) : (3 * 1024 * 1024)
         var sampleBytes = [UInt8](repeating: 0, count: payloadSize)
         for i in 0..<payloadSize {
             sampleBytes[i] = UInt8((i * 13 + 5) % 251)
         }
         let originalData = Data(sampleBytes)
 
-        let iterations = 3
+        let iterations = TestBenchmarkTier.isBenchmarkMode ? 3 : 2
         let start = PlatformMonotonicTimer.nowNanoseconds()
 
         for _ in 0..<iterations {
@@ -128,7 +132,7 @@ final class FastContainerStreamTests: XCTestCase {
         let elapsedSeconds = Double(elapsedNanos) / 1_000_000_000.0
         let throughputMBs = totalMB / elapsedSeconds
 
-        print("⚡ [Fast GZIP Container] Level 1 Framing Throughput: \(String(format: "%.2f", throughputMBs)) MB/s")
+        TTLogger.debug("⚡ [Fast GZIP Container] Level 1 Framing Throughput: \(String(format: "%.2f", throughputMBs)) MB/s")
 
         #if DEBUG
         XCTAssertGreaterThanOrEqual(throughputMBs, 1000.0, "Debug mode throughput floor for GZIP fast framing")

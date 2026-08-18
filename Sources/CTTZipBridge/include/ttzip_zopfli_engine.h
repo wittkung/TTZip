@@ -5,6 +5,13 @@
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
+/**
+ * @file ttzip_zopfli_engine.h
+ * @brief High-ratio Deflate compressor and Zopfli wrapper with history warm-up.
+ * @details Declares options structures and C entry points for in-process Deflate chunk
+ *          compression, dictionary seeding, and dynamic block splitting.
+ */
+
 #ifndef TTZIP_ZOPFLI_ENGINE_H
 #define TTZIP_ZOPFLI_ENGINE_H
 
@@ -16,29 +23,39 @@
 extern "C" {
 #endif
 
-/// 进程内多轮迭代图论最优 Deflate 块压缩器配置
+/**
+ * @brief Configuration tuning parameters for in-process Zopfli iterative Deflate compression.
+ */
 typedef struct {
-    int compression_level;        ///< 请求的压缩级别 (1..15)
-    int num_iterations;           ///< 迭代轮次 (Level 6: 5 轮, Level 7: 15 轮)
-    int block_splitting;          ///< 是否启用局部熵变动态最优块切分 (1=开启, 0=单块)
-    int max_block_splits;         ///< 最大切分块数 (默认 15)
-    double early_exit_threshold;  ///< 自适应早退收敛阈值 (默认 0.0001 即 0.01%)
+    int    compression_level;    /**< Target compression level (1..15). */
+    int    num_iterations;       /**< Iteration count (Level 6: 5 passes, Level 7: 15 passes). */
+    int    block_splitting;      /**< Non-zero to enable dynamic entropy-driven block splitting. */
+    int    max_block_splits;     /**< Upper limit on the number of block splits (default 15). */
+    double early_exit_threshold; /**< Asymptotic convergence threshold (default 0.0001 = 0.01%). */
 } TTZipZopfliOptions;
 
-/// 默认选项初始化
+/**
+ * @brief Initializes a TTZipZopfliOptions structure with default parameters for a given level.
+ *
+ * @param[out] options Destination options structure to initialize.
+ * @param[in]  level   Requested compression level (1..12).
+ */
 void ttzip_zopfli_init_options(TTZipZopfliOptions *options, int level);
 
-/// 进程内无锁分块最优 Deflate 压缩 (带跨块 32KB 历史字典预热与 RFC 1951 流式对齐)
-///
-/// @param in 待压缩数据块
-/// @param in_size 待压缩数据字节数
-/// @param history 前一个块末尾的历史数据 (用于 32KB 字典预热，可为 NULL)
-/// @param history_size 历史数据字节数 (最大 32768)
-/// @param out 压缩输出缓冲区
-/// @param out_capacity 输出缓冲区容量
-/// @param options 压缩选项
-/// @param is_final 是否为 Deflate 终末分块 (1=输出 BFINAL=1, 0=输出 BFINAL=0 并追加 SYNC_FLUSH 对齐)
-/// @return 实际压缩后的字节数；若无法压缩或空间不足返回 0
+/**
+ * @brief Compresses a block using multi-pass Zopfli graph optimization with history dictionary warm-up.
+ *
+ * @param[in]  in           Input uncompressed data buffer.
+ * @param[in]  in_size      Length of uncompressed data in bytes.
+ * @param[in]  history      Pointer to preceding 32KB history dictionary, or NULL.
+ * @param[in]  history_size Size of preceding history dictionary in bytes (<= 32768).
+ * @param[out] out          Destination buffer receiving Deflate bitstream.
+ * @param[in]  out_capacity Total allocated capacity of out buffer in bytes.
+ * @param[in]  options      Tuning options (iterations, block splitting).
+ * @param[in]  is_final     Non-zero if this is the final block in the stream.
+ *
+ * @return Number of compressed bytes written to out, or 0 on overflow / error.
+ */
 size_t ttzip_zopfli_compress_block_with_history(
     const uint8_t *in,
     size_t in_size,
@@ -50,6 +67,30 @@ size_t ttzip_zopfli_compress_block_with_history(
     int is_final
 );
 
+/**
+ * @brief Compresses a chunk using the native in-process Apple Silicon Deflate engine.
+ *
+ * @param[in]  in           Input uncompressed data buffer.
+ * @param[in]  in_size      Length of uncompressed data in bytes.
+ * @param[in]  history      Pointer to preceding 32KB history dictionary, or NULL.
+ * @param[in]  history_size Size of preceding history dictionary in bytes (<= 32768).
+ * @param[out] out          Destination buffer receiving Deflate bitstream.
+ * @param[in]  out_capacity Total allocated capacity of out buffer in bytes.
+ * @param[in]  tier_level   Tier level (1 = Fast, 2 = Fast+, 3 = Normal, 4 = Maximum).
+ * @param[in]  is_final     Non-zero if this is the final chunk in the stream.
+ *
+ * @return Number of compressed bytes written to out, or 0 on overflow / error.
+ */
+size_t ttzip_native_deflate_compress_chunk_with_history(
+    const uint8_t *in,
+    size_t in_size,
+    const uint8_t *history,
+    size_t history_size,
+    uint8_t *out,
+    size_t out_capacity,
+    int tier_level,
+    int is_final
+);
 
 #ifdef __cplusplus
 }

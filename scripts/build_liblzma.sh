@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+#
+# Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+# All rights reserved.
+#
+# TTZip: High-performance native archiving and compression engine for macOS.
 # ==============================================================================
 # scripts/build_liblzma.sh
 # 自动化编译 xz-upstream (liblzma) 为 macOS Universal 2 (arm64 + x86_64) 静态库并部署到 Vendor

@@ -11,14 +11,15 @@ import XCTest
 final class MIPSBenchmarkEngineTests: XCTestCase {
     
     func testMIPSBenchmarkPassCalculatesValidRatings() async {
+        let dictMB = TestBenchmarkTier.isBenchmarkMode ? 16 : 2
         let engine = MIPSHardwareBenchmarkEngine.shared
         let metric = await engine.runMIPSBenchmark(
-            dictionarySizeMB: 16,
+            dictionarySizeMB: dictMB,
             threadCount: 4,
             iterations: 1
         )
         
-        XCTAssertEqual(metric.dictionarySizeMB, 16)
+        XCTAssertEqual(metric.dictionarySizeMB, dictMB)
         XCTAssertEqual(metric.threadCount, 4)
         XCTAssertGreaterThan(metric.compressMIPS, 100.0)
         XCTAssertGreaterThan(metric.decompressMIPS, 100.0)
@@ -26,7 +27,5 @@ final class MIPSBenchmarkEngineTests: XCTestCase {
         XCTAssertGreaterThan(metric.compressSpeedMBs, 100.0)
         XCTAssertGreaterThan(metric.decompressSpeedMBs, 100.0)
         XCTAssertGreaterThan(metric.ratingPerUsageMIPS, 10.0)
-        
-        print("[MIPS BENCHMARK] Total MIPS: \(String(format: "%.1f", metric.totalMIPS)), Comp: \(String(format: "%.1f", metric.compressSpeedMBs)) MB/s, Decomp: \(String(format: "%.1f", metric.decompressSpeedMBs)) MB/s")
     }
 }

@@ -9,6 +9,8 @@ import XCTest
 @testable import TTZipCore
 import CTTZipBridge
 
+/// Test suite validating RFC 1950, 1951, and 1952 stream coding compliance,
+/// multi-level compression, flush modes, chunk granularities, and streaming throughput.
 final class DeflateStreamCoderTests: XCTestCase {
     
     // MARK: - 1. RFC 1950 (Zlib), RFC 1952 (Gzip), RFC 1951 (Raw) Roundtrip Fidelity Tests
@@ -214,7 +216,7 @@ final class DeflateStreamCoderTests: XCTestCase {
         let payloadMB = Double(payload.count) / (1024.0 * 1024.0)
         let throughputMBs = payloadMB / max(0.0001, elapsed)
         
-        print("⚡️ [PERF GATE] Deflate Streaming Level 1 Throughput: \(String(format: "%.2f", throughputMBs)) MB/s (Elapsed: \(String(format: "%.4f", elapsed)) s)")
+        TTLogger.debug("⚡️ [PERF GATE] Deflate Streaming Level 1 Throughput: \(String(format: "%.2f", throughputMBs)) MB/s (Elapsed: \(String(format: "%.4f", elapsed)) s)")
         
         XCTAssertGreaterThanOrEqual(
             throughputMBs,
@@ -228,7 +230,7 @@ final class DeflateStreamCoderTests: XCTestCase {
         let decompressElapsed = CFAbsoluteTimeGetCurrent() - decompressStartTime
         let decompressThroughputMBs = payloadMB / max(0.0001, decompressElapsed)
         
-        print("⚡️ [PERF GATE] Deflate Streaming Decompression Throughput: \(String(format: "%.2f", decompressThroughputMBs)) MB/s")
+        TTLogger.debug("⚡️ [PERF GATE] Deflate Streaming Decompression Throughput: \(String(format: "%.2f", decompressThroughputMBs)) MB/s")
         XCTAssertGreaterThanOrEqual(decompressThroughputMBs, 500.0, "Decompression throughput must exceed 500 MB/s")
         XCTAssertEqual(decompressed.count, payload.count)
     }

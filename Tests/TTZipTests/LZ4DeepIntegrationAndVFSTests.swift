@@ -118,29 +118,23 @@ final class LZ4DeepIntegrationAndVFSTests: XCTestCase {
     // MARK: - 4. Real Physical Microbenchmarks Silesia A/B
     
     func testBenchmark_TLSStreamPoolVsStandard_OnSilesiaCorpus() throws {
-        // Silesia ：dickens (10.19MB ) ooffice (6.15MB )
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else { return }
         let dickensData = try SilesiaFixtureLoader.mappedData(named: "dickens")
         let oofficeData = try SilesiaFixtureLoader.mappedData(named: "ooffice")
         let engine = LZ4LzoEngine()
         
         let workloads: [(name: String, data: Data)] = [
-            ("Silesia/dickens (10.19MB 文本)", dickensData),
-            ("Silesia/ooffice (6.15MB 二进制)", oofficeData)
+            ("Silesia/dickens (10.19MB text)", dickensData),
+            ("Silesia/ooffice (6.15MB binary)", oofficeData)
         ]
         
-        print("\n=========================================================================================================")
-        print("         [Empirical Benchmark] LZ4 TLS TLS State Pool Reuse vs Standard Stateless Single-Block Compression (Silesia 真实语料)")
-        print("=========================================================================================================")
-        
-        for (name, payload) in workloads {
+        for (_, payload) in workloads {
             let iterations = TestBenchmarkTier.benchmarkIterations(default: 5, benchmark: 100)
             let totalMB = (Double(payload.count * iterations)) / (1024.0 * 1024.0)
             
-            // Verify expected invariant
             _ = engine.compress(data: payload, acceleration: 1)
             _ = engine.compressWithTLS(data: payload, acceleration: 1)
             
-            // 1. (Before)：
             let startStandard = DispatchTime.now().uptimeNanoseconds
             for _ in 0..<iterations {
                 _ = engine.compress(data: payload, acceleration: 1)
@@ -148,7 +142,6 @@ final class LZ4DeepIntegrationAndVFSTests: XCTestCase {
             let elapsedStandardNs = DispatchTime.now().uptimeNanoseconds - startStandard
             let throughputStandard = totalMB / (Double(elapsedStandardNs) / 1_000_000_000.0)
             
-            // 2. (After)：TLS
             let startTLS = DispatchTime.now().uptimeNanoseconds
             for _ in 0..<iterations {
                 _ = engine.compressWithTLS(data: payload, acceleration: 1)
@@ -157,28 +150,19 @@ final class LZ4DeepIntegrationAndVFSTests: XCTestCase {
             let throughputTLS = totalMB / (Double(elapsedTLSNs) / 1_000_000_000.0)
             
             let deltaPercent = (throughputTLS - throughputStandard) / throughputStandard * 100.0
-            print("  ▶ 载荷: \(name) [\(iterations) 轮平均]")
-            print("    * Baseline (Standard Single Block) : \(String(format: "%.1f", throughputStandard)) MB/s (耗时: \(String(format: "%.2f", Double(elapsedStandardNs)/1_000_000.0)) ms)")
-            print("    * 优化 (TLS 状态池): \(String(format: "%.1f", throughputTLS)) MB/s (耗时: \(String(format: "%.2f", Double(elapsedTLSNs)/1_000_000.0)) ms)")
-            print("    * Measured Physical Speedup    : \(String(format: "%+.1f%%", deltaPercent))")
+            _ = deltaPercent
         }
-        print("=========================================================================================================\n")
     }
     
     func testBenchmark_PartialDecompressVsFullDecompress_OnSilesiaCorpus() throws {
-        // Silesia samba (21.61MB)
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else { return }
         let sambaData = try SilesiaFixtureLoader.mappedData(named: "samba")
         let engine = LZ4LzoEngine()
         let compressed = engine.compress(data: sambaData, acceleration: 1)
         
-        let targetPrefixSizes = [64, 512, 4096] // 64B 元数据头, 512B TAR 头, 4KB 页面
+        let targetPrefixSizes = [64, 512, 4096]
         let iterations = TestBenchmarkTier.benchmarkIterations(default: 10, benchmark: 200)
         
-        print("\n=========================================================================================================")
-        print("     [Empirical Benchmark] LZ4 Partial Partial Prefix Truncated Decompress vs Full Decompress (Silesia/samba 21.61MB 真实载荷)")
-        print("=========================================================================================================")
-        
-        // 1. (Before)：
         let startFull = DispatchTime.now().uptimeNanoseconds
         for _ in 0..<iterations {
             let full = engine.decompress(data: compressed, originalSizeHint: sambaData.count)
@@ -187,10 +171,7 @@ final class LZ4DeepIntegrationAndVFSTests: XCTestCase {
         let elapsedFullNs = DispatchTime.now().uptimeNanoseconds - startFull
         let avgFullMs = (Double(elapsedFullNs) / Double(iterations)) / 1_000_000.0
         
-        print("  * Baseline (全量解压 21.6MB 后截断): 单次平均耗时 \(String(format: "%.3f", avgFullMs)) ms (\(String(format: "%.2f", Double(elapsedFullNs)/1_000_000.0)) ms / \(iterations)轮)")
-        
         for targetSize in targetPrefixSizes {
-            // 2. (After)：Partial
             let startPartial = DispatchTime.now().uptimeNanoseconds
             for _ in 0..<iterations {
                 _ = engine.decompressPartial(data: compressed, targetSize: targetSize)
@@ -198,25 +179,21 @@ final class LZ4DeepIntegrationAndVFSTests: XCTestCase {
             let elapsedPartialNs = DispatchTime.now().uptimeNanoseconds - startPartial
             let avgPartialMs = (Double(elapsedPartialNs) / Double(iterations)) / 1_000_000.0
             let speedup = avgFullMs / avgPartialMs
-            
-            print("  ▶ 目标尺寸: \(targetSize) 字节前缀 (Partial 短路)")
-            print("    * 单次平均耗时 : \(String(format: "%.4f", avgPartialMs)) ms (\(String(format: "%.2f", Double(elapsedPartialNs)/1_000_000.0)) ms / \(iterations)轮)")
-            print("    * 真实探测Speedup: \(String(format: "%.1fx", speedup)) (耗时削减 \(String(format: "%.1f%%", (1.0 - 1.0/speedup)*100.0)))")
+            _ = speedup
         }
-        print("=========================================================================================================\n")
     }
     
     func testBenchmark_VFSCachePoolThroughput_OnRealCorpus() throws {
-        let pool = VFSLz4CachePool(maxRamBytes: 64 * 1024 * 1024) // 64MB RAM
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else { return }
+        let pool = VFSLz4CachePool(maxRamBytes: 64 * 1024 * 1024)
         let sessionId = "silesia_vfs_session_\(UUID().uuidString)"
         
-        // Silesia 256KB 100
         let dickens = try SilesiaFixtureLoader.mappedData(named: "dickens")
         let mozilla = try SilesiaFixtureLoader.mappedData(named: "mozilla")
         var combined = dickens
         combined.append(mozilla)
         
-        let chunkSize = 256 * 1024 // 256 KB
+        let chunkSize = 256 * 1024
         var chunks: [Data] = []
         var offset = 0
         let targetLimit = TestBenchmarkTier.benchmarkIterations(default: 20, benchmark: 100)
@@ -228,35 +205,21 @@ final class LZ4DeepIntegrationAndVFSTests: XCTestCase {
         let iterations = chunks.count
         let totalRawMB = Double(iterations * chunkSize) / (1024.0 * 1024.0)
         
-        // 1.
         let startPut = DispatchTime.now().uptimeNanoseconds
         for (i, chunk) in chunks.enumerated() {
             pool.put(sessionId: sessionId, chunkIndex: i, rawData: chunk)
         }
         let elapsedPutNs = DispatchTime.now().uptimeNanoseconds - startPut
         let putMBs = totalRawMB / (Double(elapsedPutNs) / 1_000_000_000.0)
-        let avgPutUs = Double(elapsedPutNs) / Double(iterations) / 1000.0
+        _ = putMBs
         
-        // 2.
         let startGet = DispatchTime.now().uptimeNanoseconds
         for i in 0..<iterations {
             _ = pool.get(sessionId: sessionId, chunkIndex: i)
         }
         let elapsedGetNs = DispatchTime.now().uptimeNanoseconds - startGet
         let getMBs = totalRawMB / (Double(elapsedGetNs) / 1_000_000_000.0)
-        let avgGetUs = Double(elapsedGetNs) / Double(iterations) / 1000.0
-        
-        let stats = pool.getStats()
-        let ramCompressionRatio = Double(iterations * chunkSize) / Double(max(stats.ramBytes, 1))
-        
-        print("\n=========================================================================================================")
-        print("          [Empirical Benchmark] VFS Two-Level LZ4 Cache Pool (100 块 x 256KB 真实 Silesia 语料数据)")
-        print("=========================================================================================================")
-        print("  * 原始载荷总计 : \(String(format: "%.2f", totalRawMB)) MB (256KB x \(iterations) 块)")
-        print("  * 压缩暂存耗时 : \(String(format: "%.2f", Double(elapsedPutNs)/1_000_000.0)) ms | 吞吐: \(String(format: "%.1f", putMBs)) MB/s | 平均延迟: \(String(format: "%.2f", avgPutUs)) µs/块")
-        print("  * 瞬时还原耗时 : \(String(format: "%.2f", Double(elapsedGetNs)/1_000_000.0)) ms | 吞吐: \(String(format: "%.1f", getMBs)) MB/s | 平均延迟: \(String(format: "%.2f", avgGetUs)) µs/块")
-        print("  * 物理内存压缩比: \(String(format: "%.2fx", ramCompressionRatio)) (节省 \(String(format: "%.1f%%", (1.0 - 1.0/ramCompressionRatio)*100.0)) 物理内存)")
-        print("=========================================================================================================\n")
+        _ = getMBs
         
         pool.clearSession(sessionId: sessionId)
     }

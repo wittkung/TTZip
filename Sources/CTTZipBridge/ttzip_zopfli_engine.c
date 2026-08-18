@@ -5,9 +5,19 @@
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
+/**
+ * @file ttzip_zopfli_engine.c
+ * @brief High-ratio Deflate compressor and Zopfli wrapper with history warm-up.
+ * @details Dispatches fast/lazy compression to native Apple Silicon Deflate routines,
+ *          and high-ratio iterations to iterative Zopfli shortest-path DAG optimization.
+ */
+
 #include "include/ttzip_zopfli_engine.h"
 #include "include/ttzip_huffman_inplace.h"
 #include "include/CTTZipStreamCoder.h"
+#include "native_deflate/ttzip_deflate_engine.h"
+#include "zopfli/deflate.h"
+#include "zopfli/zopfli.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -17,7 +27,7 @@
 #include <arm_neon.h>
 #endif
 
-// Q8.8 定点数 (256 units = 1 bit)
+/* Q8.8 fixed-point arithmetic constants (256 units = 1.0 bit) */
 #define TTZIP_FIXED_SCALE 256
 #define TTZIP_WINDOW_SIZE 32768
 #define TTZIP_WINDOW_MASK 32767
@@ -26,8 +36,8 @@
 #define TTZIP_HASH_SIZE   65536
 #define TTZIP_HASH_MASK   65535
 
-// 256 阶 mantissa log2 快速查表 (整型单周期)
-static const uint16_t s_log2_mantissa_lut[256] = {
+/* 256-entry mantissa log2 lookup table for fast single-cycle entropy estimates */
+__attribute__((unused)) static const uint16_t s_log2_mantissa_lut[256] = {
     0, 1, 3, 4, 6, 7, 9, 10, 11, 13, 14, 16, 17, 18, 20, 21,
     22, 24, 25, 26, 28, 29, 30, 31, 33, 34, 35, 36, 38, 39, 40, 41,
     42, 44, 45, 46, 47, 48, 49, 51, 52, 53, 54, 55, 56, 57, 58, 59,
@@ -46,7 +56,7 @@ static const uint16_t s_log2_mantissa_lut[256] = {
     192, 192, 193, 193, 193, 194, 194, 195, 195, 195, 196, 196, 197, 197, 198, 198
 };
 
-static inline uint32_t ttzip_fast_log2_fixed(uint32_t x) {
+__attribute__((unused)) static inline uint32_t ttzip_fast_log2_fixed(uint32_t x) {
     if (x <= 1) return 0;
     int lz = __builtin_clz(x);
     int exp = 31 - lz;
@@ -54,23 +64,8 @@ static inline uint32_t ttzip_fast_log2_fixed(uint32_t x) {
     return (uint32_t)((exp << 8) + s_log2_mantissa_lut[frac & 0xFF]);
 }
 
-// Length extra bits mapping (3..258)
-__attribute__((unused)) static const uint8_t s_length_extra_bits[29] = {
-    0, 0, 0, 0, 0, 0, 0, 0,
-    1, 1, 1, 1, 2, 2, 2, 2,
-    3, 3, 3, 3, 4, 4, 4, 4,
-    5, 5, 5, 5, 0
-};
-
-// Distance extra bits mapping (1..32768)
-__attribute__((unused)) static const uint8_t s_dist_extra_bits[30] = {
-    0, 0, 0, 0, 1, 1, 2, 2,
-    3, 3, 4, 4, 5, 5, 6, 6,
-    7, 7, 8, 8, 9, 9, 10, 10,
-    11, 11, 12, 12, 13, 13
-};
-
 __attribute__((unused)) static inline uint16_t ttzip_get_length_code(uint32_t len) {
+
     static const uint8_t s_len_to_code[259] = {
         0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13,
         14, 14, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17,
@@ -109,61 +104,52 @@ void ttzip_zopfli_init_options(TTZipZopfliOptions *options, int level) {
         options->num_iterations = 5;
         options->block_splitting = 0;
         options->max_block_splits = 0;
-        options->early_exit_threshold = 0.00005; // 0.005%
+        options->early_exit_threshold = 0.00005; /* 0.005% */
     } else {
         options->num_iterations = 15;
         options->block_splitting = 1;
         options->max_block_splits = 15;
-        options->early_exit_threshold = 0.00005; // 0.005%
+        options->early_exit_threshold = 0.00005; /* 0.005% */
     }
 }
 
-#include <zlib.h>
-#include "zopfli/deflate.h"
-#include "zopfli/zopfli.h"
-
-static size_t ttzip_zlib_compress_chunk_with_history(
+/* Native in-process Deflate chunk compressor */
+size_t ttzip_native_deflate_compress_chunk_with_history(
     const uint8_t *in,
     size_t in_size,
     const uint8_t *history,
     size_t history_size,
     uint8_t *out,
     size_t out_capacity,
-    int level,
+    int tier_level,
     int is_final
 ) {
-    z_stream strm;
-    memset(&strm, 0, sizeof(strm));
-    int z_lvl = level;
-    if (z_lvl < 1) z_lvl = 1;
-    if (z_lvl > 9) z_lvl = 9;
-    
-    // raw deflate: windowBits = -15
-    if (deflateInit2(&strm, z_lvl, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
-        return 0;
+    ttzip_native_deflate_options_t def_opt;
+    def_opt.tier_level = tier_level;
+    def_opt.dynamic_huffman = true;
+    def_opt.enable_history_warmup = true;
+
+    if (tier_level <= 1) {
+        def_opt.tier_level = 1;
+        def_opt.max_chain_depth = 0;
+        def_opt.nice_match_len = 32;
+    } else if (tier_level == 2) {
+        def_opt.tier_level = 2;
+        def_opt.max_chain_depth = 0;
+        def_opt.nice_match_len = 64;
+    } else if (tier_level == 3 || tier_level == 7) {
+        def_opt.tier_level = 3;
+        def_opt.max_chain_depth = 4;
+        def_opt.nice_match_len = 32;
+    } else {
+        def_opt.tier_level = 4;
+        def_opt.max_chain_depth = 16;
+        def_opt.nice_match_len = 128;
     }
-    
-    if (history && history_size > 0) {
-        size_t h_len = history_size > 32768 ? 32768 : history_size;
-        const uint8_t *h_ptr = history + history_size - h_len;
-        deflateSetDictionary(&strm, (const Bytef *)h_ptr, (uInt)h_len);
-    }
-    
-    strm.next_in = (Bytef *)in;
-    strm.avail_in = (uInt)in_size;
-    strm.next_out = (Bytef *)out;
-    strm.avail_out = (uInt)out_capacity;
-    
-    int flush = is_final ? Z_FINISH : Z_SYNC_FLUSH;
-    int ret = deflate(&strm, flush);
-    
-    size_t compressed_size = strm.total_out;
-    deflateEnd(&strm);
-    
-    if (ret == Z_STREAM_END || (!is_final && ret == Z_OK)) {
-        return compressed_size;
-    }
-    return 0;
+
+    return ttzip_native_deflate_compress_block_with_history(
+        in, in_size, history, history_size, out, out_capacity, &def_opt, is_final != 0
+    );
 }
 
 size_t ttzip_zopfli_compress_block_with_history(
@@ -185,22 +171,21 @@ size_t ttzip_zopfli_compress_block_with_history(
         target_level = options->compression_level;
     }
 
-    // 针对高速档位 (Level 1..5, deflateLevel <= 10)：调用 Apple Silicon 硬件加速 18 核并发 Deflate 流
+    /* Fast path (Level 1..5, deflateLevel <= 10): Dispatch to 100% native in-process Deflate */
     if (!options || options->num_iterations <= 1 || target_level <= 9) {
-        int z_lvl = 1;
-        if (target_level == 1) z_lvl = 1;
-        else if (target_level == 2) z_lvl = 2;
-        else if (target_level == 7) z_lvl = 5;  // Tier 3 (Normal): 3.8 GB/s @ 3.32 MB (压制 pigz-6 3.4 GB/s @ 3.43 MB)
-        else if (target_level == 9) z_lvl = 7;  // Tier 4 (Maximum): 2.6 GB/s @ 3.24 MB (压制 pigz-9 2.1 GB/s @ 3.39 MB)
-        else z_lvl = target_level <= 9 ? target_level : 5;
+        int tier = 3;
+        if (target_level == 1) tier = 1;
+        else if (target_level == 2) tier = 2;
+        else if (target_level == 7) tier = 3;
+        else if (target_level == 9) tier = 4;
+        else tier = (target_level <= 2 ? target_level : (target_level <= 7 ? 3 : 4));
 
-        return ttzip_zlib_compress_chunk_with_history(in, in_size, history, history_size, out, out_capacity, z_lvl, is_final);
+        return ttzip_native_deflate_compress_chunk_with_history(
+            in, in_size, history, history_size, out, out_capacity, tier, is_final
+        );
     }
 
-
-
-
-    // 针对 Level 6 (5 轮) 与 Level 7 (15 轮 + 块切分) 极限重压：调用 Google Zopfli 官方多轮迭代 Squeeze 引擎
+    /* Ultra high-ratio path: Level 6 (5 iterations) and Level 7 (15 iterations + dynamic splitting) via Zopfli Squeeze */
     ZopfliOptions zopt;
     ZopfliInitOptions(&zopt);
     zopt.numiterations = options->num_iterations;
@@ -220,12 +205,12 @@ size_t ttzip_zopfli_compress_block_with_history(
         size_t total_buf_size = hist_len + in_size;
         uint8_t *combined = (uint8_t *)malloc(total_buf_size);
         if (!combined) {
-            return ttzip_libdeflate_compress(in, in_size, out, out_capacity, 12);
+            return ttzip_native_deflate_compress_chunk_with_history(in, in_size, history, history_size, out, out_capacity, 4, is_final);
         }
         memcpy(combined, hist_ptr, hist_len);
         memcpy(combined + hist_len, in, in_size);
 
-        // ZopfliDeflatePart: btype=2 (Dynamic Huffman)
+        /* ZopfliDeflatePart: btype=2 (Dynamic Huffman) */
         ZopfliDeflatePart(&zopt, 2, is_final, combined, hist_len, total_buf_size, &bp, &zout, &zoutsize);
         free(combined);
     } else {
@@ -233,14 +218,13 @@ size_t ttzip_zopfli_compress_block_with_history(
     }
 
     if (!is_final && zout && zoutsize > 0) {
-        // 追加 RFC 1951 严格的 Z_SYNC_FLUSH (BFINAL=0, BTYPE=00, 0x00 0x00 0xFF 0xFF)
+        /* Append RFC 1951 Z_SYNC_FLUSH boundary marker (BFINAL=0, BTYPE=00, 0x00 0x00 0xFF 0xFF) */
         ZopfliAddSyncFlushBlock(&bp, &zout, &zoutsize);
     }
 
-
     if (!zout || zoutsize == 0) {
         if (zout) free(zout);
-        return ttzip_libdeflate_compress(in, in_size, out, out_capacity, 12);
+        return ttzip_native_deflate_compress_chunk_with_history(in, in_size, history, history_size, out, out_capacity, 4, is_final);
     }
 
     if (zoutsize > out_capacity) {
@@ -252,5 +236,3 @@ size_t ttzip_zopfli_compress_block_with_history(
     free(zout);
     return zoutsize;
 }
-
-

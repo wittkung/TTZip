@@ -76,7 +76,7 @@ final class BloscLZNativeEngineTests: XCTestCase {
     }
 
     func testBloscLZThroughputBenchmark() throws {
-        let sizeMB = 10
+        let sizeMB = TestBenchmarkTier.isBenchmarkMode ? 10 : 2
         let totalBytes = sizeMB * 1024 * 1024
         var source = [UInt8](repeating: 0, count: totalBytes)
         for i in 0..<totalBytes {

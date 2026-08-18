@@ -200,7 +200,6 @@ final class TestTelemetryAndRendererTests: XCTestCase {
     func testHexDiffRendering() {
         let expected = Data([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00])
         var actual = Data([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00])
-
         
         let matchOutput = TestTerminalRenderer.renderHexDiff(expected: expected, actual: actual, useColor: false)
         XCTAssertTrue(matchOutput.contains("[Hex Match]"))
@@ -214,4 +213,60 @@ final class TestTelemetryAndRendererTests: XCTestCase {
         XCTAssertTrue(snippet.contains("[Hex Difference Diagnostic]"))
         XCTAssertTrue(snippet.contains("Expected: 0x504B"))
     }
+    
+    // MARK: - 3. Aligned Stream & TestLogger Tests
+    
+    func testRenderAlignedRow() {
+        let row = TestTerminalRenderer.renderAlignedRow(
+            index: 42,
+            total: 209,
+            badge: .pass,
+            target: "tar.zst",
+            testName: "testDiagnostic_tar.zst",
+            durationMs: 12.45,
+            useColor: false
+        )
+        XCTAssertTrue(row.contains("[ 42/209]"))
+        XCTAssertTrue(row.contains("[PASS]"))
+        XCTAssertTrue(row.contains("[tar.zst     ]"))
+        XCTAssertTrue(row.contains("testDiagnostic_tar.zst"))
+        XCTAssertTrue(row.contains("12.45 ms"))
+    }
+    
+    func testTerminalCapabilitiesAndStripANSI() {
+        let textWithANSI = "\u{001B}[1;32m[PASS]\u{001B}[0m \u{001B}[38;5;220mKintsugi Gold\u{001B}[0m"
+        let stripped = TerminalCapabilities.stripANSI(from: textWithANSI)
+        XCTAssertEqual(stripped, "[PASS] Kintsugi Gold")
+        XCTAssertFalse(stripped.contains("\u{001B}"))
+    }
+    
+    func testTestLoggerTaskLocalSessionBuffering() async {
+        let originalLevel = TestLogger.logLevel
+        defer { TestLogger.logLevel = originalLevel }
+        TestLogger.logLevel = .debug
+        
+        await TestLogger.withSession(testName: "testMockAsyncSession") {
+            TestLogger.info("Step 1: Initializing test")
+            TestLogger.debug("Step 2: Low-level pointer allocated")
+            
+            let snapshot = TestLogger.currentSession?.snapshot() ?? []
+            XCTAssertEqual(snapshot.count, 2)
+            XCTAssertEqual(snapshot[0], "Step 1: Initializing test")
+            XCTAssertEqual(snapshot[1], "Step 2: Low-level pointer allocated")
+        }
+        
+        // Outside withSession, currentSession must be nil
+        XCTAssertNil(TestLogger.currentSession)
+    }
+    
+    func testTestLoggerSyncSession() {
+        TestLogger.withSessionSync(testName: "testMockSyncSession") {
+            TestLogger.info("Sync message 1")
+            TestLogger.verbose("Sync message 2")
+            
+            let logs = TestLogger.currentSession?.snapshot() ?? []
+            XCTAssertTrue(logs.contains("Sync message 1"))
+        }
+    }
 }
+

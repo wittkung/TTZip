@@ -9,15 +9,17 @@ import XCTest
 import CTTZipBridge
 @testable import TTZipCore
 
+/// Exhaustive comparative test suite validating C-Blosc2 architectural optimizations integrated into TTZip.
 final class Blosc2ExhaustiveComparativeTests: XCTestCase {
 
+    /// Executes exhaustive benchmarks across precision quantization, lazy slicing, plugin dispatch, special values, and dictionary compression.
     func testExhaustiveAbsorptionBenchmark() throws {
-        print("\n" + String(repeating: "=", count: 100))
-        print("📊 [Exhaustive Comparison] TTZip × C-Blosc2 全景架构吸收与调优 物理实测差分审计")
-        print(String(repeating: "=", count: 100))
+        TTLogger.debug("\n" + String(repeating: "=", count: 100))
+        TTLogger.debug("📊 [Exhaustive Comparison] TTZip x C-Blosc2 Architecture Integration Empirical Audit")
+        TTLogger.debug(String(repeating: "=", count: 100))
 
         // ---------------------------------------------------------------------
-        // 1. Bit-Grooming (NSD=3) + BitShuffle + Deflate 科学浮点矩阵 (64KB Float32)
+        // 1. Bit-Grooming (NSD=3) + BitShuffle + Deflate Scientific Float Matrix (64KB Float32)
         // ---------------------------------------------------------------------
         let floatCount = 16384
         var rawFloats = [Float](repeating: 0, count: floatCount)
@@ -38,7 +40,7 @@ final class Blosc2ExhaustiveComparativeTests: XCTestCase {
         // Optimized: BitGroom (NSD=3) + NEON BitShuffle + Deflate L6
         let t1_2 = PlatformMonotonicTimer.nowNanoseconds()
         let groomedFloats = Blosc2FilterBridge.bitGroom(floats: rawFloats, nsd: 3)
-        var groomedBytes = Data(bytes: groomedFloats, count: rawFloatBytes)
+        let groomedBytes = Data(bytes: groomedFloats, count: rawFloatBytes)
         var shuffledBytes = [UInt8](repeating: 0, count: rawFloatBytes)
         groomedBytes.withUnsafeBytes { rawIn in
             shuffledBytes.withUnsafeMutableBytes { rawOut in
@@ -55,13 +57,13 @@ final class Blosc2ExhaustiveComparativeTests: XCTestCase {
         let optTimeMs = Double(t1_3 - t1_2) / 1_000_000.0
         let optRatio = Double(rawFloatBytes) / Double(optDeflate.count)
 
-        print(String(format: "▶ [1. 浮点精密量化与位级重排 (Bit-Grooming NSD=3 + BitShuffle)]"))
-        print(String(format: "  • 优化前 (Raw Deflate L6)                 : 体积 %6d B | 压缩比: %5.2fx | 耗时: %5.2f ms", rawDeflate.count, rawRatio, rawTimeMs))
-        print(String(format: "  • 优化后 (BitGroom + BitShuffle + L6)    : 体积 %6d B | 压缩比: %5.2fx | 耗时: %5.2f ms", optDeflate.count, optRatio, optTimeMs))
-        print(String(format: "  • 差分收益: 空间压缩比提升 +%.1f%% (体积削减 %.1f%%), 吞吐加速 %.1fx\n", ((optRatio - rawRatio) / rawRatio) * 100.0, (1.0 - Double(optDeflate.count) / Double(rawDeflate.count)) * 100.0, rawTimeMs / max(0.001, optTimeMs)))
+        TTLogger.debug(String(format: "▶ [1. Floating-Point Quantization & Bit Permutation (Bit-Grooming NSD=3 + BitShuffle)]"))
+        TTLogger.debug(String(format: "  • Baseline (Raw Deflate L6)             : Size %6d B | Ratio: %5.2fx | Elapsed: %5.2f ms", rawDeflate.count, rawRatio, rawTimeMs))
+        TTLogger.debug(String(format: "  • Optimized (BitGroom + BitShuffle + L6): Size %6d B | Ratio: %5.2fx | Elapsed: %5.2f ms", optDeflate.count, optRatio, optTimeMs))
+        TTLogger.debug(String(format: "  • Differential Gain: Compression ratio +%.1f%% (size reduction %.1f%%), speedup %.1fx\n", ((optRatio - rawRatio) / rawRatio) * 100.0, (1.0 - Double(optDeflate.count) / Double(rawDeflate.count)) * 100.0, rawTimeMs / max(0.001, optTimeMs)))
 
         // ---------------------------------------------------------------------
-        // 2. 微块级懒加载与区间零拷贝切片 (Lazy Slicing 4KB from 4MB SuperChunk)
+        // 2. Micro-Block Lazy Loading & Zero-Copy Slicing (Lazy Slicing 4KB from 4MB SuperChunk)
         // ---------------------------------------------------------------------
         var scConfig = ttzip_schunk_config_t()
         scConfig.chunk_size = 4 * 1024 * 1024 // 4MB Chunk
@@ -83,17 +85,18 @@ final class Blosc2ExhaustiveComparativeTests: XCTestCase {
             ttzip_schunk_append_chunk(schunk, raw.baseAddress!, raw.count)
         }
 
-        // Baseline: 全量解压 4MB Chunk 再截取 4KB 切片
+        // Baseline: Full decompression of 4MB Chunk followed by subdata slicing
         var fullDecBuf = Data(count: 4 * 1024 * 1024)
         let t2_0 = PlatformMonotonicTimer.nowNanoseconds()
         _ = fullDecBuf.withUnsafeMutableBytes { rawOut in
             ttzip_schunk_decompress_chunk(schunk, 0, rawOut.baseAddress!, rawOut.count)
         }
         let baselineSlice = fullDecBuf.subdata(in: 0..<4096)
+        _ = baselineSlice
         let t2_1 = PlatformMonotonicTimer.nowNanoseconds()
         let baselineSliceTimeMs = Double(t2_1 - t2_0) / 1_000_000.0
 
-        // Optimized: 区间微块切片 ttzip_schunk_get_slice_buffer
+        // Optimized: Range micro-block slice ttzip_schunk_get_slice_buffer
         var lazySliceBuf = Data(count: 4096)
         let t2_2 = PlatformMonotonicTimer.nowNanoseconds()
         _ = lazySliceBuf.withUnsafeMutableBytes { rawOut in
@@ -102,13 +105,13 @@ final class Blosc2ExhaustiveComparativeTests: XCTestCase {
         let t2_3 = PlatformMonotonicTimer.nowNanoseconds()
         let lazySliceTimeMs = Double(t2_3 - t2_2) / 1_000_000.0
 
-        print(String(format: "▶ [2. 微块级懒加载区间切片 (Lazy Sub-Chunk Slicing 4KB Header)]"))
-        print(String(format: "  • 优化前 (全量解压 4MB Chunk + Subdata)   : 耗时: %5.3f ms | 内存开销: 4.00 MB", baselineSliceTimeMs))
-        print(String(format: "  • 优化后 (微块懒加载 ttzip_get_slice_buf): 耗时: %5.3f ms | 内存开销: 0.00 MB", lazySliceTimeMs))
-        print(String(format: "  • 差分收益: 延迟缩短 %.1f%% (查询响应加速 %.1fx)\n", (1.0 - lazySliceTimeMs / max(0.0001, baselineSliceTimeMs)) * 100.0, baselineSliceTimeMs / max(0.0001, lazySliceTimeMs)))
+        TTLogger.debug(String(format: "▶ [2. Micro-block Lazy Sub-Chunk Slicing (Lazy Sub-Chunk Slicing 4KB Header)]"))
+        TTLogger.debug(String(format: "  • Baseline (Full 4MB Chunk Decompress + Subdata): Elapsed: %5.3f ms | Memory: 4.00 MB", baselineSliceTimeMs))
+        TTLogger.debug(String(format: "  • Optimized (Micro-block Lazy Slicing)          : Elapsed: %5.3f ms | Memory: 0.00 MB", lazySliceTimeMs))
+        TTLogger.debug(String(format: "  • Differential Gain: Latency reduced %.1f%% (query speedup %.1fx)\n", (1.0 - lazySliceTimeMs / max(0.0001, baselineSliceTimeMs)) * 100.0, baselineSliceTimeMs / max(0.0001, lazySliceTimeMs)))
 
         // ---------------------------------------------------------------------
-        // 3. 动态插件中枢与极速分发 (Dynamic Plugin Dispatch 64KB)
+        // 3. Dynamic Plugin Dispatch Hub (Dynamic Plugin Dispatch 64KB)
         // ---------------------------------------------------------------------
         let sampleText = "TTZip Plugin Performance Test String Payload Across 64KB Buffer"
         var pluginInput = Data()
@@ -137,11 +140,11 @@ final class Blosc2ExhaustiveComparativeTests: XCTestCase {
         let avgPluginCallUs = (Double(t3_1 - t3_0) / 100.0) / 1000.0
         let pluginThroughput = (65536.0 / (1024.0 * 1024.0)) / ((Double(t3_1 - t3_0) / 100.0) / 1_000_000_000.0)
 
-        print(String(format: "▶ [3. 动态滤镜/编解码插件中枢 (Dynamic Plugin Dispatch 64KB)]"))
-        print(String(format: "  • 吞吐率: %7.1f MB/s | 单次 64KB 变换耗时: %5.2f µs (零堆分配/无锁原子调度)\n", pluginThroughput, avgPluginCallUs))
+        TTLogger.debug(String(format: "▶ [3. Dynamic Filter/Codec Plugin Hub (Dynamic Plugin Dispatch 64KB)]"))
+        TTLogger.debug(String(format: "  • Throughput: %7.1f MB/s | Single 64KB Transform Elapsed: %5.2f µs (Zero-allocation atomic dispatch)\n", pluginThroughput, avgPluginCallUs))
 
         // ---------------------------------------------------------------------
-        // 4. 特殊全零与常数块旁路 (Special-Value 1MB Block)
+        // 4. Special Zero and Constant Block Bypass (Special-Value 1MB Block)
         // ---------------------------------------------------------------------
         let sparseSize = 1024 * 1024
         let zeroData = Data(count: sparseSize)
@@ -180,13 +183,13 @@ final class Blosc2ExhaustiveComparativeTests: XCTestCase {
         let t4_7 = PlatformMonotonicTimer.nowNanoseconds()
         let specialFillThroughput = (Double(sparseSize) / (1024.0 * 1024.0)) / (Double(t4_7 - t4_6) / 1_000_000_000.0)
 
-        print(String(format: "▶ [4. 稀疏全零/常数块旁路 (Special-Value 1MB)]"))
-        print(String(format: "  • 优化前 (Zstd L3)                    : 压缩 %6.1f MB/s | 解压 %7.1f MB/s | 存储: %d B", zstdCompThroughput, zstdDecThroughput, zstdCSize))
-        print(String(format: "  • 优化后 (SWAR Scan + dc zva Fill)    : 探测 %6.1f MB/s | 解压 %7.1f MB/s | 存储: 0 B", specialDetectThroughput, specialFillThroughput))
-        print(String(format: "  • 差分收益: 写入探测加速 %.1fx, 解压吞吐 %.1fx, 空间节省 100.0%%\n", specialDetectThroughput / zstdCompThroughput, specialFillThroughput / zstdDecThroughput))
+        TTLogger.debug(String(format: "▶ [4. Sparse Zero/Constant Value Block Bypass (Special-Value 1MB)]"))
+        TTLogger.debug(String(format: "  • Baseline (Zstd L3)                : Comp %6.1f MB/s | Decomp %7.1f MB/s | Storage: %d B", zstdCompThroughput, zstdDecThroughput, zstdCSize))
+        TTLogger.debug(String(format: "  • Optimized (SWAR Scan + Zero Fill) : Detect %6.1f MB/s | Decomp %7.1f MB/s | Storage: 0 B", specialDetectThroughput, specialFillThroughput))
+        TTLogger.debug(String(format: "  • Differential Gain: Write detection speedup %.1fx, Decompress throughput %.1fx, Space saved 100.0%%\n", specialDetectThroughput / zstdCompThroughput, specialFillThroughput / zstdDecThroughput))
 
         // ---------------------------------------------------------------------
-        // 5. 帧级共享字典 (SuperChunk JSON 50KB)
+        // 5. Frame-Level Shared Dictionary Topology (SuperChunk JSON 50KB)
         // ---------------------------------------------------------------------
         var scDictConfig = ttzip_schunk_config_t()
         scDictConfig.chunk_size = 64 * 1024
@@ -236,13 +239,13 @@ final class Blosc2ExhaustiveComparativeTests: XCTestCase {
         let noDictRatio = Double(totalRawBytes) / Double(totalNoDictCBytes)
         let superChunkRatio = Double(totalRawBytes) / Double(totalSuperChunkCBytes)
 
-        print(String(format: "▶ [5. 帧级共享字典拓扑 (SuperChunk JSON 50KB)]"))
-        print(String(format: "  • 优化前 (独立分块 Zstd L3)           : 原始 %5d B ➔ 压缩后 %5d B | 压缩比: %5.2fx", totalRawBytes, totalNoDictCBytes, noDictRatio))
-        print(String(format: "  • 优化后 (SuperChunk Frame Shared Dict): 原始 %5d B ➔ 压缩后 %5d B | 压缩比: %5.2fx", totalRawBytes, totalSuperChunkCBytes, superChunkRatio))
-        print(String(format: "  • 差分收益: 共享字典额外激增 +%.1f%% 空间压缩率\n", ((superChunkRatio - noDictRatio) / noDictRatio) * 100.0))
+        TTLogger.debug(String(format: "▶ [5. Frame Shared Dictionary Topology (SuperChunk JSON 50KB)]"))
+        TTLogger.debug(String(format: "  • Baseline (Independent Zstd L3)        : Raw %5d B -> Comp %5d B | Ratio: %5.2fx", totalRawBytes, totalNoDictCBytes, noDictRatio))
+        TTLogger.debug(String(format: "  • Optimized (SuperChunk Frame Shared Dict): Raw %5d B -> Comp %5d B | Ratio: %5.2fx", totalRawBytes, totalSuperChunkCBytes, superChunkRatio))
+        TTLogger.debug(String(format: "  • Differential Gain: Shared dictionary yields +%.1f%% space compression gain\n", ((superChunkRatio - noDictRatio) / noDictRatio) * 100.0))
 
         // ---------------------------------------------------------------------
-        // 6. 不可压数据自适应阻断 (Heuristic Auto-Tuning 64KB Random)
+        // 6. Adaptive Fast Rejection for Incompressible Data (Heuristic Tuner 64KB Random)
         // ---------------------------------------------------------------------
         let randSize = 65536
         var randBytes = [UInt8](repeating: 0, count: randSize)
@@ -261,11 +264,11 @@ final class Blosc2ExhaustiveComparativeTests: XCTestCase {
         let t6_3 = PlatformMonotonicTimer.nowNanoseconds()
         let tunerTimeMs = Double(t6_3 - t6_2) / 1_000_000.0
 
-        print(String(format: "▶ [6. 高熵不可压数据自适应调优 (Heuristic Tuner 64KB Random)]"))
-        print(String(format: "  • 优化前 (盲目 Deflate 压缩)          : 压缩后 %5d B (体积膨胀 +%d B) | 耗时: %5.3f ms", blindComp.count, blindComp.count - randSize, blindTimeMs))
-        print(String(format: "  • 优化后 (Shannon 级联微采样自适应探测): 命中模式 [%@] ➔ 直通 DIRECT 存储   | 耗时: %5.3f ms", rec.codec == TTZIP_TUNER_CODEC_DIRECT ? "DIRECT/STORE" : "COMPRESS", tunerTimeMs))
-        print(String(format: "  • 差分收益: 耗时削减 %.1f%% (CPU 周期节省 %.1fx), 零体积负膨胀\n", (1.0 - tunerTimeMs / max(0.0001, blindTimeMs)) * 100.0, blindTimeMs / max(0.0001, tunerTimeMs)))
+        TTLogger.debug(String(format: "▶ [6. High-Entropy Incompressible Data Adaptive Tuning (Heuristic Tuner 64KB Random)]"))
+        TTLogger.debug(String(format: "  • Baseline (Blind Deflate Compression)   : Size %5d B (Expansion +%d B) | Elapsed: %5.3f ms", blindComp.count, blindComp.count - randSize, blindTimeMs))
+        TTLogger.debug(String(format: "  • Optimized (Shannon Cascade Fast-Reject): Mode [%@] -> DIRECT Store | Elapsed: %5.3f ms", rec.codec == TTZIP_TUNER_CODEC_DIRECT ? "DIRECT/STORE" : "COMPRESS", tunerTimeMs))
+        TTLogger.debug(String(format: "  • Differential Gain: Elapsed reduced %.1f%% (CPU cycles saved %.1fx), zero inflation\n", (1.0 - tunerTimeMs / max(0.0001, blindTimeMs)) * 100.0, blindTimeMs / max(0.0001, tunerTimeMs)))
 
-        print(String(repeating: "=", count: 100) + "\n")
+        TTLogger.debug(String(repeating: "=", count: 100) + "\n")
     }
 }

@@ -90,7 +90,9 @@ final class CrossBlockDeflateDictionaryTests: XCTestCase {
         var testData = Data()
         let sentence = "HighPerformanceParallelDeflateAppleSiliconMSeriesEngine2026 "
         let sentenceData = sentence.data(using: .utf8)!
-        while testData.count < 4 * 1024 * 1024 {
+        let targetSize = TestBenchmarkTier.isBenchmarkMode ? (4 * 1024 * 1024) : (1024 * 1024)
+        let blockSize = TestBenchmarkTier.isBenchmarkMode ? 524288 : 131072
+        while testData.count < targetSize {
             testData.append(sentenceData)
         }
         try testData.write(to: sampleFile)
@@ -102,7 +104,7 @@ final class CrossBlockDeflateDictionaryTests: XCTestCase {
             outputPath: archivePath,
             inputPath: sampleFile.path,
             level: .normal,
-            blockSize: 524288 // 512KB chunks -> 8 blocks
+            blockSize: blockSize // 8 multi-blocks
         )
         XCTAssertTrue(success, "ZipExtremeBlockWriter must successfully compress 4MB multi-block file")
         

@@ -33,10 +33,14 @@ final class AllFormatDiagnosticSuiteTests: XCTestCase {
         let defaultLevels: [ArchiveCompressionLevel] = TestBenchmarkTier.isBenchmarkMode
             ? [.store, .level1, .level6, .level9]
             : [.level1, .level6]
+        let sampleFiles = TestBenchmarkTier.isBenchmarkMode ? 100 : 10
+        let lineRepeats = TestBenchmarkTier.isBenchmarkMode ? 2000 : 100
         let config = FormatDiagnosticConfig(
             format: format,
             levelsToTest: levels ?? defaultLevels,
-            testPasswordEncryption: testEncryption
+            testPasswordEncryption: testEncryption,
+            sampleFileCount: sampleFiles,
+            lineRepeatCount: lineRepeats
         )
         let pass = try FormatDiagnosticSuiteRunner.shared.runDiagnosticSuite(config: config)
         XCTAssertTrue(pass, "Format diagnostic suite failed for \(format.rawValue.uppercased())", file: file, line: line)

@@ -12,7 +12,7 @@ import XCTest
 @MainActor
 final class AsyncPathAutocompletionTests: XCTestCase {
     
-    private var tempDirectory: URL!
+    nonisolated(unsafe) private var tempDirectory: URL!
     
     override func setUp() {
         super.setUp()

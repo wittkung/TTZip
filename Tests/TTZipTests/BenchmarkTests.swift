@@ -10,7 +10,9 @@ import XCTest
 
 final class BenchmarkTests: XCTestCase {
     
-    let payloadSize: Int = 5 * 1024 * 1024 // 5 MB
+    var payloadSize: Int {
+        TestBenchmarkTier.isBenchmarkMode ? (5 * 1024 * 1024) : (1024 * 1024)
+    }
     
     private func createRealWorldPayload(at sandbox: IsolatedTempSandbox) throws -> String {
         let realWorldFilePath = sandbox.fileURL(named: "real_world_payload.bin").path

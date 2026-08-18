@@ -9,10 +9,14 @@ import XCTest
 import QuartzCore
 @testable import TTZipCore
 
-/// 纯 TAR.ZST / Zstandard 格式同构帕累托对标测试套件
+/// Isomorphic TAR.ZST / Zstandard format Pareto benchmark PK test suite (TTZip vs. Meta zstd CLI).
 final class TarZstParetoFrontierPkTests: XCTestCase {
     
+    /// Evaluates same-format TAR.ZST compression Pareto frontier against Meta official zstd.
     func testTarZstSameFormatParetoFrontier() async throws {
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            throw XCTSkip("Benchmark test requires TTZIP_RUN_BENCHMARKS=1")
+        }
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_zst_pk_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -25,7 +29,7 @@ final class TarZstParetoFrontierPkTests: XCTestCase {
         var points: [ParetoPoint] = []
         let writer = ArchiveWriter()
         
-        // 1. TTZip TAR.ZST 原生管道 (Level 1 到 12)
+        // 1. TTZip TAR.ZST native pipeline (Levels 1 to 12).
         for lvl in 1...12 {
             let levelEnum = ArchiveCompressionLevel(rawValue: lvl) ?? .level1
             let outPath = tempDir.appendingPathComponent("ttzip_zst_\(lvl).tar.zst").path
@@ -48,7 +52,7 @@ final class TarZstParetoFrontierPkTests: XCTestCase {
             }
         }
         
-        // 2. Meta 官方 Zstandard CLI (/opt/homebrew/bin/zstd -T0 -1, -3, -6, -9, -15, -19)
+        // 2. Meta official Zstandard CLI (/opt/homebrew/bin/zstd -T0 -1, -3, -6, -9, -15, -19).
         let zstdPath = "/opt/homebrew/bin/zstd"
         if FileManager.default.fileExists(atPath: zstdPath) {
             for zLvl in [1, 3, 6, 9, 15, 19] {
@@ -77,7 +81,7 @@ final class TarZstParetoFrontierPkTests: XCTestCase {
             }
         }
         
-        // 3. 计算同格式帕累托前沿
+        // 3. Compute isomorphic TAR.ZST Pareto frontier.
         var mutablePoints = points
         let paretoRes = ParetoFrontierCalculator.shared.computeParetoFrontier(points: &mutablePoints)
         
@@ -100,7 +104,7 @@ final class TarZstParetoFrontierPkTests: XCTestCase {
             title: title
         )
         
-        print("🏆 100% 同格式 TAR.ZST / Zstandard 专属帕累托图已生成: \(artifactPath)")
+        TTLogger.debug("🏆 Isomorphic TAR.ZST / Zstandard Pareto chart generated: \(artifactPath)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPath))
     }
 }

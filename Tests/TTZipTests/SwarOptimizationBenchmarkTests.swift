@@ -5,9 +5,6 @@
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
-// Tests/TTZipTests/SwarOptimizationBenchmarkTests.swift
-// TTZip Global SWAR & Pattern Acceleration Benchmarks
-
 import XCTest
 import CTTZipBridge
 @testable import TTZipCore
@@ -34,13 +31,6 @@ final class SwarOptimizationBenchmarkTests: XCTestCase {
         let totalMB = (Double(size) * Double(iterations)) / (1024.0 * 1024.0)
         let throughputMBS = totalMB / elapsed
 
-        print("\n=======================================================")
-        print("  [SWAR Benchmark] ASCII Scan Throughput:")
-        print("  - Total Data Processed: \(String(format: "%.2f", totalMB)) MB")
-        print("  - Elapsed Time:         \(String(format: "%.4f", elapsed)) s")
-        print("  - Throughput:           \(String(format: "%.2f", throughputMBS)) MB/s")
-        print("=======================================================\n")
-
         XCTAssertGreaterThan(throughputMBS, 2000.0, "ASCII scan throughput must exceed 2,000 MB/s")
     }
 
@@ -64,13 +54,6 @@ final class SwarOptimizationBenchmarkTests: XCTestCase {
         XCTAssertEqual(matchCount, iterations)
 
         let opsPerSec = Double(iterations) / elapsed
-
-        print("\n=======================================================")
-        print("  [SWAR Benchmark] Path Encoding Detection:")
-        print("  - Iterations:     \(iterations)")
-        print("  - Elapsed Time:   \(String(format: "%.4f", elapsed)) s")
-        print("  - Detection Rate: \(String(format: "%.2f", opsPerSec / 1_000_000.0)) M ops/s")
-        print("=======================================================\n")
 
         XCTAssertGreaterThan(opsPerSec, 5_000_000.0, "Encoding detection rate must exceed 5M ops/s")
     }
@@ -115,13 +98,6 @@ final class SwarOptimizationBenchmarkTests: XCTestCase {
 
         let totalOps = Double(iterations * headers.count)
         let opsPerSec = totalOps / elapsed
-
-        print("\n=======================================================")
-        print("  [SWAR Benchmark] Magic Format Sniffing (Optimized):")
-        print("  - Total Sniffs:   \(Int(totalOps))")
-        print("  - Elapsed Time:   \(String(format: "%.4f", elapsed)) s")
-        print("  - Sniffing Rate:  \(String(format: "%.2f", opsPerSec / 1_000_000.0)) M sniffs/s")
-        print("=======================================================\n")
 
         #if DEBUG
         XCTAssertGreaterThan(opsPerSec, 10_000_000.0, "Header format sniffing rate in Debug mode must exceed 10M sniffs/s")

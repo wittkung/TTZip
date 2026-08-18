@@ -82,13 +82,14 @@ public enum MultiModalDatasetGenerator {
         defer { try? fileHandle.close() }
 
         // Write non-zero header
-        var header = [UInt8](repeating: 0x5A, count: allocatedHeaderBytes)
+        let header = [UInt8](repeating: 0x5A, count: allocatedHeaderBytes)
         try fileHandle.write(contentsOf: Data(header))
 
         // Seek to end and truncate/write last byte to form sparse hole
         try fileHandle.seek(toOffset: UInt64(virtualSizeBytes - 1))
-        var tailByte: UInt8 = 0x5A
+        let tailByte: UInt8 = 0x5A
         try fileHandle.write(contentsOf: Data([tailByte]))
+
     }
 
     /// Generates a repetitive JSON log stream.

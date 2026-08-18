@@ -194,9 +194,9 @@ public final class SVGParetoPlotter: @unchecked Sendable {
             let py = mapY(p.throughputMBs)
             let fam = SoftwareFamilyClassifier.classify(algorithm: p.algorithm)
 
-            let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
             let cleanName: String
             if fam == .sevenZip {
+
                 cleanName = p.algorithm.replacingOccurrences(of: "7-Zip 26.02 (ZIP ", with: "7-zip-")
                     .replacingOccurrences(of: "7-Zip 26.02 (7Z ", with: "7-zip-")
                     .replacingOccurrences(of: ")", with: "")

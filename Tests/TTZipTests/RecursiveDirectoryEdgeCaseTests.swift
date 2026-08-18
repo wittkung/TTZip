@@ -8,9 +8,12 @@
 import XCTest
 @testable import TTZipCore
 
+/// Test suite validating edge cases in recursive directory tree archiving,
+/// including deep nesting, non-ASCII Unicode paths, mixed inputs, macOS metadata junk filtering,
+/// split volume creation, and header encryption.
 final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
     
-    /// 1. 5
+    /// Verifies deep nested directory hierarchy archiving and extraction fidelity across formats.
     func testDeepNestedDirectoryTreeCompression() async throws {
         let writer = ArchiveWriter()
         let reader = ArchiveReader()
@@ -29,15 +32,15 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
             let archivePath = tempDir.appendingPathComponent("deep_\(format.rawValue).\(format.rawValue)").path
             try await writer.createArchive(outputPath: archivePath, format: format, level: .normal, inputPaths: [tempDir.appendingPathComponent("L1").path])
             
-            // ( L1, L2, L3, L4, L5 )
+            // Validate recursive directory entries (L1 through L5)
             let entries = try await reader.inspect(archivePath: archivePath)
-            XCTAssertGreaterThanOrEqual(entries.count, 6, "格式 \(format) 未能完整递归压入深层目录树")
+            XCTAssertGreaterThanOrEqual(entries.count, 6, "Format \(format) failed to recursively archive deeply nested directory tree")
             
             let leafEntry = entries.first(where: { $0.name.contains("deep_leaf.txt") })
-            XCTAssertNotNil(leafEntry, "格式 \(format) 缺失叶子节点文件")
+            XCTAssertNotNil(leafEntry, "Format \(format) missing leaf node file")
             XCTAssertGreaterThan(leafEntry?.uncompressedSize ?? 0, 0)
             
-            // Verify expected invariant
+            // Verify extraction fidelity
             let destDir = tempDir.appendingPathComponent("dest_\(format.rawValue)")
             try await extractor.extract(archivePath: archivePath, destinationDir: destDir.path)
             
@@ -48,7 +51,7 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         }
     }
     
-    /// 2. 、
+    /// Verifies compression and inspection of directories and files containing Chinese and special characters.
     func testChineseAndSpecialCharacterPathsCompression() async throws {
         let writer = ArchiveWriter()
         let reader = ArchiveReader()
@@ -58,7 +61,7 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         try FileManager.default.createDirectory(at: chineseFolder, withIntermediateDirectories: true)
         
         let videoFile = chineseFolder.appendingPathComponent("测试 视频_01.mp4")
-        let dummyData = Data(repeating: 0xAB, count: 1024 * 64) // 64KB 模拟视频数据
+        let dummyData = Data(repeating: 0xAB, count: 1024 * 64) // 64KB dummy video payload
         try dummyData.write(to: videoFile)
         
         let archivePath = tempDir.appendingPathComponent("output_chinese.7z").path
@@ -68,11 +71,11 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(entries.count, 2)
         
         let foundVideo = entries.first(where: { $0.name.contains("测试 视频_01.mp4") || $0.path.contains("测试 视频_01.mp4") })
-        XCTAssertNotNil(foundVideo, "未能在压缩包中找到中文路径下的文件")
+        XCTAssertNotNil(foundVideo, "Failed to locate file under Chinese path in archive")
         XCTAssertEqual(foundVideo?.uncompressedSize, 64 * 1024)
     }
     
-    /// Validates expected behavior and invariants.
+    /// Tests compression of mixed inputs containing multiple standalone files and folders.
     func testMultiFolderAndMultiFileMixedInputs() async throws {
         let writer = ArchiveWriter()
         let reader = ArchiveReader()
@@ -102,10 +105,10 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         )
         
         let entries = try await reader.inspect(archivePath: archivePath)
-        XCTAssertGreaterThanOrEqual(entries.count, 5, "混合多文件与多文件夹未被完整写入包中")
+        XCTAssertGreaterThanOrEqual(entries.count, 5, "Mixed files and folders were not completely written to archive")
     }
     
-    /// 4. macOS (.DS_Store / __MACOSX)
+    /// Verifies macOS junk file (.DS_Store) filtering when archiving directory trees.
     func testMacJunkFilteringInDirectoryTree() async throws {
         let writer = ArchiveWriter()
         let reader = ArchiveReader()
@@ -132,11 +135,11 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         let hasDSStore = entries.contains(where: { $0.name.contains(".DS_Store") })
         let hasMainSwift = entries.contains(where: { $0.name.contains("main.swift") })
         
-        XCTAssertFalse(hasDSStore, ".DS_Store 垃圾文件未被过滤")
-        XCTAssertTrue(hasMainSwift, "正常源码文件误遭剔除")
+        XCTAssertFalse(hasDSStore, ".DS_Store junk file was not filtered")
+        XCTAssertTrue(hasMainSwift, "Legitimate source code file was erroneously removed")
     }
     
-    /// 5. (7z / Zip .001, .002...)
+    /// Verifies multi-volume split archive generation (.001, .002, etc.).
     func testSplitVolumeArchiveCreation() async throws {
         let writer = ArchiveWriter()
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("SplitVol_\(UUID().uuidString)")
@@ -148,7 +151,7 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         try dummyData.write(to: largeFile)
         
         let outputZip = tempDir.appendingPathComponent("split_archive.7z").path
-        let splitSize: Int64 = 64 * 1024 // 64KB 切片
+        let splitSize: Int64 = 64 * 1024 // 64KB volume segment size
         
         try await writer.createArchive(
             outputPath: outputZip,
@@ -160,10 +163,10 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         )
         
         let part1 = tempDir.appendingPathComponent("split_archive.7z.001").path
-        XCTAssertTrue(FileManager.default.fileExists(atPath: part1), "分卷压缩包 .001 卷未成功生成")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: part1), "Split volume .001 part was not generated successfully")
     }
     
-    /// 6. Header (-p -mhe=on)
+    /// Verifies encrypted 7z archive creation with password protection.
     func testPasswordEncrypted7zCreation() async throws {
         let writer = ArchiveWriter()
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("Enc_\(UUID().uuidString)")
@@ -185,6 +188,6 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
             password: password
         )
         
-        XCTAssertTrue(FileManager.default.fileExists(atPath: output7z), "加密压缩包未成功生成")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: output7z), "Encrypted archive was not generated successfully")
     }
 }

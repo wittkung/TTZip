@@ -9,10 +9,14 @@ import XCTest
 import QuartzCore
 @testable import TTZipCore
 
-/// 纯 ZIP 格式【多核满载极限对决】基准评测套件 (18 核心饱和调度)
+/// Multi-core saturated scheduling ZIP format Pareto benchmark PK test suite (TTZip vs. pigz multi-threaded).
 final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
 
+    /// Evaluates multi-core parallel ZIP compression Pareto frontier against pigz and advzip.
     func testZipMultiCoreParetoFrontier() async throws {
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            throw XCTSkip("Benchmark test requires TTZIP_RUN_BENCHMARKS=1")
+        }
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_multicore_pk_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -22,30 +26,29 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
         let payloadBytes = (sampleAttrs[.size] as? Int64) ?? 100_000_000
         let payloadMB = Double(payloadBytes) / 1024.0 / 1024.0
 
-        // 0. 科学 Warm-up 热身轮次 (消除缺页中断、GCD 线程冷创建与 C 状态冷开销)
+        // 0. Warm-up pass to eliminate page faults, thread pool cold creation, and C state initialization overhead.
         let asyncWriter = ArchiveWriter()
         let warmupPath = tempDir.appendingPathComponent("ttzip_warmup.zip").path
         _ = try? await asyncWriter.createArchive(outputPath: warmupPath, format: .zip, level: .level1, inputPaths: [realSamplePath])
         try? FileManager.default.removeItem(atPath: warmupPath)
 
-        // 校验样本密码学指纹
+        // Verify cryptographic SHA-256 fingerprint of the fixture.
         let corpusItem = CorpusItem(id: "enwik8", name: "enwik8", tier: .tier1Text, path: realSamplePath, sizeBytes: payloadBytes)
         let fp = CorpusFingerprintManager.shared.computeFingerprint(for: corpusItem)
         if let fp = fp {
-            print("🔒 [Benchmark Fixture Verified] SHA-256: \(fp.sha256Hex)")
+            TTLogger.debug("🔒 [Benchmark Fixture Verified] SHA-256: \(fp.sha256Hex)")
         }
 
         var zipPoints: [ParetoPoint] = []
 
-        // 1. TTZip 全谱系真·帕累托 8 大黄金档位 (Tier 0..5 永远实时实测，Tier 6/7 默认按需缓存，支持 TTZIP_BENCH_ALL_LIVE=1 强制全量重跑)
+        // 1. TTZip multi-core profiles (Tiers 0..5 live execution, Tiers 6/7 cached or forced via TTZIP_BENCH_ALL_LIVE=1).
         let datasetSha256 = fp?.sha256Hex ?? "unknown"
         let forceLiveAll = (ProcessInfo.processInfo.environment["TTZIP_BENCH_ALL_LIVE"] == "1" ||
                             ProcessInfo.processInfo.environment["TTZIP_FORCE_BENCH_RERUN"] == "1")
 
         for (tierIdx, profile) in ZipCompressionProfile.allProfiles.enumerated() {
             if tierIdx >= 6 && !forceLiveAll {
-                // Tier 6 (Ultra Zopfli) 与 Tier 7 (Extreme Peak) 默认复用基准缓存 (0.001s 加载)
-                // 如需强制现场重跑，设置环境变量 TTZIP_BENCH_ALL_LIVE=1 或 TTZIP_FORCE_BENCH_RERUN=1
+                // Tier 6 (Ultra Zopfli) and Tier 7 (Extreme Peak) default to caching unless forced.
                 let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
                     toolId: "ttzip_mc_\(tierIdx)",
                     algorithm: "TTZip \(tierIdx) (\(profile.name))",
@@ -80,13 +83,13 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
                         compressedBytes: sz,
                         uncompressedBytes: payloadBytes
                     )
-                    print("📊 [TTZip Tier \(tierIdx)] \(profile.name): deflateLvl=\(profile.deflateLevel), speed=\(String(format: "%.1f", speed)) MB/s, sz=\(String(format: "%.2f", Double(sz)/(1024*1024))) MB")
+                    TTLogger.debug("📊 [TTZip Tier \(tierIdx)] \(profile.name): deflateLvl=\(profile.deflateLevel), speed=\(String(format: "%.1f", speed)) MB/s, sz=\(String(format: "%.2f", Double(sz)/(1024*1024))) MB")
                     zipPoints.append(pt)
                 }
             }
         }
 
-        // 2. pigz 18 核心多线程 Deflate (Mark Adler 官方多核极速引擎, -p 18, 覆盖全量 11 大物理级别)
+        // 2. pigz multi-threaded Deflate (18 cores, across 11 levels).
         let pigzPath = "/opt/homebrew/bin/pigz"
         if FileManager.default.fileExists(atPath: pigzPath) {
             let pigzLevels: [(Int, String)] = [
@@ -132,7 +135,7 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
             }
         }
 
-        // 3. AdvanceCOMP (advzip -4 极限迭代重压)
+        // 3. AdvanceCOMP (advzip -4 iterative optimization).
         let advzipPath = "/opt/homebrew/bin/advzip"
         if FileManager.default.fileExists(atPath: advzipPath) {
             let advPoint = CompetitorBenchmarkCacheManager.shared.getOrRun(
@@ -163,7 +166,7 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
             zipPoints.append(advPoint)
         }
 
-        // 3. 计算多核帕累托前沿并输出图表
+        // 4. Compute multi-core Pareto frontier and export plot.
         let artifactPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/pareto_pk_zip_multicore.png"
         let docsPath = "docs/benchmarks/pareto_pk_zip_multicore.png"
         let title = "ZIP Format Multi-Core Pareto Benchmark (18-Core: TTZip vs. pigz)"
@@ -186,7 +189,7 @@ final class ZipMultiCoreParetoFrontierPkTests: XCTestCase {
             title: title
         )
 
-        print("🏆 纯 ZIP 格式 18 核心满载极限对决图表已生成: \(artifactPath)")
+        TTLogger.debug("🏆 Pure ZIP 18-core multi-threaded Pareto chart generated: \(artifactPath)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPath))
     }
 }

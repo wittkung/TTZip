@@ -7,11 +7,12 @@
 
 import Foundation
 import CryptoKit
+@testable import TTZipCore
 
-/// ( 、mkfile AES )
+/// Utility generator creating realistic file fixtures and synthetic payloads for test suites.
 public enum TestFileGenerator {
     
-    /// 1. ( )
+    /// Generates a batch of small dummy data files within the specified directory.
     @discardableResult
     public static func createBatchSmallFiles(in directory: URL, count: Int, sizePerFileInKB: Int) throws -> [URL] {
         let fileManager = FileManager.default
@@ -26,7 +27,7 @@ public enum TestFileGenerator {
         return generatedURLs
     }
     
-    /// 2. ( Foundation OutputStream ， OOM)
+    /// Generates a large payload file using streamed 1MB chunks to prevent memory exhaustion.
     public static func createHugeFile(at targetURL: URL, sizeInMB: Int) throws {
         let parentDir = targetURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
@@ -44,7 +45,7 @@ public enum TestFileGenerator {
         }
     }
 
-    /// Validates expected behavior and invariants.
+    /// Generates a realistic structured text log file with the given number of log lines.
     public static func createRealisticLogFile(at targetURL: URL, linesCount: Int) throws {
         let parentDir = targetURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
@@ -58,7 +59,7 @@ public enum TestFileGenerator {
         try logData.write(to: targetURL)
     }
     
-    /// 4. ( Apple CryptoKit AES-GCM)
+    /// Generates an AES-GCM encrypted payload file using Apple CryptoKit.
     public static func createHugeEncryptedFile(at targetURL: URL, sizeInMB: Int) throws {
         let parentDir = targetURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
@@ -70,7 +71,7 @@ public enum TestFileGenerator {
         try combinedData.write(to: targetURL)
     }
     
-    /// 5. macOS `/usr/sbin/mkfile` GB
+    /// Instantly allocates a sparse/dense huge file on macOS using `/usr/sbin/mkfile`.
     public static func createInstantHugeFile(atPath path: String, sizeInMB: Int) {
         let parentDir = (path as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
@@ -84,14 +85,17 @@ public enum TestFileGenerator {
     }
 }
 
-/// Validates expected behavior and invariants.
+/// Formatted diagnostic test logger dispatching structured test summaries through TTLogger.
 public enum TTZipTestLogger {
+    
+    /// Emits a structured section header banner for a test suite.
     public static func logHeader(_ title: String) {
-        print("\n================================================================================")
-        print("  📊 [TTZip Test Suite] \(title)")
-        print("================================================================================")
+        TTLogger.debug("\n================================================================================")
+        TTLogger.debug("  📊 [TTZip Test Suite] \(title)")
+        TTLogger.debug("================================================================================")
     }
 
+    /// Emits a structured row of performance metrics for an archive compression/decompression benchmark.
     public static func logMetricsRow(
         format: String,
         payloadMB: Double,
@@ -108,12 +112,13 @@ public enum TTZipTestLogger {
         let cSpd = String(format: "%.1f", compressSpeedMBs)
         let dSpd = String(format: "%.1f", decompressSpeedMBs)
         let el = String(format: "%.3f", elapsedSeconds)
-        print("  [▶ \(format)] 载荷: \(pMB) MB | 压缩包: \(cMB) MB (\(rP)%) | 编解码: \(cSpd) / \(dSpd) MB/s | 耗时: \(el) s -> \(status)")
+        TTLogger.debug("  [▶ \(format)] Payload: \(pMB) MB | Archive: \(cMB) MB (\(rP)%) | Codec: \(cSpd) / \(dSpd) MB/s | Elapsed: \(el) s -> \(status)")
     }
 
+    /// Emits a formatted test suite completion summary.
     public static func logSuiteSummary(suiteName: String, totalTests: Int, passed: Int, failed: Int, duration: Double) {
-        print("--------------------------------------------------------------------------------")
-        print("  ✅ 测试套件 [\(suiteName)] 完成: 运行 \(totalTests) 测试 | 通过 \(passed) | 失败 \(failed) | 总耗时: \(String(format: "%.3f", duration)) 秒")
-        print("--------------------------------------------------------------------------------\n")
+        TTLogger.debug("--------------------------------------------------------------------------------")
+        TTLogger.debug("  ✅ Test Suite [\(suiteName)] Completed: \(totalTests) tests | \(passed) passed | \(failed) failed | Total time: \(String(format: "%.3f", duration)) s")
+        TTLogger.debug("--------------------------------------------------------------------------------\n")
     }
 }

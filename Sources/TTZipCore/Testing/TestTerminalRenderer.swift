@@ -35,9 +35,11 @@ public enum TestTerminalRenderer: Sendable {
         public static let boldCyan = "\u{001B}[1;36m"
         public static let boldWhite = "\u{001B}[1;37m"
         
-        // High-intensity
+        // High-intensity & Kintsugi Gold
         public static let brightYellow = "\u{001B}[1;93m"
         public static let brightCyan = "\u{001B}[1;96m"
+        public static let kintsugiGold = "\u{001B}[38;5;220m"
+        public static let boldKintsugiGold = "\u{001B}[1;38;5;220m"
     }
     
     // MARK: - Badges
@@ -49,6 +51,7 @@ public enum TestTerminalRenderer: Sendable {
         case standards = "STANDARDS"
         case oracle = "ORACLE"
         case fuzz = "FUZZ"
+        case perf = "PERF"
         case running = "RUN"
         case info = "INFO"
     }
@@ -72,6 +75,8 @@ public enum TestTerminalRenderer: Sendable {
             return "\(ANSI.boldMagenta)[ORACLE]\(ANSI.reset)"
         case .fuzz:
             return "\(ANSI.brightYellow)[FUZZ]\(ANSI.reset)"
+        case .perf:
+            return "\(ANSI.boldKintsugiGold)[PERF]\(ANSI.reset)"
         case .running:
             return "\(ANSI.boldBlue)[RUN]\(ANSI.reset)"
         case .info:
@@ -85,6 +90,27 @@ public enum TestTerminalRenderer: Sendable {
     public static func standardsBadge(useColor: Bool = true) -> String { badge(.standards, useColor: useColor) }
     public static func oracleBadge(useColor: Bool = true) -> String { badge(.oracle, useColor: useColor) }
     public static func fuzzBadge(useColor: Bool = true) -> String { badge(.fuzz, useColor: useColor) }
+    public static func perfBadge(useColor: Bool = true) -> String { badge(.perf, useColor: useColor) }
+    
+    // MARK: - Aligned Streaming Row (zlib-ng & CTest Paradigm)
+    
+    /// Render aligned streaming test progress row
+    public static func renderAlignedRow(
+        index: Int,
+        total: Int,
+        badge badgeType: Badge,
+        target: String,
+        testName: String,
+        durationMs: Double,
+        useColor: Bool = TerminalCapabilities.supportsColor
+    ) -> String {
+        let b = badge(badgeType, useColor: useColor)
+        let dur = formatDuration(ms: durationMs)
+        let targetPadded = target.padding(toLength: 12, withPad: " ", startingAt: 0)
+        let namePadded = testName.count > 42 ? String(testName.prefix(39)) + "..." : testName.padding(toLength: 42, withPad: " ", startingAt: 0)
+        let idxStr = String(format: "%3d/%3d", index, total)
+        return "  [\(idxStr)] \(b) [\(targetPadded)] \(namePadded) (\(dur))"
+    }
     
     // MARK: - Timing Metrics
     

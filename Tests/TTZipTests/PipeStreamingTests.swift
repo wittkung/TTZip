@@ -153,7 +153,7 @@ final class PipeStreamingTests: XCTestCase {
         // Test pipe reader with ttzip_stream_archive_entries_to_fd
         let pipe = Pipe()
         var errBuf = [CChar](repeating: 0, count: 512)
-        var patterns: [UnsafePointer<CChar>?] = [("doc.txt" as NSString).utf8String]
+        let patterns: [UnsafePointer<CChar>?] = [("doc.txt" as NSString).utf8String]
         
         let rc = patterns.withUnsafeBufferPointer { ptr in
             return ttzip_stream_archive_entries_to_fd(

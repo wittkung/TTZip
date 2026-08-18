@@ -9,12 +9,17 @@ import XCTest
 @testable import TTZipCore
 import CTTZipBridge
 
+/// Comprehensive 5-Tier multi-modality corpus benchmark suite using weighted geometric mean index.
 final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
     
+    /// Evaluates 5-tier scientific multi-modality corpus compression efficiency across candidate tools.
     func testComprehensiveFiveTierGeometricMeanPk() async throws {
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            throw XCTSkip("Benchmark test requires TTZIP_RUN_BENCHMARKS=1")
+        }
         let orchestrator = CorpusOrchestrator.shared
         
-        // 1. 选取 5 大 Tier 代表性真实语料
+        // 1. Select representative real-world corpora across 5 major tiers.
         let tier1Item = orchestrator.items(for: .tier1Text).first { $0.id.contains("dickens") || $0.id.contains("webster") || $0.id == "enwik8" }
         let tier2Item = orchestrator.items(for: .tier2Binary).first { $0.id.contains("ooffice") || $0.id.contains("mozilla") }
         let tier3Item = orchestrator.items(for: .tier3Structured).first { $0.id.contains("xml") || $0.id.contains("nci") }
@@ -22,7 +27,7 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
         let tier5Item = orchestrator.items(for: .tier5DenseMatrix).first { $0.id.contains("mr") || $0.id.contains("x-ray") }
         
         guard let t1 = tier1Item, let t2 = tier2Item, let t3 = tier3Item, let t4 = tier4Item, let t5 = tier5Item else {
-            XCTFail("无法完整加载 5 大 Tier 真实语料")
+            XCTFail("Failed to load representative corpora for all 5 tiers")
             return
         }
         
@@ -34,16 +39,16 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
             (.tier5DenseMatrix, t5)
         ]
         
-        print("\n========================================================================")
-        print("🏛️  5-Tier 科学多模态真实语料库综合基准评测 (Geometric Mean Index)")
-        print("------------------------------------------------------------------------")
+        TTLogger.debug("\n========================================================================")
+        TTLogger.debug("🏛️  5-Tier Multi-Modality Corpus Comprehensive Benchmark (Geometric Mean Index)")
+        TTLogger.debug("------------------------------------------------------------------------")
         for (tier, item) in tiersList {
             let sizeMB = Double(item.sizeBytes) / 1024.0 / 1024.0
-            print("  • \(tier.rawValue): \(item.name) (\(String(format: "%.2f", sizeMB)) MB)")
+            TTLogger.debug("  • \(tier.rawValue): \(item.name) (\(String(format: "%.2f", sizeMB)) MB)")
         }
-        print("========================================================================\n")
+        TTLogger.debug("========================================================================\n")
         
-        // 2. 定义拟评测的多软件与多档位矩阵
+        // 2. Define benchmark candidate tools and compression level matrix.
         struct BenchmarkCandidate {
             let name: String
             let level: Int
@@ -52,7 +57,7 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
         
         var candidates: [BenchmarkCandidate] = []
         
-        // 1. TTZip 原生统一引擎 (内建香农熵自适应分流与多核并行): 全部 1 到 12 等级
+        // 1. TTZip native unified engine across all levels (Levels 1 to 12).
         for lvl in 1...12 {
             let levelEnum = ArchiveCompressionLevel(rawValue: lvl) ?? .level1
             candidates.append(BenchmarkCandidate(name: "TTZip (L\(lvl))", level: lvl) { corpus in
@@ -70,7 +75,7 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
             })
         }
         
-        // 3. 7-Zip / pigz / Apple Native: 根据配置选择从黄金快照快速恢复或现场全量重跑
+        // 2. Competitor matrix (7-Zip / pigz / Apple Native): live rerun or golden snapshot.
         if CompetitorBaselineSnapshotManager.shouldRerunCompetitors {
             let sevenZipLevels = [1, 3, 5, 7, 9]
             for mx in sevenZipLevels {
@@ -148,7 +153,7 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
             })
         }
         
-        // 3. 执行 5-Tier 矩阵基准评测
+        // 3. Execute 5-Tier matrix benchmark evaluation.
         var compositeScores: [AlgorithmCompositeScore] = []
         var plotPoints: [ParetoPoint] = []
         
@@ -163,12 +168,12 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
                         payloadBytes: item.sizeBytes,
                         compressedBytes: outSize,
                         compressionSpeedMBs: speed,
-                        decompressionSpeedMBs: speed * 3.5, // 典型解压比率
+                        decompressionSpeedMBs: speed * 3.5, // Typical decompression ratio model
                         compressionRatio: ratio,
                         spaceSavingsPct: savings
                     ))
                 } catch {
-                    print("⚠️ 测量失败: \(cand.name) on \(item.name)")
+                    TTLogger.debug("⚠️ Measurement failed: \(cand.name) on \(item.name)")
                 }
             }
             
@@ -189,7 +194,7 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
             ))
         }
         
-        // 若使用竞品黄金快照，直接合并快照点位
+        // Merge competitor golden snapshot data when competitor live rerun is disabled.
         if !CompetitorBaselineSnapshotManager.shouldRerunCompetitors {
             for comp in CompetitorBaselineSnapshotManager.fiveTierGeometricMeanCompetitors {
                 let specScore = (comp.throughputMBs / 100.0) * (comp.compressionRatio * 5.0)
@@ -217,18 +222,18 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
             }
         }
         
-        // 4. 计算帕累托前沿
+        // 4. Compute Pareto frontier.
         compositeScores = CompositeEfficiencyCalculator.computeParetoFrontier(scores: compositeScores)
         
-        // 5. 控制台输出标准学术表格
-        print("========================================================================================================================")
-        print("🏛️  5-Tier 跨语料加权几何平均综合效能榜 (Weighted Geometric Mean Index)")
-        print("========================================================================================================================")
-        print(String(format: "%-28@ | %-16@ | %-12@ | %-12@ | %-12@ | %-12@", "Algorithm/Software", "Geom Comp MB/s", "Geom Ratio", "Space Sav%", "SPEC-Score", "Pareto Rank"))
-        print("------------------------------------------------------------------------------------------------------------------------")
+        // 5. Output standardized table via TTLogger.
+        TTLogger.debug("========================================================================================================================")
+        TTLogger.debug("🏛️  5-Tier Weighted Geometric Mean Composite Efficiency Index")
+        TTLogger.debug("========================================================================================================================")
+        TTLogger.debug(String(format: "%-28@ | %-16@ | %-12@ | %-12@ | %-12@ | %-12@", "Algorithm/Software", "Geom Comp MB/s", "Geom Ratio", "Space Sav%", "SPEC-Score", "Pareto Rank"))
+        TTLogger.debug("------------------------------------------------------------------------------------------------------------------------")
         for s in compositeScores.sorted(by: { $0.normalizedSpecScore > $1.normalizedSpecScore }) {
             let rankStr = s.isParetoOptimal ? "★ Optimal" : "Rank \(s.paretoRank)"
-            print(String(
+            TTLogger.debug(String(
                 format: "%-28@ | %13.1f MB/s | %10.2fx | %10.1f%% | %12.1f | %@",
                 s.algorithm as NSString,
                 s.geomCompSpeedMBs,
@@ -238,9 +243,9 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
                 rankStr as NSString
             ))
         }
-        print("========================================================================================================================\n")
+        TTLogger.debug("========================================================================================================================\n")
         
-        // 6. 生成综合效能帕累托图表
+        // 6. Generate composite efficiency Pareto chart.
         let artifactPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/pareto_composite_geometric.png"
         let pResult = ParetoFrontierResult(
             totalPointsEvaluated: plotPoints.count,
@@ -256,7 +261,7 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
             height: 1080,
             title: "5-Tier Multi-Corpus Geometric Mean Benchmark (TTZip vs. 7-Zip vs. pigz vs. Apple Native)"
         )
-        print("🏆 5-Tier 综合效能帕累托图已生成: \(artifactPath)")
+        TTLogger.debug("🏆 5-Tier composite Pareto chart generated: \(artifactPath)")
         
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPath))
     }

@@ -36,8 +36,7 @@ final class NearOptimalParserTests: XCTestCase {
         let l12Size = l12Compressed.count
         let gainPercent = Double(l6Size - l12Size) / Double(l6Size) * 100.0
 
-        print("📊 [Near-Optimal Parser] Original: \(originalData.count) B | L6: \(l6Size) B | L12 (Near-Optimal): \(l12Size) B | Space Saving: \(String(format: "%.2f", gainPercent))%")
-
+        // Space saving calculated and asserted
         XCTAssertLessThanOrEqual(l12Size, l6Size, "Near-Optimal Level 12 must be smaller than or equal to Level 6")
         XCTAssertGreaterThanOrEqual(gainPercent, 1.5, "Near-Optimal parser should achieve measurable size reduction on text")
     }
@@ -103,8 +102,7 @@ final class NearOptimalParserTests: XCTestCase {
         let totalMB = Double(payloadSize * iterations) / (1024.0 * 1024.0)
         let elapsedSeconds = Double(elapsedNanos) / 1_000_000_000.0
         let throughputMBs = totalMB / elapsedSeconds
-
-        print("⚡ [Near-Optimal Parser] Level 11 DAG Throughput: \(String(format: "%.2f", throughputMBs)) MB/s")
+        _ = throughputMBs
 
         #if DEBUG
         XCTAssertGreaterThanOrEqual(throughputMBs, 5.0, "Debug mode throughput floor for Near-Optimal parsing")

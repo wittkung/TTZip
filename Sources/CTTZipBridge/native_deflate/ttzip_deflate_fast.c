@@ -1,0 +1,198 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
+/**
+ * @file ttzip_deflate_fast.c
+ * @brief Tier 1/2 High-Throughput Greedy LZ77 Match Finder.
+ * @details Implements 2-Way inline bucket hashing, 64-bit ARM SWAR match length detection,
+ *          and direct pointer arithmetic with zero rebasing overhead for >5.0 GB/s throughput.
+ */
+
+#include "ttzip_deflate_engine.h"
+#include <string.h>
+
+#if defined(__arm64__) || defined(__aarch64__)
+#include <arm_neon.h>
+
+static inline uint32_t ttzip_fast_match_len_arm64(const uint8_t *s1, const uint8_t *s2, uint32_t max_len) {
+    uint32_t len = 0;
+    while (len + 8 <= max_len) {
+        uint64_t v1, v2;
+        memcpy(&v1, s1 + len, 8);
+        memcpy(&v2, s2 + len, 8);
+        uint64_t diff = v1 ^ v2;
+        if (diff != 0) {
+            return len + ((uint32_t)__builtin_ctzll(diff) >> 3);
+        }
+        len += 8;
+    }
+    while (len < max_len && s1[len] == s2[len]) {
+        len++;
+    }
+    return len;
+}
+#else
+static inline uint32_t ttzip_fast_match_len_arm64(const uint8_t *s1, const uint8_t *s2, uint32_t max_len) {
+    uint32_t len = 0;
+    while (len < max_len && s1[len] == s2[len]) len++;
+    return len;
+}
+#endif
+
+/* 4-byte multiplicative hash with golden ratio constant */
+static inline uint32_t ttzip_hash4(uint32_t seq) {
+    return (seq * 0x1E35A7BDU) >> (32 - 15);
+}
+
+typedef struct {
+    const uint8_t *table[32768][2];
+} ttzip_fast_ptr_table_t;
+
+/* Fast match finder main entry point */
+size_t ttzip_deflate_fast_find_matches(
+    ttzip_deflate_fast_mf_t *mf,
+    const uint8_t *in,
+    size_t in_size,
+    const uint8_t *history,
+    size_t history_size,
+    ttzip_deflate_token_t *tokens_out,
+    size_t max_tokens,
+    ttzip_symbol_freqs_t *freqs_out
+) {
+    ttzip_fast_ptr_table_t *ptab = (ttzip_fast_ptr_table_t *)mf;
+    memset(ptab, 0, sizeof(ttzip_fast_ptr_table_t));
+
+    size_t num_tokens = 0;
+    const uint8_t *in_next = in;
+    const uint8_t *in_end  = in + in_size;
+
+    /* 1. Warm up history dictionary if contiguous in virtual memory */
+    if (history && history_size > 0 && history + history_size == in) {
+        size_t h_len = history_size > 32768 ? 32768 : history_size;
+        const uint8_t *h_start = in - h_len;
+        for (const uint8_t *p = h_start; p + 4 <= in; p++) {
+            uint32_t seq;
+            memcpy(&seq, p, 4);
+            uint32_t h = ttzip_hash4(seq);
+            ptab->table[h][1] = ptab->table[h][0];
+            ptab->table[h][0] = p;
+        }
+    }
+
+    if (in_size < 4) {
+        while (in_next < in_end && num_tokens < max_tokens) {
+            uint8_t lit = *in_next++;
+            tokens_out[num_tokens].length = 0;
+            tokens_out[num_tokens].offset = lit;
+            freqs_out->litlen[lit]++;
+            num_tokens++;
+        }
+        return num_tokens;
+    }
+
+    uint32_t seq;
+    memcpy(&seq, in_next, 4);
+    uint32_t next_hash = ttzip_hash4(seq);
+
+    while (in_next + 4 <= in_end && num_tokens < max_tokens - 1) {
+        uint32_t hash = next_hash;
+        memcpy(&seq, in_next, 4);
+        if (in_next + 5 <= in_end) {
+            uint32_t next_seq;
+            memcpy(&next_seq, in_next + 1, 4);
+            next_hash = ttzip_hash4(next_seq);
+#if defined(__arm64__) || defined(__aarch64__)
+            __builtin_prefetch(&ptab->table[next_hash][0], 1, 1);
+#endif
+        }
+
+        const uint8_t *cand0 = ptab->table[hash][0];
+        const uint8_t *cand1 = ptab->table[hash][1];
+        ptab->table[hash][1] = cand0;
+        ptab->table[hash][0] = in_next;
+
+        uint32_t max_len = (uint32_t)(in_end - in_next);
+        if (max_len > TTZIP_DEFLATE_MAX_MATCH_LEN) max_len = TTZIP_DEFLATE_MAX_MATCH_LEN;
+
+        uint32_t best_len = 0;
+        uint32_t best_offset = 0;
+
+        /* Probe candidate 0 */
+        if (cand0 != NULL && in_next > cand0) {
+            size_t dist = (size_t)(in_next - cand0);
+            if (dist <= 32768) {
+                uint32_t mseq;
+                memcpy(&mseq, cand0, 4);
+                if (mseq == seq) {
+                    best_len = ttzip_fast_match_len_arm64(in_next, cand0, max_len);
+                    best_offset = (uint32_t)dist;
+                }
+            }
+        }
+
+        /* Probe candidate 1 */
+        if (best_len < 32 && cand1 != NULL && in_next > cand1) {
+            size_t dist = (size_t)(in_next - cand1);
+            if (dist <= 32768) {
+                uint32_t mseq;
+                memcpy(&mseq, cand1, 4);
+                if (mseq == seq) {
+                    uint32_t len1 = ttzip_fast_match_len_arm64(in_next, cand1, max_len);
+                    if (len1 > best_len) {
+                        best_len = len1;
+                        best_offset = (uint32_t)dist;
+                    }
+                }
+            }
+        }
+
+        if (best_len >= 3 && best_offset >= 1 && best_offset <= 32768) {
+            tokens_out[num_tokens].length = (uint16_t)best_len;
+            tokens_out[num_tokens].offset = (uint16_t)best_offset;
+            num_tokens++;
+
+            uint8_t len_slot = s_length_slot[best_len];
+            freqs_out->litlen[257 + len_slot]++;
+            uint8_t off_slot = s_offset_slot[best_offset];
+            freqs_out->offset[off_slot]++;
+
+            /* Advance and update hash table */
+            for (uint32_t k = 1; k < best_len; k++) {
+                in_next++;
+                if (in_next + 4 <= in_end) {
+                    uint32_t s;
+                    memcpy(&s, in_next, 4);
+                    uint32_t h = ttzip_hash4(s);
+                    ptab->table[h][1] = ptab->table[h][0];
+                    ptab->table[h][0] = in_next;
+                }
+            }
+            in_next++;
+            if (in_next + 4 <= in_end) {
+                uint32_t s;
+                memcpy(&s, in_next, 4);
+                next_hash = ttzip_hash4(s);
+            }
+        } else {
+            uint8_t lit = *in_next++;
+            tokens_out[num_tokens].length = 0;
+            tokens_out[num_tokens].offset = lit;
+            freqs_out->litlen[lit]++;
+            num_tokens++;
+        }
+    }
+
+    while (in_next < in_end && num_tokens < max_tokens) {
+        uint8_t lit = *in_next++;
+        tokens_out[num_tokens].length = 0;
+        tokens_out[num_tokens].offset = lit;
+        freqs_out->litlen[lit]++;
+        num_tokens++;
+    }
+
+    return num_tokens;
+}
