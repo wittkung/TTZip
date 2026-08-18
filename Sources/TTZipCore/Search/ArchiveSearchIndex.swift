@@ -132,17 +132,26 @@ public final class ArchiveSearchIndex: @unchecked Sendable {
                         continue
                     }
                     
-                    let namePtr = baseAddr.advanced(by: Int(desc.nameOffset))
                     let nameLen = Int(desc.nameLength)
-                    if memmem(namePtr, nameLen, patternPtr, patternLen) != nil {
-                        matched.append(desc.index)
+                    let pathLen = Int(desc.pathLength)
+                    if patternLen > nameLen && patternLen > pathLen {
                         continue
                     }
                     
+                    let firstByte = Int32(patternBuf[0])
+                    let namePtr = baseAddr.advanced(by: Int(desc.nameOffset))
+                    if nameLen >= patternLen, memchr(namePtr, firstByte, nameLen) != nil {
+                        if memmem(namePtr, nameLen, patternPtr, patternLen) != nil {
+                            matched.append(desc.index)
+                            continue
+                        }
+                    }
+                    
                     let pathPtr = baseAddr.advanced(by: Int(desc.pathOffset))
-                    let pathLen = Int(desc.pathLength)
-                    if memmem(pathPtr, pathLen, patternPtr, patternLen) != nil {
-                        matched.append(desc.index)
+                    if pathLen >= patternLen, memchr(pathPtr, firstByte, pathLen) != nil {
+                        if memmem(pathPtr, pathLen, patternPtr, patternLen) != nil {
+                            matched.append(desc.index)
+                        }
                     }
                 }
             }

@@ -84,6 +84,7 @@ void ttzip_slice_start(const char* slice_name) {
 }
 
 void ttzip_slice_end(const char* slice_name) {
+    (void)slice_name;
     if (!atomic_load(&g_slice_enabled) || t_stack_depth <= 0) return;
     uint64_t end_time = mach_absolute_time();
     

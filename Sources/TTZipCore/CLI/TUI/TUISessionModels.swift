@@ -1,9 +1,9 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
-//  TUISessionModels.swift
-//  TTZipCore
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
 //
-//  Created by TTZip on 2026-08-18.
-//
+// TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
 

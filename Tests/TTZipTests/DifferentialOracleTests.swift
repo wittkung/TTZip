@@ -335,4 +335,42 @@ final class DifferentialOracleTests: XCTestCase {
             XCTFail("Missing regular file entry in extracted manifest")
         }
     }
+    
+    // MARK: - 9. Multi-Way Consensus Matrix
+    
+    func testMultiWayOracleConsensusMatrix() async throws {
+        let registry = DifferentialOracleRegistry.shared
+        _ = registry.discoverOracles()
+        
+        let sourceDir = try sandbox.createSubdirectory("multiway_source")
+        let doc1 = sourceDir.appendingPathComponent("data1.txt")
+        let doc2 = sourceDir.appendingPathComponent("sub/data2.json")
+        _ = try sandbox.createSubdirectory("multiway_source/sub")
+        try "Payload A".write(to: doc1, atomically: true, encoding: .utf8)
+        try "{\"status\":\"ok\"}".write(to: doc2, atomically: true, encoding: .utf8)
+        
+        let runSandbox = try sandbox.createSubdirectory("multiway_run")
+        
+        // 1. TAR multi-oracle verification
+        if let tarOracle = registry.oraclePath(for: "tar") {
+            let tarReport = try await DifferentialOracleTestHarness.executeRoundtrip(
+                format: .tar,
+                sourceDir: sourceDir.path,
+                oracle: tarOracle,
+                tempSandbox: runSandbox.appendingPathComponent("tar_run").path
+            )
+            XCTAssertTrue(tarReport.isPassed, "TAR oracle roundtrip must pass: \(tarReport.divergenceErrors)")
+        }
+        
+        // 2. ZIP multi-oracle verification
+        if let zipOracle = registry.oraclePath(for: "unzip") {
+            let zipReport = try await DifferentialOracleTestHarness.executeRoundtrip(
+                format: .zip,
+                sourceDir: sourceDir.path,
+                oracle: zipOracle,
+                tempSandbox: runSandbox.appendingPathComponent("zip_run").path
+            )
+            XCTAssertTrue(zipReport.isPassed, "ZIP oracle roundtrip must pass: \(zipReport.divergenceErrors)")
+        }
+    }
 }

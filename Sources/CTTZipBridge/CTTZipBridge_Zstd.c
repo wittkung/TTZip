@@ -89,6 +89,7 @@ int ttzip_zstd_compress_file_stream(
     
     int error = TTZIP_OK;
     int fd_in = -1;
+    int fd_out = -1;
     ZSTD_CCtx* cctx = NULL;
     ZSTD_CDict* cdict = NULL;
     void* mapped_in = MAP_FAILED;
@@ -118,7 +119,7 @@ int ttzip_zstd_compress_file_stream(
         ttzip_common_mkdir_p(parent_dir_comp);
     }
 
-    int fd_out = open(dst_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    fd_out = open(dst_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (fd_out < 0) { error = TTZIP_ERR_OPEN_FAILED; goto cleanup; }
     
     cctx = ZSTD_createCCtx();

@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
+//
+// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
+// All rights reserved.
+//
+// TTZip: High-performance native archiving and compression engine for macOS.
+
 /**
  * @file CTTZipChecksum.h
- * @brief TTZip 硬件加速校验和中枢接口 (Adler-32 & CRC-32)
- * @details 采用 ARM64 PMULL / DotProd / AVX2 硬件向量化与 5552 字节延迟取模技术。
+ * @brief Hardware-accelerated Adler-32 and CRC-32 checksum kernel interface.
+ * @details Implements ARM64 PMULL / DotProd / AVX2 vectorization with NMAX=5552 deferred modular reduction.
  */
 
 #ifndef CTTZIP_CHECKSUM_H

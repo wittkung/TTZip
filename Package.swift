@@ -39,7 +39,14 @@ let package = Package(
                 .headerSearchPath("snappy"),
                 .headerSearchPath("../../Vendor/include"),
                 .headerSearchPath("../../Vendor/include/uchardet"),
-                .unsafeFlags(["-O3"])
+                .unsafeFlags([
+                    "-O3",
+                    "-fvisibility=hidden",
+                    "-Wall",
+                    "-Wextra",
+                    "-Wvla",
+                    "-Wformat=2"
+                ])
             ],
             linkerSettings: [
                 .linkedLibrary("bz2"),

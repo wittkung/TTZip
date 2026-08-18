@@ -8,6 +8,32 @@
 /**
  * @file ttzip_bcj_arm64_neon.c
  * @brief ARM64 NEON vectorized BCJ executable branch target converter.
+ *
+ * ============================================================================
+ * Mathematical Foundation & Branch Target Transformation Invariant:
+ *
+ * 1. ARM64 B and BL Opcode Encoding:
+ *    Opcode mask:    0x7C000000 (bits 30..26)
+ *    Match pattern:  0x14000000 (B: 000101, BL: 100101)
+ *    Payload:        imm26 in bits 25..0 (26-bit signed immediate word offset).
+ *
+ * 2. Relative to Absolute Target Address Derivation:
+ *    Let instruction pointer be IP_curr = IP_base + pos.
+ *    Sign extension from 26-bit two's complement to 32-bit:
+ *      offset_bytes = (imm26 & 0x02000000) ? (imm26 | 0xFC000000) << 2 : imm26 << 2
+ *    Target address:
+ *      Target_abs = IP_curr + offset_bytes
+ *      imm26_new  = (Target_abs >> 2) & 0x03FFFFFF
+ *
+ * 3. Bidirectional Reversible Isomorphism:
+ *    Encode: T(rel, IP) = (rel << 2) + IP
+ *    Decode: T^{-1}(abs, IP) = abs - IP
+ *    T^{-1}(T(rel, IP), IP) == rel << 2 holds for all offsets in range [-128MB, +128MB).
+ *
+ * @complexity Time: O(size / 16) NEON vector sweeps -> O(N)
+ * @complexity Space: O(1) in-place stack execution (Zero dynamic heap allocations)
+ * @threadsafe 100% Reentrant and thread-safe over distinct data buffers.
+ * ============================================================================
  */
 
 #include "include/ttzip_bcj_arm64_neon.h"

@@ -208,7 +208,9 @@ int ttzip_decompress_tar_pixz(const char* pixz_bin, const char* tar_bin, const c
     posix_spawn_file_actions_addclose(&px_actions, pipefds[0]);
     posix_spawn_file_actions_addclose(&px_actions, pipefds[1]);
     
-    const char* px_argv[] = { pixz_bin, "-d", "-i", archive_path, NULL };
+    char core_arg[16];
+    snprintf(core_arg, sizeof(core_arg), "%d", cores > 0 ? cores : 4);
+    const char* px_argv[] = { pixz_bin, "-d", "-p", core_arg, "-i", archive_path, NULL };
     pid_t px_pid;
     int status1 = posix_spawn(&px_pid, pixz_bin, &px_actions, &attr, (char* const*)px_argv, get_process_environ());
     posix_spawn_file_actions_destroy(&px_actions);

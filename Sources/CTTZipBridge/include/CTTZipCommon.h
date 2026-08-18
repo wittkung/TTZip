@@ -34,13 +34,40 @@ extern "C" {
 #endif
 
 /* ============================================================================
- * 1. Struct Lifetime Magic Sentinels
+ * 1. Struct Lifetime Magic Sentinels & Free-Poisoning
  * ============================================================================ */
 
-#define TTZIP_STRUCT_MAGIC 0x545A4950U /* 'TZIP' */
+#define TTZIP_STRUCT_MAGIC 0x545A4950U /**< 'TZIP' Valid Live Sentinel */
+#define TTZIP_POISON_FREE  0xDEADBEEFU /**< Freed Poison Sentinel (UAF Detector) */
 
 /* ============================================================================
- * 2. Unified C Status and Error Codes
+ * 2. Multicore Cacheline Alignment (False Sharing Prevention)
+ * ============================================================================ */
+
+#if defined(__APPLE__) && defined(__aarch64__)
+#define TTZIP_CACHELINE_SIZE 128 /**< Apple Silicon M-series L2 Cacheline Size */
+#else
+#define TTZIP_CACHELINE_SIZE 64  /**< Standard x86_64 / ARM64 L1/L2 Cacheline Size */
+#endif
+
+#define TTZIP_CACHELINE_ALIGNED __attribute__((aligned(TTZIP_CACHELINE_SIZE)))
+
+/* ============================================================================
+ * 3. Arithmetic Integer Overflow Checking
+ * ============================================================================ */
+
+#if defined(__has_builtin) && __has_builtin(__builtin_add_overflow)
+#define ttzip_add_overflow(a, b, res) __builtin_add_overflow((a), (b), (res))
+#define ttzip_mul_overflow(a, b, res) __builtin_mul_overflow((a), (b), (res))
+#define ttzip_sub_overflow(a, b, res) __builtin_sub_overflow((a), (b), (res))
+#else
+#define ttzip_add_overflow(a, b, res) (*(res) = (a) + (b), (*(res) < (a)))
+#define ttzip_mul_overflow(a, b, res) (*(res) = (a) * (b), ((a) != 0 && *(res) / (a) != (b)))
+#define ttzip_sub_overflow(a, b, res) (*(res) = (a) - (b), (*(res) > (a)))
+#endif
+
+/* ============================================================================
+ * 4. Unified C Status and Error Codes
  * ============================================================================ */
 
 typedef enum ttzip_error_t {
@@ -60,11 +87,11 @@ typedef enum ttzip_error_t {
 } ttzip_error_t;
 
 /* ============================================================================
- * 3. Sensitive Memory Physical Eradication (DSE Immunity)
+ * 5. Sensitive Memory Physical Eradication (DSE Immunity)
  * ============================================================================ */
 
 /**
- * @brief Zero out sensitive memory securely.
+ * @brief Zero out sensitive memory securely with compiler barrier.
  * @param[in,out] ptr Starting pointer.
  * @param[in]     len Byte length.
  */
@@ -72,9 +99,16 @@ static inline void ttzip_secure_zero(void* ptr, size_t len) {
     if (!ptr || len == 0) return;
 #if defined(__APPLE__) || defined(__STDC_LIB_EXT1__)
     memset_s(ptr, len, 0, len);
+#elif defined(_WIN32)
+    SecureZeroMemory(ptr, len);
+#elif defined(__linux__) && defined(_GNU_SOURCE)
+    explicit_bzero(ptr, len);
 #else
     volatile unsigned char* p = (volatile unsigned char*)ptr;
     while (len--) *p++ = 0;
+#endif
+#if defined(__GNUC__) || defined(__clang__)
+    __asm__ __volatile__("" : : "r"(ptr) : "memory");
 #endif
 }
 

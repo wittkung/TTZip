@@ -14,7 +14,6 @@
 #define TTZIP_7Z_HEADER_PARSER_H
 
 #include "ttzip_platform.h"
-#include "ttzip_platform.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -31,6 +30,7 @@ typedef struct {
 } ttzip_7z_file_meta_t;
 
 typedef struct {
+    uint32_t magic;
     uint64_t primary_method_id;
     uint64_t total_folders;
     size_t payload_offset;
@@ -59,14 +59,49 @@ typedef struct {
     size_t num_stream_crcs;
 } ttzip_7z_header_info_t;
 
+/**
+ * @brief Decodes a 7Z variable-length 64-bit integer using branchless __builtin_clz and 64-bit load.
+ *
+ * @param[in]  buf Pointer to the input byte buffer.
+ * @param[in]  len Available bytes in buffer.
+ * @param[out] val Pointer to store the decoded 64-bit integer.
+ * @return size_t Number of bytes consumed (1 to 9), or 0 if `len` is insufficient.
+ *
+ * @pre `buf != NULL && val != NULL`
+ * @post If return > 0, `val` contains the decoded value without UB shift overflow.
+ * @complexity Time: O(1) (~3-4 CPU cycles) | Space: O(1)
+ * @threadsafe Fully reentrant and thread-safe.
+ */
 TTZIP_API size_t ttzip_7z_read_varint(const uint8_t* buf, size_t len, uint64_t* val);
 
+/**
+ * @brief Parses 7Z archive header metadata, folder structures, and encryption parameters.
+ *
+ * @param[in]  mapped_data Read-only memory-mapped archive buffer.
+ * @param[in]  file_size   Total archive file size in bytes.
+ * @param[out] out_info    Pointer to the output header metadata structure.
+ * @return int 0 on success, negative error code on failure.
+ *
+ * @pre `mapped_data != NULL && file_size >= 32 && out_info != NULL`
+ * @post `out_info` is initialized and populated with heap-allocated arrays (must be freed via `ttzip_7z_free_header_info`).
+ * @complexity Time: O(metadata_size) | Space: O(num_files)
+ * @threadsafe Reentrant across independent header info objects.
+ */
 TTZIP_API int ttzip_7z_parse_header_metadata(
     const uint8_t* mapped_data,
     size_t file_size,
     ttzip_7z_header_info_t* out_info
 );
 
+/**
+ * @brief Frees all dynamically allocated arrays inside a 7Z header info struct and poisons memory.
+ *
+ * @param[in,out] info Pointer to the header info structure to deallocate.
+ *
+ * @pre `info != NULL`
+ * @post Internal file and size arrays are freed and pointers set to NULL.
+ * @threadsafe Thread-safe on exclusive instance.
+ */
 TTZIP_API void ttzip_7z_free_header_info(ttzip_7z_header_info_t* info);
 
 #ifdef __cplusplus

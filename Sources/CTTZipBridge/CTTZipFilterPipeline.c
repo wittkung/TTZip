@@ -224,7 +224,6 @@ void ttzip_filter_bitshuffle_forward_neon(const uint8_t* src, uint8_t* dst, size
     ttzip_filter_shuffle_forward(src, dst, size, typesize);
 
     // 2. Stage 2: Bit-Plane Transposition (on each 8-byte sub-matrix)
-    size_t full_words = size / 8;
     size_t offset = 0;
 
 #if (defined(__ARM_NEON) || defined(__aarch64__))
