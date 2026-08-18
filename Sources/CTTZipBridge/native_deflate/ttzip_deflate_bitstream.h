@@ -137,6 +137,30 @@ static inline void ttzip_bs_write_sync_flush(ttzip_bitstream_t *bs) {
     }
 }
 
+/**
+ * @brief Emits a raw RFC 1951 uncompressed block (BTYPE=00) directly copying uncompressed bytes.
+ */
+static inline void ttzip_bs_write_uncompressed_block(
+    ttzip_bitstream_t *bs,
+    const uint8_t *in,
+    uint16_t len,
+    bool is_final
+) {
+    uint32_t bfinal_bit = is_final ? 1 : 0;
+    ttzip_bs_write_bits(bs, bfinal_bit | (0 << 1), 3);
+    ttzip_bs_flush_byte_align(bs);
+
+    uint16_t nlen = (uint16_t)~len;
+    if (bs->out_next + 4 + len <= bs->out_end) {
+        memcpy(bs->out_next, &len, 2);
+        memcpy(bs->out_next + 2, &nlen, 2);
+        memcpy(bs->out_next + 4, in, len);
+        bs->out_next += 4 + len;
+    } else {
+        bs->overflow = true;
+    }
+}
+
 #ifdef __cplusplus
 }
 #endif

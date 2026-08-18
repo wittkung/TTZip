@@ -151,18 +151,18 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
             })
         }
         
-        TTLogger.debug("========================================================================================================================")
-        TTLogger.debug("🏛️  250MB Real-World Compound Workspace Benchmark (Compound Mixed Workspace)")
-        TTLogger.debug("========================================================================================================================")
-        TTLogger.debug(String(format: "%-28@ | %-16@ | %-12@ | %-12@ | %-16@", "Algorithm/Software", "Compression MB/s", "Ratio", "Space Sav%", "Archive Size"))
-        TTLogger.debug("------------------------------------------------------------------------------------------------------------------------")
+        print("\n========================================================================================================================")
+        print("🏛️  250MB Real-World Compound Workspace Benchmark (Compound Mixed Workspace)")
+        print("========================================================================================================================")
+        print(String(format: "%-28@ | %-16@ | %-12@ | %-12@ | %-16@", "Algorithm/Software", "Compression MB/s", "Ratio", "Space Sav%", "Archive Size"))
+        print("------------------------------------------------------------------------------------------------------------------------")
         
         var plotPoints: [ParetoPoint] = []
         
         for cand in candidates {
             let (speed, ratio, savings, outSize) = try await cand.run()
             let sizeMB = Double(outSize) / 1024.0 / 1024.0
-            TTLogger.debug(String(
+            print(String(
                 format: "%-28@ | %13.1f MB/s | %10.2fx | %10.1f%% | %11.2f MB",
                 cand.name as NSString,
                 speed,
@@ -186,7 +186,7 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
         if !CompetitorBaselineSnapshotManager.shouldRerunCompetitors {
             for comp in CompetitorBaselineSnapshotManager.compoundMixedWorkspaceCompetitors {
                 let sizeMB = Double(comp.archiveSizeBytes) / 1024.0 / 1024.0
-                TTLogger.debug(String(
+                print(String(
                     format: "%-28@ | %13.1f MB/s | %10.2fx | %10.1f%% | %11.2f MB",
                     comp.algorithm as NSString,
                     comp.throughputMBs,
@@ -206,7 +206,7 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
             }
         }
         
-        TTLogger.debug("========================================================================================================================\n")
+        print("========================================================================================================================\n")
         
         // Render Pareto frontier plot artifact.
         let artifactPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/pareto_compound_mixed.png"
@@ -227,5 +227,102 @@ final class CompoundMixedCorpusBenchmarkPkTests: XCTestCase {
         TTLogger.debug("🏆 Real-world compound workspace Pareto chart generated: \(artifactPath)")
         
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPath))
+    }
+
+    // MARK: - 2. Single-Core 1v1 Duel on 250MB Mixed Workspace (TTZip vs. libdeflate)
+
+    func testCompoundMixedCorpusSingleCoreVsLibdeflate1v1() async throws {
+        guard ProcessInfo.processInfo.environment["TTZIP_RUN_BENCHMARKS"] != nil else {
+            throw XCTSkip("Benchmark test requires TTZIP_RUN_BENCHMARKS=1")
+        }
+
+        let orchestrator = CorpusOrchestrator.shared
+        let workspaceDir = NSTemporaryDirectory() + "compound_singlecore_duel_\(UUID().uuidString)"
+        defer { try? FileManager.default.removeItem(atPath: workspaceDir) }
+
+        let (totalBytes, totalFiles) = try orchestrator.mountCompoundMixedWorkspace(at: workspaceDir)
+        let totalMB = Double(totalBytes) / 1024.0 / 1024.0
+
+        // Read all files into memory buffers for pure in-memory compression benchmarking (zero disk I/O distortion)
+        var fileBuffers: [(path: String, data: Data)] = []
+        let fileEnumerator = FileManager.default.enumerator(atPath: workspaceDir)
+        while let relPath = fileEnumerator?.nextObject() as? String {
+            let fullPath = (workspaceDir as NSString).appendingPathComponent(relPath)
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue {
+                if let d = try? Data(contentsOf: URL(fileURLWithPath: fullPath)) {
+                    fileBuffers.append((relPath, d))
+                }
+            }
+        }
+
+        print("\n================== 250MB MIXED WORKSPACE: SINGLE-CORE 1v1 DUEL ==================")
+        print("Dataset: \(String(format: "%.2f", totalMB)) MB in \(totalFiles) files (5-Tier Mixed Modality)")
+        print("==================================================================================")
+        print(String(format: "%-16@ | %-16@ | %-16@ | %-12@ | %-12@ | %-8@", "Level", "TTZip (1-Core)", "libdeflate (1-Core)", "TTZip Ratio", "libdef Ratio", "Speedup"))
+        print("----------------------------------------------------------------------------------")
+
+        let levelsToTest: [(ttzipLvl: Int, libdefLvl: Int, name: String)] = [
+            (1, 1, "Level 1 (Fast)"),
+            (2, 3, "Level 2/3 (Fast+)"),
+            (3, 6, "Level 3/6 (Normal)"),
+            (4, 9, "Level 4/9 (Maximum)"),
+            (5, 12, "Level 5/12 (High)")
+        ]
+
+        for item in levelsToTest {
+            let outMaxChunk = 16 * 1024 * 1024
+            var outBuf = [UInt8](repeating: 0, count: outMaxChunk)
+            let nilPtr: UnsafePointer<UInt8>? = nil
+
+            // 1. Measure TTZip pure single-core
+            let t0_ttzip = DispatchTime.now()
+            var ttzipCompTotal: Int64 = 0
+
+            for (_, fileData) in fileBuffers {
+                if fileData.isEmpty { continue }
+                let compSize = fileData.withUnsafeBytes { rawIn -> size_t in
+                    let inPtr = rawIn.bindMemory(to: UInt8.self).baseAddress!
+                    return outBuf.withUnsafeMutableBufferPointer { rawOut -> size_t in
+                        return ttzip_native_deflate_compress_chunk_with_history(
+                            inPtr, fileData.count, nilPtr, 0, rawOut.baseAddress!, outMaxChunk, Int32(item.ttzipLvl), 1
+                        )
+                    }
+                }
+                ttzipCompTotal += Int64(compSize > 0 ? compSize : fileData.count)
+            }
+            let dur_ttzip = Double(DispatchTime.now().uptimeNanoseconds - t0_ttzip.uptimeNanoseconds) / 1_000_000_000.0
+            let speed_ttzip = totalMB / max(1e-6, dur_ttzip)
+            let ratio_ttzip = Double(totalBytes) / Double(max(1, ttzipCompTotal))
+
+            // 2. Measure libdeflate pure single-core
+            let t0_libdef = DispatchTime.now()
+            var libdefCompTotal: Int64 = 0
+
+            for (_, fileData) in fileBuffers {
+                if fileData.isEmpty { continue }
+                let compSize = fileData.withUnsafeBytes { rawIn -> size_t in
+                    let inPtr = rawIn.bindMemory(to: UInt8.self).baseAddress!
+                    return outBuf.withUnsafeMutableBufferPointer { rawOut -> size_t in
+                        return ttzip_libdeflate_compress(
+                            inPtr, fileData.count, rawOut.baseAddress!, outMaxChunk, Int32(item.libdefLvl)
+                        )
+                    }
+                }
+                libdefCompTotal += Int64(compSize > 0 ? compSize : fileData.count)
+            }
+            let dur_libdef = Double(DispatchTime.now().uptimeNanoseconds - t0_libdef.uptimeNanoseconds) / 1_000_000_000.0
+            let speed_libdef = totalMB / max(1e-6, dur_libdef)
+            let ratio_libdef = Double(totalBytes) / Double(max(1, libdefCompTotal))
+
+            let speedupPct = ((speed_ttzip - speed_libdef) / speed_libdef) * 100.0
+            let status = speedupPct >= 0.0 ? "🟢 UP" : "⚪ FLAT"
+
+            print(String(
+                format: "%-16@ | %13.1f MB/s | %13.1f MB/s | %10.2fx | %10.2fx | %+6.1f%% (%@)",
+                item.name, speed_ttzip, speed_libdef, ratio_ttzip, ratio_libdef, speedupPct, status
+            ))
+        }
+        print("==================================================================================\n")
     }
 }

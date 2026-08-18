@@ -29,13 +29,16 @@ extern "C" {
 #define TTZIP_DEFLATE_MAX_MATCH_LEN 258
 #define TTZIP_DEFLATE_MIN_MATCH_LEN 3
 
+#define TTZIP_DEFLATE_FAST_HASH_BITS 12
+#define TTZIP_DEFLATE_FAST_HASH_SIZE (1 << TTZIP_DEFLATE_FAST_HASH_BITS) /* 4096 entries (64 KB) */
+
 typedef int16_t ttzip_mf_pos_t;
 
 /**
- * @brief Tier 1/2 Fast 2-Way direct pointer match finder cache (aligned to 64-byte cache line).
+ * @brief Tier 1/2 Fast 2-Way direct pointer match finder cache (64 KB, 100% L1 D-Cache resident).
  */
 typedef struct __attribute__((aligned(64))) {
-    const uint8_t *hash_tab[32768][2];
+    const uint8_t *hash_tab[TTZIP_DEFLATE_FAST_HASH_SIZE][2];
 } ttzip_deflate_fast_mf_t;
 
 /**

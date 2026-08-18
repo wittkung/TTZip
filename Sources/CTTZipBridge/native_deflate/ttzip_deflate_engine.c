@@ -93,6 +93,8 @@ static TTZIP_THREAD_LOCAL ttzip_deflate_token_t s_tls_fixed_tokens[65536 + 64];
 
 #define TTZIP_STREAM_CHUNK_SIZE 65536
 
+#include "CTTZipStreamCoder.h"
+
 /* Primary entry point for native Deflate block/stream compression */
 size_t ttzip_native_deflate_compress_block_with_history(
     const uint8_t *in,
@@ -108,7 +110,7 @@ size_t ttzip_native_deflate_compress_block_with_history(
         init_slot_tables();
     }
 
-    if (in_size == 0) {
+    if (!in || in_size == 0) {
         ttzip_bitstream_t bs;
         ttzip_bs_init(&bs, out, out_capacity);
         if (is_final) {
@@ -124,6 +126,28 @@ size_t ttzip_native_deflate_compress_block_with_history(
 
     ttzip_bitstream_t bs;
     ttzip_bs_init(&bs, out, out_capacity);
+
+    /* 0. Early entropy short-circuit for high-entropy / incompressible payloads */
+    if (in_size >= 65536) {
+        double entropy = 0.0, ratio = 1.0;
+        int routing = ttzip_probe_entropy_and_compressibility(in, in_size, 2048, &entropy, &ratio);
+        if (routing == 0) {
+            size_t p = 0;
+            while (p < in_size) {
+                size_t clen = (p + TTZIP_STREAM_CHUNK_SIZE <= in_size) ? TTZIP_STREAM_CHUNK_SIZE : (in_size - p);
+                bool c_final = (p + clen >= in_size) && is_final;
+                ttzip_bs_write_uncompressed_block(&bs, in + p, (uint16_t)clen, c_final);
+                if (bs.overflow) return 0;
+                p += clen;
+            }
+            if (is_final) {
+                ttzip_bs_flush_byte_align(&bs);
+            } else {
+                ttzip_bs_write_sync_flush(&bs);
+            }
+            return bs.overflow ? 0 : (size_t)(bs.out_next - out);
+        }
+    }
 
     size_t pos = 0;
     while (pos < in_size) {
@@ -168,6 +192,14 @@ size_t ttzip_native_deflate_compress_block_with_history(
             num_tokens = ttzip_deflate_deep_lazy_find_matches(
                 &s_tls_deep_lazy_mf, in_chunk, chunk_len, cur_history, cur_hist_len, depth, nice_len, lookahead, s_tls_fixed_tokens, 65536, &freqs
             );
+        }
+
+        if (num_tokens >= (chunk_len * 98) / 100 && chunk_len <= 65535) {
+            /* Data is effectively incompressible (>98% literals): directly emit RFC 1951 uncompressed block (BTYPE=00) */
+            ttzip_bs_write_uncompressed_block(&bs, in_chunk, (uint16_t)chunk_len, chunk_is_final);
+            if (bs.overflow) return 0;
+            pos += chunk_len;
+            continue;
         }
 
         bool use_dynamic = options ? options->dynamic_huffman : true;

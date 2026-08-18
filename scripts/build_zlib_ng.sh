@@ -19,7 +19,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # 默认配置参数
 ZLIB_NG_TAG="${ZLIB_NG_TAG:-2.2.4}"
 ZLIB_NG_REPO="${ZLIB_NG_REPO:-https://github.com/zlib-ng/zlib-ng.git}"
-WORK_DIR="/tmp/ttzip_build_zlib_ng_$$"
+WORK_DIR="$(pwd)/scratch/ttzip_build_zlib_ng_$$"
 VENDOR_DIR="${REPO_ROOT}/Vendor"
 SRC_DIR=""
 

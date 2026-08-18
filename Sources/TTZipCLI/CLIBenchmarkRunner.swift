@@ -160,11 +160,11 @@ public enum CLIBenchmarkRunner {
             print("\n=========================================================================================")
             print("📊 TTZip Native Peak Benchmark Results (Apple Silicon Unified Memory)")
             print("=========================================================================================")
-            print(String(format: "%-15s | %-12s | %-12s | %-10s | %-10s", "Algorithm", "Comp Speed", "Extract Speed", "Ratio", "Speedup"))
+            print(String(format: "%-15@ | %-12@ | %-12@ | %-10@ | %-10@", "Algorithm" as NSString, "Comp Speed" as NSString, "Extract Speed" as NSString, "Ratio" as NSString, "Speedup" as NSString))
             print("=========================================================================================")
             for res in results {
-                print(String(format: "%-15s | %-10.1f MB/s | %-10.1f MB/s | %-9.1f %% | %-8.1f x",
-                             res.formatName,
+                print(String(format: "%-15@ | %-10.1f MB/s | %-10.1f MB/s | %-9.1f %% | %-8.1f x",
+                             res.formatName as NSString,
                              res.throughputMBs,
                              res.decompressionThroughputMBs,
                              res.compressionRatioPercent,
