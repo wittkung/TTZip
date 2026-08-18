@@ -55,14 +55,14 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                 }
             }
 
-            // Fast-Path 0: 单文件极速分块并行通道 (香农熵自适应探测 + 18 核心分块多核并行，90+ GB/s)
-            if (context.password == nil || context.password!.isEmpty) && (context.splitVolumeSizeBytes == nil || context.splitVolumeSizeBytes == 0) && context.inputPaths.count == 1 {
+            // Fast-Path 0: 单文件极速分块并行通道 (仅针对 level6/level7/extreme 极限重压)
+            if (context.password == nil || context.password!.isEmpty) && (context.splitVolumeSizeBytes == nil || context.splitVolumeSizeBytes == 0) && context.inputPaths.count == 1 && (context.level == .level6 || context.level == .level7) {
                 let singlePath = context.inputPaths[0]
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: singlePath, isDirectory: &isDir), !isDir.boolValue {
                     let attrs = (try? FileManager.default.attributesOfItem(atPath: singlePath)) ?? [:]
                     let fileSize = (attrs[.size] as? Int64) ?? 0
-                    if fileSize >= 2 * 1024 * 1024 { // L1~L12: 全量 18 核极速分块并行通道 + 32KB 跨块字典接力
+                    if fileSize >= 2 * 1024 * 1024 {
                         let extremeOk = (try? ZipExtremeBlockWriter.shared.createExtremeArchive(
                             outputPath: context.archivePath,
                             inputPath: singlePath,

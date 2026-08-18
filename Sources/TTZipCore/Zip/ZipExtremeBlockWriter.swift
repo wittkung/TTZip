@@ -83,77 +83,39 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
             compressedPayload = rawData
             totalCompressedBytes = uncompressedBytes
         } else {
-            // 2. 18 核心饱和分块并发压缩 (18-Core Saturated Block-Parallel Deflate)
-            let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : max(4 * 1024 * 1024, (rawData.count + 15) / 16)
-            let actualBlockSize = min(rawData.count, max(65536, baseBlockSize))
-            let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
+            // 2. 100% RFC 1951 PKWARE Deflate 流式压缩
+            let maxOut = rawData.count + 512
+            let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: maxOut)
+            defer { outBuf.deallocate() }
             
-            let maxChunkOut = actualBlockSize + 512
-            let totalOutputSlab = UnsafeMutablePointer<UInt8>.allocate(capacity: totalBlocks * maxChunkOut)
-            defer { totalOutputSlab.deallocate() }
+            var options = TTZipZopfliOptions(
+                compression_level: activeProfile.deflateLevel,
+                num_iterations: activeProfile.zopfliIterations,
+                block_splitting: activeProfile.blockSplitting ? 1 : 0,
+                max_block_splits: activeProfile.maxBlockSplits,
+                early_exit_threshold: activeProfile.earlyExitThreshold
+            )
             
-            struct RawBlockBuffer: @unchecked Sendable {
-                let ptr: UnsafePointer<UInt8>
-                let size: Int
+            let compSize = rawData.withUnsafeBytes { rawIn -> size_t in
+                guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                return ttzip_zopfli_compress_block_with_history(
+                    baseAddr,
+                    rawData.count,
+                    nil,
+                    0,
+                    outBuf,
+                    maxOut,
+                    &options
+                )
             }
             
-            let resultsBox = StateBoxResults([RawBlockBuffer?](repeating: nil, count: totalBlocks))
-            
-            rawData.withUnsafeBytes { rawIn in
-                guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                let ptrBox = SendablePointerBox(pointer: baseAddr, size: rawData.count)
-                let slabBox = SendableMutablePointerBox(pointer: totalOutputSlab, size: totalBlocks * maxChunkOut)
-                
-                DispatchQueue.concurrentPerform(iterations: totalBlocks) { blockIdx in
-                    let offset = blockIdx * actualBlockSize
-                    let currentChunkSize = min(actualBlockSize, ptrBox.size - offset)
-                    let chunkPtr = ptrBox.pointer.advanced(by: offset)
-                    let outBuf = slabBox.pointer.advanced(by: blockIdx * maxChunkOut)
-                    
-                    var options = TTZipZopfliOptions(
-                        compression_level: activeProfile.deflateLevel,
-                        num_iterations: activeProfile.zopfliIterations,
-                        block_splitting: activeProfile.blockSplitting ? 1 : 0,
-                        max_block_splits: activeProfile.maxBlockSplits,
-                        early_exit_threshold: activeProfile.earlyExitThreshold
-                    )
-                    
-                    let compSize = ttzip_zopfli_compress_block_with_history(
-                        chunkPtr,
-                        currentChunkSize,
-                        nil,
-                        0,
-                        outBuf,
-                        maxChunkOut,
-                        &options
-                    )
-                    
-                    if compSize > 0 && compSize < currentChunkSize {
-                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: compSize))
-                    } else {
-                        // Incompressible fallback
-                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: chunkPtr, size: currentChunkSize))
-                    }
-                }
+            if compSize > 0 && compSize < rawData.count {
+                compressedPayload = Data(bytes: outBuf, count: compSize)
+                totalCompressedBytes = Int64(compSize)
+            } else {
+                compressedPayload = rawData
+                totalCompressedBytes = uncompressedBytes
             }
-            
-            // 3. 顺序组装压缩载荷 (单次预分配零重分配)
-            var totalComp: Int = 0
-            for idx in 0..<totalBlocks {
-                if let buf = resultsBox.values[idx] {
-                    totalComp += buf.size
-                }
-            }
-            
-            var payload = Data()
-            payload.reserveCapacity(totalComp)
-            for idx in 0..<totalBlocks {
-                if let buf = resultsBox.values[idx] {
-                    payload.append(buf.ptr, count: buf.size)
-                }
-            }
-            compressedPayload = payload
-            totalCompressedBytes = Int64(payload.count)
         }
         
         // 4. 构建标准 PKWARE ZIP 容器 (Local File Header + Central Directory + EOCD)
