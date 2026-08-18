@@ -20,7 +20,15 @@ extension ArchiveExtractor {
     ) -> Bool {
         let pathLower = archivePath.lowercased()
 
-        // 1. 7Z / DMG / ISO / Split Volume (.001)
+        // 1. Apple DMG (UDIF with LZFSE / ZLIB / RAW / LZMA chunks)
+        if targetFormat == .dmg || pathLower.hasSuffix(".dmg") {
+            if let ok = try? DMGVirtualStreamAdapter.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: password, skipMacJunk: options.skipMacJunk), ok {
+                Self.cleanupQuarantineAttributes(at: destinationDir)
+                return true
+            }
+        }
+
+        // 1.1 7Z / ISO / Split Volume (.001) / Generic container fallback
         if targetFormat == .sevenZip || targetFormat == .dmg || targetFormat == .iso || ArchiveCompressionFormat.sevenZipFamilyExtensions.contains(where: { pathLower.hasSuffix($0) }) || pathLower.contains(".7z.") {
             if let ok = try? SevenZipEngine.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: password), ok {
                 return true

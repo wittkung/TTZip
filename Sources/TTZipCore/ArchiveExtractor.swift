@@ -92,6 +92,27 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
             return
         }
         
+        // Fast-path for Apple DMG containers (UDIF with LZFSE / ZLIB / RAW / LZMA chunks)
+        if pathLower.hasSuffix(".dmg") {
+            let candidates: [String?] = passCandidates.isEmpty ? [password] : passCandidates.map { Optional($0) }
+            for cand in candidates {
+                if let ok = try? DMGVirtualStreamAdapter.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: cand, skipMacJunk: options.skipMacJunk), ok {
+                    if let items = try? FileManager.default.contentsOfDirectory(atPath: destinationDir), !items.isEmpty {
+                        return
+                    }
+                }
+            }
+        }
+        
+        // Fast-path for single-file .lzfse archives
+        if pathLower.hasSuffix(".lzfse") {
+            let outName = URL(fileURLWithPath: archivePath).deletingPathExtension().lastPathComponent
+            let targetOut = (destinationDir as NSString).appendingPathComponent(outName.isEmpty ? "decompressed" : outName)
+            if LzfseCAdapter.shared.decompressFileStream(srcPath: archivePath, dstPath: targetOut) == 0 {
+                return
+            }
+        }
+        
         // Fast-path for 7z / DMG / ISO containers
         if pathLower.contains(".7z") || pathLower.contains("sevenzip") || pathLower.hasSuffix(".cb7") || pathLower.hasSuffix(".dmg") || pathLower.hasSuffix(".iso") {
             let candidates: [String?] = passCandidates.isEmpty ? [password] : passCandidates.map { Optional($0) }

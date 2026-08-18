@@ -7,52 +7,18 @@
 
 import Foundation
 
-/// Lightweight data payload representing an archive inspected for QuickLook preview.
-public struct QuickLookPreviewData: Sendable, Equatable {
-    public let archivePath: String
-    public let archiveName: String
-    public let format: ArchiveCompressionFormat
-    public let uncompressedSizeBytes: Int64
-    public let compressedSizeBytes: Int64
-    public let compressionRatioPercent: Double
-    public let totalEntriesCount: Int
-    public let isEncrypted: Bool
-    public let rootNodes: [ArchiveTreeNode]
-    
-    public init(
-        archivePath: String,
-        archiveName: String,
-        format: ArchiveCompressionFormat,
-        uncompressedSizeBytes: Int64,
-        compressedSizeBytes: Int64,
-        compressionRatioPercent: Double,
-        totalEntriesCount: Int,
-        isEncrypted: Bool,
-        rootNodes: [ArchiveTreeNode]
-    ) {
-        self.archivePath = archivePath
-        self.archiveName = archiveName
-        self.format = format
-        self.uncompressedSizeBytes = uncompressedSizeBytes
-        self.compressedSizeBytes = compressedSizeBytes
-        self.compressionRatioPercent = compressionRatioPercent
-        self.totalEntriesCount = totalEntriesCount
-        self.isEncrypted = isEncrypted
-        self.rootNodes = rootNodes
-    }
-}
-
 /// Out-of-process, non-blocking QuickLook preview and HTML5 rendering engine for all 16 supported archive formats.
 public enum QuickLookPreviewEngine: Sendable {
     
-    /// Inspects an archive header in-process and builds a lightweight `QuickLookPreviewData` model in milliseconds.
-    public static func inspectForPreview(archivePath: String, password: String? = nil) async throws -> QuickLookPreviewData {
+    /// Inspects an archive header in-process and builds a lightweight `QuickLookPreviewPayload` model in milliseconds.
+    public static func inspectForPreview(archivePath: String, password: String? = nil) async throws -> QuickLookPreviewPayload {
         let url = URL(fileURLWithPath: archivePath)
         let archiveName = url.lastPathComponent
         
         let reader = ArchiveReader()
         let entries = try await reader.inspect(archivePath: archivePath, password: password)
-        let rootNodes = ArchiveTreeBuilder.buildTree(from: entries)
+        let rootArchiveNodes = ArchiveTreeBuilder.buildTree(from: entries)
+        let previewNodes = rootArchiveNodes.map { PreviewTreeNode.from(archiveTreeNode: $0) }
         
         var fileSize: Int64 = 0
         _ = ttzip_stat_file_info(archivePath, &fileSize, nil, nil)
@@ -67,18 +33,19 @@ public enum QuickLookPreviewEngine: Sendable {
         }
         
         let detectedFormat = ArchiveCompressionFormat.from(extensionOrName: url.pathExtension) ?? .zip
+        let formatIdentifier = QuickLookFormatIdentifier.from(format: detectedFormat).rawValue
         let isEncrypted = entries.contains { $0.isEncrypted }
         
-        return QuickLookPreviewData(
+        return QuickLookPreviewPayload(
             archivePath: archivePath,
             archiveName: archiveName,
-            format: detectedFormat,
+            formatIdentifier: formatIdentifier,
             uncompressedSizeBytes: uncompressedSize,
             compressedSizeBytes: compressedSize,
             compressionRatioPercent: ratio,
             totalEntriesCount: entries.count,
             isEncrypted: isEncrypted,
-            rootNodes: rootNodes
+            rootNodes: previewNodes
         )
     }
     
@@ -89,12 +56,12 @@ public enum QuickLookPreviewEngine: Sendable {
         let formattedCompressed = ByteCountFormatter.string(fromByteCount: data.compressedSizeBytes, countStyle: .file)
         
         var rowsHTML = ""
-        func renderNodes(_ nodes: [ArchiveTreeNode], depth: Int) {
+        func renderNodes(_ nodes: [PreviewTreeNode], depth: Int) {
             for node in nodes {
                 let indent = String(repeating: "&nbsp;&nbsp;&nbsp;&nbsp;", count: depth)
                 let icon = node.isDirectory ? "📁" : fileIconEmoji(for: node.name)
-                let sizeStr = node.isDirectory ? "--" : ByteCountFormatter.string(fromByteCount: node.uncompressedSize, countStyle: .file)
-                let isEnc = node.entry?.isEncrypted ?? false
+                let sizeStr = node.isDirectory ? "--" : ByteCountFormatter.string(fromByteCount: node.uncompressedSizeBytes, countStyle: .file)
+                let isEnc = node.isEncrypted
                 let encBadge = isEnc ? "<span class='badge enc'>🔒</span>" : ""
                 
                 rowsHTML += """
@@ -222,7 +189,7 @@ public enum QuickLookPreviewEngine: Sendable {
                 <div class="title-section">
                     <h1>\(escapeHTML(data.archiveName))</h1>
                     <div class="meta-stats">
-                        <span>\(data.format.displayName.uppercased())</span> •
+                        <span>\((data.format?.displayName ?? data.formatIdentifier).uppercased())</span> •
                         <span>\(data.totalEntriesCount) items</span> •
                         <span>\(formattedUncompressed) (Compressed: \(formattedCompressed))</span>
                         \(data.isEncrypted ? "• <span class='badge enc'>Encrypted</span>" : "")

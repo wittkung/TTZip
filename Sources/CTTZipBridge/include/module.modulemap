@@ -25,6 +25,7 @@ module CTTZipBridge {
     header "ttzip_native_archive.h"
     header "ttzip_lzma_hc4_neon.h"
     header "ttzip_crc64.h"
+    header "ttzip_dmg_demux.h"
     header "CTTZipDiagnostics.h"
     export *
 }

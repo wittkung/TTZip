@@ -53,6 +53,7 @@ cmake_install.cmake
 Vendor/*-upstream/
 Vendor/turbobench/
 Vendor/worktrees/
+.worktrees/
 
 # ------------------------------------------------------------------------------
 # 5. Static Libraries & Binary Targets

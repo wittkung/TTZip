@@ -35,6 +35,7 @@ let package = Package(
             cSettings: [
                 .headerSearchPath("include"),
                 .headerSearchPath("fast-lzma2"),
+                .headerSearchPath("lzfse"),
                 .headerSearchPath("../../Vendor/include"),
                 .headerSearchPath("../../Vendor/include/uchardet"),
                 .unsafeFlags(["-O3"])

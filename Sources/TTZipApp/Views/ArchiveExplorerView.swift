@@ -9,11 +9,12 @@ import SwiftUI
 import TTZipCore
 import AppKit
 import QuickLook
+import UniformTypeIdentifiers
 
 public struct ArchiveExplorerView: View {
     public let archivePath: String
     public var password: String? = nil
-    public let entries: [ArchiveEntry]
+    @State public var entries: [ArchiveEntry]
     public let onExtractClicked: () -> Void
     public let onCloseClicked: () -> Void
     
@@ -27,6 +28,12 @@ public struct ArchiveExplorerView: View {
     @State private var currentTempDir: URL? = nil
     @State private var eventMonitor: Any? = nil
     
+    // In-Place Live Edit & Mutation States
+    @State private var activeEditSessions: [String: InPlaceEditSession] = [:]
+    @State private var syncStatusMessage: String? = nil
+    @State private var isMutatingArchive: Bool = false
+    @State private var showDeleteConfirmation: Bool = false
+    
     public init(
         archivePath: String,
         password: String? = nil,
@@ -36,7 +43,7 @@ public struct ArchiveExplorerView: View {
     ) {
         self.archivePath = archivePath
         self.password = password
-        self.entries = entries
+        self._entries = State(initialValue: entries)
         self.onExtractClicked = onExtractClicked
         self.onCloseClicked = onCloseClicked
     }
@@ -48,6 +55,7 @@ public struct ArchiveExplorerView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Header Bar
             HStack(spacing: TTZipTheme.Spacing.xs) {
                 Image(systemName: "archivebox")
                     .font(.system(size: 18, weight: .light))
@@ -56,7 +64,35 @@ public struct ArchiveExplorerView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.primary)
                 
+                if let status = syncStatusMessage {
+                    HStack(spacing: 4) {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                        Text(status)
+                            .font(TTZipTheme.Typography.caption)
+                            .foregroundStyle(TTZipTheme.bambooGreen)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(TTZipTheme.bambooGreen.opacity(0.12))
+                    .clipShape(Capsule())
+                    .transition(.opacity)
+                }
+                
                 Spacer()
+                
+                if let selected = selectedEntry, !selected.isDirectory {
+                    Button(action: { openSelectedInExternalEditor(selected) }) {
+                        Label("Open in Editor", systemImage: "arrow.up.forward.app")
+                            .font(TTZipTheme.Typography.callout)
+                            .padding(.horizontal, TTZipTheme.Spacing.sm)
+                            .padding(.vertical, TTZipTheme.Spacing.xs)
+                    }
+                    .buttonStyle(.plain)
+                    .background(Color.secondary.opacity(0.15))
+                    .clipShape(Capsule())
+                    .help("Open in default macOS application and watch for live changes")
+                }
                 
                 Toggle(isOn: $showPreviewPanel.animation(.easeOut(duration: 0.2))) {
                     Label("Preview Panel", systemImage: "sidebar.right")
@@ -184,18 +220,19 @@ public struct ArchiveExplorerView: View {
                 .fill(TTZipTheme.hairlineBorder)
                 .frame(height: 0.5)
             
+            // Footer Bar
             HStack {
                 if let selected = selectedEntry {
                     Text("Selected: \(selected.name) (\(formatBytes(selected.uncompressedSize))) · Path: \(selected.path)")
                         .font(TTZipTheme.Typography.caption)
                         .foregroundStyle(.primary)
                 } else {
-                    Text("Ready")
+                    Text("Ready · Drag files here to add to archive")
                         .font(TTZipTheme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text("Click folders to expand/collapse, click files to preview")
+                Text("Double-click / ⌥O to live edit · Delete key to remove")
                     .font(TTZipTheme.Typography.caption)
                     .foregroundStyle(.secondary)
             }
@@ -204,6 +241,20 @@ public struct ArchiveExplorerView: View {
             .background(Color.clear)
         }
         .searchable(text: $searchText, prompt: "Search files and folders...")
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            handleDropFiles(providers: providers)
+            return true
+        }
+        .confirmationDialog("Delete Item", isPresented: $showDeleteConfirmation, actions: {
+            Button("Delete from Archive", role: .destructive) {
+                if let selected = selectedEntry {
+                    deleteSelectedEntry(selected)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }, message: {
+            Text("Are you sure you want to delete '\(selectedEntry?.name ?? "")' from the archive?")
+        })
         .onAppear {
             treeStore.updateEntries(entries)
             
@@ -228,6 +279,20 @@ public struct ArchiveExplorerView: View {
                     }
                     return nil
                 }
+                
+                // Delete / Backspace key
+                if event.keyCode == 51 || event.keyCode == 117 {
+                    if let firstResponder = NSApp.keyWindow?.firstResponder {
+                        if firstResponder.isKind(of: NSTextView.self) && (firstResponder as? NSTextView)?.isFieldEditor == true {
+                            return event
+                        }
+                    }
+                    if selectedEntry != nil {
+                        showDeleteConfirmation = true
+                        return nil
+                    }
+                }
+                
                 return event
             }
         }
@@ -244,6 +309,138 @@ public struct ArchiveExplorerView: View {
             previewTask?.cancel()
             if let tempDir = currentTempDir {
                 try? FileManager.default.removeItem(at: tempDir)
+            }
+            
+            // Clean up active edit sessions
+            for session in activeEditSessions.values {
+                InPlaceArchiveMutationEngine.shared.closeEditingSession(session: session)
+            }
+            activeEditSessions.removeAll()
+        }
+    }
+    
+    // MARK: - In-Place Live Editing & Mutation Operations
+    
+    private func openSelectedInExternalEditor(_ entry: ArchiveEntry) {
+        Task {
+            do {
+                let session = try await InPlaceArchiveMutationEngine.shared.beginEditingSession(
+                    archivePath: archivePath,
+                    entryPath: entry.path,
+                    password: password
+                )
+                
+                await MainActor.run {
+                    self.activeEditSessions[session.sessionId] = session
+                    self.syncStatusMessage = "Watching '\(entry.name)' for external changes..."
+                }
+                
+                // Open in default macOS application
+                NSWorkspace.shared.open(URL(fileURLWithPath: session.stagedFilePath))
+                
+                // Start auto sync
+                InPlaceArchiveMutationEngine.shared.startWatchingAndAutoSync(
+                    session: session,
+                    password: password
+                ) { updatedSession, result in
+                    Task { @MainActor in
+                        switch result {
+                        case .success:
+                            self.syncStatusMessage = "⚡️ Saved & updated '\(entry.name)' in archive"
+                            self.reloadArchiveEntries()
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            if self.syncStatusMessage?.contains(entry.name) == true {
+                                self.syncStatusMessage = nil
+                            }
+                        case .failure(let err):
+                            self.syncStatusMessage = "❌ Sync failed: \(err.localizedDescription)"
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.syncStatusMessage = "Error opening: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func handleDropFiles(providers: [NSItemProvider]) {
+        var droppedPaths: [String] = []
+        let group = DispatchGroup()
+        
+        for provider in providers {
+            group.enter()
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                if let url = url, url.isFileURL {
+                    droppedPaths.append(url.path)
+                }
+                group.leave()
+            }
+        }
+        
+        group.notify(queue: .main) {
+            guard !droppedPaths.isEmpty else { return }
+            self.isMutatingArchive = true
+            self.syncStatusMessage = "Adding \(droppedPaths.count) items into archive..."
+            
+            Task {
+                do {
+                    try await InPlaceArchiveMutationEngine.shared.addFilesToArchive(
+                        archivePath: self.archivePath,
+                        sourceFilePaths: droppedPaths,
+                        destinationVirtualFolder: nil,
+                        password: self.password
+                    )
+                    await MainActor.run {
+                        self.isMutatingArchive = false
+                        self.syncStatusMessage = "Added items successfully"
+                        self.reloadArchiveEntries()
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.isMutatingArchive = false
+                        self.syncStatusMessage = "Failed to add items: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
+    }
+    
+    private func deleteSelectedEntry(_ entry: ArchiveEntry) {
+        isMutatingArchive = true
+        syncStatusMessage = "Deleting '\(entry.name)' from archive..."
+        
+        Task {
+            do {
+                try await InPlaceArchiveMutationEngine.shared.deleteEntriesFromArchive(
+                    archivePath: archivePath,
+                    entryPathsToDelete: [entry.path],
+                    password: password
+                )
+                await MainActor.run {
+                    self.isMutatingArchive = false
+                    self.syncStatusMessage = "Deleted '\(entry.name)'"
+                    self.selectedEntryID = nil
+                    self.reloadArchiveEntries()
+                }
+            } catch {
+                await MainActor.run {
+                    self.isMutatingArchive = false
+                    self.syncStatusMessage = "Failed to delete: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func reloadArchiveEntries() {
+        Task {
+            let reader = ArchiveReader()
+            if let newEntries = try? await reader.inspect(archivePath: archivePath, password: password) {
+                await MainActor.run {
+                    self.entries = newEntries
+                    self.treeStore.updateEntries(newEntries, force: true)
+                }
             }
         }
     }

@@ -8,70 +8,90 @@
 #include "include/CTTZipBridge_LZFSE.h"
 #include "include/CTTZipCommon.h"
 #include "include/CTTZipBridge_APFS.h"
-#include <lzfse.h>
+#include "lzfse.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <dlfcn.h>
+#include <pthread.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-typedef size_t (*lzfse_encode_fn)(uint8_t *dst_buffer, size_t dst_size,
-                                   const uint8_t *src_buffer, size_t src_size,
-                                   void *scratch_buffer);
-typedef size_t (*lzfse_decode_fn)(uint8_t *dst_buffer, size_t dst_size,
-                                   const uint8_t *src_buffer, size_t src_size,
-                                   void *scratch_buffer);
+// MARK: - Thread-Local Scratch Arena Management
 
-static void* s_lzfse_handle = NULL;
-static lzfse_encode_fn s_encode_fn = NULL;
-static lzfse_decode_fn s_decode_fn = NULL;
+static pthread_key_t s_decode_scratch_key;
+static pthread_key_t s_encode_scratch_key;
+static pthread_once_t s_key_once = PTHREAD_ONCE_INIT;
 
-static bool init_lzfse_symbols(void) {
-    if (s_encode_fn && s_decode_fn) return true;
-    
-    if (!s_lzfse_handle) {
-        s_lzfse_handle = dlopen("liblzfse.dylib", RTLD_LAZY);
-        if (!s_lzfse_handle) {
-            s_lzfse_handle = dlopen("/usr/lib/liblzfse.dylib", RTLD_LAZY);
-        }
-        if (!s_lzfse_handle) {
-            s_lzfse_handle = dlopen("/opt/homebrew/lib/liblzfse.dylib", RTLD_LAZY);
-        }
+static void free_thread_scratch(void* ptr) {
+    if (ptr) {
+        free(ptr);
     }
-    
-    if (s_lzfse_handle) {
-        s_encode_fn = (lzfse_encode_fn)dlsym(s_lzfse_handle, "lzfse_encode_buffer");
-        s_decode_fn = (lzfse_decode_fn)dlsym(s_lzfse_handle, "lzfse_decode_buffer");
-    }
-    
-    return (s_encode_fn != NULL && s_decode_fn != NULL);
 }
 
+static void init_scratch_keys(void) {
+    pthread_key_create(&s_decode_scratch_key, free_thread_scratch);
+    pthread_key_create(&s_encode_scratch_key, free_thread_scratch);
+}
+
+static void* get_thread_decode_scratch(void) {
+    pthread_once(&s_key_once, init_scratch_keys);
+    void* scratch = pthread_getspecific(s_decode_scratch_key);
+    if (!scratch) {
+        size_t size = lzfse_decode_scratch_size();
+        if (size == 0) size = 2129920; // fallback to 2.03MB
+        scratch = malloc(size);
+        if (scratch) {
+            pthread_setspecific(s_decode_scratch_key, scratch);
+        }
+    }
+    return scratch;
+}
+
+static void* get_thread_encode_scratch(void) {
+    pthread_once(&s_key_once, init_scratch_keys);
+    void* scratch = pthread_getspecific(s_encode_scratch_key);
+    if (!scratch) {
+        size_t size = lzfse_encode_scratch_size();
+        if (size == 0) size = 2129920; // fallback to 2.03MB
+        scratch = malloc(size);
+        if (scratch) {
+            pthread_setspecific(s_encode_scratch_key, scratch);
+        }
+    }
+    return scratch;
+}
+
+// MARK: - Public Core APIs
+
 bool ttzip_lzfse_is_available(void) {
-    return init_lzfse_symbols();
+    return true; // 100% In-Process C Static Compilation
 }
 
 size_t ttzip_lzfse_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity) {
     if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
-    if (!init_lzfse_symbols()) return 0;
     
-    return s_encode_fn((uint8_t*)dst, dst_capacity, (const uint8_t*)src, src_size, NULL);
+    void* scratch = get_thread_encode_scratch();
+    return lzfse_encode_buffer((uint8_t*)dst, dst_capacity, (const uint8_t*)src, src_size, scratch);
 }
 
 size_t ttzip_lzfse_decompress(const void* src, size_t src_size, void* dst, size_t dst_capacity) {
     if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
-    if (!init_lzfse_symbols()) return 0;
     
-    return s_decode_fn((uint8_t*)dst, dst_capacity, (const uint8_t*)src, src_size, NULL);
+    void* scratch = get_thread_decode_scratch();
+    return lzfse_decode_buffer((uint8_t*)dst, dst_capacity, (const uint8_t*)src, src_size, scratch);
 }
+
+size_t ttzip_lzfse_decompress_block(const void* src, size_t src_size, void* dst, size_t dst_capacity) {
+    return ttzip_lzfse_decompress(src, src_size, dst, dst_capacity);
+}
+
+// MARK: - File Streaming Workflows
 
 int ttzip_lzfse_compress_file_stream(const char* src_path, const char* dst_path) {
     if (!src_path || !dst_path) return TTZIP_ERR_INVALID_PARAM;
-    if (!init_lzfse_symbols()) return TTZIP_ERR_ARCHIVE_INIT_FAILED;
     
     int fd_in = open(src_path, O_RDONLY);
     if (fd_in < 0) return TTZIP_ERR_FILE_NOT_FOUND;
@@ -87,13 +107,14 @@ int ttzip_lzfse_compress_file_stream(const char* src_path, const char* dst_path)
     if (mapped == MAP_FAILED) return TTZIP_ERR_MMAP_FAILED;
     
     size_t out_cap = (size_t)st.st_size + 65536;
-    uint8_t *out_buf = malloc(out_cap);
+    uint8_t *out_buf = (uint8_t*)malloc(out_cap);
     if (!out_buf) {
         munmap(mapped, (size_t)st.st_size);
         return TTZIP_ERR_MMAP_FAILED;
     }
     
-    size_t comp_size = s_encode_fn(out_buf, out_cap, (const uint8_t*)mapped, (size_t)st.st_size, NULL);
+    void* scratch = get_thread_encode_scratch();
+    size_t comp_size = lzfse_encode_buffer(out_buf, out_cap, (const uint8_t*)mapped, (size_t)st.st_size, scratch);
     munmap(mapped, (size_t)st.st_size);
     
     if (comp_size == 0) {
@@ -108,16 +129,15 @@ int ttzip_lzfse_compress_file_stream(const char* src_path, const char* dst_path)
     }
     
     ttzip_apfs_preallocate(fd_out, (int64_t)comp_size);
-    write(fd_out, out_buf, comp_size);
+    ssize_t written = write(fd_out, out_buf, comp_size);
     close(fd_out);
     free(out_buf);
     
-    return TTZIP_OK;
+    return (written == (ssize_t)comp_size) ? TTZIP_OK : TTZIP_ERR_OPEN_FAILED;
 }
 
 int ttzip_lzfse_decompress_file_stream(const char* src_path, const char* dst_path) {
     if (!src_path || !dst_path) return TTZIP_ERR_INVALID_PARAM;
-    if (!init_lzfse_symbols()) return TTZIP_ERR_ARCHIVE_INIT_FAILED;
     
     int fd_in = open(src_path, O_RDONLY);
     if (fd_in < 0) return TTZIP_ERR_FILE_NOT_FOUND;
@@ -132,14 +152,30 @@ int ttzip_lzfse_decompress_file_stream(const char* src_path, const char* dst_pat
     close(fd_in);
     if (mapped == MAP_FAILED) return TTZIP_ERR_MMAP_FAILED;
     
-    size_t out_cap = (size_t)st.st_size * 8 + 65536;
-    uint8_t *out_buf = malloc(out_cap);
+    void* scratch = get_thread_decode_scratch();
+    
+    size_t out_cap = (size_t)st.st_size * 4;
+    if (out_cap < 256 * 1024) out_cap = 256 * 1024; // at least 256KB
+    uint8_t *out_buf = (uint8_t*)malloc(out_cap);
     if (!out_buf) {
         munmap(mapped, (size_t)st.st_size);
         return TTZIP_ERR_MMAP_FAILED;
     }
     
-    size_t decomp_size = s_decode_fn(out_buf, out_cap, (const uint8_t*)mapped, (size_t)st.st_size, NULL);
+    size_t decomp_size = 0;
+    while (out_cap <= 1024 * 1024 * 1024) { // max 1GB
+        decomp_size = lzfse_decode_buffer(out_buf, out_cap, (const uint8_t*)mapped, (size_t)st.st_size, scratch);
+        if (decomp_size > 0 && decomp_size < out_cap) {
+            break; // Successfully decoded complete stream!
+        }
+        size_t next_cap = out_cap * 2;
+        if (next_cap > 1024 * 1024 * 1024) break;
+        uint8_t *new_buf = (uint8_t*)realloc(out_buf, next_cap);
+        if (!new_buf) break;
+        out_buf = new_buf;
+        out_cap = next_cap;
+    }
+    
     munmap(mapped, (size_t)st.st_size);
     
     if (decomp_size == 0) {
@@ -154,9 +190,9 @@ int ttzip_lzfse_decompress_file_stream(const char* src_path, const char* dst_pat
     }
     
     ttzip_apfs_preallocate(fd_out, (int64_t)decomp_size);
-    write(fd_out, out_buf, decomp_size);
+    ssize_t written = write(fd_out, out_buf, decomp_size);
     close(fd_out);
     free(out_buf);
     
-    return TTZIP_OK;
+    return (written == (ssize_t)decomp_size) ? TTZIP_OK : TTZIP_ERR_OPEN_FAILED;
 }

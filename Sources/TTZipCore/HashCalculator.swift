@@ -146,4 +146,10 @@ public final class HashCalculator: HashCalculating, @unchecked Sendable {
         let digest = hasher.finalize()
         return digest.map { String(format: "%02x", $0) }.joined()
     }
+    
+    /// Static convenience method for calculating SHA-256 fingerprint of a file.
+    public static func calculateSHA256(filePath: String) -> String? {
+        let calc = HashCalculator()
+        return try? calc.computeHashSync(filePath: filePath, type: .sha256)
+    }
 }
