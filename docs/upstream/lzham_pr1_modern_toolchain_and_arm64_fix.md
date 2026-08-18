@@ -3,7 +3,7 @@
 **Target Repository**: `richgel999/lzham_codec`  
 **Target Branch**: `master`  
 **Working Branch**: `fix/modern-toolchain-and-arm64-compat`  
-**Commit**: `3f952fa` (`fix: modernize CMake version and fix AArch64/Clang compatibility issues`)  
+**Commit**: `f093b87` (`fix: modernize CMake version and fix AArch64/Clang compatibility issues`)  
 
 ---
 

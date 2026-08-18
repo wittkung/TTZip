@@ -3,7 +3,7 @@
 **Target Repository**: `richgel999/lzham_codec`  
 **Target Branch**: `master`  
 **Working Branch**: `feat/arm64-neon-match-copy-acceleration`  
-**Commit**: `5e5f6c4` (`feat(decomp): add ARM64 NEON vectorized match copy fast-path`)  
+**Commit**: `70d6ba6` (`feat(decomp): add ARM64 NEON vectorized match copy fast-path`)  
 
 ---
 
