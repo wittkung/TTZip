@@ -203,6 +203,13 @@ In `cmake/config.h.in`, when `defined(__APPLE__)` is detected, we override the c
 #endif  /* defined(__APPLE__) */
 ```
 
+### Key Properties & Invariants
+- **Zero Impact on Single-Arch Builds**: On Linux, Windows (MSVC), Android, and non-Apple targets, CMake's `#cmakedefine01` behavior is 100% untouched.
+- **Slice-Aware Dispatch**: On Darwin, each slice compiled during the build phase dynamically enables its native vector pipeline (`tbl.16b` / `vqtbl1q_u8` on ARM64, `pshufb` / `_mm_shuffle_epi8` on x86_64).
+- **Target Baseline Adaptive Resolution**: Dynamically adapts to compiler baseline and target architecture flags (e.g. `__BMI2__` and `__SSE4_2__` are enabled only when target architecture flags are explicitly passed or enabled by the toolchain, avoiding illegal instruction faults on legacy hardware).
+- **Canonical Architecture Pattern**: Because CMake evaluates configure-time checks globally across all `-DCMAKE_OSX_ARCHITECTURES` using the combined compiler invocation, resolving multi-slice hardware features at compile-time via `config.h.in` is the established canonical pattern across top-tier portable C/C++ libraries (consistent with projects like zlib-ng, libjpeg-turbo, and libdeflate).
+- **Clean Fallback**: Unknown or legacy 32-bit slices gracefully fall back to zero without compiler warnings.
+
 ### Verification / How Has This Been Tested
 
 #### 1. Universal Binary Build & Architecture Inspection
@@ -222,8 +229,13 @@ otool -arch arm64 -tvV CMakeFiles/snappy.dir/snappy.cc.o | grep "tbl"
 # Physical Output:
 # 000000000000809c	tbl.16b	v0, { v0 }, v1
 
-# Before this patch: 0 tbl instructions (completely stripped scalar fallback)
-# After this patch:  tbl.16b active in ARM64 slice
+# Verify x86_64 slice actively emits SSSE3 vector shuffle (_mm_shuffle_epi8 -> pshufb)
+otool -arch x86_64 -tvV CMakeFiles/snappy.dir/snappy.cc.o | grep "pshufb"
+# Physical Output:
+# 00000000000076ec	pshufb	%xmm1, %xmm0
+
+# Before this patch: 0 tbl instructions on ARM64 and 0 pshufb instructions on x86_64 (completely stripped scalar fallback)
+# After this patch:  Both tbl.16b (ARM64) and pshufb (x86_64) are active in their respective slices.
 ```
 
 #### 3. Native Regression Suite
