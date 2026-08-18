@@ -83,7 +83,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
             compressedPayload = rawData
             totalCompressedBytes = uncompressedBytes
         } else {
-            // 2. 18 核心饱和分块并发压缩 (18-Core Saturated Block-Parallel Deflate + RFC 1951 Sync Flush)
+            // Tier 1..7: 18 核心饱和分块并发压缩 (18-Core Saturated Block-Parallel Deflate + RFC 1951 Sync Flush)
             let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : max(1024 * 1024, (rawData.count + 17) / 18)
             let actualBlockSize = min(rawData.count, max(65536, baseBlockSize))
             let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
@@ -114,36 +114,13 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                     let histPtr: UnsafePointer<UInt8>? = blockIdx > 0 ? chunkPtr.advanced(by: -min(32768, offset)) : nil
                     let histSize: Int = blockIdx > 0 ? min(32768, offset) : 0
                     
-                    var compSize: size_t = 0
-                    if totalBlocks == 1 {
-                        var options = TTZipZopfliOptions(
-                            compression_level: activeProfile.deflateLevel,
-                            num_iterations: activeProfile.zopfliIterations,
-                            block_splitting: activeProfile.blockSplitting ? 1 : 0,
-                            max_block_splits: activeProfile.maxBlockSplits,
-                            early_exit_threshold: activeProfile.earlyExitThreshold
-                        )
-                        compSize = ttzip_zopfli_compress_block_with_history(
-                            chunkPtr,
-                            currentChunkSize,
-                            nil,
-                            0,
-                            outBuf,
-                            maxChunkOut,
-                            &options
-                        )
-                    } else {
-                        compSize = ttzip_raw_deflate_block_compress_with_dict(
-                            chunkPtr,
-                            currentChunkSize,
-                            histPtr,
-                            histSize,
-                            outBuf,
-                            maxChunkOut,
-                            activeProfile.deflateLevel,
-                            isFinal
-                        )
-                    }
+                    let compSize = ttzip_libdeflate_compress(
+                        chunkPtr,
+                        currentChunkSize,
+                        outBuf,
+                        maxChunkOut,
+                        activeProfile.deflateLevel
+                    )
                     
                     if compSize > 0 && compSize < currentChunkSize {
                         resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: compSize))

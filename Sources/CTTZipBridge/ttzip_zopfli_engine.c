@@ -6,10 +6,12 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 #include "include/ttzip_zopfli_engine.h"
+#include "include/ttzip_huffman_inplace.h"
 #include "include/CTTZipStreamCoder.h"
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
 #include <arm_neon.h>
@@ -19,8 +21,10 @@
 #define TTZIP_FIXED_SCALE 256
 #define TTZIP_WINDOW_SIZE 32768
 #define TTZIP_WINDOW_MASK 32767
-#define TTZIP_HASH_SHIFT 5
-#define TTZIP_HASH_MASK 32767
+#define TTZIP_MIN_MATCH   3
+#define TTZIP_MAX_MATCH   258
+#define TTZIP_HASH_SIZE   65536
+#define TTZIP_HASH_MASK   65535
 
 // 256 阶 mantissa log2 快速查表 (整型单周期)
 static const uint16_t s_log2_mantissa_lut[256] = {
@@ -42,12 +46,55 @@ static const uint16_t s_log2_mantissa_lut[256] = {
     192, 192, 193, 193, 193, 194, 194, 195, 195, 195, 196, 196, 197, 197, 198, 198
 };
 
-__attribute__((unused)) static inline uint32_t ttzip_fast_log2_fixed(uint32_t x) {
+static inline uint32_t ttzip_fast_log2_fixed(uint32_t x) {
     if (x <= 1) return 0;
     int lz = __builtin_clz(x);
     int exp = 31 - lz;
     uint32_t frac = (x << (lz + 1)) >> 24;
     return (uint32_t)((exp << 8) + s_log2_mantissa_lut[frac & 0xFF]);
+}
+
+// Length extra bits mapping (3..258)
+__attribute__((unused)) static const uint8_t s_length_extra_bits[29] = {
+    0, 0, 0, 0, 0, 0, 0, 0,
+    1, 1, 1, 1, 2, 2, 2, 2,
+    3, 3, 3, 3, 4, 4, 4, 4,
+    5, 5, 5, 5, 0
+};
+
+// Distance extra bits mapping (1..32768)
+__attribute__((unused)) static const uint8_t s_dist_extra_bits[30] = {
+    0, 0, 0, 0, 1, 1, 2, 2,
+    3, 3, 4, 4, 5, 5, 6, 6,
+    7, 7, 8, 8, 9, 9, 10, 10,
+    11, 11, 12, 12, 13, 13
+};
+
+__attribute__((unused)) static inline uint16_t ttzip_get_length_code(uint32_t len) {
+    static const uint8_t s_len_to_code[259] = {
+        0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13,
+        14, 14, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17,
+        18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20,
+        20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21,
+        22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23,
+        23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
+        24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 25,
+        25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+        26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26,
+        26, 26, 26, 26, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27,
+        27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27
+    };
+    if (len < 3) return 257;
+    if (len > 258) len = 258;
+    return (uint16_t)(257 + s_len_to_code[len]);
+}
+
+__attribute__((unused)) static inline uint8_t ttzip_get_dist_code(uint32_t dist) {
+    if (dist <= 4) return (uint8_t)(dist - 1);
+    int lz = __builtin_clz(dist - 1);
+    int exp = 31 - lz;
+    uint32_t frac = (dist - 1) >> (exp - 1);
+    return (uint8_t)((exp << 1) + (frac & 1));
 }
 
 void ttzip_zopfli_init_options(TTZipZopfliOptions *options, int level) {
@@ -80,8 +127,6 @@ size_t ttzip_zopfli_compress_block_with_history(
     size_t out_capacity,
     const TTZipZopfliOptions *options
 ) {
-    (void)history;
-    (void)history_size;
     if (!in || in_size == 0 || !out || out_capacity == 0) {
         return 0;
     }
@@ -99,4 +144,3 @@ size_t ttzip_zopfli_compress_block_with_history(
     // 针对 Level 12 极限重压：调用 libdeflate Level 12 极速近最优图论基准
     return ttzip_libdeflate_compress(in, in_size, out, out_capacity, 12);
 }
-

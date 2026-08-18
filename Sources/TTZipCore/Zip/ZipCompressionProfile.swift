@@ -82,12 +82,38 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 6000.0
     )
     
-    /// Tier 1: Fast (极速轻量 LZ77 短匹配，libdeflate L2，吞吐 >= 4500 MB/s)
+    /// Tier 1: Fast (极速轻量 LZ77 短匹配，libdeflate L1，吞吐 >= 6500 MB/s)
     public static let fast = ZipCompressionProfile(
         id: "zip_tier_1_fast",
         name: "Fast (1)",
         level: .level1,
+        deflateLevel: 1,
+        zopfliIterations: 1,
+        blockSplitting: false,
+        maxBlockSplits: 0,
+        earlyExitThreshold: 0.0001,
+        targetThroughputFloorMBs: 6500.0
+    )
+    
+    /// Tier 2: Fast+ (快速匹配增加哈希链深度，libdeflate L2，吞吐 >= 6000 MB/s)
+    public static let fastPlus = ZipCompressionProfile(
+        id: "zip_tier_2_fast_plus",
+        name: "Fast+ (2)",
+        level: .level2,
         deflateLevel: 2,
+        zopfliIterations: 1,
+        blockSplitting: false,
+        maxBlockSplits: 0,
+        earlyExitThreshold: 0.0001,
+        targetThroughputFloorMBs: 6000.0
+    )
+    
+    /// Tier 3: Normal (标准帕累托平衡档位，libdeflate L7，吞吐 >= 4500 MB/s)
+    public static let normal = ZipCompressionProfile(
+        id: "zip_tier_3_normal",
+        name: "Normal (3)",
+        level: .level3,
+        deflateLevel: 7,
         zopfliIterations: 1,
         blockSplitting: false,
         maxBlockSplits: 0,
@@ -95,56 +121,30 @@ extension ZipCompressionProfile {
         targetThroughputFloorMBs: 4500.0
     )
     
-    /// Tier 2: Fast+ (快速匹配增加哈希链深度，libdeflate L4，吞吐 >= 3800 MB/s)
-    public static let fastPlus = ZipCompressionProfile(
-        id: "zip_tier_2_fast_plus",
-        name: "Fast+ (2)",
-        level: .level2,
-        deflateLevel: 4,
-        zopfliIterations: 1,
-        blockSplitting: false,
-        maxBlockSplits: 0,
-        earlyExitThreshold: 0.0001,
-        targetThroughputFloorMBs: 3800.0
-    )
-    
-    /// Tier 3: Normal (标准帕累托平衡档位，libdeflate L6，吞吐 >= 3000 MB/s)
-    public static let normal = ZipCompressionProfile(
-        id: "zip_tier_3_normal",
-        name: "Normal (3)",
-        level: .level3,
-        deflateLevel: 6,
-        zopfliIterations: 1,
-        blockSplitting: false,
-        maxBlockSplits: 0,
-        earlyExitThreshold: 0.0001,
-        targetThroughputFloorMBs: 3000.0
-    )
-    
-    /// Tier 4: Maximum (深度字典模式匹配，libdeflate L8，吞吐 >= 1800 MB/s)
+    /// Tier 4: Maximum (深度字典模式匹配，libdeflate L9，吞吐 >= 2500 MB/s)
     public static let maximum = ZipCompressionProfile(
         id: "zip_tier_4_maximum",
         name: "Maximum (4)",
         level: .level4,
-        deflateLevel: 8,
+        deflateLevel: 9,
         zopfliIterations: 1,
         blockSplitting: false,
         maxBlockSplits: 0,
         earlyExitThreshold: 0.0001,
-        targetThroughputFloorMBs: 1800.0
+        targetThroughputFloorMBs: 2500.0
     )
     
-    /// Tier 5: Graph Fast (有限前瞻 DAG 最短路径图论剪枝，libdeflate L10，吞吐 >= 600 MB/s)
+    /// Tier 5: Graph Fast (有限前瞻 DAG 最短路径图论剪枝，libdeflate L10，吞吐 >= 400 MB/s)
     public static let graphFast = ZipCompressionProfile(
         id: "zip_tier_5_graph_fast",
         name: "Graph Fast (5)",
         level: .level5,
         deflateLevel: 10,
-        zopfliIterations: 4,
+        zopfliIterations: 1,
         blockSplitting: false,
         maxBlockSplits: 0,
         earlyExitThreshold: 0.0001,
-        targetThroughputFloorMBs: 600.0
+        targetThroughputFloorMBs: 400.0
     )
     
     /// Tier 6: Ultra Zopfli (100% 进程内全局 DAG 最短路径穷举，libdeflate L12 / 10 轮 Zopfli，吞吐 >= 2.5 MB/s)
