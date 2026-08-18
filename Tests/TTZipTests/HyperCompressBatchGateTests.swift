@@ -24,7 +24,7 @@ final class HyperCompressBatchGateTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "HyperCompress ZIP Batch (500 Files)",
             payloadBytes: totalBytes,
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { _ in },
             block: { sandbox in
                 let outArchive = sandbox.fileURL(named: "hypercompress_batch.zip").path
@@ -58,7 +58,7 @@ final class HyperCompressBatchGateTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "HyperCompress TAR.ZST Batch (500 Files)",
             payloadBytes: totalBytes,
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { _ in },
             block: { sandbox in
                 let outArchive = sandbox.fileURL(named: "hypercompress_batch.tar.zst").path
@@ -92,7 +92,7 @@ final class HyperCompressBatchGateTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "HyperCompress 7Z Batch (500 Files)",
             payloadBytes: totalBytes,
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { _ in },
             block: { sandbox in
                 let outArchive = sandbox.fileURL(named: "hypercompress_batch.7z").path
