@@ -84,8 +84,9 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
             totalCompressedBytes = uncompressedBytes
         } else {
             // Tier 1..7: Multi-core parallel block Deflate with RFC 1951 sync flush boundaries
-            let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : max(1024 * 1024, (rawData.count + 17) / 18)
+            let baseBlockSize = blockSize > 0 ? max(65536, blockSize) : max(262144, (rawData.count + 17) / 18)
             let actualBlockSize = min(rawData.count, max(65536, baseBlockSize))
+
             let totalBlocks = (rawData.count + actualBlockSize - 1) / actualBlockSize
             
             let maxChunkOut = actualBlockSize + 65536
