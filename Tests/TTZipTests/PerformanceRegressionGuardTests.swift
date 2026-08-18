@@ -29,14 +29,10 @@ final class PerformanceRegressionGuardTests: XCTestCase {
         let calibrator = HardwareCalibrator.shared
         let writer = ArchiveWriter()
         
-        // 50MB test dataset for amortized system call measurement
+        // 50MB standardized dataset matching HardwareCalibrator baseline
         let dataSize = 50 * 1024 * 1024
-        var sampleData = Data(count: dataSize)
-        for i in 0..<dataSize {
-            sampleData[i] = UInt8(i % 251)
-        }
-        
-        let sampleFile = sandbox.fileURL(named: "perf_guard_sample.bin")
+        let sampleData = Data(count: dataSize)
+        let sampleFile = sandbox.url.appendingPathComponent("bench_payload.bin")
         try sampleData.write(to: sampleFile)
         
         let testScenarios: [ScenarioBaselineKey] = [

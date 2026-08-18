@@ -19,7 +19,7 @@ final class SwarOptimizationBenchmarkTests: XCTestCase {
         var asciiBytes = [UInt8](repeating: UInt8(ascii: "a"), count: size)
         asciiBytes[size - 1] = 0 // null terminated
 
-        let iterations = 100_000
+        let iterations = TestBenchmarkTier.benchmarkIterations(default: 20_000, benchmark: 100_000)
         let startTime = CFAbsoluteTimeGetCurrent()
 
         var isValid = true
@@ -47,7 +47,7 @@ final class SwarOptimizationBenchmarkTests: XCTestCase {
     func testEncodingDetectionSpeedup() throws {
         let sampleText = "Documents/Dev/TTZip/Sources/TTZipCore/ArchiveEngineFamily.swift"
         let sampleData = sampleText.data(using: .utf8)!
-        let iterations = 1_000_000
+        let iterations = TestBenchmarkTier.benchmarkIterations(default: 200_000, benchmark: 1_000_000)
 
         let startTime = CFAbsoluteTimeGetCurrent()
         var matchCount = 0
@@ -97,7 +97,7 @@ final class SwarOptimizationBenchmarkTests: XCTestCase {
             }
         }
 
-        let iterations = 2_000_000
+        let iterations = TestBenchmarkTier.benchmarkIterations(default: 500_000, benchmark: 2_000_000)
 
         let startTime = CFAbsoluteTimeGetCurrent()
         var validCount = 0

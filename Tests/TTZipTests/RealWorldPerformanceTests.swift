@@ -16,7 +16,7 @@ final class RealWorldPerformanceTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "Zip Tiny Files",
             payloadBytes: 1000 * 10240, // ~10MB
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { sandbox in
                 let inputDir = sandbox.fileURL(named: "tiny_files_in")
                 try TestFileGenerator.createBatchSmallFiles(in: inputDir, count: 1000, sizePerFileInKB: 10)
@@ -45,7 +45,7 @@ final class RealWorldPerformanceTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "7Z Tiny Files",
             payloadBytes: 1000 * 10240,
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { sandbox in
                 let inputDir = sandbox.fileURL(named: "tiny_files_in_7z")
                 try TestFileGenerator.createBatchSmallFiles(in: inputDir, count: 1000, sizePerFileInKB: 10)
@@ -72,7 +72,7 @@ final class RealWorldPerformanceTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "Zip Large Compressible",
             payloadBytes: 20 * 1024 * 1024, // 20MB
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { sandbox in
                 let logFileURL = sandbox.fileURL(named: "large_comp.log")
                 try TestFileGenerator.createRealisticLogFile(at: logFileURL, linesCount: 100000)
@@ -99,7 +99,7 @@ final class RealWorldPerformanceTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "7Z Large Compressible",
             payloadBytes: 20 * 1024 * 1024,
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { sandbox in
                 let logFileURL = sandbox.fileURL(named: "large_comp_7z.log")
                 try TestFileGenerator.createRealisticLogFile(at: logFileURL, linesCount: 100000)
@@ -126,7 +126,7 @@ final class RealWorldPerformanceTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "Zip Large Incompressible",
             payloadBytes: 20 * 1024 * 1024,
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { sandbox in
                 let binFile = sandbox.fileURL(named: "large_incomp.bin").path
                 TestFileGenerator.createInstantHugeFile(atPath: binFile, sizeInMB: 20)
@@ -153,7 +153,7 @@ final class RealWorldPerformanceTests: XCTestCase {
         let metrics = try await AsyncBenchmarkRunner.measure(
             name: "7Z Large Incompressible",
             payloadBytes: 20 * 1024 * 1024,
-            iterations: 2,
+            iterations: TestBenchmarkTier.isBenchmarkMode ? 2 : 1,
             setUp: { sandbox in
                 let binFile = sandbox.fileURL(named: "large_incomp_7z.bin").path
                 TestFileGenerator.createInstantHugeFile(atPath: binFile, sizeInMB: 20)

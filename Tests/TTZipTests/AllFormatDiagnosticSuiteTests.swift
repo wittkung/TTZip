@@ -9,18 +9,12 @@ import XCTest
 import Foundation
 @testable import TTZipCore
 
-/// Validates expected behavior and invariants.
+/// Format Diagnostic Suite Tests
 ///
-/// ， `--filter` ：
-/// - ZIP: `swift test --filter testZipDiagnostic`
-/// - 7z: `swift test --filter testSevenZipDiagnostic`
-/// - ZSTD: `swift test --filter testZstdDiagnostic`
-/// - GZIP: `swift test --filter testGzipDiagnostic`
-/// - TAR: `swift test --filter testTarDiagnostic`
-/// - ...
+/// Runs diagnostic validation across all supported archive formats.
 final class AllFormatDiagnosticSuiteTests: XCTestCase {
 
-    /// ( )
+    /// Formats currently supporting creation verification
     private static let supportedCreationFormats: Set<ArchiveCompressionFormat> = [
         .zip, .sevenZip, .tar, .tarGz, .gz, .tarZst, .zst, .tarBz2, .bz2, .tarXz, .xz,
         .lzip, .lz4, .brotli, .lrzip, .aar, .wim, .dmg, .iso
@@ -28,7 +22,7 @@ final class AllFormatDiagnosticSuiteTests: XCTestCase {
 
     private func assertDiagnosticPass(
         for format: ArchiveCompressionFormat,
-        levels: [ArchiveCompressionLevel] = [.store, .level1, .level6, .level9],
+        levels: [ArchiveCompressionLevel]? = nil,
         testEncryption: Bool = false,
         file: StaticString = #filePath,
         line: UInt = #line
@@ -36,13 +30,16 @@ final class AllFormatDiagnosticSuiteTests: XCTestCase {
         guard Self.supportedCreationFormats.contains(format) else {
             throw XCTSkip("\(format.rawValue.uppercased()) format native C packing creation is not yet supported, skipping test")
         }
+        let defaultLevels: [ArchiveCompressionLevel] = TestBenchmarkTier.isBenchmarkMode
+            ? [.store, .level1, .level6, .level9]
+            : [.level1, .level6]
         let config = FormatDiagnosticConfig(
             format: format,
-            levelsToTest: levels,
+            levelsToTest: levels ?? defaultLevels,
             testPasswordEncryption: testEncryption
         )
         let pass = try FormatDiagnosticSuiteRunner.shared.runDiagnosticSuite(config: config)
-        XCTAssertTrue(pass, "❌ [Diagnostic assertion failure] \(format.rawValue.uppercased()) (\(format.fileExtension)) 格式单项诊断测试未达到 100% 通过率", file: file, line: line)
+        XCTAssertTrue(pass, "Format diagnostic suite failed for \(format.rawValue.uppercased())", file: file, line: line)
     }
 
     func testZipDiagnostic() throws { try assertDiagnosticPass(for: .zip, testEncryption: true) }
