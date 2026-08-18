@@ -47,41 +47,35 @@ extension ArchiveWriter {
         }
     }
     
-    /// Splits an archive file into numbered volumes (`.001`, `.002`, etc.) when split volume size is specified.
-    public static func sliceArchiveIfNeeded(archivePath: String, splitSizeBytes: Int64) throws {
+    /// Splits an archive file into numbered or spanned volumes when split volume size is specified.
+    public static func sliceArchiveIfNeeded(
+        archivePath: String,
+        splitSizeBytes: Int64,
+        namingPattern: VolumeNamingPattern = .numberedExtension
+    ) throws {
         let fm = FileManager.default
         guard fm.fileExists(atPath: archivePath) else { return }
         let attrs = try fm.attributesOfItem(atPath: archivePath)
         guard let fileSize = attrs[.size] as? Int64, fileSize > 0 else { return }
+        guard splitSizeBytes >= 65536 && splitSizeBytes < fileSize else { return }
+        
+        let sink = try MultiVolumeStreamSink(
+            baseOutputPath: archivePath,
+            volumeSizeBytes: splitSizeBytes,
+            namingPattern: namingPattern,
+            cleanOnFailure: true
+        )
         
         let fileHandle = try FileHandle(forReadingFrom: URL(fileURLWithPath: archivePath))
         defer { try? fileHandle.close() }
         
-        var chunkIndex = 1
-        var remainingBytes = fileSize
         let bufferSize = 4 * 1024 * 1024
-        
-        while remainingBytes > 0 {
-            let partExt = String(format: ".%03d", chunkIndex)
-            let partPath = archivePath + partExt
-            fm.createFile(atPath: partPath, contents: nil)
-            let outHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: partPath))
-            
-            var bytesWrittenForThisPart: Int64 = 0
-            while bytesWrittenForThisPart < splitSizeBytes && remainingBytes > 0 {
-                let bytesToRead = min(Int64(bufferSize), min(splitSizeBytes - bytesWrittenForThisPart, remainingBytes))
-                if let data = try fileHandle.read(upToCount: Int(bytesToRead)), !data.isEmpty {
-                    try outHandle.write(contentsOf: data)
-                    bytesWrittenForThisPart += Int64(data.count)
-                    remainingBytes -= Int64(data.count)
-                } else {
-                    break
-                }
-            }
-            try outHandle.close()
-            chunkIndex += 1
+        while let chunk = try fileHandle.read(upToCount: bufferSize), !chunk.isEmpty {
+            try sink.write(data: chunk)
         }
         
-        try fm.removeItem(atPath: archivePath)
+        try sink.close()
+        try? fm.removeItem(atPath: archivePath)
     }
 }
+

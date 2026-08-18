@@ -143,11 +143,12 @@ final class RecursiveDirectoryEdgeCaseTests: XCTestCase {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         
         let largeFile = tempDir.appendingPathComponent("payload_5MB.bin")
-        let dummyData = Data(repeating: 0x5A, count: 5 * 1024 * 1024)
+        var prng = DeterministicPRNG(seed: 0xCAFE_BABE)
+        let dummyData = Data((0..<(2 * 1024 * 1024)).map { _ in UInt8(prng.next() & 0xFF) })
         try dummyData.write(to: largeFile)
         
         let outputZip = tempDir.appendingPathComponent("split_archive.7z").path
-        let splitSize: Int64 = 1 * 1024 * 1024 // 1MB 切片
+        let splitSize: Int64 = 64 * 1024 // 64KB 切片
         
         try await writer.createArchive(
             outputPath: outputZip,

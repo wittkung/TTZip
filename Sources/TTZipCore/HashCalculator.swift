@@ -152,4 +152,11 @@ public final class HashCalculator: HashCalculating, @unchecked Sendable {
         let calc = HashCalculator()
         return try? calc.computeHashSync(filePath: filePath, type: .sha256)
     }
+    
+    /// Static convenience method for calculating SHA-256 fingerprint of raw in-memory data.
+    public static func calculateSHA256(data: Data) -> String? {
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
 }
+
