@@ -78,83 +78,81 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
             }
         }
 
-        // 2. 7-Zip 官方 ARM64 单线程引擎 (/opt/homebrew/bin/7zz, -tzip -mmt=1)
+        let corpusItem = CorpusItem(id: "enwik8", name: "enwik8", tier: .tier1Text, path: realSamplePath, sizeBytes: payloadBytes)
+        let fp = CorpusFingerprintManager.shared.computeFingerprint(for: corpusItem)
+        let datasetSha256 = fp?.sha256Hex ?? "unknown"
+
+        // 3. 7-Zip 官方 ARM64 单线程引擎 (/opt/homebrew/bin/7zz, -tzip -mmt=1)
         let sevenZipPath = "/opt/homebrew/bin/7zz"
         if FileManager.default.fileExists(atPath: sevenZipPath) {
             let configs: [(Int, String)] = [(1, "7-Zip 1-Thread (Fast)"), (3, "7-Zip 1-Thread (Fast2)"), (5, "7-Zip 1-Thread (Normal)"), (7, "7-Zip 1-Thread (Max)"), (9, "7-Zip 1-Thread (Ultra)")]
             for (mx, label) in configs {
-                let outPath = tempDir.appendingPathComponent("7zip_sc_\(mx).zip").path
-                let p = Process()
-                p.executableURL = URL(fileURLWithPath: sevenZipPath)
-                p.arguments = ["a", "-tzip", "-mx=\(mx)", "-mmt=1", "-bso0", "-bsp0", "-y", outPath, realSamplePath]
-                let t0 = CACurrentMediaTime()
-                try p.run()
-                p.waitUntilExit()
-                let dur = max(1e-6, CACurrentMediaTime() - t0)
-                let sz = (try? FileManager.default.attributesOfItem(atPath: outPath)[.size] as? Int64) ?? 0
-                if sz > 0 {
+                let point = CompetitorBenchmarkCacheManager.shared.getOrRun(
+                    toolId: "7zip_sc_\(mx)",
+                    algorithm: label,
+                    level: mx,
+                    datasetSha256: datasetSha256
+                ) {
+                    let outPath = tempDir.appendingPathComponent("7zip_sc_\(mx).zip").path
+                    let p = Process()
+                    p.executableURL = URL(fileURLWithPath: sevenZipPath)
+                    p.arguments = ["a", "-tzip", "-mx=\(mx)", "-mmt=1", "-bso0", "-bsp0", "-y", outPath, realSamplePath]
+                    let t0 = PlatformMonotonicTimer.nowNanoseconds()
+                    try? p.run()
+                    p.waitUntilExit()
+                    let dur = max(1e-6, Double(PlatformMonotonicTimer.nowNanoseconds() - t0) / 1_000_000_000.0)
+                    let sz = (try? FileManager.default.attributesOfItem(atPath: outPath)[.size] as? Int64) ?? 0
                     let savings = (1.0 - Double(sz) / Double(payloadBytes)) * 100.0
                     let speed = payloadMB / dur
-                    points.append(ParetoPoint(
-                        id: "7zip_sc_\(mx)",
-                        algorithm: label,
-                        level: mx,
-                        throughputMBs: speed,
-                        spaceSavingsPct: savings,
-                        compressedBytes: sz,
-                        uncompressedBytes: payloadBytes
-                    ))
+                    return (speed, savings, sz, payloadBytes)
                 }
+                points.append(point)
             }
         }
 
-        // 3. Apple Native 系统单线程工具链 (/usr/bin/ditto & /usr/bin/zip -1..-9)
-        let dittoOut = tempDir.appendingPathComponent("apple_ditto_sc.zip").path
-        let pDitto = Process()
-        pDitto.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        pDitto.arguments = ["-c", "-k", "--sequesterRsrc", realSamplePath, dittoOut]
-        let t0Ditto = CACurrentMediaTime()
-        try pDitto.run()
-        pDitto.waitUntilExit()
-        let durDitto = max(1e-6, CACurrentMediaTime() - t0Ditto)
-        let szDitto = (try? FileManager.default.attributesOfItem(atPath: dittoOut)[.size] as? Int64) ?? 0
-        if szDitto > 0 {
+        // 4. Apple Native 系统单线程工具链 (/usr/bin/ditto & /usr/bin/zip -1..-9)
+        let dittoPoint = CompetitorBenchmarkCacheManager.shared.getOrRun(
+            toolId: "apple_ditto_sc",
+            algorithm: "Apple Native (ditto)",
+            level: 6,
+            datasetSha256: datasetSha256
+        ) {
+            let dittoOut = tempDir.appendingPathComponent("apple_ditto_sc.zip").path
+            let pDitto = Process()
+            pDitto.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+            pDitto.arguments = ["-c", "-k", "--sequesterRsrc", realSamplePath, dittoOut]
+            let t0Ditto = PlatformMonotonicTimer.nowNanoseconds()
+            try? pDitto.run()
+            pDitto.waitUntilExit()
+            let durDitto = max(1e-6, Double(PlatformMonotonicTimer.nowNanoseconds() - t0Ditto) / 1_000_000_000.0)
+            let szDitto = (try? FileManager.default.attributesOfItem(atPath: dittoOut)[.size] as? Int64) ?? 0
             let savings = (1.0 - Double(szDitto) / Double(payloadBytes)) * 100.0
             let speed = payloadMB / durDitto
-            points.append(ParetoPoint(
-                id: "apple_ditto_sc",
-                algorithm: "Apple Native (ditto)",
-                level: 6,
-                throughputMBs: speed,
-                spaceSavingsPct: savings,
-                compressedBytes: szDitto,
-                uncompressedBytes: payloadBytes
-            ))
+            return (speed, savings, szDitto, payloadBytes)
         }
+        points.append(dittoPoint)
 
         for zLvl in [1, 3, 6, 9] {
-            let outPath = tempDir.appendingPathComponent("apple_zip_sc_\(zLvl).zip").path
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
-            p.arguments = ["-\(zLvl)", "-q", "-r", outPath, realSamplePath]
-            let t0 = CACurrentMediaTime()
-            try p.run()
-            p.waitUntilExit()
-            let dur = max(1e-6, CACurrentMediaTime() - t0)
-            let sz = (try? FileManager.default.attributesOfItem(atPath: outPath)[.size] as? Int64) ?? 0
-            if sz > 0 {
+            let zipPoint = CompetitorBenchmarkCacheManager.shared.getOrRun(
+                toolId: "apple_zip_sc_\(zLvl)",
+                algorithm: "Apple Native (zip -\(zLvl))",
+                level: zLvl,
+                datasetSha256: datasetSha256
+            ) {
+                let outPath = tempDir.appendingPathComponent("apple_zip_sc_\(zLvl).zip").path
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+                p.arguments = ["-\(zLvl)", "-q", "-r", outPath, realSamplePath]
+                let t0 = PlatformMonotonicTimer.nowNanoseconds()
+                try? p.run()
+                p.waitUntilExit()
+                let dur = max(1e-6, Double(PlatformMonotonicTimer.nowNanoseconds() - t0) / 1_000_000_000.0)
+                let sz = (try? FileManager.default.attributesOfItem(atPath: outPath)[.size] as? Int64) ?? 0
                 let savings = (1.0 - Double(sz) / Double(payloadBytes)) * 100.0
                 let speed = payloadMB / dur
-                points.append(ParetoPoint(
-                    id: "apple_zip_sc_\(zLvl)",
-                    algorithm: "Apple Native (zip -\(zLvl))",
-                    level: zLvl,
-                    throughputMBs: speed,
-                    spaceSavingsPct: savings,
-                    compressedBytes: sz,
-                    uncompressedBytes: payloadBytes
-                ))
+                return (speed, savings, sz, payloadBytes)
             }
+            points.append(zipPoint)
         }
 
         // 4. 计算单核帕累托前沿并输出图表 (带对数压缩比扩展)

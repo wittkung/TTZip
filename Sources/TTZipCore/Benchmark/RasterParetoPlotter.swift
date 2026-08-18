@@ -104,10 +104,10 @@ public final class RasterParetoPlotter: @unchecked Sendable {
         let maxLogX = logRatio(maxX)
         let spanLogX = max(0.01, maxLogX - minLogX)
 
-        let domainMinLogX = max(0.0, minLogX - spanLogX * 0.08)
-        let domainMaxLogX = maxLogX + spanLogX * 0.08
+        let domainMinLogX = max(0.0, minLogX - spanLogX * 0.03)
+        let domainMaxLogX = maxLogX + spanLogX * 0.04
 
-        let minLogY = log10(max(1.0, minY * 0.70))
+        let minLogY = log10(max(0.05, minY * 0.60))
         let maxLogY = log10(max(10.0, maxY * 1.25))
 
         func mapX(_ savingsVal: Double) -> CGFloat {
@@ -123,12 +123,19 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             return marginBottom + CGFloat(norm) * plotH
         }
 
-        // 3. 绘制极淡水平网格线 (Y 轴对数速度刻度，紧致动态范围)
+        // 3. 绘制极淡水平网格线 (Y 轴对数速度刻度，全域 0.1 MB/s 到 200 GB/s 覆盖)
         let gridColor = CGColor(red: 241/255.0, green: 245/255.0, blue: 249/255.0, alpha: 1.0)
         let axisTextColor = NSColor(calibratedRed: 100/255.0, green: 116/255.0, blue: 139/255.0, alpha: 1.0)
 
         let candidateYTicks: [(val: Double, label: String)] = [
+            (0.1, "0.1 MB/s"),
+            (0.2, "0.2 MB/s"),
+            (0.5, "0.5 MB/s"),
+            (1.0, "1.0 MB/s"),
+            (2.0, "2.0 MB/s"),
+            (5.0, "5.0 MB/s"),
             (10.0, "10 MB/s"),
+            (20.0, "20 MB/s"),
             (50.0, "50 MB/s"),
             (100.0, "100 MB/s"),
             (200.0, "200 MB/s"),
@@ -137,13 +144,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             (2000.0, "2,000 MB/s"),
             (5000.0, "5,000 MB/s"),
             (10000.0, "10 GB/s"),
-            (20000.0, "20 GB/s"),
-            (30000.0, "30 GB/s"),
-            (50000.0, "50 GB/s"),
-            (75000.0, "75 GB/s"),
-            (100000.0, "100 GB/s"),
-            (150000.0, "150 GB/s"),
-            (200000.0, "200 GB/s")
+            (20000.0, "200 GB/s")
         ]
 
         for tick in candidateYTicks {
@@ -166,10 +167,10 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             }
         }
 
-        // 4. 绘制 X 轴（对数空间节省率 %）刻度与标签
+        // 4. 绘制 X 轴（对数空间节省率 %）细分刻度与标签 (消除空白，精确延展)
         let candidateXTicks: [Double] = [
             0.0, 20.0, 40.0, 60.0, 70.0, 80.0, 85.0, 90.0, 92.0, 94.0, 95.0,
-            95.5, 96.0, 96.2, 96.4, 96.5, 96.6, 96.7, 96.8, 97.0, 97.2, 97.5,
+            95.5, 96.0, 96.1, 96.2, 96.3, 96.4, 96.5, 96.6, 96.7, 96.8, 96.9, 97.0, 97.05, 97.1, 97.2, 97.5,
             98.0, 98.5, 99.0, 99.5, 99.8, 99.9
         ]
 
@@ -179,7 +180,7 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let tickLog = logRatio(tickVal)
             if tickLog >= domainMinLogX && tickLog <= domainMaxLogX {
                 let x = mapX(tickVal)
-                if x - lastTickCanvasX >= 75.0 {
+                if x - lastTickCanvasX >= 55.0 {
                     activeXTicks.append(tickVal)
                     lastTickCanvasX = x
                 }
