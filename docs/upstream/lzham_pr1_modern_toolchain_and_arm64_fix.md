@@ -9,15 +9,30 @@
 
 ### Summary
 
-This PR addresses modern toolchain build failures and compiler deprecation warnings across macOS (AppleClang 15/16+), Linux (GCC 11-14 / Clang), and AArch64/ARM64 systems, allowing LZHAM to build out of the box with modern CMake.
+This PR synthesizes and unifies several historically reported community compatibility issues into a single, cohesive, zero-regression patch. It addresses modern toolchain build failures and compiler deprecation warnings across macOS (AppleClang 15/16+ on Apple Silicon), Linux (GCC 11-14 / Clang 16-19), and AArch64/ARM64 systems, allowing LZHAM to build out of the box with modern CMake.
 
 ---
 
-### Background & Context
+### Historical Context & Community Continuity
+
+LZHAM was originally authored around 2011-2015 when CMake 2.8, x86/x64 architectures, and C++03 compilers were standard. Over the subsequent decade, several community members identified specific modern toolchain friction points across individual issues and PRs:
+
+1. **Issue #26 (2020 by @GregSlazinski)**: Highlighted that modern AppleClang / Clang standard libraries no longer recognize `std::__is_pod<T>::__value`, causing template instantiation errors.
+2. **PR #29 (2022 by @partiallyderived)**: Identified that CMake ordering required `cmake_minimum_required` before `project()`.
+3. **PR #31 (2022 by @partiallyderived)**: Pointed out that `pause` is not a valid assembly mnemonic on AArch64 / ARM64, requiring `yield` for spinlock back-off.
+4. **Issue #24 / PR #25 (2017-2020 by @gvollant)** and **PR #34 (2025 by @MaskRay)**: Pointed out header macro and build configuration requirements on modern distributions.
+
+Because these fixes were submitted separately over time and remained open, anyone cloning the repository today on modern development environments (macOS Sonoma/Sequoia on Apple Silicon, modern Linux distributions with CMake >= 3.30, and GCC 11+) encounters immediate build failures.
+
+This PR respectfully integrates and validates all these community findings into a clean, verified, atomic commit.
+
+---
+
+### Detailed Technical Rationale
 
 1. **Modern CMake Policy Hierarchy (Resolves #29)**:  
-   - **CMake >= 3.30 compatibility removal**: Modern CMake removed default compatibility for versions older than 3.5. Calling `cmake_minimum_required(VERSION 3.5)` in the root `CMakeLists.txt` before `project(lzham)` resolves fatal configuration errors.
-   - **Submodule clean up**: The legacy `cmake_minimum_required(VERSION 2.8)` invocations across subdirectories (`lzhamdecomp`, `lzhamcomp`, `lzhamdll`, `lzhamtest`) were removed so that child modules cleanly inherit the root project's CMake policy scope without emitting redundant deprecation warnings.
+   - **CMake >= 3.30 Compatibility Policy**: Modern CMake removed default compatibility for versions older than 3.5. Calling `cmake_minimum_required(VERSION 3.5)` in the root `CMakeLists.txt` before `project(lzham)` resolves fatal configuration errors.
+   - **Submodule Clean Up**: The legacy `cmake_minimum_required(VERSION 2.8)` invocations across child directories (`lzhamdecomp`, `lzhamcomp`, `lzhamdll`, `lzhamtest`) were removed so that submodules cleanly inherit the root project's CMake policy scope without emitting redundant deprecation warnings.
 
 2. **Clang / C++17+ `__is_pod` Trait (Resolves #26)**:  
    Modern libc++ does not expose `std::__is_pod<T>::__value` as an unqualified identifier. Using the compiler intrinsic `__is_pod(T)` resolves compilation errors (`error: expected unqualified-id`) across modern AppleClang, LLVM, and GCC.
