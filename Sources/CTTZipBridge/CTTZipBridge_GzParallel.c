@@ -115,18 +115,13 @@ static void compress_chunk_async(parallel_gz_ctx *ctx, uint64_t seq, uint8_t *un
         size_t final_size = 0;
         
         if (ctx->codec_type == PARALLEL_CODEC_GZ) {
-            struct libdeflate_compressor *compressor = ttzip_get_tls_compressor(z_level);
-            if (!compressor) {
-                free(uncompressed_data);
-                return;
-            }
-            size_t max_out = libdeflate_gzip_compress_bound(compressor, uncompressed_len);
+            size_t max_out = ttzip_gzip_compress_bound(uncompressed_len);
             out_buf = malloc(max_out);
             if (!out_buf) {
                 free(uncompressed_data);
                 return;
             }
-            final_size = libdeflate_gzip_compress(compressor, uncompressed_data, uncompressed_len, out_buf, max_out);
+            final_size = ttzip_gzip_compress_fast(uncompressed_data, uncompressed_len, out_buf, max_out, z_level);
         } else if (ctx->codec_type == PARALLEL_CODEC_BZ2) {
             unsigned int max_out = (unsigned int)(uncompressed_len + (uncompressed_len / 100) + 600);
             out_buf = malloc(max_out);

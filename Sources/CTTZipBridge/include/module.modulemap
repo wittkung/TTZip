@@ -28,6 +28,9 @@ module CTTZipBridge {
     header "ttzip_crc64.h"
     header "ttzip_dmg_demux.h"
     header "ttzip_zopfli_engine.h"
+    header "ttzip_adaptive_block_split.h"
+    header "ttzip_huffman_inplace.h"
+    header "ttzip_container_fast.h"
     header "CTTZipDiagnostics.h"
     export *
 }

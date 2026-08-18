@@ -57,6 +57,8 @@
 #include "ttzip_blosclz.h"
 #include "ttzip_context_pool.h"
 #include "ttzip_huffman_inplace.h"
+#include "ttzip_adaptive_block_split.h"
+#include "ttzip_container_fast.h"
 
 #ifdef __cplusplus
 

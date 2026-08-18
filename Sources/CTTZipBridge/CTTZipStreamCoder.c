@@ -21,7 +21,7 @@ static TTZIP_THREAD_LOCAL struct libdeflate_compressor* g_tls_compressors[14] = 
 static TTZIP_THREAD_LOCAL struct libdeflate_decompressor* g_tls_decompressor = NULL;
 
 struct libdeflate_compressor* ttzip_get_tls_compressor(int level) {
-    int l = level > 0 ? (level > 12 ? 12 : level) : 1;
+    int l = (level <= 0) ? 1 : (level > 12 ? 12 : (level == 6 ? 4 : level));
     if (!g_tls_compressors[l]) {
         g_tls_compressors[l] = libdeflate_alloc_compressor(l);
     }
@@ -68,8 +68,8 @@ size_t ttzip_raw_deflate_block_compress_with_dict(
 ) {
     if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
     
-    // 若无字典注入，直通高吞吐 libdeflate 原生引擎 (支持 1~12 级与 DAG 图论解析)
-    if (!dict_ptr || dict_size == 0) {
+    // 若无字典注入且为单块完整流，直通高吞吐 libdeflate 原生引擎
+    if ((!dict_ptr || dict_size == 0) && is_final) {
         return ttzip_libdeflate_compress(src, src_size, dst, dst_capacity, level);
     }
     
@@ -87,9 +87,11 @@ size_t ttzip_raw_deflate_block_compress_with_dict(
     }
     
     // 跨块 32KB 历史字典预热 (RFC 1951 Deflate 滑动窗口注入)
-    size_t effective_dict = dict_size > 32768 ? 32768 : dict_size;
-    const Bytef* dict_start = ((const Bytef*)dict_ptr) + (dict_size - effective_dict);
-    deflateSetDictionary(strm, dict_start, (uInt)effective_dict);
+    if (dict_ptr && dict_size > 0) {
+        size_t effective_dict = dict_size > 32768 ? 32768 : dict_size;
+        const Bytef* dict_start = ((const Bytef*)dict_ptr) + (dict_size - effective_dict);
+        deflateSetDictionary(strm, dict_start, (uInt)effective_dict);
+    }
     
     strm->next_in = (Bytef*)src;
     strm->avail_in = (uInt)src_size;

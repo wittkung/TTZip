@@ -93,6 +93,8 @@ set(CTTZIP_CORE_SOURCES
     Sources/CTTZipBridge/ttzip_native_archive.c
     Sources/CTTZipBridge/ttzip_crc64.c
     Sources/CTTZipBridge/ttzip_huffman_inplace.c
+    Sources/CTTZipBridge/ttzip_adaptive_block_split.c
+    Sources/CTTZipBridge/ttzip_container_fast.c
 )
 
 # 架构硬件加速分支
