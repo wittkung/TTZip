@@ -53,6 +53,9 @@ size_t ttzip_libdeflate_decompress(const void* src, size_t src_size, void* dst, 
     return (res == LIBDEFLATE_SUCCESS) ? actual_out : 0;
 }
 
+static _Thread_local z_stream s_tls_raw_deflate_strm[13];
+static _Thread_local bool s_tls_raw_deflate_inited[13] = { false };
+
 size_t ttzip_raw_deflate_block_compress_with_dict(
     const void* src,
     size_t src_size,
@@ -65,35 +68,38 @@ size_t ttzip_raw_deflate_block_compress_with_dict(
 ) {
     if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
     
-    z_stream strm;
-    memset(&strm, 0, sizeof(strm));
-    
     int z_lvl = level > 0 ? (level > 9 ? 9 : level) : 6;
-    int ret = deflateInit2(&strm, z_lvl, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
-    if (ret != Z_OK) return 0;
+    z_stream* strm = &s_tls_raw_deflate_strm[z_lvl];
+    
+    if (!s_tls_raw_deflate_inited[z_lvl]) {
+        memset(strm, 0, sizeof(z_stream));
+        int ret = deflateInit2(strm, z_lvl, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
+        if (ret != Z_OK) return 0;
+        s_tls_raw_deflate_inited[z_lvl] = true;
+    } else {
+        int ret = deflateReset(strm);
+        if (ret != Z_OK) return 0;
+    }
     
     // 跨块 32KB 历史字典预热 (RFC 1951 Deflate 滑动窗口注入)
     if (dict_ptr && dict_size > 0) {
         size_t effective_dict = dict_size > 32768 ? 32768 : dict_size;
         const Bytef* dict_start = ((const Bytef*)dict_ptr) + (dict_size - effective_dict);
-        deflateSetDictionary(&strm, dict_start, (uInt)effective_dict);
+        deflateSetDictionary(strm, dict_start, (uInt)effective_dict);
     }
     
-    strm.next_in = (Bytef*)src;
-    strm.avail_in = (uInt)src_size;
-    strm.next_out = (Bytef*)dst;
-    strm.avail_out = (uInt)dst_capacity;
+    strm->next_in = (Bytef*)src;
+    strm->avail_in = (uInt)src_size;
+    strm->next_out = (Bytef*)dst;
+    strm->avail_out = (uInt)dst_capacity;
     
     int flush = is_final ? Z_FINISH : Z_SYNC_FLUSH;
-    ret = deflate(&strm, flush);
+    int ret = deflate(strm, flush);
     if (ret < 0 || (is_final && ret != Z_STREAM_END)) {
-        deflateEnd(&strm);
         return 0;
     }
     
-    size_t comp_size = (size_t)strm.total_out;
-    deflateEnd(&strm);
-    return comp_size;
+    return (size_t)strm->total_out;
 }
 
 size_t ttzip_raw_deflate_block_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity, int level, bool is_final) {
