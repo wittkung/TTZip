@@ -55,8 +55,8 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                 }
             }
 
-            // Fast-Path 0: 单文件极速分块并行通道 (仅针对 level6/level7/extreme 极限重压)
-            if (context.password == nil || context.password!.isEmpty) && (context.splitVolumeSizeBytes == nil || context.splitVolumeSizeBytes == 0) && context.inputPaths.count == 1 && (context.level == .level6 || context.level == .level7) {
+            // Fast-Path 0: 单文件极速分块并行通道 (针对 level4..7 深度与图论极限重压)
+            if (context.password == nil || context.password!.isEmpty) && (context.splitVolumeSizeBytes == nil || context.splitVolumeSizeBytes == 0) && context.inputPaths.count == 1 && (context.level == .level4 || context.level == .level5 || context.level == .level6 || context.level == .level7) {
                 let singlePath = context.inputPaths[0]
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: singlePath, isDirectory: &isDir), !isDir.boolValue {

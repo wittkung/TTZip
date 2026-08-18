@@ -323,13 +323,13 @@ public struct CompressIntegratedConfigSectionView: View {
         if fmt == .zip {
             switch lvl {
             case .store: titleName = "Store (0%)"
-            case .level1: titleName = "1: 极速 (5.4 GB/s)"
-            case .level2: titleName = "2: 快速 (3.8 GB/s)"
-            case .level3: titleName = "3: 标准 (3.2 GB/s)"
-            case .level4: titleName = "4: 深度 (1.8 GB/s)"
-            case .level5: titleName = "5: 图论 (200 MB/s)"
-            case .level6: titleName = "6: 超级 (97.0%)"
-            case .level7: titleName = "7: 极限 (97.05%)"
+            case .level1: titleName = "1: 极速 (6.0 GB/s)"
+            case .level2: titleName = "2: 标准 (5.5 GB/s)"
+            case .level3: titleName = "3: 极限 (4.5 GB/s)"
+            case .level4: titleName = "4: 深度 (200 MB/s)"
+            case .level5: titleName = "5: 图论 (20 MB/s)"
+            case .level6: titleName = "6: 超级 (10 MB/s)"
+            case .level7: titleName = "7: 巅峰 (5.0 MB/s)"
             default: titleName = "Level \(lvl.rawValue)"
             }
         } else {

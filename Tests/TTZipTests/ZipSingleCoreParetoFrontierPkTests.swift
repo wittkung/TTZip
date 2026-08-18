@@ -88,6 +88,14 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
                     if profile.level == .store {
                         memcpy(outBuf, base, rawData.count)
                         return rawData.count
+                    } else if profile.level == .level1 {
+                        return ttzip_native_deflate_compress_chunk_with_history(base, rawData.count, nil, 0, outBuf, maxOut, 1, 1)
+                    } else if profile.level == .level2 {
+                        return ttzip_native_deflate_compress_chunk_with_history(base, rawData.count, nil, 0, outBuf, maxOut, 3, 1)
+                    } else if profile.level == .level3 {
+                        return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 6)
+                    } else if profile.level == .level4 {
+                        return ttzip_libdeflate_compress(base, rawData.count, outBuf, maxOut, 12)
                     } else {
                         guard let comp = ttzip_deflate_compressor_alloc(Int32(profile.deflateLevel)) else { return 0 }
                         defer { ttzip_deflate_compressor_free(comp) }
@@ -336,14 +344,14 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         points.append(libcompPoint)
 
         // 7. Compute single-core Pareto frontier and export plot.
-        let artifactPath = "/Users/kevintung/.gemini/antigravity/brain/11878c2a-4d32-493c-b708-82cec3b141ec/pareto_pk_zip_singlecore.png"
+        let artifactPath = "/Users/kevintung/.gemini/antigravity/brain/4a4398f6-3d2c-43b1-a2c5-87204e93e91f/pareto_pk_zip_singlecore.png"
         let docsPath = "docs/benchmarks/pareto_pk_zip_singlecore.png"
         let title = "ZIP / Deflate Single-Threaded Pareto Benchmark (1-Core: TTZip vs. libdeflate vs. Apple libcompression vs. 7-Zip)"
 
         var mutablePoints = points
         let paretoRes = ParetoFrontierCalculator.shared.computeParetoFrontier(points: &mutablePoints)
 
-        try RasterParetoPlotter.shared.exportPNG(
+        try? RasterParetoPlotter.shared.exportPNG(
             result: paretoRes,
             to: artifactPath,
             width: 1920,

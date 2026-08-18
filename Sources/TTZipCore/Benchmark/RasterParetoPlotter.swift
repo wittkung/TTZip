@@ -176,19 +176,19 @@ public final class RasterParetoPlotter: @unchecked Sendable {
 
             let sizeMB = 100.0 * (1.0 - savingsVal / 100.0)
             if xFold.isFolded {
-                // 自适应 3 段弹性展开算法 (压缩 4.4MB~3.7MB 闲置空隙，充分展开右侧密集高压战场)
-                // 1) 快速压缩区间 (5.0MB ~ 3.7MB, 占 20% 宽度): 包含 pigz-1 (4.8MB), pigz-2/3 (4.45MB)
-                // 2) 核心平衡区间 (3.7MB ~ 3.3MB, 占 36% 宽度): 包含 ttzip-l1, L2, L3, L5, pigz-4..9
-                // 3) 极限图论区间 (3.3MB ~ 2.9MB, 占 38% 宽度): 包含 L4, L6, Zopfli, advzip-4, L7
-                if sizeMB >= 3.70 {
-                    let norm = (5.00 - sizeMB) / max(1e-4, 5.00 - 3.70)
-                    return marginLeft + CGFloat(0.06 + max(0.0, min(1.0, norm)) * 0.20) * plotW
-                } else if sizeMB >= 3.30 {
-                    let norm = (3.70 - sizeMB) / max(1e-4, 3.70 - 3.30)
-                    return marginLeft + CGFloat(0.26 + max(0.0, min(1.0, norm)) * 0.36) * plotW
+                // 自适应 3 段弹性展开算法 (充分展开右侧密集高压战场并拉开 L1 与 L2 间距)
+                // 1) 快速压缩区间 (5.0MB ~ 3.90MB, 占 25% 宽度): 包含 minizip(4.7MB), pigz-1(4.6MB), pigz-2/3(4.25MB), L1(4.11MB), L2(3.98MB)
+                // 2) 核心平衡区间 (3.90MB ~ 3.10MB, 占 42% 宽度): 包含 7z(3.53MB), pigz-4..9(3.37..3.24MB), L3(3.23MB)
+                // 3) 极限图论区间 (3.10MB ~ 2.80MB, 占 28% 宽度): 包含 L4(3.03MB), L5(2.87MB), L6(2.85MB), L7(2.82MB)
+                if sizeMB >= 3.90 {
+                    let norm = (5.00 - sizeMB) / max(1e-4, 5.00 - 3.90)
+                    return marginLeft + CGFloat(0.05 + max(0.0, min(1.0, norm)) * 0.25) * plotW
+                } else if sizeMB >= 3.10 {
+                    let norm = (3.90 - sizeMB) / max(1e-4, 3.90 - 3.10)
+                    return marginLeft + CGFloat(0.30 + max(0.0, min(1.0, norm)) * 0.42) * plotW
                 } else {
-                    let norm = (3.30 - sizeMB) / max(1e-4, 3.30 - 2.90)
-                    return marginLeft + CGFloat(0.62 + max(0.0, min(1.0, norm)) * 0.36) * plotW
+                    let norm = (3.10 - sizeMB) / max(1e-4, 3.10 - 2.80)
+                    return marginLeft + CGFloat(0.72 + max(0.0, min(1.0, norm)) * 0.26) * plotW
                 }
             } else {
                 let norm = (maxDomainSize - sizeMB) / max(1e-4, maxDomainSize - minDomainSize)
@@ -479,19 +479,11 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let cy = mapY(p.throughputMBs)
             let fam = SoftwareFamilyClassifier.classify(algorithm: p.algorithm)
 
-            let isFlagshipEndpoint = (fam == .ttzip && (p.level == 1 || p.level == 12)) || (p.algorithm == "TTZip (ZIP Fast)" || p.algorithm == "TTZip (ZIP Ultra)")
-            let isHeroPill = isFlagshipEndpoint
-            let isHeroNormal = fam.isHero && !isHeroPill
-
             let cleanName: String
             if fam == .ttzip {
                 let speedStr = p.throughputMBs >= 1000 ? String(format: "%.1f GB/s", p.throughputMBs / 1000.0) : String(format: "%.0f MB/s", p.throughputMBs)
                 if p.level == 0 {
                     cleanName = "L0 (Store \(speedStr))"
-                } else if p.level == 1 {
-                    cleanName = "ttzip-l1 (\(speedStr))"
-                } else if p.level == 12 {
-                    cleanName = "ttzip-l12 (\(speedStr))"
                 } else {
                     cleanName = "L\(p.level)"
                 }
@@ -526,25 +518,18 @@ public final class RasterParetoPlotter: @unchecked Sendable {
                 cleanName = p.algorithm.lowercased()
             }
 
-
             let font: NSFont
             let textColor: NSColor
             let isCapsule: Bool
             let bgCol: NSColor
             let borderCol: NSColor?
 
-            if isHeroPill {
-                font = NSFont.systemFont(ofSize: 12, weight: .bold)
-                textColor = NSColor.white
-                isCapsule = true
-                bgCol = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
-                borderCol = nil
-            } else if isHeroNormal {
-                font = NSFont.systemFont(ofSize: 10, weight: .bold)
+            if fam.isHero {
+                font = NSFont.systemFont(ofSize: 11, weight: .bold)
                 textColor = NSColor(calibratedRed: 37/255.0, green: 99/255.0, blue: 235/255.0, alpha: 1.0)
-                isCapsule = true
-                bgCol = NSColor(calibratedRed: 239/255.0, green: 246/255.0, blue: 255/255.0, alpha: 0.95)
-                borderCol = NSColor(calibratedRed: 191/255.0, green: 219/255.0, blue: 254/255.0, alpha: 1.0)
+                isCapsule = false
+                bgCol = NSColor(calibratedWhite: 1.0, alpha: 0.90)
+                borderCol = nil
             } else {
                 font = NSFont.systemFont(ofSize: 10, weight: .semibold)
                 let brandHex = fam.brandColorHex
@@ -557,16 +542,14 @@ public final class RasterParetoPlotter: @unchecked Sendable {
             let str = NSAttributedString(string: cleanName, attributes: [.font: font])
             let strSize = str.size()
 
-            let padX: CGFloat = isHeroPill ? 12.0 : (isHeroNormal ? 8.0 : 0.0)
-            let padY: CGFloat = isHeroPill ? 5.0 : (isHeroNormal ? 3.0 : 0.0)
-            let pillW = strSize.width + padX * 2
-            let pillH = strSize.height + padY * 2
+            let pillW = strSize.width
+            let pillH = strSize.height
 
             placements.append(PointLabelPlacement(
                 point: p,
                 canvasX: cx,
                 canvasY: cy,
-                isHeroBadge: isHeroPill || isHeroNormal,
+                isHeroBadge: false,
                 labelText: cleanName,
                 textSize: strSize,
                 pillWidth: pillW,

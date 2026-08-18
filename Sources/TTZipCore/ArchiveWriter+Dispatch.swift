@@ -96,8 +96,8 @@ extension ArchiveWriter {
             }
         }
         
-        // 1.5. Single-File Extreme Multi-Block Parallel Route (Zopfli DAG + 32KB cross-block warmup)
-        if format == .zip && (level == .level6 || level == .level7) && (password == nil || password!.isEmpty) && (splitVolumeSizeBytes == nil || splitVolumeSizeBytes == 0),
+        // 1.5. Single-File Extreme Multi-Block Parallel Route (Zopfli DAG / Near-Optimal DP + 32KB cross-block warmup)
+        if format == .zip && (level == .level4 || level == .level5 || level == .level6 || level == .level7) && (password == nil || password!.isEmpty) && (splitVolumeSizeBytes == nil || splitVolumeSizeBytes == 0),
            inputPaths.count == 1, let singlePath = inputPaths.first {
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: singlePath, isDirectory: &isDir), !isDir.boolValue {
