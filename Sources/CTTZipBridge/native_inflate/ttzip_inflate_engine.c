@@ -47,7 +47,17 @@ int ttzip_deflate_decompress(
     size_t out_capacity,
     size_t *actual_out_size
 ) {
-    if (!d || !in || !out) return -1;
+    uint8_t dummy = 0;
+    if (!out && out_capacity == 0) out = &dummy;
+    if (!d || (!out && out_capacity > 0)) return -1;
+    if (in_size == 0) {
+        if (actual_out_size) *actual_out_size = 0;
+        return (out_capacity == 0) ? 0 : -1;
+    }
+    if (!in) return -1;
+
+
+
 
     /* Fast-path decompression through specialized hardware-aligned libdeflate / dual-LUT */
     enum libdeflate_result res = libdeflate_deflate_decompress(

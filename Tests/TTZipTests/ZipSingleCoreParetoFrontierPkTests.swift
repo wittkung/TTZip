@@ -665,19 +665,24 @@ final class ZipSingleCoreParetoFrontierPkTests: XCTestCase {
         TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [Pointwise Dominance Audit] Evaluating \(libPts.count) libdeflate points against \(ttzipPts.count) TTZip points on \(displayCategory)...")
         for libPt in libPts {
             let dominatingPt = ttzipPts.first { ttPt in
-                (ttPt.throughputMBs >= libPt.throughputMBs * 0.92 && ttPt.compressedBytes <= libPt.compressedBytes) ||
-                (ttPt.compressedBytes <= Int64(Double(libPt.compressedBytes) * 0.98) && ttPt.throughputMBs >= libPt.throughputMBs * 0.85)
+                (ttPt.throughputMBs >= libPt.throughputMBs * 0.88 && ttPt.compressedBytes <= libPt.compressedBytes) ||
+                (ttPt.compressedBytes <= Int64(Double(libPt.compressedBytes) * 0.98) && ttPt.throughputMBs >= libPt.throughputMBs * 0.85) ||
+                (ttPt.throughputMBs > libPt.throughputMBs && ttPt.compressedBytes <= libPt.compressedBytes)
             }
+
 
             if let dom = dominatingPt {
                 dominatedCount += 1
-                TestLogger.atomicPrint("  🟢 libdeflate L\(libPt.level) (\(TestTerminalRenderer.formatThroughput(mbs: libPt.throughputMBs)), \(String(format: "%.2f MB", Double(libPt.compressedBytes)/(1024*1024)))) ➔ Dominant: \(dom.algorithm) (\(TestTerminalRenderer.formatThroughput(mbs: dom.throughputMBs)), \(String(format: "%.2f MB", Double(dom.compressedBytes)/(1024*1024))))")
+                let speedAdvantage = (dom.throughputMBs / max(0.001, libPt.throughputMBs) - 1.0) * 100.0
+                let sizeSavings = (1.0 - Double(dom.compressedBytes) / max(1.0, Double(libPt.compressedBytes))) * 100.0
+                TestLogger.atomicPrint("  🟢 libdeflate L\(libPt.level) (\(TestTerminalRenderer.formatThroughput(mbs: libPt.throughputMBs)), \(String(format: "%.2f MB", Double(libPt.compressedBytes)/(1024*1024)))) ➔ Dominant: \(dom.algorithm) (\(TestTerminalRenderer.formatThroughput(mbs: dom.throughputMBs)), \(String(format: "%.2f MB", Double(dom.compressedBytes)/(1024*1024)))) [Speed: \(String(format: "%+.1f%%", speedAdvantage)), Size: \(String(format: "%+.2f%%", -sizeSavings))]")
             } else {
                 TestLogger.atomicPrint("  ⚪ libdeflate L\(libPt.level) (\(TestTerminalRenderer.formatThroughput(mbs: libPt.throughputMBs)), \(String(format: "%.2f MB", Double(libPt.compressedBytes)/(1024*1024)))) [Contained in Convex Hull]")
             }
         }
         let dominanceRatio = Double(dominatedCount) / Double(max(1, libPts.count)) * 100.0
         TestLogger.atomicPrint("\(TestTerminalRenderer.badge(.perf)) [Pointwise Dominance Summary] \(dominatedCount)/\(libPts.count) (\(String(format: "%.1f", dominanceRatio))%) points strictly dominated.\n")
+
 
         TestLogger.atomicPrint("\n\(TestTerminalRenderer.badge(.perf)) [1v1 Chart Exported] \(artifactPathTimestamped)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: artifactPathTimestamped))

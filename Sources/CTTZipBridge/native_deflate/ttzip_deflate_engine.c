@@ -392,7 +392,16 @@ size_t ttzip_deflate_compress(
     void *out,
     size_t out_capacity
 ) {
-    if (!c || !in || !out || out_capacity == 0) return 0;
+    if (!c || !out || out_capacity == 0) return 0;
+    if (in_size == 0) {
+        if (out_capacity < 2) return 0;
+        uint8_t *out_bytes = (uint8_t *)out;
+        out_bytes[0] = 0x03;
+        out_bytes[1] = 0x00;
+        return 2;
+    }
+    if (!in) return 0;
+
     
     if (c->level >= 13) {
         TTZipZopfliOptions zopts;
