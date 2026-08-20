@@ -6,6 +6,7 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
 
 /// Represents multi-dimensional tensor shape geometry and 2-level hypercube partition layout (b2nd standard).
 public struct NDimTensorShape: Sendable, Codable, Equatable {
@@ -115,10 +116,92 @@ public enum NDimHypercubeChunker {
         in shape: NDimTensorShape
     ) -> [NDimIntersectingBlock] {
         let rank = shape.rank
+        guard rank <= 8 else {
+            return fallbackIntersectingBlocks(for: range, in: shape)
+        }
+
+        var geom = ttzip_tensor_geom_t()
+        var cShape = [Int64](repeating: 0, count: 8)
+        var cChunk = [Int32](repeating: 0, count: 8)
+        var cBlock = [Int32](repeating: 0, count: 8)
+
+        for i in 0..<rank {
+            cShape[i] = shape.dimensions[i]
+            cChunk[i] = Int32(shape.chunkShape[i])
+            cBlock[i] = Int32(shape.blockShape[i])
+        }
+
+        let initRes = cShape.withUnsafeBufferPointer { sPtr in
+            cChunk.withUnsafeBufferPointer { cPtr in
+                cBlock.withUnsafeBufferPointer { bPtr in
+                    ttzip_tensor_geom_init(&geom, Int8(rank), UInt8(shape.elementByteSize), sPtr.baseAddress, cPtr.baseAddress, bPtr.baseAddress)
+                }
+            }
+        }
+        guard initRes == 0 else {
+            return fallbackIntersectingBlocks(for: range, in: shape)
+        }
+
+        var slice = ttzip_tensor_slice_req_t()
+        for i in 0..<rank {
+            slice.start.0 = range.startIndices[0]
+            if i == 0 { slice.start.0 = range.startIndices[0]; slice.stop.0 = range.endIndices[0]; slice.step.0 = range.strides[0] }
+            else if i == 1 { slice.start.1 = range.startIndices[1]; slice.stop.1 = range.endIndices[1]; slice.step.1 = range.strides[1] }
+            else if i == 2 { slice.start.2 = range.startIndices[2]; slice.stop.2 = range.endIndices[2]; slice.step.2 = range.strides[2] }
+            else if i == 3 { slice.start.3 = range.startIndices[3]; slice.stop.3 = range.endIndices[3]; slice.step.3 = range.strides[3] }
+            else if i == 4 { slice.start.4 = range.startIndices[4]; slice.stop.4 = range.endIndices[4]; slice.step.4 = range.strides[4] }
+            else if i == 5 { slice.start.5 = range.startIndices[5]; slice.stop.5 = range.endIndices[5]; slice.step.5 = range.strides[5] }
+            else if i == 6 { slice.start.6 = range.startIndices[6]; slice.stop.6 = range.endIndices[6]; slice.step.6 = range.strides[6] }
+            else if i == 7 { slice.start.7 = range.startIndices[7]; slice.stop.7 = range.endIndices[7]; slice.step.7 = range.strides[7] }
+        }
+
+        let maxExpected = max(1024, Int(totalBlocks(shape: shape)))
+        var cBlocks = [ttzip_tensor_intersect_block_t](repeating: ttzip_tensor_intersect_block_t(), count: maxExpected)
+
+        let foundCount = cBlocks.withUnsafeMutableBufferPointer { bBuf in
+            ttzip_tensor_find_intersecting_blocks(&geom, &slice, bBuf.baseAddress, maxExpected)
+        }
+
+        if foundCount > 0 {
+            var results = [NDimIntersectingBlock]()
+            results.reserveCapacity(foundCount)
+            for i in 0..<foundCount {
+                let cb = cBlocks[i]
+                var chunkCoord = [Int64]()
+                var blockCoord = [Int64]()
+                var globalStart = [Int64]()
+                for k in 0..<rank {
+                    if k == 0 { chunkCoord.append(cb.chunk_coords.0); blockCoord.append(cb.block_coords.0); globalStart.append(cb.global_start_coords.0) }
+                    else if k == 1 { chunkCoord.append(cb.chunk_coords.1); blockCoord.append(cb.block_coords.1); globalStart.append(cb.global_start_coords.1) }
+                    else if k == 2 { chunkCoord.append(cb.chunk_coords.2); blockCoord.append(cb.block_coords.2); globalStart.append(cb.global_start_coords.2) }
+                    else if k == 3 { chunkCoord.append(cb.chunk_coords.3); blockCoord.append(cb.block_coords.3); globalStart.append(cb.global_start_coords.3) }
+                    else if k == 4 { chunkCoord.append(cb.chunk_coords.4); blockCoord.append(cb.block_coords.4); globalStart.append(cb.global_start_coords.4) }
+                    else if k == 5 { chunkCoord.append(cb.chunk_coords.5); blockCoord.append(cb.block_coords.5); globalStart.append(cb.global_start_coords.5) }
+                    else if k == 6 { chunkCoord.append(cb.chunk_coords.6); blockCoord.append(cb.block_coords.6); globalStart.append(cb.global_start_coords.6) }
+                    else if k == 7 { chunkCoord.append(cb.chunk_coords.7); blockCoord.append(cb.block_coords.7); globalStart.append(cb.global_start_coords.7) }
+                }
+                results.append(NDimIntersectingBlock(
+                    chunkIndex: cb.chunk_idx,
+                    blockIndexInChunk: cb.block_idx_in_chunk,
+                    chunkCoord: chunkCoord,
+                    blockCoord: blockCoord,
+                    blockStartGlobalCoord: globalStart
+                ))
+            }
+            return results
+        }
+
+        return fallbackIntersectingBlocks(for: range, in: shape)
+    }
+
+    private static func fallbackIntersectingBlocks(
+        for range: NDimSliceCoordinateRange,
+        in shape: NDimTensorShape
+    ) -> [NDimIntersectingBlock] {
+        let rank = shape.rank
         let chunkGrid = chunkGridDimensions(shape: shape)
         let blockGrid = blockGridDimensions(shape: shape)
 
-        // 1. Determine bounding range of chunks along each axis
         var chunkMin = [Int64](repeating: 0, count: rank)
         var chunkMax = [Int64](repeating: 0, count: rank)
         for i in 0..<rank {
@@ -128,10 +211,8 @@ public enum NDimHypercubeChunker {
 
         var results: [NDimIntersectingBlock] = []
 
-        // Recursive generator over multi-dimensional chunk indices
         func iterateChunks(dim: Int, currentChunkCoord: inout [Int64]) {
             if dim == rank {
-                // Compute linear chunk index
                 var cIdx: Int64 = 0
                 var stride: Int64 = 1
                 for k in (0..<rank).reversed() {
@@ -139,7 +220,6 @@ public enum NDimHypercubeChunker {
                     stride *= chunkGrid[k]
                 }
 
-                // Inside this chunk, determine bounding range of blocks
                 var blockMin = [Int64](repeating: 0, count: rank)
                 var blockMax = [Int64](repeating: 0, count: rank)
                 for i in 0..<rank {

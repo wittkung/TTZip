@@ -33,7 +33,7 @@ typedef struct {
     size_t valid_bytes;        // Actual byte length stored
     int64_t chunk_index;       // Logical chunk index
     _Atomic ttzip_prefetch_slot_state_t state;
-} ttzip_prefetch_slot_t;
+} __attribute__((aligned(64))) ttzip_prefetch_slot_t;
 
 typedef struct {
     ttzip_prefetch_slot_t slots[TTZIP_PREFETCH_DEFAULT_SLOTS];

@@ -82,15 +82,28 @@ static void collect_c_items_recursive(const char* src_path, const char* rel_path
                 while (base_rel_len > 0 && rel_path[base_rel_len - 1] == '/') {
                     base_rel_len--;
                 }
-                char clean_parent_rel[4096];
-                if (base_rel_len >= sizeof(clean_parent_rel)) base_rel_len = sizeof(clean_parent_rel) - 1;
-                memcpy(clean_parent_rel, rel_path, base_rel_len);
-                clean_parent_rel[base_rel_len] = '\0';
 
-                char child_src[4096];
-                char child_rel[4096];
-                snprintf(child_src, sizeof(child_src), "%s/%s", src_path, de->d_name);
-                snprintf(child_rel, sizeof(child_rel), "%s/%s", clean_parent_rel, de->d_name);
+                size_t src_len = strlen(src_path);
+                size_t name_len = strlen(de->d_name);
+                
+                char child_src[1024];
+                char child_rel[1024];
+
+                if (src_len + name_len + 2 >= sizeof(child_src) || base_rel_len + name_len + 2 >= sizeof(child_rel)) {
+                    continue; // Skip paths exceeding 1024 bytes safely
+                }
+
+                memcpy(child_src, src_path, src_len);
+                child_src[src_len] = '/';
+                memcpy(child_src + src_len + 1, de->d_name, name_len + 1);
+
+                if (base_rel_len > 0) {
+                    memcpy(child_rel, rel_path, base_rel_len);
+                    child_rel[base_rel_len] = '/';
+                    memcpy(child_rel + base_rel_len + 1, de->d_name, name_len + 1);
+                } else {
+                    memcpy(child_rel, de->d_name, name_len + 1);
+                }
 
                 if (de->d_type == DT_REG) {
                     struct stat cst;

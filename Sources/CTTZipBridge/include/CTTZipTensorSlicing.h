@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "ttzip_platform.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,6 +69,24 @@ int ttzip_tensor_extract_strided_slice(
     uint8_t* dst_slice,
     size_t dst_capacity_bytes,
     size_t* out_extracted_bytes
+);
+
+typedef struct {
+    int64_t chunk_idx;
+    int32_t block_idx_in_chunk;
+    int64_t chunk_coords[TTZIP_TENSOR_MAX_NDIM];
+    int64_t block_coords[TTZIP_TENSOR_MAX_NDIM];
+    int64_t global_start_coords[TTZIP_TENSOR_MAX_NDIM];
+} ttzip_tensor_intersect_block_t;
+
+/**
+ * @brief Enumerates all intersecting atomic micro-blocks for an N-dimensional bounding box slice.
+ */
+TTZIP_API size_t ttzip_tensor_find_intersecting_blocks(
+    const ttzip_tensor_geom_t* geom,
+    const ttzip_tensor_slice_req_t* slice,
+    ttzip_tensor_intersect_block_t* out_blocks,
+    size_t max_blocks
 );
 
 #ifdef __cplusplus

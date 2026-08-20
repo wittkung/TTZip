@@ -6,6 +6,7 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
 
 /// Value type representing metrics and outcomes from password recovery exploration.
 public struct PasswordRecoveryResult: Sendable {

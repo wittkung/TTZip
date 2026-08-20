@@ -104,6 +104,24 @@ TTZIP_API int ttzip_7z_parse_header_metadata(
  */
 TTZIP_API void ttzip_7z_free_header_info(ttzip_7z_header_info_t* info);
 
+typedef struct {
+    uint8_t major_version;
+    uint8_t minor_version;
+    uint32_t start_header_crc;
+    uint64_t next_header_offset;
+    uint64_t next_header_size;
+    uint32_t next_header_crc;
+} ttzip_7z_signature_header_t;
+
+/**
+ * @brief Parses and validates 32-byte 7z Signature Header.
+ */
+TTZIP_API int ttzip_7z_parse_signature_header(
+    const uint8_t* mapped_data,
+    size_t file_size,
+    ttzip_7z_signature_header_t* out_sig
+);
+
 #ifdef __cplusplus
 }
 #endif

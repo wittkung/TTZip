@@ -44,7 +44,7 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
     }
 
     size_t alloc_cap = (size_t)(total_payload_bytes + list.count * 128 + 4096);
-    uint8_t stack_out_mem[131072];
+    uint8_t stack_out_mem[8192];
     uint8_t* out_mem = (alloc_cap <= sizeof(stack_out_mem)) ? stack_out_mem : ((alloc_cap <= 16 * 1024 * 1024) ? (uint8_t*)malloc(alloc_cap) : NULL);
 
     if (out_mem) {

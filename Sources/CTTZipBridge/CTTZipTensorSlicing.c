@@ -151,3 +151,125 @@ int ttzip_tensor_extract_strided_slice(
     if (out_extracted_bytes) *out_extracted_bytes = written_bytes;
     return 0;
 }
+
+static void iterate_blocks_recursive(
+    const ttzip_tensor_geom_t* geom,
+    const int64_t* chunk_coord,
+    int64_t chunk_idx,
+    const int64_t* block_min,
+    const int64_t* block_max,
+    const int32_t* n_blocks,
+    int b_dim,
+    int64_t* current_block_coord,
+    ttzip_tensor_intersect_block_t* out_blocks,
+    size_t max_blocks,
+    size_t* count
+) {
+    int rank = geom->ndim;
+    if (b_dim == rank) {
+        if (*count >= max_blocks) return;
+        ttzip_tensor_intersect_block_t* block = &out_blocks[*count];
+        block->chunk_idx = chunk_idx;
+
+        int64_t b_idx = 0;
+        int64_t b_stride = 1;
+        for (int k = rank - 1; k >= 0; k--) {
+            b_idx += current_block_coord[k] * b_stride;
+            b_stride *= n_blocks[k];
+        }
+        block->block_idx_in_chunk = (int32_t)b_idx;
+
+        for (int k = 0; k < rank; k++) {
+            block->chunk_coords[k] = chunk_coord[k];
+            block->block_coords[k] = current_block_coord[k];
+            block->global_start_coords[k] = chunk_coord[k] * geom->chunkshape[k] + current_block_coord[k] * geom->blockshape[k];
+        }
+        (*count)++;
+        return;
+    }
+
+    for (int64_t b = block_min[b_dim]; b <= block_max[b_dim]; b++) {
+        current_block_coord[b_dim] = b;
+        iterate_blocks_recursive(geom, chunk_coord, chunk_idx, block_min, block_max, n_blocks, b_dim + 1, current_block_coord, out_blocks, max_blocks, count);
+    }
+}
+
+static void iterate_chunks_recursive(
+    const ttzip_tensor_geom_t* geom,
+    const ttzip_tensor_slice_req_t* slice,
+    const int64_t* chunk_min,
+    const int64_t* chunk_max,
+    const int64_t* n_chunks,
+    const int32_t* n_blocks,
+    int dim,
+    int64_t* current_chunk_coord,
+    ttzip_tensor_intersect_block_t* out_blocks,
+    size_t max_blocks,
+    size_t* count
+) {
+    int rank = geom->ndim;
+    if (dim == rank) {
+        // Linear chunk index
+        int64_t c_idx = 0;
+        int64_t c_stride = 1;
+        for (int k = rank - 1; k >= 0; k--) {
+            c_idx += current_chunk_coord[k] * c_stride;
+            c_stride *= n_chunks[k];
+        }
+
+        int64_t block_min[TTZIP_TENSOR_MAX_NDIM];
+        int64_t block_max[TTZIP_TENSOR_MAX_NDIM];
+        for (int i = 0; i < rank; i++) {
+            int64_t chunk_start = current_chunk_coord[i] * geom->chunkshape[i];
+            int64_t chunk_end = chunk_start + geom->chunkshape[i];
+            if (chunk_end > geom->shape[i]) chunk_end = geom->shape[i];
+
+            int64_t local_start = slice->start[i] > chunk_start ? (slice->start[i] - chunk_start) : 0;
+            int64_t local_end = slice->stop[i] < chunk_end ? (slice->stop[i] - chunk_start) : (chunk_end - chunk_start);
+
+            block_min[i] = local_start / geom->blockshape[i];
+            block_max[i] = (local_end > 0 ? (local_end - 1) : 0) / geom->blockshape[i];
+        }
+
+        int64_t current_block_coord[TTZIP_TENSOR_MAX_NDIM] = {0};
+        iterate_blocks_recursive(geom, current_chunk_coord, c_idx, block_min, block_max, n_blocks, 0, current_block_coord, out_blocks, max_blocks, count);
+        return;
+    }
+
+    for (int64_t c = chunk_min[dim]; c <= chunk_max[dim]; c++) {
+        current_chunk_coord[dim] = c;
+        iterate_chunks_recursive(geom, slice, chunk_min, chunk_max, n_chunks, n_blocks, dim + 1, current_chunk_coord, out_blocks, max_blocks, count);
+    }
+}
+
+size_t ttzip_tensor_find_intersecting_blocks(
+    const ttzip_tensor_geom_t* geom,
+    const ttzip_tensor_slice_req_t* slice,
+    ttzip_tensor_intersect_block_t* out_blocks,
+    size_t max_blocks
+) {
+    if (!geom || !slice || !out_blocks || max_blocks == 0) return 0;
+    int rank = geom->ndim;
+    if (rank <= 0 || rank > TTZIP_TENSOR_MAX_NDIM) return 0;
+
+    int64_t n_chunks[TTZIP_TENSOR_MAX_NDIM];
+    int32_t n_blocks[TTZIP_TENSOR_MAX_NDIM];
+    int64_t chunk_min[TTZIP_TENSOR_MAX_NDIM];
+    int64_t chunk_max[TTZIP_TENSOR_MAX_NDIM];
+
+    for (int i = 0; i < rank; i++) {
+        n_chunks[i] = (geom->shape[i] + geom->chunkshape[i] - 1) / geom->chunkshape[i];
+        n_blocks[i] = (geom->chunkshape[i] + geom->blockshape[i] - 1) / geom->blockshape[i];
+
+        chunk_min[i] = slice->start[i] / geom->chunkshape[i];
+        int64_t max_idx = slice->start[i] > (slice->stop[i] - 1) ? slice->start[i] : (slice->stop[i] - 1);
+        chunk_max[i] = max_idx / geom->chunkshape[i];
+    }
+
+    size_t count = 0;
+    int64_t current_chunk_coord[TTZIP_TENSOR_MAX_NDIM] = {0};
+    iterate_chunks_recursive(geom, slice, chunk_min, chunk_max, n_chunks, n_blocks, 0, current_chunk_coord, out_blocks, max_blocks, &count);
+
+    return count;
+}
+

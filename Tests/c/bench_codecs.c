@@ -19,8 +19,8 @@ void run_codec_benchmarks(void) {
     printf("--------------------------------------------------------------------------------\n");
     printf(" 🚀 Benchmark Suite: SOTA Codec Throughput (1MB In-Memory Corpus)\n");
     printf("--------------------------------------------------------------------------------\n");
-    printf(" %-24s | %-10s | %-12s | %-12s | %-10s\n", "Codec (Level)", "Ratio (%)", "Comp (MB/s)", "Decomp (MB/s)", "MIPS Score");
-    printf("--------------------------------------------------------------------------------\n");
+    printf(" %-24s | %-10s | %-12s | %-10s | %-12s | %-10s\n", "Codec (Level)", "Ratio (%)", "Comp (MB/s)", "Comp CPB", "Decomp (MB/s)", "Decomp CPB");
+    printf("--------------------------------------------------------------------------------------------------------\n");
 
     uint8_t* raw = (uint8_t*)malloc(BENCH_CORPUS_SIZE);
     uint8_t* comp = (uint8_t*)malloc(BENCH_CORPUS_SIZE * 2);
@@ -46,7 +46,9 @@ void run_codec_benchmarks(void) {
         uint64_t t0 = ttzip_bench_nanos();
         size_t csize = libdeflate_deflate_compress(compressor, raw, BENCH_CORPUS_SIZE, comp, BENCH_CORPUS_SIZE * 2);
         uint64_t t1 = ttzip_bench_nanos();
-        double comp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, t1 - t0);
+        uint64_t comp_elapsed = t1 - t0;
+        double comp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, comp_elapsed);
+        double comp_cpb = ttzip_calc_cpb(BENCH_CORPUS_SIZE, comp_elapsed);
         double ratio = ttzip_calc_ratio_pct(csize, BENCH_CORPUS_SIZE);
 
         // Decompress benchmark
@@ -54,12 +56,13 @@ void run_codec_benchmarks(void) {
         size_t dsize = 0;
         libdeflate_deflate_decompress(decompressor, comp, csize, decomp, BENCH_CORPUS_SIZE, &dsize);
         uint64_t t3 = ttzip_bench_nanos();
-        double decomp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, t3 - t2);
-        double mips = ttzip_calc_mips_score(comp_speed, ratio);
+        uint64_t decomp_elapsed = t3 - t2;
+        double decomp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, decomp_elapsed);
+        double decomp_cpb = ttzip_calc_cpb(BENCH_CORPUS_SIZE, decomp_elapsed);
 
         char name[32];
         snprintf(name, sizeof(name), "Deflate (libdeflate L%d)", lvl);
-        printf(" %-24s | %8.2f %% | %10.1f   | %10.1f   | %10.1f\n", name, ratio, comp_speed, decomp_speed, mips);
+        printf(" %-24s | %8.2f %% | %10.1f   | %8.3f   | %10.1f   | %8.3f\n", name, ratio, comp_speed, comp_cpb, decomp_speed, decomp_cpb);
 
         libdeflate_free_compressor(compressor);
     }
@@ -72,18 +75,21 @@ void run_codec_benchmarks(void) {
         uint64_t t0 = ttzip_bench_nanos();
         size_t csize = ZSTD_compress(comp, BENCH_CORPUS_SIZE * 2, raw, BENCH_CORPUS_SIZE, lvl);
         uint64_t t1 = ttzip_bench_nanos();
-        double comp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, t1 - t0);
+        uint64_t comp_elapsed = t1 - t0;
+        double comp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, comp_elapsed);
+        double comp_cpb = ttzip_calc_cpb(BENCH_CORPUS_SIZE, comp_elapsed);
         double ratio = ttzip_calc_ratio_pct(csize, BENCH_CORPUS_SIZE);
 
         uint64_t t2 = ttzip_bench_nanos();
         ZSTD_decompress(decomp, BENCH_CORPUS_SIZE, comp, csize);
         uint64_t t3 = ttzip_bench_nanos();
-        double decomp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, t3 - t2);
-        double mips = ttzip_calc_mips_score(comp_speed, ratio);
+        uint64_t decomp_elapsed = t3 - t2;
+        double decomp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, decomp_elapsed);
+        double decomp_cpb = ttzip_calc_cpb(BENCH_CORPUS_SIZE, decomp_elapsed);
 
         char name[32];
         snprintf(name, sizeof(name), "Zstandard (Zstd L%d)", lvl);
-        printf(" %-24s | %8.2f %% | %10.1f   | %10.1f   | %10.1f\n", name, ratio, comp_speed, decomp_speed, mips);
+        printf(" %-24s | %8.2f %% | %10.1f   | %8.3f   | %10.1f   | %8.3f\n", name, ratio, comp_speed, comp_cpb, decomp_speed, decomp_cpb);
     }
 
     // 3. Fast-LZMA2 (FL2) L3
@@ -91,16 +97,19 @@ void run_codec_benchmarks(void) {
         uint64_t t0 = ttzip_bench_nanos();
         size_t csize = FL2_compress(comp, BENCH_CORPUS_SIZE * 2, raw, BENCH_CORPUS_SIZE, 3);
         uint64_t t1 = ttzip_bench_nanos();
-        double comp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, t1 - t0);
+        uint64_t comp_elapsed = t1 - t0;
+        double comp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, comp_elapsed);
+        double comp_cpb = ttzip_calc_cpb(BENCH_CORPUS_SIZE, comp_elapsed);
         double ratio = ttzip_calc_ratio_pct(csize, BENCH_CORPUS_SIZE);
 
         uint64_t t2 = ttzip_bench_nanos();
         FL2_decompress(decomp, BENCH_CORPUS_SIZE, comp, csize);
         uint64_t t3 = ttzip_bench_nanos();
-        double decomp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, t3 - t2);
-        double mips = ttzip_calc_mips_score(comp_speed, ratio);
+        uint64_t decomp_elapsed = t3 - t2;
+        double decomp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, decomp_elapsed);
+        double decomp_cpb = ttzip_calc_cpb(BENCH_CORPUS_SIZE, decomp_elapsed);
 
-        printf(" %-24s | %8.2f %% | %10.1f   | %10.1f   | %10.1f\n", "Fast-LZMA2 (FL2 L3)", ratio, comp_speed, decomp_speed, mips);
+        printf(" %-24s | %8.2f %% | %10.1f   | %8.3f   | %10.1f   | %8.3f\n", "Fast-LZMA2 (FL2 L3)", ratio, comp_speed, comp_cpb, decomp_speed, decomp_cpb);
     }
 
     // 4. Apple LZFSE
@@ -108,16 +117,19 @@ void run_codec_benchmarks(void) {
         uint64_t t0 = ttzip_bench_nanos();
         size_t csize = lzfse_encode_buffer(comp, BENCH_CORPUS_SIZE * 2, raw, BENCH_CORPUS_SIZE, NULL);
         uint64_t t1 = ttzip_bench_nanos();
-        double comp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, t1 - t0);
+        uint64_t comp_elapsed = t1 - t0;
+        double comp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, comp_elapsed);
+        double comp_cpb = ttzip_calc_cpb(BENCH_CORPUS_SIZE, comp_elapsed);
         double ratio = ttzip_calc_ratio_pct(csize, BENCH_CORPUS_SIZE);
 
         uint64_t t2 = ttzip_bench_nanos();
         lzfse_decode_buffer(decomp, BENCH_CORPUS_SIZE, comp, csize, NULL);
         uint64_t t3 = ttzip_bench_nanos();
-        double decomp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, t3 - t2);
-        double mips = ttzip_calc_mips_score(comp_speed, ratio);
+        uint64_t decomp_elapsed = t3 - t2;
+        double decomp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, decomp_elapsed);
+        double decomp_cpb = ttzip_calc_cpb(BENCH_CORPUS_SIZE, decomp_elapsed);
 
-        printf(" %-24s | %8.2f %% | %10.1f   | %10.1f   | %10.1f\n", "Apple LZFSE", ratio, comp_speed, decomp_speed, mips);
+        printf(" %-24s | %8.2f %% | %10.1f   | %8.3f   | %10.1f   | %8.3f\n", "Apple LZFSE", ratio, comp_speed, comp_cpb, decomp_speed, decomp_cpb);
     }
 
     // 5. Google Snappy
@@ -128,17 +140,20 @@ void run_codec_benchmarks(void) {
         uint64_t t0 = ttzip_bench_nanos();
         ttzip_snappy_compress((const char*)raw, BENCH_CORPUS_SIZE, (char*)comp, &csize);
         uint64_t t1 = ttzip_bench_nanos();
-        double comp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, t1 - t0);
+        uint64_t comp_elapsed = t1 - t0;
+        double comp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, comp_elapsed);
+        double comp_cpb = ttzip_calc_cpb(BENCH_CORPUS_SIZE, comp_elapsed);
         double ratio = ttzip_calc_ratio_pct(csize, BENCH_CORPUS_SIZE);
 
         size_t dsize = BENCH_CORPUS_SIZE;
         uint64_t t2 = ttzip_bench_nanos();
         ttzip_snappy_decompress((const char*)comp, csize, (char*)decomp, &dsize);
         uint64_t t3 = ttzip_bench_nanos();
-        double decomp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, t3 - t2);
-        double mips = ttzip_calc_mips_score(comp_speed, ratio);
+        uint64_t decomp_elapsed = t3 - t2;
+        double decomp_speed = ttzip_calc_throughput_mbs(BENCH_CORPUS_SIZE, decomp_elapsed);
+        double decomp_cpb = ttzip_calc_cpb(BENCH_CORPUS_SIZE, decomp_elapsed);
 
-        printf(" %-24s | %8.2f %% | %10.1f   | %10.1f   | %10.1f\n", "Google Snappy", ratio, comp_speed, decomp_speed, mips);
+        printf(" %-24s | %8.2f %% | %10.1f   | %8.3f   | %10.1f   | %8.3f\n", "Google Snappy", ratio, comp_speed, comp_cpb, decomp_speed, decomp_cpb);
     }
 
     printf("--------------------------------------------------------------------------------\n\n");

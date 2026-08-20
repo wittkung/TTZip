@@ -8,6 +8,7 @@
 #include "include/CTTZipGzParallel.h"
 #include "include/CTTZipBridge.h"
 #include "include/CTTZipCommon.h"
+#include "include/CTTZipStreamCoder.h"
 #include "include/ttzip_threadpool.h"
 
 #include <stdio.h>
@@ -132,14 +133,13 @@ static void compress_chunk_worker_routine(void* arg) {
     int z_level = ctx->level > 0 ? (ctx->level > 12 ? 12 : ctx->level) : 6;
 
     if (ctx->codec_type == PARALLEL_CODEC_GZ) {
-        struct libdeflate_compressor *comp = libdeflate_alloc_compressor(z_level);
+        struct libdeflate_compressor *comp = ttzip_get_tls_compressor(z_level);
         if (comp) {
             size_t max_out = libdeflate_gzip_compress_bound(comp, uncompressed_len);
             out_buf = (uint8_t*)malloc(max_out > 0 ? max_out : 64);
             if (out_buf) {
                 final_size = libdeflate_gzip_compress(comp, uncompressed_data, uncompressed_len, out_buf, max_out);
             }
-            libdeflate_free_compressor(comp);
         }
     } else if (ctx->codec_type == PARALLEL_CODEC_BZ2) {
         unsigned int max_out = (unsigned int)(uncompressed_len + (uncompressed_len / 100) + 600);

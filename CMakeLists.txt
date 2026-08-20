@@ -52,7 +52,6 @@ set(TTZIP_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/zopfli
     ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/lzfse
     ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/snappy
-    ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/native_deflate
     ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/include/uchardet
 )
@@ -64,7 +63,6 @@ file(GLOB CTTZIP_CORE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/zopfli/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/lzfse/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/snappy/*.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/native_deflate/*.c"
 )
 
 # 5. 构建静态库与目标
@@ -207,7 +205,6 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/c
         ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/include
         ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge
-        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/native_deflate
         ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/lzfse
     )
 
@@ -278,7 +275,6 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/c
         ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/include
         ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge
-        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/native_deflate
         ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/lzfse
         ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/fast-lzma2
     )

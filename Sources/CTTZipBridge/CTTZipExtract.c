@@ -225,7 +225,7 @@ int ttzip_extract_zip_c_parallel(
     ssize_t eocd_pos = -1;
 
     for (ssize_t i = (ssize_t)file_size - 22; i >= (ssize_t)search_start; i--) {
-        if (mapped[i] == 0x50 && mapped[i+1] == 0x4b && mapped[i+2] == 0x05 && mapped[i+3] == 0x06) {
+        if (read_u32_le(mapped + i) == 0x06054b50) {
             eocd_pos = i;
             break;
         }

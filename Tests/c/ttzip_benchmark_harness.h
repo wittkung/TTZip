@@ -51,11 +51,39 @@ static inline uint64_t ttzip_bench_nanos(void) {
 }
 
 // ==============================================================================
-// 2. Metrics & Math Calculations
+// 2. Nominal Clock Frequency & Microarchitectural Metrics (CPI / CPB / IPC)
 // ==============================================================================
+static inline double ttzip_get_nominal_freq_ghz(void) {
+#if defined(__APPLE__)
+    // Apple Silicon performance cores typically scale between 3.20 - 4.40 GHz.
+    // Default baseline calibrated nominal frequency: 3.50 GHz.
+    return 3.50;
+#else
+    return 3.00;
+#endif
+}
+
 static inline double ttzip_calc_throughput_mbs(size_t bytes, uint64_t elapsed_nanos) {
     if (elapsed_nanos == 0) return 0.0;
     return ((double)bytes * 1000000000.0) / ((double)elapsed_nanos * 1048576.0);
+}
+
+static inline double ttzip_calc_cpb(size_t bytes, uint64_t elapsed_nanos) {
+    if (bytes == 0) return 0.0;
+    double cycles = (double)elapsed_nanos * ttzip_get_nominal_freq_ghz();
+    return cycles / (double)bytes;
+}
+
+static inline double ttzip_calc_ipc(size_t total_instructions, uint64_t elapsed_nanos) {
+    double cycles = (double)elapsed_nanos * ttzip_get_nominal_freq_ghz();
+    if (cycles == 0.0) return 0.0;
+    return (double)total_instructions / cycles;
+}
+
+static inline double ttzip_calc_cpi(size_t total_instructions, uint64_t elapsed_nanos) {
+    double ipc = ttzip_calc_ipc(total_instructions, elapsed_nanos);
+    if (ipc == 0.0) return 0.0;
+    return 1.0 / ipc;
 }
 
 static inline double ttzip_calc_ratio_pct(size_t compressed_bytes, size_t original_bytes) {

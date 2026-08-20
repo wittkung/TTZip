@@ -45,41 +45,39 @@ int ttzip_extract_7z_native_c(
 );
 
 ttzip_native_fmt_t ttzip_detect_format_from_header(const uint8_t* buffer, size_t len) {
-    if (!buffer || len == 0) return TTZIP_NATIVE_FMT_UNKNOWN;
+    if (!buffer || len < 2) return TTZIP_NATIVE_FMT_UNKNOWN;
 
-    if (len >= 2) {
-        uint16_t u16;
-        memcpy(&u16, buffer, 2);
+    if (len >= 8) {
+        uint64_t head;
+        memcpy(&head, buffer, 8);
+        uint16_t u16 = (uint16_t)head;
         if (u16 == 0x4B50) return TTZIP_NATIVE_FMT_ZIP; // 'PK'
         if (u16 == 0x8B1F) return TTZIP_NATIVE_FMT_GZ;
-    }
-
-    if (len >= 6) {
+        if ((head & 0x0000FFFFFFFFFFFFULL) == 0x00001C27AFBC7A37ULL) return TTZIP_NATIVE_FMT_7Z; // 7z\xbc\xaf\x27\x1c
+        if ((head & 0x000000FFFFFFFFFFULL) == 0x0000005A587A37FDULL) return TTZIP_NATIVE_FMT_XZ; // \xFD7zXZ
+        uint32_t u32 = (uint32_t)head;
+        if (u32 == 0xFD2FB528) return TTZIP_NATIVE_FMT_ZSTD;
+        if (u32 == 0x184D2204) return TTZIP_NATIVE_FMT_LZ4;
+        if ((head & 0x00FFFFFFULL) == 0x00685A42ULL) return TTZIP_NATIVE_FMT_BZ2; // 'B','Z','h'
+    } else if (len >= 6) {
         uint32_t m32;
         uint16_t m16;
         memcpy(&m32, buffer, 4);
         memcpy(&m16, buffer + 4, 2);
-        if (m32 == 0xAFBC7A37 && m16 == 0x1C27) { // "7z\xbc\xaf\x27\x1c"
-            return TTZIP_NATIVE_FMT_7Z;
-        }
+        if (m32 == 0xAFBC7A37 && m16 == 0x1C27) return TTZIP_NATIVE_FMT_7Z;
         if (buffer[0] == 0xFD) {
             uint32_t xz_magic;
             memcpy(&xz_magic, buffer + 1, 4);
-            if (xz_magic == 0x5A587A37) { // '7zXZ'
-                return TTZIP_NATIVE_FMT_XZ;
-            }
+            if (xz_magic == 0x5A587A37) return TTZIP_NATIVE_FMT_XZ;
         }
-    }
-
-    if (len >= 4) {
-        uint32_t u32;
-        memcpy(&u32, buffer, 4);
-        if (u32 == 0xFD2FB528) return TTZIP_NATIVE_FMT_ZSTD;
-        if (u32 == 0x184D2204) return TTZIP_NATIVE_FMT_LZ4;
-    }
-
-    if (len >= 3 && buffer[0] == 'B' && buffer[1] == 'Z' && buffer[2] == 'h') {
-        return TTZIP_NATIVE_FMT_BZ2;
+        uint16_t u16 = (uint16_t)m32;
+        if (u16 == 0x4B50) return TTZIP_NATIVE_FMT_ZIP;
+        if (u16 == 0x8B1F) return TTZIP_NATIVE_FMT_GZ;
+    } else {
+        uint16_t u16;
+        memcpy(&u16, buffer, 2);
+        if (u16 == 0x4B50) return TTZIP_NATIVE_FMT_ZIP;
+        if (u16 == 0x8B1F) return TTZIP_NATIVE_FMT_GZ;
     }
 
     if (len >= 262) {

@@ -446,3 +446,41 @@ void ttzip_7z_free_header_info(ttzip_7z_header_info_t* info) {
     if (info->coder_unpack_sizes) { free(info->coder_unpack_sizes); info->coder_unpack_sizes = NULL; }
     if (info->stream_crcs) { free(info->stream_crcs); info->stream_crcs = NULL; }
 }
+
+int ttzip_7z_parse_signature_header(
+    const uint8_t* mapped_data,
+    size_t file_size,
+    ttzip_7z_signature_header_t* out_sig
+) {
+    if (!mapped_data || file_size < 32 || !out_sig) {
+        return -1;
+    }
+
+    // 7z signature: '7' 'z' 0xBC 0xAF 0x27 0x1C
+    static const uint8_t k7zSignature[6] = {'7', 'z', 0xBC, 0xAF, 0x27, 0x1C};
+    if (memcmp(mapped_data, k7zSignature, 6) != 0) {
+        return -2;
+    }
+
+    out_sig->major_version = mapped_data[6];
+    out_sig->minor_version = mapped_data[7];
+
+    uint32_t start_crc = 0;
+    memcpy(&start_crc, mapped_data + 8, 4);
+    out_sig->start_header_crc = start_crc;
+
+    uint64_t next_offset = 0;
+    memcpy(&next_offset, mapped_data + 12, 8);
+    out_sig->next_header_offset = next_offset;
+
+    uint64_t next_size = 0;
+    memcpy(&next_size, mapped_data + 20, 8);
+    out_sig->next_header_size = next_size;
+
+    uint32_t next_crc = 0;
+    memcpy(&next_crc, mapped_data + 28, 4);
+    out_sig->next_header_crc = next_crc;
+
+    return 0;
+}
+

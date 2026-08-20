@@ -41,58 +41,52 @@ public final class ArchiveSearchIndex: @unchecked Sendable {
         }
     }
     
-    private var normalizedBuffer: [UInt8] = []
-    private var descriptors: [IndexedEntryDescriptor] = []
+    private var cIndex = ttzip_search_index_t()
+    private var isInitialized = false
     private let lock = NSLock()
     
-    public init() {}
+    public init() {
+        lock.lock()
+        defer { lock.unlock() }
+        if ttzip_search_index_init(&cIndex, 1024) == 0 {
+            isInitialized = true
+        }
+    }
+
+    deinit {
+        if isInitialized {
+            ttzip_search_index_free(&cIndex)
+        }
+    }
     
     /// Populates the contiguous columnar search index from a list of entry paths and sizes.
     public func build(entries: [(path: String, size: Int64, isDir: Bool)]) {
         lock.lock()
         defer { lock.unlock() }
         
-        normalizedBuffer.removeAll(keepingCapacity: true)
-        descriptors.removeAll(keepingCapacity: true)
-        descriptors.reserveCapacity(entries.count)
+        if !isInitialized {
+            if ttzip_search_index_init(&cIndex, max(256, entries.count)) == 0 {
+                isInitialized = true
+            }
+        }
+        
+        ttzip_search_index_clear(&cIndex)
         
         for (idx, item) in entries.enumerated() {
-            let pathLower = item.path.lowercased()
-            let name = (item.path as NSString).lastPathComponent.lowercased()
-            
-            let pathUtf8 = Array(pathLower.utf8)
-            let nameUtf8 = Array(name.utf8)
-            
-            let pOffset = UInt32(normalizedBuffer.count)
-            normalizedBuffer.append(contentsOf: pathUtf8)
-            normalizedBuffer.append(0) // Null-terminator
-            
-            let nOffset = UInt32(normalizedBuffer.count)
-            normalizedBuffer.append(contentsOf: nameUtf8)
-            normalizedBuffer.append(0)
-            
-            let desc = IndexedEntryDescriptor(
-                index: Int32(idx),
-                nameOffset: nOffset,
-                nameLength: UInt16(nameUtf8.count),
-                pathOffset: pOffset,
-                pathLength: UInt16(pathUtf8.count),
-                uncompressedSize: item.size,
-                isDirectory: item.isDir
-            )
-            descriptors.append(desc)
+            _ = item.path.withCString { cPath in
+                ttzip_search_index_add_entry(&cIndex, Int32(idx), cPath, item.size, item.isDir)
+            }
         }
     }
     
     /// Executes a search query across all indexed entries with nanosecond timing.
     public func search(query: ArchiveSearchQuery) -> ArchiveSearchResult {
         lock.lock()
-        let localDescriptors = descriptors
-        let localBuffer = normalizedBuffer
+        let count = isInitialized ? cIndex.entry_count : 0
         lock.unlock()
         
         let startNano = mach_absolute_time()
-        guard !localDescriptors.isEmpty else {
+        guard count > 0 else {
             return ArchiveSearchResult(
                 matchedIndices: [],
                 matchedEntriesCount: 0,
@@ -102,66 +96,40 @@ public final class ArchiveSearchIndex: @unchecked Sendable {
         }
         
         let rawQueryText = query.queryText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if rawQueryText.isEmpty {
-            let allIndices = localDescriptors.map(\.index)
-            let elapsedMs = Self.elapsedMilliseconds(from: startNano)
-            return ArchiveSearchResult(
-                matchedIndices: allIndices,
-                matchedEntriesCount: allIndices.count,
-                totalScannedEntries: localDescriptors.count,
-                searchDurationMs: elapsedMs
-            )
-        }
+        var matchedIndices = [Int32](repeating: 0, count: count)
         
-        let patternBytes = Array((query.caseSensitive ? rawQueryText : rawQueryText.lowercased()).utf8)
-        let patternLen = patternBytes.count
-        var matched = [Int32]()
-        matched.reserveCapacity(min(1024, localDescriptors.count))
-        
-        patternBytes.withUnsafeBufferPointer { patternBuf in
-            guard let patternPtr = patternBuf.baseAddress else { return }
+        var matchCount: size_t = 0
+        lock.lock()
+        if isInitialized {
+            var cQuery = ttzip_search_query_t()
+            cQuery.case_sensitive = query.caseSensitive
+            cQuery.min_size_bytes = query.minSizeBytes ?? -1
+            cQuery.max_size_bytes = query.maxSizeBytes ?? -1
             
-            localBuffer.withUnsafeBufferPointer { bufPtr in
-                guard let baseAddr = bufPtr.baseAddress else { return }
-                
-                for desc in localDescriptors {
-                    if let minSize = query.minSizeBytes, desc.uncompressedSize < minSize {
-                        continue
+            if !rawQueryText.isEmpty {
+                matchCount = rawQueryText.withCString { cQ in
+                    cQuery.query_text = cQ
+                    cQuery.query_len = strlen(cQ)
+                    return matchedIndices.withUnsafeMutableBufferPointer { mBuf in
+                        ttzip_search_index_query_neon(&cIndex, &cQuery, mBuf.baseAddress, count)
                     }
-                    if let maxSize = query.maxSizeBytes, desc.uncompressedSize > maxSize {
-                        continue
-                    }
-                    
-                    let nameLen = Int(desc.nameLength)
-                    let pathLen = Int(desc.pathLength)
-                    if patternLen > nameLen && patternLen > pathLen {
-                        continue
-                    }
-                    
-                    let firstByte = Int32(patternBuf[0])
-                    let namePtr = baseAddr.advanced(by: Int(desc.nameOffset))
-                    if nameLen >= patternLen, memchr(namePtr, firstByte, nameLen) != nil {
-                        if memmem(namePtr, nameLen, patternPtr, patternLen) != nil {
-                            matched.append(desc.index)
-                            continue
-                        }
-                    }
-                    
-                    let pathPtr = baseAddr.advanced(by: Int(desc.pathOffset))
-                    if pathLen >= patternLen, memchr(pathPtr, firstByte, pathLen) != nil {
-                        if memmem(pathPtr, pathLen, patternPtr, patternLen) != nil {
-                            matched.append(desc.index)
-                        }
-                    }
+                }
+            } else {
+                cQuery.query_text = nil
+                cQuery.query_len = 0
+                matchCount = matchedIndices.withUnsafeMutableBufferPointer { mBuf in
+                    ttzip_search_index_query_neon(&cIndex, &cQuery, mBuf.baseAddress, count)
                 }
             }
         }
+        lock.unlock()
         
+        let resultSlice = Array(matchedIndices.prefix(matchCount))
         let elapsedMs = Self.elapsedMilliseconds(from: startNano)
         return ArchiveSearchResult(
-            matchedIndices: matched,
-            matchedEntriesCount: matched.count,
-            totalScannedEntries: localDescriptors.count,
+            matchedIndices: resultSlice,
+            matchedEntriesCount: resultSlice.count,
+            totalScannedEntries: count,
             searchDurationMs: elapsedMs
         )
     }

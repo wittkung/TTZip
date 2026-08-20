@@ -39,125 +39,28 @@ public enum PathPatternFilterEngine: Sendable {
     // MARK: - POSIX Fnmatch Wildcard Matching
     
     /// Evaluates whether path matches POSIX.2 glob pattern.
-    ///
-    /// - Parameters:
-    ///   - pattern: Wildcard glob pattern (supporting `*`, `?`, `[...]`, `[!...]`).
-    ///   - path: Relative or absolute path to test.
-    ///   - caseSensitive: Case sensitivity flag (default `true`).
-    /// - Returns: True if matching, false otherwise.
     public static func matches(pattern: String, path: String, caseSensitive: Bool = true) -> Bool {
-        guard !pattern.isEmpty else { return path.isEmpty }
-        guard !path.isEmpty else { return pattern == "*" }
-        
-        // 1. Wildcard short-circuit
-        if pattern == "*" {
-            return true
-        }
-        
-        // 2. Exact match short-circuit
-        if caseSensitive {
-            if pattern == path { return true }
-        } else {
-            if pattern.caseInsensitiveCompare(path) == .orderedSame { return true }
-        }
-        
-        // 3. Fast path for suffix patterns (*.ext)
-        if pattern.hasPrefix("*.") {
-            let suffixPart = pattern.dropFirst()
-            if !suffixPart.dropFirst().contains(where: { $0 == "*" || $0 == "?" || $0 == "[" || $0 == "/" || $0 == "\\" }) {
-                let suffixStr = String(suffixPart)
-                if caseSensitive {
-                    if path.hasSuffix(suffixStr) { return true }
-                } else {
-                    if path.lowercased().hasSuffix(suffixStr.lowercased()) { return true }
-                }
+        return pattern.withCString { cPattern in
+            path.withCString { cPath in
+                ttzip_path_matches(cPattern, cPath, caseSensitive)
             }
         }
-        
-        let caseFlags: Int32 = caseSensitive ? 0 : FNM_CASEFOLD
-        
-        // 4. Root anchored pattern (e.g. "/build/*")
-        if pattern.hasPrefix("/") {
-            let trimmedPattern = String(pattern.drop(while: { $0 == "/" }))
-            let trimmedPath = String(path.drop(while: { $0 == "/" }))
-            return invokeFnmatch(pattern: trimmedPattern, path: trimmedPath, flags: FNM_PATHNAME | caseFlags)
-        }
-        
-        // 5. Hierarchical path pattern (e.g. "src/*.swift" or "docs/api/*")
-        if pattern.contains("/") {
-            let trimmedPath = String(path.drop(while: { $0 == "/" }))
-            
-            if pattern.hasPrefix("**/") {
-                let subPattern = String(pattern.dropFirst(3))
-                if !subPattern.contains("/") {
-                    if matches(pattern: subPattern, path: path, caseSensitive: caseSensitive) {
-                        return true
-                    }
-                }
-            }
-            
-            if pattern.hasSuffix("/**") {
-                let prefix = String(pattern.dropLast(3))
-                let cleanPrefix = prefix.hasPrefix("/") ? String(prefix.dropFirst()) : prefix
-                if trimmedPath.hasPrefix(cleanPrefix + "/") || trimmedPath == cleanPrefix {
-                    return true
-                }
-            }
-            
-            return invokeFnmatch(pattern: pattern, path: trimmedPath, flags: FNM_PATHNAME | caseFlags)
-        }
-        
-        // 6. Basename and intermediate component matching
-        let lastComponent = (path as NSString).lastPathComponent
-        if invokeFnmatch(pattern: pattern, path: lastComponent, flags: caseFlags) {
-            return true
-        }
-        
-        let components = path.split(separator: "/")
-        for comp in components {
-            let compStr = String(comp)
-            if invokeFnmatch(pattern: pattern, path: compStr, flags: caseFlags) {
-                return true
-            }
-        }
-        
-        return invokeFnmatch(pattern: pattern, path: path, flags: caseFlags)
     }
     
     // MARK: - Metadata Evaluation Decisions
     
     /// Checks if path matches VCS metadata.
     public static func isVCSMetadata(_ path: String) -> Bool {
-        guard !path.isEmpty else { return false }
-        let last = (path as NSString).lastPathComponent
-        if vcsDirectoryNames.contains(last) || vcsFileNames.contains(last) {
-            return true
+        return path.withCString { cPath in
+            ttzip_path_is_vcs_metadata(cPath)
         }
-        let components = path.split(separator: "/")
-        for comp in components {
-            let compStr = String(comp)
-            if vcsDirectoryNames.contains(compStr) || vcsFileNames.contains(compStr) {
-                return true
-            }
-        }
-        return false
     }
     
     /// Checks if path matches OS temporary junk or metadata files.
     public static func isMacMetadata(_ path: String) -> Bool {
-        guard !path.isEmpty else { return false }
-        let last = (path as NSString).lastPathComponent
-        if macMetadataNames.contains(last) || last.hasPrefix("._") {
-            return true
+        return path.withCString { cPath in
+            ttzip_path_is_mac_metadata(cPath)
         }
-        let components = path.split(separator: "/")
-        for comp in components {
-            let compStr = String(comp)
-            if compStr == "__MACOSX" || compStr == ".Spotlight-V100" || compStr == ".Trashes" || compStr == ".fseventsd" || compStr == ".TemporaryItems" || compStr.hasPrefix("._") {
-                return true
-            }
-        }
-        return false
     }
     
     /// Evaluates whether path should be included based on exclusion/inclusion criteria.
@@ -280,15 +183,5 @@ public enum PathPatternFilterEngine: Sendable {
         
         let remaining = String(path[i..<end])
         return remaining.isEmpty ? nil : remaining
-    }
-    
-    // MARK: - C fnmatch invocation
-    
-    private static func invokeFnmatch(pattern: String, path: String, flags: Int32) -> Bool {
-        return pattern.withCString { p in
-            path.withCString { s in
-                fnmatch(p, s, flags) == 0
-            }
-        }
     }
 }

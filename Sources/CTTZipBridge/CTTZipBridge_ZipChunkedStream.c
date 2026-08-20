@@ -101,7 +101,7 @@ static void flush_ready_slots_locked(ttzip_zip_chunked_stream_t* s) {
 }
 
 static void compress_chunk_worker(ttzip_zip_chunked_stream_t* s, uint64_t seq, uint8_t* uncompressed_data, size_t uncompressed_size, bool is_final) {
-    struct libdeflate_compressor* compressor = libdeflate_alloc_compressor(s->level);
+    struct libdeflate_compressor* compressor = ttzip_get_tls_compressor(s->level);
     if (!compressor) {
         pthread_mutex_lock(&s->mutex);
         s->has_error = true;
@@ -117,7 +117,6 @@ static void compress_chunk_worker(ttzip_zip_chunked_stream_t* s, uint64_t seq, u
     
     uint8_t* out_buf = (uint8_t*)malloc(max_out);
     if (!out_buf) {
-        libdeflate_free_compressor(compressor);
         pthread_mutex_lock(&s->mutex);
         s->has_error = true;
         pthread_cond_broadcast(&s->cond);
@@ -130,7 +129,6 @@ static void compress_chunk_worker(ttzip_zip_chunked_stream_t* s, uint64_t seq, u
     if (uncompressed_size > 0) {
         actual_out = libdeflate_deflate_compress(compressor, uncompressed_data, uncompressed_size, out_buf, max_out);
     }
-    libdeflate_free_compressor(compressor);
     
     if (uncompressed_size > 0 && actual_out == 0) {
         pthread_mutex_lock(&s->mutex);

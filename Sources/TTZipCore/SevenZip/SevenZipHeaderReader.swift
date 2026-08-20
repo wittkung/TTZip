@@ -13,48 +13,19 @@ public final class SevenZipHeaderReader: @unchecked Sendable {
     
     private init() {}
     
-    @inline(__always)
-    private func readU16(_ ptr: UnsafePointer<UInt8>, _ offset: Int) -> UInt16 {
-        var val: UInt16 = 0
-        memcpy(&val, ptr.advanced(by: offset), 2)
-        return val
-    }
-    
-    @inline(__always)
-    private func readU32(_ ptr: UnsafePointer<UInt8>, _ offset: Int) -> UInt32 {
-        var val: UInt32 = 0
-        memcpy(&val, ptr.advanced(by: offset), 4)
-        return val
-    }
-    
-    @inline(__always)
-    private func readU64(_ ptr: UnsafePointer<UInt8>, _ offset: Int) -> UInt64 {
-        var val: UInt64 = 0
-        memcpy(&val, ptr.advanced(by: offset), 8)
-        return val
-    }
-    
     /// Parses and verifies the 32-byte 7z Signature Header.
     public func parseSignatureHeader(from bytePtr: UnsafePointer<UInt8>, fileSize: Int) -> SevenZipSignatureHeader? {
-        guard fileSize >= 32 else { return nil }
-        
-        let sig = [bytePtr[0], bytePtr[1], bytePtr[2], bytePtr[3], bytePtr[4], bytePtr[5]]
-        if sig != SevenZipSignatureHeader.signature { return nil }
-        
-        let major = bytePtr[6]
-        let minor = bytePtr[7]
-        let startHeaderCRC = readU32(bytePtr, 8)
-        let nextHeaderOffset = readU64(bytePtr, 12)
-        let nextHeaderSize = readU64(bytePtr, 20)
-        let nextHeaderCRC = readU32(bytePtr, 28)
-        
+        var cSig = ttzip_7z_signature_header_t()
+        let res = ttzip_7z_parse_signature_header(bytePtr, fileSize, &cSig)
+        guard res == 0 else { return nil }
+
         return SevenZipSignatureHeader(
-            majorVersion: major,
-            minorVersion: minor,
-            startHeaderCRC: startHeaderCRC,
-            nextHeaderOffset: nextHeaderOffset,
-            nextHeaderSize: nextHeaderSize,
-            nextHeaderCRC: nextHeaderCRC
+            majorVersion: cSig.major_version,
+            minorVersion: cSig.minor_version,
+            startHeaderCRC: cSig.start_header_crc,
+            nextHeaderOffset: cSig.next_header_offset,
+            nextHeaderSize: cSig.next_header_size,
+            nextHeaderCRC: cSig.next_header_crc
         )
     }
     

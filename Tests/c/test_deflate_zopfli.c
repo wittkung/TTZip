@@ -7,8 +7,8 @@
  */
 
 #include "ttzip_test_harness.h"
-#include "ttzip_deflate_engine.h"
-#include "ttzip_zopfli_engine.h"
+#include "include/CTTZipStreamCoder.h"
+#include "include/ttzip_zopfli_engine.h"
 #include "libdeflate.h"
 
 TEST_CASE(test_deflate_fast_compress_and_decompress_roundtrip) {
@@ -19,18 +19,7 @@ TEST_CASE(test_deflate_fast_compress_and_decompress_roundtrip) {
     }
 
     uint8_t comp_buf[32768];
-    ttzip_native_deflate_options_t options;
-    memset(&options, 0, sizeof(options));
-    options.tier_level = 1;
-    options.dynamic_huffman = true;
-
-    size_t comp_size = ttzip_native_deflate_compress_block_with_history(
-        src, sizeof(src),
-        NULL, 0,
-        comp_buf, sizeof(comp_buf),
-        &options,
-        true
-    );
+    size_t comp_size = ttzip_libdeflate_compress(src, sizeof(src), comp_buf, sizeof(comp_buf), 1);
 
     ASSERT_TRUE(comp_size > 0);
     ASSERT_TRUE(comp_size < sizeof(src) / 2); // > 2x compression ratio
@@ -104,16 +93,11 @@ TEST_CASE(test_deflate_with_history_dictionary) {
     memset(src, 'X', sizeof(src)); // Matches preceding history 100%
 
     uint8_t comp_buf[1024];
-    ttzip_native_deflate_options_t options;
-    memset(&options, 0, sizeof(options));
-    options.tier_level = 2;
-    options.dynamic_huffman = true;
-
-    size_t comp_size = ttzip_native_deflate_compress_block_with_history(
+    size_t comp_size = ttzip_raw_deflate_block_compress_with_dict(
         src, sizeof(src),
         history, sizeof(history),
         comp_buf, sizeof(comp_buf),
-        &options,
+        2,
         true
     );
 
