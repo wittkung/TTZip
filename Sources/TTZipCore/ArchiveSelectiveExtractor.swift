@@ -94,4 +94,51 @@ public final class ArchiveSelectiveExtractor: @unchecked Sendable {
         
         return movedCount
     }
+    
+    /// Extracts a single entry directly into memory for instant Space-bar Quick Look or Drag-and-Drop.
+    public func extractSingleEntryData(
+        archivePath: String,
+        entryPath: String,
+        password: String? = nil
+    ) async throws -> Data? {
+        let pathLower = archivePath.lowercased()
+        
+        // Fast Path: ZIP random seek table in memory
+        if pathLower.hasSuffix(".zip") || pathLower.hasSuffix(".zipx") || pathLower.hasSuffix(".aar") {
+            let fd = open(archivePath, O_RDONLY)
+            if fd >= 0 {
+                defer { close(fd) }
+                var st = stat()
+                if fstat(fd, &st) == 0 {
+                    let fileSize = Int(st.st_size)
+                    if let mapped = mmap(nil, fileSize, PROT_READ, MAP_SHARED, fd, 0), mapped != MAP_FAILED {
+                        defer { munmap(mapped, fileSize) }
+                        let bytePtr = mapped.assumingMemoryBound(to: UInt8.self)
+                        if let descriptors = ZipCentralDirectoryReader.shared.readDescriptors(from: bytePtr, fileSize: fileSize, skipMacJunk: false) {
+                            let seekTable = ZipSeekTable(descriptors: descriptors, archiveSize: fileSize, bytePtr: bytePtr)
+                            if let entryData = seekTable.extractSingleEntry(path: entryPath, from: bytePtr, fileSize: fileSize, password: password) {
+                                return entryData
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // General Streaming Path: Extract single entry to ephemeral temp directory
+        let fm = FileManager.default
+        let tempDir = fm.temporaryDirectory.appendingPathComponent("ttzip_preview_\(UUID().uuidString)").path
+        defer { try? fm.removeItem(atPath: tempDir) }
+        
+        let count = try await extractSelected(
+            archivePath: archivePath,
+            targetEntryPaths: [entryPath],
+            destinationDir: tempDir,
+            password: password
+        )
+        
+        guard count > 0 else { return nil }
+        let outPath = (tempDir as NSString).appendingPathComponent(entryPath)
+        return try? Data(contentsOf: URL(fileURLWithPath: outPath))
+    }
 }

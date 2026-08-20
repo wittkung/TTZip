@@ -135,4 +135,83 @@ public enum ConcurrencyBridge {
             ttzip_mem_budget_set_override(maxBudgetBytes)
         }
     }
+
+    // MARK: - 60fps Lock-Free Streaming Progress Bridge
+
+    /// High-resolution, zero-allocation lock-free stream bridge connecting C11 worker callbacks to SwiftUI 60fps loops.
+    public final class ProgressStreamBridge: @unchecked Sendable {
+        private var continuation: AsyncStream<ArchiveProgress>.Continuation?
+        private var lastEmitNanos: UInt64 = 0
+        private var isCancelledFlag: Bool = false
+        private let lock = os_unfair_lock_t.allocate(capacity: 1)
+
+        public init() {
+            lock.initialize(to: os_unfair_lock())
+        }
+
+        deinit {
+            lock.deinitialize(count: 1)
+            lock.deallocate()
+        }
+
+        public var isCancelled: Bool {
+            os_unfair_lock_lock(lock)
+            defer { os_unfair_lock_unlock(lock) }
+            return isCancelledFlag
+        }
+
+        public func cancel() {
+            os_unfair_lock_lock(lock)
+            isCancelledFlag = true
+            os_unfair_lock_unlock(lock)
+            continuation?.yield(ArchiveProgress(state: .cancelled))
+            continuation?.finish()
+        }
+
+        public func emit(
+            bytesProcessed: Int64,
+            totalBytes: Int64,
+            currentFileName: String = "",
+            state: ArchiveProgress.State = .processing,
+            force: Bool = false
+        ) {
+            let nowNanos = mach_absolute_time()
+            os_unfair_lock_lock(lock)
+            if isCancelledFlag {
+                os_unfair_lock_unlock(lock)
+                return
+            }
+
+            // 16.6ms throttling window (~16_666_667 nanos) unless force is true or terminal state
+            let elapsed = nowNanos > lastEmitNanos ? (nowNanos - lastEmitNanos) : 0
+            if !force && state == .processing && elapsed < 16_000_000 {
+                os_unfair_lock_unlock(lock)
+                return
+            }
+            lastEmitNanos = nowNanos
+            os_unfair_lock_unlock(lock)
+
+            let progress = ArchiveProgress(
+                state: state,
+                bytesProcessed: bytesProcessed,
+                totalBytes: totalBytes,
+                currentFileName: currentFileName
+            )
+            continuation?.yield(progress)
+            if state == .completed || state == .cancelled {
+                continuation?.finish()
+            }
+        }
+
+        public static func create() -> (bridge: ProgressStreamBridge, stream: AsyncStream<ArchiveProgress>) {
+            let bridge = ProgressStreamBridge()
+            let stream = AsyncStream<ArchiveProgress> { continuation in
+                bridge.continuation = continuation
+                continuation.onTermination = { @Sendable _ in
+                    bridge.cancel()
+                }
+            }
+            return (bridge, stream)
+        }
+    }
 }

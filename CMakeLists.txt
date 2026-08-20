@@ -197,6 +197,9 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         tests/c/test_crypto_lz4_snappy.c
         tests/c/test_deflate_stream_coder.c
         tests/c/test_platform_isa.c
+        tests/c/test_cve_regressions.c
+        tests/c/test_compat_archives.c
+        tests/c/test_fs_metadata.c
     )
 
     add_executable(ttzip_c_test_runner ${TTZIP_TEST_SOURCES})
@@ -245,6 +248,9 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         crypto_lz4_snappy
         deflate_stream_coder
         platform_isa
+        cve_regressions
+        compat_archives
+        fs_metadata
     )
 
     foreach(suite IN LISTS TEST_SUITES)
@@ -261,11 +267,20 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         LABELS "full;c11"
     )
 
+    # 9.5. TTZip LibFuzzer Harness Target
+    add_executable(ttzip_fuzzer tests/fuzz/fuzz_extract_engine.c)
+    target_link_libraries(ttzip_fuzzer PRIVATE ttzip)
+    target_include_directories(ttzip_fuzzer PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge
+    )
+
     # 10. TTZip C11 Native Benchmark Runner
     set(TTZIP_BENCH_SOURCES
         tests/c/bench_main.c
         tests/c/bench_codecs.c
         tests/c/bench_checksums.c
+        tests/c/bench_formats.c
         tests/c/bench_pareto.c
         tests/c/bench_stress_vfs.c
     )

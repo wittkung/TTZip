@@ -11,6 +11,7 @@
 // Forward declarations of benchmark suite runners
 void run_codec_benchmarks(void);
 void run_checksum_benchmarks(void);
+void run_format_benchmarks(void);
 void run_pareto_benchmarks(void);
 void run_stress_vfs_benchmarks(void);
 
@@ -18,6 +19,7 @@ int main(int argc, char** argv) {
     bool run_all = true;
     bool run_codecs = false;
     bool run_checksums = false;
+    bool run_formats = false;
     bool run_pareto = false;
     bool run_stress = false;
 
@@ -30,6 +32,8 @@ int main(int argc, char** argv) {
                 run_codecs = true;
             } else if (strcmp(argv[i], "--checksums") == 0 || strcmp(argv[i], "checksums") == 0) {
                 run_checksums = true;
+            } else if (strcmp(argv[i], "--formats") == 0 || strcmp(argv[i], "formats") == 0) {
+                run_formats = true;
             } else if (strcmp(argv[i], "--pareto") == 0 || strcmp(argv[i], "pareto") == 0) {
                 run_pareto = true;
             } else if (strcmp(argv[i], "--stress") == 0 || strcmp(argv[i], "stress") == 0) {
@@ -49,6 +53,9 @@ int main(int argc, char** argv) {
     }
     if (run_all || run_checksums) {
         run_checksum_benchmarks();
+    }
+    if (run_all || run_formats) {
+        run_format_benchmarks();
     }
     if (run_all || run_pareto) {
         run_pareto_benchmarks();

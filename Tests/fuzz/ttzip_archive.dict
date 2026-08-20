@@ -1,0 +1,22 @@
+# TTZip Multi-Format Container Fuzzing Dictionary
+# ZIP Magic & Markers
+"PK\x03\x04"
+"PK\x01\x02"
+"PK\x05\x06"
+"PK\x06\x06"
+"PK\x07\x08"
+
+# TAR Headers & Prefixes
+"ustar\x00"
+"ustar "
+"././@LongLink"
+"PaxHeaders."
+"SCHILY.xattr."
+"LIBARCHIVE.xattr."
+
+# Compression Headers
+"\x1f\x8b\x08"
+"\x28\xb5\x2f\xfd"
+"7z\xbc\xaf\x27\x1c"
+"\xfd7zXZ\x00"
+"BZh"

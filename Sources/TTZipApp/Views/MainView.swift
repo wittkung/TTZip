@@ -31,12 +31,12 @@ public struct MainView: View {
     
     public init() {}
     
-    @AppStorage("TTZip_UserLeftSidebarWidth") private var userLeftSidebarWidth: Double = 178.0
-    @AppStorage("TTZip_UserRightSidebarWidth") private var userRightSidebarWidth: Double = 340.0
-    @State private var leftSidebarWidth: CGFloat = 178
-    @State private var rightSidebarWidth: CGFloat = 340
-    @State private var initialLeftWidth: CGFloat = 178
-    @State private var initialRightWidth: CGFloat = 340
+    @AppStorage("TTZip_UserLeftSidebarWidth") private var userLeftSidebarWidth: Double = 200.0
+    @AppStorage("TTZip_UserRightSidebarWidth") private var userRightSidebarWidth: Double = 280.0
+    @State private var leftSidebarWidth: CGFloat = 200
+    @State private var rightSidebarWidth: CGFloat = 280
+    @State private var initialLeftWidth: CGFloat = 200
+    @State private var initialRightWidth: CGFloat = 280
     @State private var rightVerticalTopHeight: CGFloat = 300
     
     private var isLeftCompact: Bool { leftSidebarWidth < 140 }
