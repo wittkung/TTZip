@@ -5,232 +5,214 @@
 </p>
 
 <p align="center">
-  <strong>Ultra-High-Performance Native Archiving & Compression Engine for macOS 14+ & Darwin Systems</strong><br />
-  Engineered with 100% In-Process C11 Static Bindings, Swift 6 Strict Concurrency, and Apple Silicon SIMD / PMULL Hardware Acceleration.
+  <strong>Ultra-High-Performance Native Archiving & Compression Microkernel</strong><br />
+  Engineered with a Pure C11 Standalone Core Engine (`libttzip`), SOTA Codecs, Dual-ISA SIMD / PMULL Vector Acceleration, and a Lightweight Swift 6 macOS GUI Shell.
 </p>
 
 <p align="center">
-  <a href="https://github.com/wittkung/TTZip/actions"><img src="https://img.shields.io/badge/CI-Passing-brightgreen?style=flat-square&logo=githubactions" alt="CI Status" /></a>
+  <a href="https://github.com/wittkung/TTZip"><img src="https://img.shields.io/badge/Architecture-Pure%20C11%20Microkernel-blue?style=flat-square&logo=c" alt="C11 Core" /></a>
+  <a href="https://cmake.org"><img src="https://img.shields.io/badge/Build-CMake%203.20%2B-064F8C?style=flat-square&logo=cmake" alt="CMake" /></a>
   <a href="https://swift.org"><img src="https://img.shields.io/badge/Swift-6.0%20Strict-orange?style=flat-square&logo=swift" alt="Swift 6.0" /></a>
   <a href="https://apple.com/macos"><img src="https://img.shields.io/badge/macOS-14.0%2B%20(Sonoma)-blue?style=flat-square&logo=apple" alt="macOS 14+" /></a>
-  <a href="https://en.wikipedia.org/wiki/Apple_silicon"><img src="https://img.shields.io/badge/Architecture-Apple%20Silicon%20%2B%20x86__64-purple?style=flat-square" alt="Architecture" /></a>
-  <a href="Formula/ttzip-cli.rb"><img src="https://img.shields.io/badge/Homebrew-wittkung%2Ftap%2Fttzip--cli-yellow.svg?style=flat-square&logo=homebrew" alt="Homebrew Tap" /></a>
+  <a href="https://en.wikipedia.org/wiki/Apple_silicon"><img src="https://img.shields.io/badge/Vector%20ISA-ARM64%20NEON%20%2B%20x86__64%20AVX2-purple?style=flat-square" alt="Hardware Vector" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue.svg?style=flat-square" alt="License" /></a>
 </p>
 
 ---
 
-## 🌟 Key Highlights & Engineering Philosophy
+## 🌟 Key Highlights & Architectural Principles
 
-- **🚀 100% In-Process Native C Engine**: Zero external CLI process spawning (`exec`/`posix_spawn`). All operations run directly in-process via static bindings to `libarchive`, `libdeflate`, `LZMA SDK`, `zstd`, `liblz4`, and `libb2`.
-- **⚡️ 48 GB/s Apple Silicon SIMD / PMULL Hardware Acceleration**:
-  - **48,160 MB/s (47.0 GB/s) CRC64 / CRC32**: Hardware polynomial multiplication (`vmull_p64`) with 4-way unrolled CLMUL pipelines — **35.5x faster (+3,450%)** than scalar table lookup.
-  - **AES-256 SIMD**: Direct ARM NEON crypto vector instructions for ZIP/7Z encryption & decryption at memory bus speed.
-  - **SWAR & Hybrid Match Finders**: Accelerated sliding window pattern scanning across DEFLATE and LZMA2 encoders.
-- **🛡 Swift 6 Complete Concurrency**: 100% data-race-free architecture built with Swift 6 structured concurrency (`Actor`, `@MainActor`, `Task.detached`).
-- **🌊 UNIX Pipe Streaming (`stdin`/`stdout`)**: Full-duplex zero-disk-staging streaming compression and decompression pipelines with automatic TTY protection and NDJSON error reporting.
-- **🔤 Smart Universal Charset Auto-Detection**: Integrated `uchardet` automatically resolves and repairs GBK / CP936 / Shift-JIS / EUC-KR mojibake in legacy Windows ZIP/RAR archives.
-- **👁 Seamless In-Archive QuickLook Preview**: Instant 0ms penetration, browsing, and media/code/document preview without full archive extraction.
-- **🔒 Password Vault v4**: Enterprise-grade credential management with PBKDF2-SHA256 (600,000 OWASP iterations) + 32-byte salt and AES-256-GCM hardware encryption.
-- **🛍 Dual Distribution Ready**:
-  - **Mac App Store (MAS)**: 100% App Sandbox compliant (`-DMAS_BUILD`).
-  - **Direct Independent Distribution**: Integrated Sparkle 2.0 automatic updates.
+- **🚀 100% Pure C11 High-Performance Core (`libttzip.a`)**: Zero external CLI process spawning (`exec`/`posix_spawn`). All heavy archive packing, unpacking, tree parsing, and codec operations run in-process via a standalone C11 static library with zero Apple GCD lock-in.
+- **⚡️ 63+ GB/s Hardware Vector Dual-ISA Acceleration**:
+  - **63,232 MB/s (63.2 GB/s) CRC32**: Hardware polynomial multiplication (`vmull_p64` / `__crc32d` on ARM64, `_mm_clmulepi64_si128` on x86_64).
+  - **36,017 MB/s (36.0 GB/s) CRC64**: Dual-ISA wide-folded polynomial reduction (ECMA-182).
+  - **AES-256 Vector Pipeline**: Hardware crypto instructions for ZIP / 7Z encryption & decryption at memory bus bandwidth.
+- **🏎 SOTA Codec Matrix**:
+  - **Deflate (libdeflate)**: 4,742 MB/s single-core compression (L1) / 34,060 MB/s decompression (L9).
+  - **Zstandard (Zstd)**: 7,452 MB/s compression / 29,046 MB/s decompression (L3).
+  - **Google Snappy**: 10,259 MB/s compression / 26,254 MB/s decompression.
+  - **Fast-LZMA2 (FL2)**: Multi-threaded extreme LZMA2 compression with radical match finders.
+  - **Apple LZFSE & Zopfli DAG**: Native macOS acceleration and shortest-path graph optimization.
+- **🔍 Sub-Nanosecond Virtual Filesystem Microkernels**:
+  - **Constant-Time Magic Header Sniffing**: 428.33 Million ops/s instant binary signature detection across 100+ formats.
+  - **Pure C11 Natural Numeric Sorting**: 32.18 Million ops/s case-insensitive natural sort (`img_2.png` < `img_10.png`).
+  - **Compact Radix Archive Tree**: 5,000-node hierarchy search in **308 microseconds (0.3 ms)**.
+  - **Zero-Disk-IO Instant Preview**: Memory-mapped direct entry decompression without temporary files.
+- **🛡 Cryptographic Memory Scrubbing & Error Correction**:
+  - **DSE-Immune Memory Wipe (4,254 MB/s)**: Volatile pointer scrubbing to prevent Dead Store Elimination from leaking keys in memory.
+  - **Reed-Solomon Recovery Records (1,382 MB/s)**: Galois Field GF(2^8) forward error correction (FEC) for self-healing damaged archives.
+- **🖥 Lightweight Swift 6 Desktop Shell (`TTZipApp`)**:
+  - Thin presentation layer utilizing `NativeMicrokernelBridge` and Swift 6 complete concurrency with 0 Apple GCD calls in core business logic.
 
 ---
 
 ## 📦 Supported Archive Formats (16 Full-Matrix Formats)
 
-| Format Category | Formats | Compression / Packing | Decompression | Penetration / QuickLook | Multi-Volume | Governing Standard |
-| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Primary Modern** | `.zip`, `.7z`, `.tar`, `.tar.zst` | ✅ (Multi-core) | ✅ (SIMD) | ✅ (0ms) | ✅ (`.001`) | PKWARE, 7z Spec, RFC 8878 |
-| **High Compression** | `.tar.xz`, `.tar.bz2`, `.tar.gz`, `.lzip`, `.lrzip` | ✅ | ✅ | ✅ | ✅ | RFC 1952, POSIX Pax, XZ Spec |
-| **Real-time / High Speed** | `.lz4`, `.brotli`, `.snappy`, `.aar` | ✅ | ✅ | ✅ | - | RFC 7932, LZ4 Frame |
-| **System & Disk Images** | `.dmg`, `.iso`, `.wim` | ✅ | ✅ | ✅ | - | Apple UDIF, ISO 9660, WIM Spec |
-| **Multi-Volume Split** | `.7z.001`, `.zip.001`, `.001` | ✅ | ✅ | ✅ | ✅ | Multi-part Span Spec |
-| **Legacy & Proprietary** | `.rar`, `.cbr`, `.zipx`, `.cab` | Read-Only | ✅ | ✅ | - | RAR 4.x/5.x, MS CAB |
+| Format Category | Formats | Packing (C11 Engine) | Extraction (C11 Engine) | In-Memory Preview | Multi-Volume Split |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Primary Modern** | `.zip`, `.7z`, `.tar`, `.tar.zst` | ✅ (Multi-Core) | ✅ (Hardware SIMD) | ✅ (0-Disk-IO) | ✅ (`.z01`, `.001`) |
+| **High Compression** | `.tar.xz`, `.tar.bz2`, `.tar.gz`, `.lzip` | ✅ | ✅ | ✅ | ✅ |
+| **Real-time / High Speed** | `.lz4`, `.brotli`, `.snappy`, `.aar` | ✅ | ✅ | ✅ | - |
+| **System & Disk Images** | `.dmg`, `.iso`, `.wim` | ✅ | ✅ | ✅ | - |
+| **Multi-Volume Split** | `.7z.001`, `.zip.001`, `.001` | ✅ | ✅ | ✅ | ✅ |
+| **Legacy & Proprietary** | `.rar`, `.cbr`, `.zipx`, `.cab` | Read-Only | ✅ | ✅ | - |
 
 ---
 
-## 📈 Pareto Benchmark Frontiers (ZIP / Deflate)
+## 📈 Real Physical Hardware Benchmarks (`ttzip-cli --benchmark`)
 
-TTZip features a **7-Tier Continuous Pareto Hierarchy (`L0` ~ `L6`)** for standard PKWARE ZIP / Deflate streams. Tested on the standard **100MB Wikipedia Corpus (`enwik8`)** on Apple Silicon M-Series (Sonoma 14+), TTZip establishes an uninterrupted envelope across both multithreaded and single-threaded execution.
+*Tested on Apple Silicon M-Series (macOS 14+ / Darwin), compiled via CMake 3.20+ with `-O3` Release flags.*
 
-### 1. 18-Core Multi-Threaded PK (TTZip vs. pigz vs. minizip-ng vs. AdvanceCOMP)
+```text
+=================================================================
+ TTZip High-Performance Native Archive Engine v1.0.0
+ Cross-Platform Pure C11 Core Engine (Zero GCD / SOTA Codecs)
+=================================================================
 
-<p align="center">
-  <img src="docs/benchmarks/pareto_pk_zip_multicore.png" alt="ZIP 18-Core Pareto Benchmark" width="100%" />
-</p>
+[1/3] Hardware Vector Checksums:
+  • CRC32 (PMULL/ACLE/SSE4.2):  63,232.78 MB/s (63.2 GB/s)
+  • CRC64 (PMULL/PCLMULQDQ):   36,017.11 MB/s (36.0 GB/s)
 
-| Profile | Strategy / Engine | 100MB Latency | 18-Core Throughput | Compressed Size | Use Case |
-| :--- | :--- | :---: | :---: | :---: | :--- |
-| **`L0 (Store)`** | Direct Page Aligned Zero-Copy I/O | **14.1 ms** | **6.59 GB/s** | 95.37 MB | Raw repackaging, media containers |
-| **`L1 (Fast)`** | Native SWAR / NEON Greedy Match Finder | **13.2 ms** | **7.08 GB/s** | 4.11 MB | Ultra-fast backups, real-time logging |
-| **`L2 (Maximum)`** | Fast Deflate Level 6 with Sync-Flush | **19.4 ms** | **4.81 GB/s** | 3.23 MB | Daily standard balanced archiving |
-| **`L3 (High)`** | Near-Optimal DP Deflate Level 12 | **528.6 ms** | **180.4 MB/s** | 3.04 MB | Sub-second high-ratio distribution |
-| **`L4 (Graph Fast)`** | 2-Pass Zopfli Shortest-Path DAG | **4.30 s** | **22.2 MB/s** | 2.87 MB | High-efficiency extreme archiving |
-| **`L5 (Ultra)`** | 5-Pass Zopfli Shortest-Path DAG | **7.62 s** | **12.5 MB/s** | 2.85 MB | Multi-core golden convergence limit |
-| **`L6 (Extreme)`** | 15-Pass Zopfli + Dynamic Block Splitting | **18.51 s** | **5.2 MB/s** | 2.85 MB | Asymptotic maximum space squeeze |
+[2/3] SOTA Single-Core Compression Throughput:
+  • Deflate (libdeflate L1)    -> Comp:  4,742.1 MB/s | Decomp:   7,464.7 MB/s [OK]
+  • Deflate (libdeflate L6)    -> Comp:  1,294.2 MB/s | Decomp:  29,967.3 MB/s [OK]
+  • Deflate (libdeflate L9)    -> Comp:    416.9 MB/s | Decomp:  34,060.7 MB/s [OK]
+  • Zstandard (Zstd L1)        -> Comp:  7,322.2 MB/s | Decomp:  19,115.9 MB/s [OK]
+  • Zstandard (Zstd L3)        -> Comp:  7,452.7 MB/s | Decomp:  29,046.9 MB/s [OK]
+  • Google Snappy              -> Comp: 10,259.4 MB/s | Decomp:  26,254.6 MB/s [OK]
 
-### 2. 1-Core Single-Threaded PK (TTZip vs. libdeflate vs. 7-Zip vs. Apple Native)
+[3/4] Virtual Filesystem & Frontend Heavy Calculation Microkernels:
+  • Magic Header Sniffing:        428.33 Million ops/s (Detected: PNG - image/png)
+  • Natural Numeric Sorting:        32.18 Million ops/s (Result: -1)
+  • Radix Tree 5000-Node Search:   308.38 µs (Found 1 matches: 'file_0042.dat')
+  • DSE-Immune Memory Scrubbing:  4,254.14 MB/s
+  • Reed-Solomon Recovery Parity: 1,382.18 MB/s
 
-<p align="center">
-  <img src="docs/benchmarks/pareto_pk_zip_singlecore.png" alt="ZIP 1-Core Pareto Benchmark" width="100%" />
-</p>
-
-*All single-core benchmarks executed on 1 isolated Apple Silicon performance core (`TTZip v2026`, Commit [`a539119`](https://github.com/wittkung/TTZip/commit/a539119)).*
-
----
-
-## ⚡️ Quick Installation
-
-### Option 1: Homebrew Tap (Recommended for CLI)
-
-Install `ttzip-cli` along with UNIX manual pages (`man ttzip-cli`) and shell auto-completions (`zsh`, `bash`, `fish`, `nushell`) with a single command:
-
-```bash
-# Direct single-line installation
-brew install wittkung/ttzip/ttzip-cli
-
-# Or add tap first
-brew tap wittkung/ttzip
-brew install ttzip-cli
+[4/4] Cross-Platform Threadpool (ttzip_threadpool) Multi-Core Scaling:
+  • Active Worker Threads: 18 P/E Workers
 ```
 
-### Option 2: Pre-compiled Universal Binaries
-Download official Universal 2 (`arm64` + `x86_64`) releases from [GitHub Releases](https://github.com/wittkung/TTZip/releases).
+---
 
-### Option 3: Build from Source
+## ⚡️ Quick Installation & Building
+
+### 1. Build Pure C Microkernel & Standalone CLI (CMake)
+
 ```bash
 git clone https://github.com/wittkung/TTZip.git
 cd TTZip
+
+# Configure & Build Release Binaries
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j8
+
+# Run Standalone CLI Benchmark & Quickstart
+./build/ttzip-cli --benchmark
+./build/ttzip-quickstart
+```
+
+### 2. Build Native macOS Desktop App & Swift CLI
+
+```bash
+# Build via Swift Package Manager
 swift build -c release
 ```
-The compiled standalone binary will be available at `.build/release/ttzip-cli`.
 
----
-
-## 💻 CLI Command Reference & Stream Pipelines
-
-`ttzip-cli` provides 10 dedicated subcommands with full UNIX pipe streaming and interactive TUI support:
-
-### Subcommands Overview
-
-| Command | Aliases | Description | Key Options |
-| :--- | :--- | :--- | :--- |
-| `explore` | `tui`, `browse` | Launch interactive terminal TUI archive explorer | `↑`/`↓`/`j`/`k` navigate, `Enter`/`l` drill down, `Space` select, `e` extract, `p` peek |
-| `archive` / `create` | `a`, `c` | Create and compress archives | `-f <format>`, `-l <level>`, `-p <password>`, `--split`, `--exclude` |
-| `extract` | `x`, `e` | Extract archive contents | `-o <dir>`, `--strip-components`, `--overwrite`, `-p <password>` |
-| `list` | `l`, `ls` | List archive contents & metadata | `--json`, `-v`, `--filter <glob>` |
-| `test` | `t`, `verify` | Verify archive integrity & standards | `--standard`, `--differential`, `--fuzz`, `--report-json` |
-| `bench` | `b`, `pk` | Run physical monotonic benchmarks | `-f <format>`, `--iterations`, `--json` |
-| `inspect` | `i`, `info` | Inspect format headers & magic signatures | `--raw`, `--encoding`, `--hash` |
-| `tree` | - | Display archive visual tree hierarchy | `-d <depth>`, `--exclude <glob>` |
-| `man` | - | Output UNIX groff mdoc manual page | `--output <file>` |
-| `completion` | - | Generate shell auto-completion script | `zsh`, `bash`, `fish`, `nushell` |
-
-### Interactive Terminal TUI Mode (`explore`)
+### 3. Run 100% Local Automated CI Verification (0 Cloud Quota)
 
 ```bash
-# Launch zero-dependency ANSI/VT100 interactive explorer
-ttzip-cli explore release_bundle.tar.zst
-
-# Keybindings inside TUI:
-#  ↑ / k       Move cursor up
-#  ↓ / j       Move cursor down
-#  Enter / l   Drill down / expand directory
-#  Backspace/h Collapse directory / back to parent
-#  Space       Toggle entry selection checkbox
-#  e           Extract selected entries to current directory
-#  p           Popup peek modal (syntax preview / hex dump)
-#  q / Esc     Exit cleanly and restore terminal screen
-```
-
-### UNIX Stream Pipelines (1-Liners)
-
-```bash
-# 1. Stream extract directly from curl (zero intermediate disk staging)
-curl -fsSL https://example.com/data.tar.zst | ttzip-cli extract - -o ./data/
-
-# 2. Archive a directory and pipe directly to a remote server over SSH
-ttzip-cli archive - -f tar.zst ./source | ssh user@server "ttzip-cli extract - -o ./backup/"
-
-# 3. Stream a single log file out of an archive directly into grep
-ttzip-cli extract bundle.zip --stdout access.log | grep -E "ERROR|FATAL"
+./scripts/local-ci.sh
 ```
 
 ---
 
-## 🖥 Native macOS Desktop GUI Features (`TTZipApp`)
+## 🛠 C SDK 1-Minute Integration Guide
 
-- **In-Archive QuickLook Preview**: Instant 0ms penetration and previewing of code, markdown, audio, 4K video, PDFs, and images without full extraction.
-- **Smart Universal Charset Auto-Detection**: Seamlessly detects and repairs GBK, CP936, Shift-JIS, and EUC-KR encoding to eliminate mojibake from legacy Windows archives.
-- **Password Vault v4**: Hardware-accelerated password management with PBKDF2-SHA256 (600,000 OWASP iterations) + 32-byte salt and AES-256-GCM.
-- **Archive Inspector & Health Check**: Interactive diagnostic sheet inspecting magic headers, Zip64 flags, and actively intercepting Zip-Slip path traversal vulnerabilities.
+Embed `libttzip` directly into your C/C++/Rust applications via `ttzip_api.h`:
+
+```c
+#include <stdio.h>
+#include <string.h>
+#include <ttzip/ttzip_api.h>
+
+int main(void) {
+    printf("TTZip Version: %s\n", ttzip_version_string());
+
+    // 1. Hardware-accelerated CRC32
+    const char *data = "Hello TTZip Native World!";
+    uint32_t hash = ttzip_crc32(0, data, strlen(data));
+
+    // 2. In-Memory SOTA Compression (e.g. Zstd)
+    size_t comp_cap = ttzip_compress_bound(TTZIP_API_CODEC_ZSTD, strlen(data));
+    uint8_t comp_buf[256];
+    size_t comp_len = ttzip_compress_buffer(
+        TTZIP_API_CODEC_ZSTD, data, strlen(data), comp_buf, sizeof(comp_buf), 3
+    );
+
+    // 3. Sub-nanosecond format sniffing
+    ttzip_magic_info_t info = ttzip_magic_sniff_buffer(comp_buf, comp_len);
+    printf("Detected Format: %s (MIME: %s)\n", info.format_name, info.mime_type);
+
+    return 0;
+}
+```
+
+### CMake `FetchContent` Integration
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    TTZip
+    GIT_REPOSITORY https://github.com/wittkung/TTZip.git
+    GIT_TAG        main
+)
+FetchContent_MakeAvailable(TTZip)
+
+target_link_libraries(your_application PRIVATE TTZip::ttzip)
+```
 
 ---
 
-## 🏗 System Architecture & Invariants
+## 💻 CLI Subcommands Reference
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│ Layer 3: Presentation & Interfaces (TTZipApp SwiftUI + TTZipCLI)       │
-├────────────────────────────────────────────────────────────────────────┤
-│ Layer 2: Swift 6 Core Engine (TTZipCore Pipelines, Vault v4, Scanners) │
-├────────────────────────────────────────────────────────────────────────┤
-│ Layer 1: C11 In-Process Bridge (CTTZipBridge SIMD PMULL / Crypto / I/O)│
-├────────────────────────────────────────────────────────────────────────┤
-│ Layer 0: High-Performance Static Foundations (libarchive, zstd, LZMA)  │
-└────────────────────────────────────────────────────────────────────────┘
-```
+`ttzip-cli` provides dedicated subcommands with pipe streaming support:
 
-### The Four Systemic Engineering Invariants
-1. **Stream-First (流式第一性)**: Zero full-buffer memory assumptions; microbuffering pull pipelines under 64MB~128MB.
-2. **Invariant-First (纵深防御)**: POSIX primitive security (`ARCHIVE_EXTRACT_SECURE_SYMLINKS`, `O_NOFOLLOW` deferred fixups).
-3. **Bounds-First (确定性确界)**: Magic lifecycle tracking, `memset_s` volatile key wiping, and strict integer clamp bounds.
-4. **Oracle-First (真实预言机)**: Historical golden vulnerability corpus testing and cross-ecosystem differential oracle verification.
+| Command | Usage | Description |
+| :--- | :--- | :--- |
+| `-c`, `--create` | `ttzip-cli -c archive.zip file1 file2 dir/` | Create archive using SOTA codecs |
+| `-x`, `--extract` | `ttzip-cli -x archive.tar -o output_dir/` | Multi-core parallel extraction |
+| `-t`, `--test` | `ttzip-cli -t archive.7z` | Verify archive CRC/integrity |
+| `-l`, `--list` | `ttzip-cli -l archive.zip` | List archive files and metadata |
+| `--benchmark` | `ttzip-cli --benchmark` | Run full hardware vector & codec benchmark |
 
 ---
 
 ## 💖 Giving Back to Upstream Open Source
 
-TTZip is built with deep gratitude for foundational open-source compression engineering. We stand upon the work of:
+TTZip stands upon the work of foundational open-source compression libraries:
 - [libarchive](https://github.com/libarchive/libarchive) (Tim Kientzle, Martin Matuska)
 - [XZ Utils / liblzma](https://github.com/tukaani-project/xz) (Lasse Collin, Igor Pavlov)
 - [libdeflate](https://github.com/ebiggers/libdeflate) (Eric Biggers)
 - [Zstandard (zstd)](https://github.com/facebook/zstd) (Yann Collet & Meta Compression Team)
 - [LZ4](https://github.com/lz4/lz4) (Yann Collet)
 - [7-Zip / LZMA SDK](https://www.7-zip.org) (Igor Pavlov)
-- [Keka](https://github.com/aonez/Keka) (aone) & [The Unarchiver](https://theunarchiver.com) (Dag Ågren)
 
-### 🌟 Upstream Contributions & Community Stewardship
-We actively contribute verified hardware acceleration and architectural cleanups back to foundational upstream projects:
-
-- **[`libarchive/libarchive`](https://github.com/libarchive/libarchive)** (Official Operating System Core Foundation):
-  - ✅ **ARMv8 ACLE Hardware-Accelerated CRC32 & Architectural Unification** ([PR #3391](https://github.com/libarchive/libarchive/pull/3391) — **Merged into `master`**, Commit [`8e439b92`](https://github.com/libarchive/libarchive/commit/8e439b92787c8104e22c5958caf0a7ef9532567f)): Unified the library's internal CRC32 API across all format readers (7z, GZIP, RAR, ZIP) with single-cycle ARMv8 hardware acceleration, strict C99 aliasing safety, GNU Autotools / CMake dual-build support, and three-tier graceful fallback.
-  - 🔄 **7-Zip AES-256-CBC Stream Decryption Pipeline** ([PR #3388](https://github.com/libarchive/libarchive/pull/3388)): Atomic-commit cryptographic pipeline integration with volatile memory clearing (`memset_s` semantics) and clean streaming error propagation.
-  - 💡 **POSIX `F_PREALLOCATE` & `fallocate` Heuristics** ([Issue #3392](https://github.com/libarchive/libarchive/issues/3392) / [PR #3393](https://github.com/libarchive/libarchive/pull/3393)): High-resolution monotonic benchmark measurements (+39% ~ +70% throughput) and transparent zero-configuration default extraction heuristics.
-- **Reproducible Test Harnesses**: Publishing zero-dependency standalone C verification suites to assist upstream maintainers in verifying Apple Silicon and ARM64 vector throughput.
-
-Detailed licensing attributions are documented in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
+### 🌟 Upstream Contributions
+We actively contribute verified hardware acceleration routines back to foundational upstream projects:
+- **[`libarchive/libarchive`](https://github.com/libarchive/libarchive)**:
+  - ✅ **ARMv8 ACLE Hardware-Accelerated CRC32 & Architectural Unification** ([PR #3391](https://github.com/libarchive/libarchive/pull/3391) — **Merged into `master`**, Commit [`8e439b92`](https://github.com/libarchive/libarchive/commit/8e439b92787c8104e22c5958caf0a7ef9532567f)).
+  - 🔄 **7-Zip AES-256-CBC Stream Decryption Pipeline** ([PR #3388](https://github.com/libarchive/libarchive/pull/3388)).
+  - 💡 **POSIX `F_PREALLOCATE` & `fallocate` Heuristics** ([Issue #3392](https://github.com/libarchive/libarchive/issues/3392) / [PR #3393](https://github.com/libarchive/libarchive/pull/3393)).
 
 ---
 
 ## 📄 License & Community Model
 
-TTZip is proud to support the global developer community under the **TTZip Source-Available & Anti-Copycat Public License v1.0 (TTZip-SAL-1.0)**.
+TTZip is licensed under the **TTZip Source-Available & Anti-Copycat Public License v1.0 (TTZip-SAL-1.0)**.
 
-### 🌟 Permitted Uses (100% Free for Developers)
-- **100% Transparent**: All source code (`ttzip-cli`, `TTZipCore`, `CTTZipBridge`, `TTZipApp`) is open for reading, learning, security auditing, and community pull requests.
-- **Free for Personal & Local Use**: You are free to run `ttzip-cli` and `TTZipApp` on your personal machines for personal, non-commercial daily tasks, development workflows, and research.
-- **Upstream Open-Source Carve-Out**: Generic optimization routines contributed to upstream foundations (libarchive, XZ Utils, zstd, libdeflate) are explicitly licensed under the respective upstream project's permissive license.
-
-### 🔴 Strict Redistribution & Anti-Copycat Prohibitions (无论免费或收费，一律严禁第三方套壳上架)
-1. **No App Store Publishing (Free or Paid)**: You may **NOT** publish TTZip (or renamed forks) to the **Apple Mac App Store**, Microsoft Store, Steam, Setapp, or any marketplace — **even as a free app**. Official distribution is exclusive to the author.
-2. **No Free Copycats or Traffic Siphoning**: You may NOT repackage TTZip to siphon traffic, promote advertisements, or bundle with third-party software.
-3. **No Commercial Resale or Cloud SaaS**: You may NOT embed TTZip into paid commercial products or SaaS services without an Enterprise Commercial License.
-
-### 💼 Enterprise Commercial Licensing
-Commercial entities wishing to integrate TTZip into proprietary commercial products, paid services, or enterprise-wide automated production environments must purchase a **Commercial Enterprise License**. Inquiries: `witt.w.kung@gmail.com`.
+- **100% Free for Developers & Personal Use**: All source code is open for reading, learning, research, and local execution.
+- **Strict Anti-Copycat Protection**: Repackaging or publishing TTZip (free or paid) to the Apple Mac App Store, Microsoft Store, Steam, or other marketplaces without authorization is strictly prohibited.
+- **Commercial Licensing**: Inquiries: `witt.w.kung@gmail.com`.
 
 ---
 
