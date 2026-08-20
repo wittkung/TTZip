@@ -57,7 +57,9 @@ let package = Package(
                 .linkedLibrary("iconv"),
                 .linkedLibrary("xml2"),
                 .linkedLibrary("expat"),
-                .linkedLibrary("c++")
+                .linkedLibrary("c++"),
+                .linkedLibrary("compression"),
+                .linkedFramework("Security")
             ]
         ),
         .target(

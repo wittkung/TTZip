@@ -15,12 +15,13 @@ Icon?
 .Trashes
 
 # ------------------------------------------------------------------------------
-# 2. SwiftPM & Xcode Build Outputs
+# 2. SwiftPM, Rust & Xcode Build Outputs
 # ------------------------------------------------------------------------------
 .build/
 .build_*/
 build/
 build_*/
+rust/target/
 dist/
 build_dist/
 build_app/

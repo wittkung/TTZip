@@ -147,8 +147,12 @@ typedef int64_t ttzip_off_t;
  * 5. Status Codes (Libarchive 6-Level Hierarchy)
  * ============================================================================ */
 
+#ifndef TTZIP_STATUS_EOF
 #define TTZIP_STATUS_EOF          1   /**< End of Archive */
+#endif
+#ifndef TTZIP_STATUS_OK
 #define TTZIP_STATUS_OK           0   /**< Success */
+#endif
 #define TTZIP_STATUS_RETRY     (-10)  /**< Transient Retry */
 #define TTZIP_STATUS_WARN      (-20)  /**< Recoverable Warning */
 #define TTZIP_STATUS_FAILED    (-25)  /**< Item Error (Recoverable) */

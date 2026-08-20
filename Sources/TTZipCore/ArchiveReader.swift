@@ -89,6 +89,34 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                     CUnsafeBufferAdapter.withCString(targetInspectPath) { pathPtr in
                         CUnsafeBufferAdapter.withCString(pwd) { pwdPtr in
                             guard let pathPtr = pathPtr else { return Int32(-1) }
+                            let rustStatus = ttzip_rust_inspect_archive(pathPtr, pwdPtr, true, { entryPtr, ctx in
+                                guard let entryPtr = entryPtr, let ctx = ctx else { return false }
+                                let acc = Unmanaged<EntryAccumulator>.fromOpaque(ctx).takeUnretainedValue()
+                                let meta = entryPtr.pointee
+                                guard let cPathname = meta.path else { return true }
+                                let rawLen = strlen(cPathname)
+                                let pathData = Data(bytes: cPathname, count: rawLen)
+                                let sanitizedPath = CharsetDetector.sanitizeFilename(bytes: pathData)
+                                let detectedCharset = CharsetDetector.detectCharset(data: pathData)
+                                let lastComp = (sanitizedPath as NSString).lastPathComponent
+                                if lastComp.hasPrefix("._") || lastComp == ".DS_Store" || sanitizedPath.hasPrefix("PaxHeader") || sanitizedPath.contains("/PaxHeader") {
+                                    return true
+                                }
+                                let entry = ArchiveEntry(
+                                    path: sanitizedPath,
+                                    uncompressedSize: Int64(meta.uncompressed_size),
+                                    isDirectory: meta.is_directory,
+                                    detectedEncoding: detectedCharset,
+                                    isEncrypted: meta.is_encrypted,
+                                    isDataEncrypted: meta.is_encrypted,
+                                    isMetadataEncrypted: false
+                                )
+                                acc.entries.append(entry)
+                                return true
+                            }, contextPtr)
+                            if rustStatus == TTZIP_STATUS_OK && !accumulator.entries.isEmpty {
+                                return Int32(0)
+                            }
                             return ttzip_inspect_archive_v2(pathPtr, pwdPtr, contextPtr) { ctx, cPathname, size, isDir, isDataEnc, isMetaEnc in
                                 guard let ctx = ctx, let cPathname = cPathname else { return }
                                 let acc = Unmanaged<EntryAccumulator>.fromOpaque(ctx).takeUnretainedValue()

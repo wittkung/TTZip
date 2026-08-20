@@ -33,6 +33,7 @@ module CTTZipBridge {
     header "ttzip_container_fast.h"
     header "CTTZipDiagnostics.h"
     header "CTTZipDeflateEngine.h"
+    header "ttzip_rust_glue.h"
     export *
 }
 

@@ -81,6 +81,20 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
                 CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
                     CUnsafeBufferAdapter.withCString(pwd) { pPtr in
                         guard let aPtr = aPtr, let dPtr = dPtr else { return Int32(-1) }
+                        var opt = TTZipExtractOptions(
+                            destination_path: dPtr,
+                            password: pPtr,
+                            thread_budget: 4,
+                            overwrite_existing: true,
+                            preserve_permissions: true,
+                            dry_run: false,
+                            progress_callback: nil,
+                            user_data: nil
+                        )
+                        let rStatus = ttzip_rust_extract_archive(aPtr, dPtr, &opt)
+                        if rStatus == TTZIP_STATUS_OK {
+                            return Int32(0)
+                        }
                         return ttzip_extract_archive_advanced(aPtr, dPtr, options.skipMacJunk, pPtr)
                     }
                 }

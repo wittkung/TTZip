@@ -1,0 +1,29 @@
+[package]
+name = "ttzip-glue"
+version = "0.1.0"
+edition = "2021"
+authors = ["Witt Kung <witt.w.kung@gmail.com>"]
+description = "TTZip core native glue layer implemented in Safe Rust with hardware acceleration"
+license = "LicenseRef-TTZip-Source-Available-1.0"
+
+[lib]
+name = "ttzip_glue"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+libc = "0.2"
+zeroize = { version = "1.8", features = ["zeroize_derive", "alloc"] }
+cfg-if = "1.0"
+log = "0.4"
+
+
+
+[dev-dependencies]
+hex = "0.4"
+sha2 = "0.10"
+crc32fast = "1.4"
+adler2 = "2.0"
+aes = "0.8"
+ctr = "0.9"
+cbc = "0.1"
+
