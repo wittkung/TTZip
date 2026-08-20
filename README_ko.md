@@ -132,6 +132,18 @@ int main(void) {
 
 ---
 
+## 💖 오픈소스 기여 및 환원
+
+TTZip은 오픈소스 정신에 따라 검증된 하드웨어 가속 및 아키텍처 최적화 루틴을 상위 핵심 프로젝트에 적극 기여하고 있습니다:
+- **[`libarchive/libarchive`](https://github.com/libarchive/libarchive)**:
+  - ✅ **ARMv8 ACLE 하드웨어 CRC32 가속 및 아키텍처 통합** ([PR #3391](https://github.com/libarchive/libarchive/pull/3391) — **`master` 병합 완료**, Commit [`8e439b92`](https://github.com/libarchive/libarchive/commit/8e439b92787c8104e22c5958caf0a7ef9532567f))
+  - 🔄 **7-Zip AES-256-CBC 스트리밍 복호화 파이프라인** ([PR #3388](https://github.com/libarchive/libarchive/pull/3388))
+  - 💡 **POSIX 디스크 공간 사전 할당 휴리스틱 최적화** ([PR #3393](https://github.com/libarchive/libarchive/pull/3393))
+- **[`zlib-ng/zlib-ng`](https://github.com/zlib-ng/zlib-ng)**:
+  - 🔄 **ARM64 NEON `compare256` 최장 일치 벡터화 및 I-Cache 최적화** ([PR #2416](https://github.com/zlib-ng/zlib-ng/pull/2416)): `vmaxvq_u8` 기반 슬라이딩 윈도우 패턴 비교 최적화(긴 일치 지연 시간 -19% ~ -25% 단축, 최소 I-Cache 점유율 유지).
+
+---
+
 ## 📄 라이선스 및 이용 약관
 
 TTZip은 **TTZip Source-Available & Anti-Copycat Public License v1.0 (TTZip-SAL-1.0)**에 따라 배포됩니다.

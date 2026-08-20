@@ -197,6 +197,8 @@ TTZip 秉持开源回馈精神，积极将验证过的硬件加速与架构优�
   - ✅ **ARMv8 ACLE 硬件加速 CRC32 与架构统一** ([PR #3391](https://github.com/libarchive/libarchive/pull/3391) — **已合并至 `master`**, Commit [`8e439b92`](https://github.com/libarchive/libarchive/commit/8e439b92787c8104e22c5958caf0a7ef9532567f))。
   - 🔄 **7-Zip AES-256-CBC 流式解密流水线** ([PR #3388](https://github.com/libarchive/libarchive/pull/3388))。
   - 💡 **POSIX 空间预分配启发式优化** ([PR #3393](https://github.com/libarchive/libarchive/pull/3393))。
+- **[`zlib-ng/zlib-ng`](https://github.com/zlib-ng/zlib-ng)**：
+  - 🔄 **ARM64 NEON `compare256` 最长匹配向量化与指令缓存优化** ([PR #2416](https://github.com/zlib-ng/zlib-ng/pull/2416))：利用紧凑 `vmaxvq_u8` 指令序列优化滑动窗口模式匹配（长匹配延迟降低 -19% ~ -25%，保持极低 I-Cache 占用）。
 
 ---
 

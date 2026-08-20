@@ -132,6 +132,18 @@ int main(void) {
 
 ---
 
+## 💖 オープンソースへの還元
+
+TTZip はオープンソースの理念に基づき、検証済みのハードウェア高速化とアーキテクチャ改善を主要な上流プロジェクトへ還元しています：
+- **[`libarchive/libarchive`](https://github.com/libarchive/libarchive)**:
+  - ✅ **ARMv8 ACLE ハードウェア CRC32 加速とアーキテクチャ統合** ([PR #3391](https://github.com/libarchive/libarchive/pull/3391) — **`master` にマージ済み**, Commit [`8e439b92`](https://github.com/libarchive/libarchive/commit/8e439b92787c8104e22c5958caf0a7ef9532567f))
+  - 🔄 **7-Zip AES-256-CBC ストリーム復号パイプライン** ([PR #3388](https://github.com/libarchive/libarchive/pull/3388))
+  - 💡 **POSIX 領域事前割り当てヒューリスティクス** ([PR #3393](https://github.com/libarchive/libarchive/pull/3393))
+- **[`zlib-ng/zlib-ng`](https://github.com/zlib-ng/zlib-ng)**:
+  - 🔄 **ARM64 NEON `compare256` 最長一致ベクトル化と I-Cache 最適化** ([PR #2416](https://github.com/zlib-ng/zlib-ng/pull/2416)): `vmaxvq_u8` によるスライディングウィンドウ比較の高速化（長一致レイテンシ -19%〜-25% 低減、I-Cache 占有の最小化）。
+
+---
+
 ## 📄 ライセンスと利用規約
 
 TTZip は **TTZip Source-Available & Anti-Copycat Public License v1.0 (TTZip-SAL-1.0)** に基づいて公開されています。

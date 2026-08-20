@@ -208,6 +208,8 @@ We actively contribute verified hardware acceleration routines back to foundatio
   - ✅ **ARMv8 ACLE Hardware-Accelerated CRC32 & Architectural Unification** ([PR #3391](https://github.com/libarchive/libarchive/pull/3391) — **Merged into `master`**, Commit [`8e439b92`](https://github.com/libarchive/libarchive/commit/8e439b92787c8104e22c5958caf0a7ef9532567f)).
   - 🔄 **7-Zip AES-256-CBC Stream Decryption Pipeline** ([PR #3388](https://github.com/libarchive/libarchive/pull/3388)).
   - 💡 **POSIX `F_PREALLOCATE` & `fallocate` Heuristics** ([Issue #3392](https://github.com/libarchive/libarchive/issues/3392) / [PR #3393](https://github.com/libarchive/libarchive/pull/3393)).
+- **[`zlib-ng/zlib-ng`](https://github.com/zlib-ng/zlib-ng)**:
+  - 🔄 **ARM64 NEON `compare256` Longest Match Vectorization & I-Cache Optimization** ([PR #2416](https://github.com/zlib-ng/zlib-ng/pull/2416)): Optimized NEON sliding window pattern comparison with compact `vmaxvq_u8` instruction sequences (-19% ~ -25% latency reduction on long matches, minimal I-cache footprint).
 
 ---
 
