@@ -1,4 +1,9 @@
-# TTZip ⚡️
+<p align="center">
+  <a href="README.md"><strong>English</strong></a> |
+  <a href="README_zh.md">简体中文</a> |
+  <a href="README_ja.md">日本語</a> |
+  <a href="README_ko.md">한국어</a>
+</p>
 
 <p align="center">
   <img src="logo/AppIcon.png" alt="TTZip Logo" width="128" height="128" />
