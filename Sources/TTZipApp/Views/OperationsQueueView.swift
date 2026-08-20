@@ -10,6 +10,7 @@ import TTZipCore
 
 /// Real-time multi-task operations management window with live throughput telemetry and controls.
 public struct OperationsQueueView: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     @StateObject private var viewModel = OperationsQueueViewModel()
     @Environment(\.dismiss) private var dismiss
     
@@ -20,9 +21,9 @@ public struct OperationsQueueView: View {
             // Header Stats
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Operations Queue")
+                    Text(l10n.t(L10n.Queue.title))
                         .font(.title2.bold())
-                    Text("\(viewModel.activeTasksCount) active tasks · \(String(format: "%.1f MB/s", viewModel.overallThroughputMBs))")
+                    Text("\(viewModel.activeTasksCount) " + l10n.t(L10n.Queue.activeTasks) + " · " + l10n.formatThroughput(viewModel.overallThroughputMBs))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -44,7 +45,7 @@ public struct OperationsQueueView: View {
                     Image(systemName: "tray")
                         .font(.system(size: 40))
                         .foregroundColor(.secondary)
-                    Text("No operations in queue")
+                    Text(l10n.t(L10n.Queue.emptyQueue))
                         .font(.headline)
                         .foregroundColor(.secondary)
                 }
@@ -65,7 +66,7 @@ public struct OperationsQueueView: View {
             
             HStack {
                 Spacer()
-                Button("Close") {
+                Button(l10n.t(L10n.Common.close)) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)

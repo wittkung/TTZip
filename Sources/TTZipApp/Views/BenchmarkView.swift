@@ -10,6 +10,7 @@ import TTZipCore
 
 /// Benchmark command center view.
 public struct BenchmarkView: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     @StateObject private var viewModel = BenchmarkViewModel()
     
     public init() {}
@@ -18,11 +19,11 @@ public struct BenchmarkView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("BENCHMARK MATRIX")
+                    Text(l10n.t(L10n.Benchmark.benchmarkMatrixTitle))
                         .font(.system(size: 9, weight: .bold, design: .serif))
                         .tracking(2)
                         .foregroundStyle(TTZipTheme.kintsugiGold)
-                    Text("Performance & Benchmarks")
+                    Text(l10n.t(L10n.Sidebar.benchmark))
                         .font(.system(size: 16, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                 }
@@ -33,7 +34,7 @@ public struct BenchmarkView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 11, weight: .bold))
-                        Text(viewModel.isRunning ? "Benchmarking..." : "Run Suite (⌘R)")
+                        Text(viewModel.isRunning ? l10n.t(L10n.Common.processing) : l10n.t(L10n.Benchmark.benchmarkSuiteShortcut))
                             .font(.system(size: 11, weight: .bold))
                     }
                     .foregroundStyle(.white)

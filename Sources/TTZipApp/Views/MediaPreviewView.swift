@@ -14,6 +14,7 @@ import TTZipCore
 
 /// Media preview router and container view for native formats.
 public struct MediaPreviewView: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     let fileURL: URL?
     let fileName: String
     
@@ -66,7 +67,7 @@ public struct MediaPreviewView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.system(size: 11, weight: .bold))
-                        Text("Full Screen")
+                        Text(l10n.t(L10n.Preview.fullScreen))
                             .font(.system(size: 11, weight: .bold))
                     }
                     .foregroundStyle(.white)
@@ -131,7 +132,7 @@ public struct MediaPreviewView: View {
                         HStack(spacing: 5) {
                             Image(systemName: "xmark")
                                 .font(.system(size: 12, weight: .bold))
-                            Text("Exit Full Screen (Esc)")
+                            Text(l10n.t(L10n.Preview.exitFullScreen) + " (Esc)")
                                 .font(.system(size: 12, weight: .bold))
                         }
                         .foregroundStyle(.white)

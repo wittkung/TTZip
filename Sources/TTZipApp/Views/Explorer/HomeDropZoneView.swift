@@ -10,6 +10,7 @@ import TTZipCore
 
 /// Home drop zone view for drag-and-drop file processing.
 public struct HomeDropZoneView: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     @ObservedObject public var viewModel: AppViewState
     @Binding public var isDropTargeted: Bool
     let pickAndOpenArchive: () -> Void
@@ -59,11 +60,11 @@ public struct HomeDropZoneView: View {
             }
             
             VStack(spacing: 4) {
-                Text(isDropTargeted ? "Release to Process" : "Drop files or archives here")
+                Text(l10n.t(L10n.Explorer.dragDropPrompt))
                     .font(.system(size: 17, weight: .medium, design: .serif))
                     .foregroundStyle(.primary)
                 
-                Text("Supports fast extraction and compression for 7Z, ZIP, RAR, TAR.ZST, etc.")
+                Text(l10n.t(L10n.Sidebar.zeroCopyAcceleration))
                     .font(TTZipTheme.Typography.callout)
                     .foregroundStyle(.secondary)
             }
@@ -71,7 +72,7 @@ public struct HomeDropZoneView: View {
             VStack(spacing: 10) {
                 HStack(spacing: TTZipTheme.Spacing.md) {
                     Button(action: pickAndOpenArchive) {
-                        Label("Browse", systemImage: "folder.badge.plus")
+                        Label(l10n.t(L10n.Menu.openArchive), systemImage: "folder.badge.plus")
                             .font(.system(size: 13, weight: .medium))
                             .padding(.horizontal, TTZipTheme.Spacing.md)
                             .padding(.vertical, 7)
@@ -86,7 +87,7 @@ public struct HomeDropZoneView: View {
                     .clipShape(Capsule())
                     
                     Button(action: { withAnimation { viewModel.openCompressWorkspace() } }) {
-                        Label("New Archive", systemImage: "archivebox")
+                        Label(l10n.t(L10n.Menu.newArchiveMenu), systemImage: "archivebox")
                             .font(.system(size: 13, weight: .medium))
                             .padding(.horizontal, TTZipTheme.Spacing.md)
                             .padding(.vertical, 7)

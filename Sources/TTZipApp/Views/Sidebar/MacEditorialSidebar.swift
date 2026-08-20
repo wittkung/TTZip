@@ -10,12 +10,12 @@ import TTZipCore
 
 /// Editorial style sidebar (WSJ Editorial Sidebar).
 public struct MacEditorialSidebar: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     @Binding public var activeTab: WorkspaceTab
     public let currentArchivePath: String?
     public var isCompact: Bool = false
     
     private let tuner = AppleSiliconTuner.shared
-    private let formattedDate = Date().formatted(.dateTime.year().month(.wide).day())
     
     public init(activeTab: Binding<WorkspaceTab>, currentArchivePath: String?, isCompact: Bool = false) {
         self._activeTab = activeTab
@@ -44,7 +44,7 @@ public struct MacEditorialSidebar: View {
                             Text("TTZIP")
                                 .font(.system(size: 18, weight: .bold, design: .serif))
                                 .tracking(1.5)
-                            Text("PRO")
+                            Text(l10n.t(L10n.Sidebar.proBadge))
                                 .font(.system(size: 10, weight: .heavy, design: .serif))
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1.5)
@@ -83,7 +83,7 @@ public struct MacEditorialSidebar: View {
             
             VStack(alignment: isCompact ? .center : .leading, spacing: 6) {
                 if !isCompact {
-                    Text("INDEX")
+                    Text(l10n.t(L10n.Sidebar.indexHeader))
                         .font(.system(size: 10, weight: .bold, design: .serif))
                         .tracking(2)
                         .foregroundStyle(.secondary)
@@ -91,17 +91,17 @@ public struct MacEditorialSidebar: View {
                         .padding(.bottom, 6)
                 }
                 
-                SidebarItemView(title: "Home & Extract", icon: "archivebox", tab: .home, activeTab: $activeTab, isCompact: isCompact)
-                SidebarItemView(title: "New Archive", icon: "doc.badge.plus", tab: .compressWorkspace, activeTab: $activeTab, isCompact: isCompact)
-                SidebarItemView(title: "Presets", icon: "slider.horizontal.3", tab: .presets, activeTab: $activeTab, isCompact: isCompact)
-                SidebarItemView(title: "Benchmark", icon: "speedometer", tab: .benchmark, activeTab: $activeTab, isCompact: isCompact)
-                SidebarItemView(title: "Password Vault", icon: "key.fill", tab: .vault, activeTab: $activeTab, isCompact: isCompact)
-                SidebarItemView(title: "Licensing", icon: "checkmark.seal.fill", tab: .settings, activeTab: $activeTab, isCompact: isCompact)
+                SidebarItemView(title: l10n.t(L10n.Sidebar.homeAndExtract), icon: "archivebox", tab: .home, activeTab: $activeTab, isCompact: isCompact)
+                SidebarItemView(title: l10n.t(L10n.Sidebar.newArchive), icon: "doc.badge.plus", tab: .compressWorkspace, activeTab: $activeTab, isCompact: isCompact)
+                SidebarItemView(title: l10n.t(L10n.Sidebar.presets), icon: "slider.horizontal.3", tab: .presets, activeTab: $activeTab, isCompact: isCompact)
+                SidebarItemView(title: l10n.t(L10n.Sidebar.benchmark), icon: "speedometer", tab: .benchmark, activeTab: $activeTab, isCompact: isCompact)
+                SidebarItemView(title: l10n.t(L10n.Sidebar.vault), icon: "key.fill", tab: .vault, activeTab: $activeTab, isCompact: isCompact)
+                SidebarItemView(title: l10n.t(L10n.Sidebar.licensing), icon: "checkmark.seal.fill", tab: .settings, activeTab: $activeTab, isCompact: isCompact)
             }
             
             if !isCompact, let path = currentArchivePath {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("OPEN ARCHIVE")
+                    Text(l10n.t(L10n.Sidebar.openArchiveHeader))
                         .font(.system(size: 9, weight: .bold, design: .serif))
                         .tracking(1.5)
                         .foregroundStyle(.secondary)
@@ -127,7 +127,7 @@ public struct MacEditorialSidebar: View {
                             .font(.system(size: 11, weight: .bold, design: .serif))
                             .foregroundStyle(.primary)
                     }
-                    Text("\(tuner.topology.totalCores) Cores · \(String(format: "%.0f", tuner.topology.unifiedMemoryGB))GB RAM")
+                    Text(l10n.format(L10n.Benchmark.hardwareCoresFormat, tuner.topology.totalCores, tuner.topology.performanceCores, tuner.topology.efficiencyCores) + " · " + l10n.format(L10n.Benchmark.hardwareMemoryFormat, tuner.topology.unifiedMemoryGB))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     
@@ -135,7 +135,7 @@ public struct MacEditorialSidebar: View {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 9))
                             .foregroundStyle(TTZipTheme.bambooGreen)
-                        Text("Zero-copy fast acceleration")
+                        Text(l10n.t(L10n.Sidebar.zeroCopyAcceleration))
                             .font(.system(size: 9, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
@@ -149,10 +149,10 @@ public struct MacEditorialSidebar: View {
                         .frame(height: 0.5)
                         .padding(.bottom, 12)
                     
-                    Text(formattedDate)
+                    Text(l10n.formatDate(Date()))
                         .font(.system(size: 11, design: .serif))
                         .foregroundStyle(.primary.opacity(0.8))
-                    Text("PRINTED IN macOS")
+                    Text(l10n.t(L10n.Sidebar.printedInMacOS))
                         .font(.system(size: 9, weight: .bold, design: .serif))
                         .tracking(1)
                         .foregroundStyle(.secondary)

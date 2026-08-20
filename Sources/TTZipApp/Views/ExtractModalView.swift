@@ -31,6 +31,7 @@ private final class ExtractModalEventObserver: ObservableObject, ArchiveEventObs
 }
 
 public struct ExtractModalView: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     public let archivePath: String
     @Binding public var isPresented: Bool
     
@@ -58,7 +59,7 @@ public struct ExtractModalView: View {
                     Image(systemName: "square.and.arrow.up.fill")
                         .font(.system(size: 14))
                         .foregroundStyle(TTZipTheme.kintsugiGold)
-                    Text("Extract Archive")
+                    Text(l10n.t(L10n.Extract.title))
                         .font(.system(size: 16, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                 }
@@ -96,12 +97,12 @@ public struct ExtractModalView: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Destination Path")
+                        Text(l10n.t(L10n.Extract.destination))
                             .font(.system(size: 10, weight: .bold, design: .serif))
                             .tracking(1)
                             .foregroundStyle(TTZipTheme.kintsugiGold)
                         HStack(spacing: 8) {
-                            TextField("Destination directory", text: $destinationDir)
+                            TextField(l10n.t(L10n.Extract.destination), text: $destinationDir)
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 12, design: .monospaced))
                                 .padding(.horizontal, 10)
@@ -113,7 +114,7 @@ public struct ExtractModalView: View {
                                         .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
                                  )
                             
-                            Button("Browse...") {
+                            Button(l10n.t(L10n.Common.chooseFolder) + "...") {
                                 pickDirectory()
                             }
                             .buttonStyle(.plain)
@@ -127,12 +128,12 @@ public struct ExtractModalView: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Password (If Encrypted)")
+                        Text(l10n.t(L10n.Extract.passwordPrompt))
                             .font(.system(size: 10, weight: .bold, design: .serif))
                             .tracking(1)
                             .foregroundStyle(TTZipTheme.kintsugiGold)
                         HStack(spacing: 8) {
-                            TTSecureTextField("Leave empty if unencrypted", text: $password)
+                            TTSecureTextField(l10n.t(L10n.Extract.enterPasswordPlaceholder), text: $password)
                                 .font(.system(size: 12, design: .monospaced))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 7)
@@ -154,7 +155,7 @@ public struct ExtractModalView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "key.fill")
                                         .font(.system(size: 10))
-                                    Text("Vault")
+                                    Text(l10n.t(L10n.Vault.title))
                                         .font(.system(size: 11, weight: .bold))
                                 }
                                 .padding(.horizontal, 12)
@@ -167,7 +168,7 @@ public struct ExtractModalView: View {
                         }
                     }
                     
-                    Toggle("Reveal in Finder when completed", isOn: $autoOpenFolder)
+                    Toggle(l10n.t(L10n.Extract.autoOpenFolder), isOn: $autoOpenFolder)
                         .font(.system(size: 12, weight: .medium))
                         .toggleStyle(.checkbox)
                 }
@@ -188,7 +189,7 @@ public struct ExtractModalView: View {
                 HStack(spacing: 12) {
                     Spacer()
                     
-                    Button("Cancel") { isPresented = false }
+                    Button(l10n.t(L10n.Common.cancel)) { isPresented = false }
                         .buttonStyle(.plain)
                         .font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 16)
@@ -202,7 +203,7 @@ public struct ExtractModalView: View {
                                 ProgressView()
                                     .controlSize(.small)
                             }
-                            Text(isExtracting ? "Extracting..." : "Start Extraction")
+                            Text(isExtracting ? l10n.t(L10n.Common.processing) : l10n.t(L10n.Extract.action))
                                 .font(.system(size: 12, weight: .bold))
                         }
                         .padding(.horizontal, 18)
@@ -227,7 +228,7 @@ public struct ExtractModalView: View {
     }
     
     private func pickDirectory() {
-        if let path = SystemDialogHelper.pickDirectory(prompt: "Select extraction destination folder", defaultPath: destinationDir) {
+        if let path = SystemDialogHelper.pickDirectory(prompt: l10n.t(L10n.Common.selectDestination), defaultPath: destinationDir) {
             destinationDir = path
         }
     }

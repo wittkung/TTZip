@@ -16,19 +16,19 @@ extension ArchiveError {
         case .fileNotFound:
             return manager.string(for: L10n.Errors.fileNotFound, language: language)
         case .readFailed(let code):
-            let template = manager.string(for: L10n.Errors.corruptedHeader, language: language)
+            let template = manager.string(for: L10n.Errors.readError, language: language)
             return "\(template) (Code: \(code))"
         case .invalidFormat:
-            return manager.string(for: L10n.Archive.unsupportedFormat, language: language)
+            return manager.string(for: L10n.Errors.unsupportedFormat, language: language)
         case .passwordRequired, .passwordRequiredDetailed:
-            return manager.string(for: L10n.Archive.passwordRequired, language: language)
+            return manager.string(for: L10n.Errors.passwordRequired, language: language)
         case .wrongPassword:
-            return manager.string(for: L10n.Archive.incorrectPassword, language: language)
+            return manager.string(for: L10n.Errors.incorrectPassword, language: language)
         case .unsupportedEncryptionMethod(_, let method):
-            let template = manager.string(for: L10n.Archive.unsupportedFormat, language: language)
+            let template = manager.string(for: L10n.Errors.unsupportedFormat, language: language)
             return "\(template) [\(method)]"
         case .corruptedData(_, let entryPath):
-            let template = manager.string(for: L10n.Archive.corruptData, language: language)
+            let template = manager.string(for: L10n.Errors.corruptData, language: language)
             return "\(template): \(entryPath)"
         case .cancelled:
             return manager.string(for: L10n.Errors.operationCancelled, language: language)

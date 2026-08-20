@@ -100,8 +100,8 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
             
             let resultsBox = StateBoxResults([RawBlockBuffer?](repeating: nil, count: totalBlocks))
             
-            rawData.withUnsafeBytes { rawIn in
-                guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+            rawData.withUnsafeBytes { (rawIn: UnsafeRawBufferPointer) -> Void in
+                guard let baseAddr = rawIn.bindMemory(to: UInt8.self).baseAddress else { return }
                 let ptrBox = SendablePointerBox(pointer: baseAddr, size: rawData.count)
                 let slabBox = SendableMutablePointerBox(pointer: totalOutputSlab, size: totalBlocks * maxChunkOut)
                 ConcurrencyBridge.parallelFor(iterations: totalBlocks) { blockIdx in
@@ -136,7 +136,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                     if compSize > 0 {
                         resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: compSize))
                     } else {
-                        print("[WARNING] ExtremeBlockWriter: blockIdx \(blockIdx) failed compression, using uncompressed fallback (len: \(currentChunkSize))")
+                        TTLogger.warning("[ExtremeBlockWriter] Block \(blockIdx) compression fallback to uncompressed store (len: \(currentChunkSize))")
                         var fallbackLen: Int = 0
                         var uPos: Int = 0
                         while uPos < currentChunkSize {

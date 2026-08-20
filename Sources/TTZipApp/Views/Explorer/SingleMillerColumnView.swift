@@ -10,6 +10,7 @@ import TTZipCore
 import AppKit
 
 public struct SingleMillerColumnView: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     public let index: Int
     public let dirURL: URL
     public let selectedPath: String?
@@ -141,7 +142,7 @@ public struct SingleMillerColumnView: View {
                     LazyVStack(spacing: 2) {
                         if let items = items {
                             if items.isEmpty {
-                                Text("Empty Folder")
+                                Text(l10n.t(L10n.Explorer.emptyDirectory))
                                     .font(.system(size: 10))
                                     .foregroundStyle(.secondary)
                                     .padding(.vertical, 12)
@@ -167,7 +168,7 @@ public struct SingleMillerColumnView: View {
                             HStack(spacing: 6) {
                                 ProgressView()
                                     .controlSize(.small)
-                                Text("Loading...")
+                                Text(l10n.t(L10n.Common.loading))
                                     .font(.system(size: 10))
                                     .foregroundStyle(.secondary)
                             }
@@ -209,7 +210,7 @@ public struct SingleMillerColumnView: View {
                     Button {
                         FileClipboardStore.shared.paste(to: dirURL)
                     } label: {
-                        Label("Paste into current folder", systemImage: "doc.on.clipboard")
+                        Label(l10n.t(L10n.Common.paste), systemImage: "doc.on.clipboard")
                     }
                     .disabled(!FileClipboardStore.shared.canPaste)
                     
@@ -218,13 +219,13 @@ public struct SingleMillerColumnView: View {
                     Button {
                         onRefresh()
                     } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
+                        Label(l10n.t(L10n.Common.retry), systemImage: "arrow.clockwise")
                     }
                     
                     Button {
                         NSWorkspace.shared.selectFile(dirURL.path, inFileViewerRootedAtPath: "")
                     } label: {
-                        Label("Reveal in Finder", systemImage: "folder")
+                        Label(l10n.t(L10n.Common.revealInFinder), systemImage: "folder")
                     }
                 }
             }

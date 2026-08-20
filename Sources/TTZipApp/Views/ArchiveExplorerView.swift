@@ -18,6 +18,7 @@ public struct ArchiveExplorerView: View {
     public let onExtractClicked: () -> Void
     public let onCloseClicked: () -> Void
     
+    @ObservedObject private var l10n = AppLocalizationState.shared
     @StateObject private var treeStore = ArchiveTreeStore()
     @State private var selectedEntryID: String?
     @State private var previewFileURL: URL?
@@ -102,7 +103,7 @@ public struct ArchiveExplorerView: View {
                 .controlSize(.regular)
                 
                 Button(action: onExtractClicked) {
-                    Label("Extract to...", systemImage: "square.and.arrow.up")
+                    Label(l10n.t(L10n.Explorer.extractToPrompt), systemImage: "square.and.arrow.up")
                         .font(TTZipTheme.Typography.callout)
                         .foregroundStyle(Color.white)
                         .padding(.horizontal, TTZipTheme.Spacing.sm)
@@ -136,7 +137,7 @@ public struct ArchiveExplorerView: View {
                             VStack(spacing: 12) {
                                 ProgressView()
                                     .scaleEffect(1.1)
-                                Text("Loading archive structure...")
+                                Text(l10n.t(L10n.Explorer.loadingArchiveStructure))
                                     .font(TTZipTheme.Typography.subheadline)
                                     .foregroundStyle(.secondary)
                             }
@@ -152,7 +153,7 @@ public struct ArchiveExplorerView: View {
                         }
                     } else {
                         Table(treeStore.filteredEntries, selection: $selectedEntryID) {
-                            TableColumn("File Name (Path)") { entry in
+                            TableColumn(l10n.t(L10n.Explorer.nameHeader)) { entry in
                                 HStack(spacing: 8) {
                                     Image(systemName: fileIconName(isDirectory: entry.isDirectory, name: entry.name))
                                         .foregroundStyle(entry.isDirectory ? TTZipTheme.bambooGreen : Color.primary)
@@ -167,13 +168,13 @@ public struct ArchiveExplorerView: View {
                             }
                             .width(min: 240, ideal: 360)
                             
-                            TableColumn("Size") { entry in
+                            TableColumn(l10n.t(L10n.Explorer.sizeHeader)) { entry in
                                 Text(entry.isDirectory ? "--" : formatBytes(entry.uncompressedSize))
                                     .foregroundStyle(.secondary)
                             }
                             .width(100)
                             
-                            TableColumn("Encoding") { entry in
+                            TableColumn(l10n.t(L10n.Explorer.kindHeader)) { entry in
                                 Text(entry.detectedEncoding)
                                     .font(TTZipTheme.Typography.codeCaption)
                                     .padding(.horizontal, TTZipTheme.Spacing.xs)
@@ -198,7 +199,7 @@ public struct ArchiveExplorerView: View {
                             VStack(spacing: 16) {
                                 ProgressView()
                                     .scaleEffect(1.2)
-                                Text("Extracting preview data...")
+                                Text(l10n.t(L10n.Preview.loading))
                                     .font(TTZipTheme.Typography.subheadline)
                                     .foregroundStyle(.secondary)
                             }
@@ -206,7 +207,7 @@ public struct ArchiveExplorerView: View {
                         } else {
                             MediaPreviewView(
                                 fileURL: previewFileURL,
-                                fileName: selectedEntry?.name ?? "No file selected"
+                                fileName: selectedEntry?.name ?? l10n.t(L10n.Explorer.emptyDirectory)
                             )
                         }
                     }
@@ -227,33 +228,30 @@ public struct ArchiveExplorerView: View {
                         .font(TTZipTheme.Typography.caption)
                         .foregroundStyle(.primary)
                 } else {
-                    Text("Ready · Drag files here to add to archive")
+                    Text(l10n.t(L10n.Explorer.dragDropPrompt))
                         .font(TTZipTheme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text("Double-click / ⌥O to live edit · Delete key to remove")
-                    .font(TTZipTheme.Typography.caption)
-                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, TTZipTheme.Spacing.xl)
             .padding(.vertical, TTZipTheme.Spacing.xs)
             .background(Color.clear)
         }
-        .searchable(text: $searchText, prompt: "Search files and folders...")
+        .searchable(text: $searchText, prompt: l10n.t(L10n.Common.search))
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDropFiles(providers: providers)
             return true
         }
-        .confirmationDialog("Delete Item", isPresented: $showDeleteConfirmation, actions: {
-            Button("Delete from Archive", role: .destructive) {
+        .confirmationDialog(l10n.t(L10n.Dialogs.confirmDeleteTitle), isPresented: $showDeleteConfirmation, actions: {
+            Button(l10n.t(L10n.Common.delete), role: .destructive) {
                 if let selected = selectedEntry {
                     deleteSelectedEntry(selected)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(l10n.t(L10n.Common.cancel), role: .cancel) {}
         }, message: {
-            Text("Are you sure you want to delete '\(selectedEntry?.name ?? "")' from the archive?")
+            Text(l10n.format(L10n.Dialogs.confirmDeleteMessage, selectedEntry?.name ?? ""))
         })
         .onAppear {
             treeStore.updateEntries(entries)

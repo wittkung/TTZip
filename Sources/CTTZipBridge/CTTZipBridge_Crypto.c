@@ -553,7 +553,16 @@ int ttzip_aes256_cbc_encrypt(
 static uint8_t* convert_utf8_to_utf16le(const char* utf8, size_t* out_bytes) {
     if (!utf8) return NULL;
     size_t len = strlen(utf8);
-    uint16_t* utf16_buf = (uint16_t*)malloc(sizeof(uint16_t) * (len * 2 + 2));
+    size_t count = 0;
+    if (ttzip_mul_overflow(len, (size_t)2, &count) ||
+        ttzip_add_overflow(count, (size_t)2, &count)) {
+        return NULL;
+    }
+    size_t alloc_bytes = 0;
+    if (ttzip_mul_overflow(sizeof(uint16_t), count, &alloc_bytes)) {
+        return NULL;
+    }
+    uint16_t* utf16_buf = (uint16_t*)malloc(alloc_bytes);
     if (!utf16_buf) return NULL;
 
     size_t out_len = 0;

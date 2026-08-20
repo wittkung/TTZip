@@ -23,6 +23,7 @@ public enum AppLogoCache {
 }
 
 public struct MainView: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     @StateObject private var viewModel = AppViewState()
     @State private var isSidebarVisible: Bool = true
     @State private var isRightSidebarVisible: Bool = true
@@ -156,10 +157,10 @@ public struct MainView: View {
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
                 if viewModel.currentArchivePath != nil {
-                    Button { pickAndOpenArchive() } label: { Label("Open Archive", systemImage: "folder.badge.plus") }
+                    Button { pickAndOpenArchive() } label: { Label(l10n.t(L10n.Menu.openArchive), systemImage: "folder.badge.plus") }
                         .keyboardShortcut("o", modifiers: [.command])
                     
-                    Button { withAnimation { viewModel.openCompressWorkspace() } } label: { Label("New Archive", systemImage: "archivebox.circle") }
+                    Button { withAnimation { viewModel.openCompressWorkspace() } } label: { Label(l10n.t(L10n.Menu.newArchiveMenu), systemImage: "archivebox.circle") }
                         .keyboardShortcut("n", modifiers: [.command])
                     
                     if viewModel.activeTab == .home {
@@ -167,15 +168,15 @@ public struct MainView: View {
                             if let targetPath = viewModel.selectedDiskItem?.path ?? viewModel.currentArchivePath {
                                 Task { await viewModel.quickExtractArchive(archivePath: targetPath) }
                             } else {
-                                viewModel.statusMessage = "Select an archive item to extract"
+                                viewModel.statusMessage = l10n.t(L10n.Explorer.extractToPrompt)
                             }
-                        } label: { Label("Quick Extract", systemImage: "arrow.down.circle.fill") }
+                        } label: { Label(l10n.t(L10n.Extract.action), systemImage: "arrow.down.circle.fill") }
                         .keyboardShortcut("e", modifiers: [.command])
                         
-                        Button { viewModel.showExtractModal = true } label: { Label("Extract To...", systemImage: "slider.horizontal.3") }
+                        Button { viewModel.showExtractModal = true } label: { Label(l10n.t(L10n.Explorer.extractToPrompt), systemImage: "slider.horizontal.3") }
                         .keyboardShortcut("e", modifiers: [.option, .command])
                         
-                        Button { withAnimation { viewModel.reset() } } label: { Label("Close", systemImage: "xmark.circle") }
+                        Button { withAnimation { viewModel.reset() } } label: { Label(l10n.t(L10n.Common.close), systemImage: "xmark.circle") }
                         .keyboardShortcut("w", modifiers: [.command])
                     }
                 }
@@ -211,7 +212,7 @@ public struct MainView: View {
             if let path = notif.object as? String {
                 viewModel.pendingEncryptedPath = path
                 viewModel.showPasswordPrompt = true
-                viewModel.statusMessage = "Archive encrypted. Password required to explore contents"
+                viewModel.statusMessage = l10n.t(L10n.Errors.passwordRequired)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TTZipQuickExtractArchive"))) { notif in
@@ -235,7 +236,7 @@ public struct MainView: View {
                     Button(action: { viewModel.closeMediaPreview() }) {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.left")
-                            Text("Back")
+                            Text(l10n.t(L10n.Common.close))
                         }
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(TTZipTheme.bambooGreen)
@@ -293,11 +294,11 @@ public struct MainView: View {
             if searchService.isSearching {
                 HStack(spacing: 8) {
                     ProgressView().scaleEffect(0.7)
-                    Text("Searching...").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(l10n.t(L10n.Common.processing)).font(.system(size: 11)).foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 12)
             } else if searchService.searchResults.isEmpty {
-                Text("No matching files found").font(.system(size: 11)).foregroundStyle(.secondary).padding(.vertical, 12)
+                Text(l10n.t(L10n.Explorer.emptyDirectory)).font(.system(size: 11)).foregroundStyle(.secondary).padding(.vertical, 12)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
@@ -344,7 +345,7 @@ public struct MainView: View {
     }
     
     private func pickAndOpenArchive() {
-        if let firstPath = SystemDialogHelper.pickFiles(prompt: "Select Archive", canChooseDirectories: false, allowsMultipleSelection: false).first {
+        if let firstPath = SystemDialogHelper.pickFiles(prompt: l10n.t(L10n.Menu.openArchive), canChooseDirectories: false, allowsMultipleSelection: false).first {
             viewModel.openArchiveAsFolder(url: URL(fileURLWithPath: firstPath))
         }
     }

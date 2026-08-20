@@ -11,6 +11,7 @@ import LocalAuthentication
 
 /// Keychain and password safe vault view.
 public struct PasswordVaultView: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     @StateObject private var viewModel: PasswordVaultViewModel
     @FocusState private var isMasterPasswordFocused: Bool
     
@@ -137,7 +138,7 @@ public struct PasswordVaultView: View {
                                 .buttonStyle(.plain)
                                 
                                 Button(action: { viewModel.unlockVault() }) {
-                                    Text("Unlock")
+                                    Text(l10n.t(L10n.Vault.unlockButton))
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundStyle(Color.primary)
                                         .padding(.horizontal, 14)
@@ -195,7 +196,7 @@ public struct PasswordVaultView: View {
                                 .font(.system(size: 9, weight: .bold, design: .serif))
                                 .tracking(2)
                                 .foregroundStyle(TTZipTheme.kintsugiGold)
-                            Text("Password Vault")
+                            Text(l10n.t(L10n.Vault.title))
                                 .font(.system(size: 16, weight: .bold, design: .serif))
                                 .foregroundStyle(.primary)
                         }
@@ -219,7 +220,7 @@ public struct PasswordVaultView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "lock.fill")
                                     .font(.system(size: 10))
-                                Text("Lock Vault")
+                                Text(l10n.t(L10n.Vault.lockVault))
                                     .font(.system(size: 10.5, weight: .bold))
                             }
                             .foregroundStyle(.secondary)
@@ -234,7 +235,7 @@ public struct PasswordVaultView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "plus.circle.fill")
                                     .font(.system(size: 11, weight: .bold))
-                                Text("Add Password (⌘N)")
+                                Text(l10n.t(L10n.Vault.addPassword) + " (⌘N)")
                                     .font(.system(size: 11, weight: .bold))
                             }
                             .foregroundStyle(.white)
@@ -268,9 +269,9 @@ public struct PasswordVaultView: View {
                                 .foregroundStyle(TTZipTheme.bambooGreen.opacity(0.4))
                             
                             VStack(spacing: 4) {
-                                Text("No Saved Passwords")
+                                Text(l10n.t(L10n.Vault.emptyVault))
                                     .font(.system(size: 13, weight: .bold))
-                                Text("Click [Add Password] to save credentials")
+                                Text(l10n.t(L10n.Vault.noPasswordsSavedPrompt))
                                     .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                             }

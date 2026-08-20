@@ -10,6 +10,7 @@ import TTZipCore
 
 /// Preset workspace central configuration view.
 public struct PresetWorkspaceView: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     @StateObject private var viewModel: PresetWorkspaceViewModel
     
     public init(viewModel: PresetWorkspaceViewModel = PresetWorkspaceViewModel()) {
@@ -31,7 +32,7 @@ public struct PresetWorkspaceView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("PRO CONFIGURATION")
+                            Text(l10n.t(L10n.Presets.proConfig))
                                 .font(.system(size: 9, weight: .bold, design: .serif))
                                 .tracking(2)
                                 .foregroundStyle(TTZipTheme.kintsugiGold)
@@ -45,7 +46,7 @@ public struct PresetWorkspaceView: View {
                             Button(action: { viewModel.undoDraft() }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "arrow.uturn.backward.circle")
-                                    Text("Undo (⌘Z)")
+                                    Text(l10n.t(L10n.Presets.undo) + " (⌘Z)")
                                 }
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(viewModel.canUndoDraft ? TTZipTheme.kintsugiGold : Color.gray)
@@ -60,7 +61,7 @@ public struct PresetWorkspaceView: View {
                             Button(action: { viewModel.redoDraft() }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "arrow.uturn.forward.circle")
-                                    Text("Redo (⇧⌘Z)")
+                                    Text(l10n.t(L10n.Presets.redo) + " (⇧⌘Z)")
                                 }
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(viewModel.canRedoDraft ? TTZipTheme.kintsugiGold : Color.gray)
@@ -75,7 +76,7 @@ public struct PresetWorkspaceView: View {
                             Button(action: { viewModel.discardDraft() }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "xmark.circle")
-                                    Text("Discard")
+                                    Text(l10n.t(L10n.Common.cancel))
                                 }
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(TTZipTheme.cinnabarRed)
@@ -98,10 +99,10 @@ public struct PresetWorkspaceView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Preset Name")
+                                Text(l10n.t(L10n.Presets.name))
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(.secondary)
-                                TextField("Enter preset name", text: $viewModel.editorName)
+                                TextField(l10n.t(L10n.Presets.presetNamePlaceholder), text: $viewModel.editorName)
                                     .textFieldStyle(.plain)
                                     .font(.system(size: 13, weight: .medium))
                                     .padding(.horizontal, 10)
@@ -122,7 +123,7 @@ public struct PresetWorkspaceView: View {
                                 Text("Default Password (Optional)")
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(.secondary)
-                                TTSecureTextField("Leave empty for no default password", text: $viewModel.editorDefaultPassword)
+                                TTSecureTextField(l10n.t(L10n.Vault.passwordPlaceholder), text: $viewModel.editorDefaultPassword)
                                     .font(.system(size: 12.5))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
@@ -139,7 +140,7 @@ public struct PresetWorkspaceView: View {
                         Button(action: { viewModel.deleteSelectedPreset() }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "trash.fill")
-                                Text("Delete")
+                                Text(l10n.t(L10n.Common.delete))
                             }
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(TTZipTheme.cinnabarRed)
@@ -153,7 +154,7 @@ public struct PresetWorkspaceView: View {
                         Button(action: { viewModel.duplicateSelectedPreset() }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "doc.on.doc.fill")
-                                Text("Duplicate")
+                                Text(l10n.t(L10n.Presets.duplicate))
                             }
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(TTZipTheme.kintsugiGold)
@@ -177,7 +178,7 @@ public struct PresetWorkspaceView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 12, weight: .bold))
-                                Text("Save Configuration")
+                                Text(l10n.t(L10n.Presets.saveDraft))
                                     .font(.system(size: 12, weight: .bold))
                             }
                             .foregroundStyle(.white)

@@ -103,7 +103,14 @@ int ttzip_create_7z_solid_fast_c(
         }
     }
 
-    uint64_t* file_offsets = (uint64_t*)malloc(sizeof(uint64_t) * num_files);
+    size_t alloc_bytes = 0;
+    if (ttzip_mul_overflow(sizeof(uint64_t), (size_t)num_files, &alloc_bytes)) {
+        if (solid_buf) ttzip_platform_aligned_free(solid_buf);
+        free(list.entries);
+        return TTZIP_ERR_OUT_OF_MEMORY;
+    }
+
+    uint64_t* file_offsets = (uint64_t*)malloc(alloc_bytes);
     if (!file_offsets) {
         if (solid_buf) ttzip_platform_aligned_free(solid_buf);
         free(list.entries);

@@ -20,13 +20,13 @@ public struct SettingsView: View {
         
         public var id: String { rawValue }
         
-        public func displayName(isZh: Bool) -> String {
+        public var titleKey: any LocaleKeyProtocol {
             switch self {
-            case .general: return isZh ? "通用" : "General"
-            case .localization: return isZh ? "语言与单位" : "Localization"
-            case .presets: return isZh ? "默认预设" : "Presets"
-            case .vault: return isZh ? "密码保险箱" : "Vault"
-            case .license: return isZh ? "授权与硬件" : "Hardware & Pro"
+            case .general: return L10n.Settings.general
+            case .localization: return L10n.Settings.localization
+            case .presets: return L10n.Presets.title
+            case .vault: return L10n.Vault.title
+            case .license: return L10n.Settings.licenseStatus
             }
         }
         
@@ -50,10 +50,6 @@ public struct SettingsView: View {
     
     public init() {}
     
-    private var isZh: Bool {
-        l10n.currentLanguage == .zhHans || l10n.currentLanguage == .zhHant
-    }
-    
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
@@ -61,7 +57,7 @@ public struct SettingsView: View {
                     Button(action: { selectedTab = tab }) {
                         HStack(spacing: 6) {
                             Image(systemName: tab.systemImage)
-                            Text(tab.displayName(isZh: isZh))
+                            Text(l10n.t(tab.titleKey))
                         }
                         .font(TTZipTheme.Typography.caption)
                         .bold()
@@ -106,7 +102,7 @@ public struct SettingsView: View {
     @ViewBuilder
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: TTZipTheme.Spacing.md) {
-            Label(isZh ? "智能高熵直通与存储旁路 (Smart Store Bypass)" : "Smart Store Bypass", systemImage: "bolt.badge.automatic.fill")
+            Label(l10n.t(L10n.Settings.smartStoreBypass), systemImage: "bolt.badge.automatic.fill")
                 .font(TTZipTheme.Typography.sectionHeader)
                 .foregroundStyle(TTZipTheme.bambooGreen)
             
@@ -119,9 +115,9 @@ public struct SettingsView: View {
                 set: { ArchiveEntropyEvaluator.isSmartStoreBypassEnabled = $0 }
             )) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(isZh ? "自动跳过物理不可压缩极高熵数据 (实测 Shannon 熵 > 7.90)" : "Bypass incompressible high-entropy data (Shannon entropy > 7.90)")
+                    Text(l10n.t(L10n.Compress.smartStoreBypassTitle))
                         .font(TTZipTheme.Typography.bodyMedium)
-                    Text(isZh ? "基于实测字节熵动态评估。仅当实测达到物理极值（密文/随机数/无冗余预压缩块）时触发 Store 直通旁路，压缩吞吐提升高达 20x~35x。" : "Dynamically detects already-compressed and encrypted blocks to avoid wasting CPU cycles.")
+                    Text(l10n.t(L10n.Settings.bypassHighEntropyDesc))
                         .font(TTZipTheme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -133,7 +129,7 @@ public struct SettingsView: View {
     @ViewBuilder
     private var localizationSection: some View {
         VStack(alignment: .leading, spacing: TTZipTheme.Spacing.md) {
-            Label(isZh ? "界面语言与度量单位" : "Language & Measurement Units", systemImage: "globe")
+            Label(l10n.t(L10n.Settings.localization), systemImage: "globe")
                 .font(TTZipTheme.Typography.sectionHeader)
                 .foregroundStyle(TTZipTheme.bambooGreen)
             
@@ -141,9 +137,9 @@ public struct SettingsView: View {
                 .fill(TTZipTheme.hairlineBorder)
                 .frame(height: 0.5)
             
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Text(isZh ? "应用界面语言:" : "App Language:")
+                    Text(l10n.t(L10n.Settings.language) + ":")
                         .font(TTZipTheme.Typography.bodyMedium)
                     Spacer()
                     Picker("", selection: Binding(
@@ -154,10 +150,21 @@ public struct SettingsView: View {
                             Text(lang.displayName).tag(lang)
                         }
                     }
-                    .frame(width: 160)
+                    .frame(width: 180)
                 }
                 
-                Text(isZh ? "切换语言将即时生效，无需重启应用。" : "Language switch applies immediately without restarting TTZip.")
+                HStack {
+                    Text(l10n.t(L10n.Settings.byteUnits) + ":")
+                        .font(TTZipTheme.Typography.bodyMedium)
+                    Spacer()
+                    Picker("", selection: $l10n.byteUnitStandard) {
+                        Text(l10n.t(L10n.Settings.unitSI)).tag(ByteSizeStandard.metricSI)
+                        Text(l10n.t(L10n.Settings.unitIEC)).tag(ByteSizeStandard.binaryIEC)
+                    }
+                    .frame(width: 240)
+                }
+                
+                Text(l10n.t(L10n.Settings.instantSwitchNote))
                     .font(TTZipTheme.Typography.caption)
                     .foregroundStyle(.secondary)
             }
@@ -167,7 +174,7 @@ public struct SettingsView: View {
     @ViewBuilder
     private var presetsSection: some View {
         VStack(alignment: .leading, spacing: TTZipTheme.Spacing.md) {
-            Label(isZh ? "默认新建归档预设" : "Default Archive Presets", systemImage: "slider.horizontal.3")
+            Label(l10n.t(L10n.Presets.title), systemImage: "slider.horizontal.3")
                 .font(TTZipTheme.Typography.sectionHeader)
                 .foregroundStyle(TTZipTheme.bambooGreen)
             
@@ -177,7 +184,7 @@ public struct SettingsView: View {
             
             Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 12) {
                 GridRow {
-                    Text(isZh ? "默认格式:" : "Default Format:")
+                    Text(l10n.t(L10n.Settings.defaultFormat) + ":")
                         .font(TTZipTheme.Typography.subheadline)
                         .foregroundStyle(.secondary)
                     Picker("", selection: $defaultFormat) {
@@ -189,13 +196,13 @@ public struct SettingsView: View {
                 }
                 
                 GridRow {
-                    Text(isZh ? "压缩级别:" : "Compression Level:")
+                    Text(l10n.t(L10n.Compress.level) + ":")
                         .font(TTZipTheme.Typography.subheadline)
                         .foregroundStyle(.secondary)
                     Picker("", selection: $defaultLevel) {
-                        Text(isZh ? "极速压缩 (Fast)" : "Fast").tag(ArchiveCompressionLevel.fast)
-                        Text(isZh ? "标准均衡 (Normal)" : "Normal").tag(ArchiveCompressionLevel.normal)
-                        Text(isZh ? "极限压缩 (Maximum)" : "Maximum").tag(ArchiveCompressionLevel.maximum)
+                        Text(l10n.t(L10n.Compress.levelFastest)).tag(ArchiveCompressionLevel.fast)
+                        Text(l10n.t(L10n.Compress.levelNormal)).tag(ArchiveCompressionLevel.normal)
+                        Text(l10n.t(L10n.Compress.levelMaximum)).tag(ArchiveCompressionLevel.maximum)
                     }
                     .frame(width: 180)
                 }
@@ -206,7 +213,7 @@ public struct SettingsView: View {
     @ViewBuilder
     private var vaultSection: some View {
         VStack(alignment: .leading, spacing: TTZipTheme.Spacing.md) {
-            Label(isZh ? "密码保险箱 v4 安全策略" : "Password Vault v4 Security", systemImage: "lock.shield.fill")
+            Label(l10n.t(L10n.Vault.vaultSecurityHeader), systemImage: "lock.shield.fill")
                 .font(TTZipTheme.Typography.sectionHeader)
                 .foregroundStyle(TTZipTheme.bambooGreen)
             
@@ -215,11 +222,11 @@ public struct SettingsView: View {
                 .frame(height: 0.5)
             
             VStack(alignment: .leading, spacing: 8) {
-                Text(isZh ? "• 密钥派生: PBKDF2-SHA256 (600,000 轮 OWASP 强化迭代)" : "• Key Derivation: PBKDF2-SHA256 (600,000 OWASP iterations)")
+                Text(l10n.t(L10n.Vault.pbkdf2Desc))
                     .font(TTZipTheme.Typography.caption)
-                Text(isZh ? "• 物理安全: 密码内存释放使用 volatile 指针强制清零 (Dead-Store 免疫)" : "• Memory Security: Volatile zeroing prevents dead-store elimination")
+                Text(l10n.t(L10n.Vault.volatileZeroingDesc))
                     .font(TTZipTheme.Typography.caption)
-                Text(isZh ? "• 存储加密: AES-256-GCM 硬件加密存储" : "• Vault Storage: AES-256-GCM hardware encryption")
+                Text(l10n.t(L10n.Vault.aesGcmStorageDesc))
                     .font(TTZipTheme.Typography.caption)
             }
             .foregroundStyle(.secondary)
@@ -230,7 +237,7 @@ public struct SettingsView: View {
     private var licenseAndHardwareSection: some View {
         VStack(alignment: .leading, spacing: TTZipTheme.Spacing.md) {
             HStack {
-                Label(isZh ? "商业版授权状态" : "Commercial License Status", systemImage: "checkmark.seal.fill")
+                Label(l10n.t(L10n.Settings.licenseStatus), systemImage: "checkmark.seal.fill")
                     .font(TTZipTheme.Typography.sectionHeader)
                     .foregroundStyle(TTZipTheme.bambooGreen)
                 Spacer()
@@ -238,7 +245,7 @@ public struct SettingsView: View {
                     Circle()
                         .fill(TTZipTheme.bambooGreen)
                         .frame(width: 8, height: 8)
-                    Text(isPro ? (isZh ? "Pro 商业专业版" : "Pro License") : (isZh ? "Free 免费版" : "Free Edition"))
+                    Text(isPro ? l10n.t(L10n.Settings.proLicenseActive) : l10n.t(L10n.Settings.freeEdition))
                         .font(TTZipTheme.Typography.caption)
                         .bold()
                         .foregroundStyle(TTZipTheme.bambooGreen)
@@ -256,9 +263,9 @@ public struct SettingsView: View {
             #if MAS_BUILD
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(isZh ? "Mac App Store 正版授权 (全功能已解锁)" : "Mac App Store Full License (Active)")
+                    Text(l10n.t(L10n.Settings.macAppStoreLicenseActive))
                         .font(TTZipTheme.Typography.bodyMedium)
-                    Text(isZh ? "已通过 Mac App Store 购买激活，所有 16 种格式与 Apple Silicon 硬件加速已全部解锁。" : "Purchased from Mac App Store. All vector pipelines and 16 formats unlocked.")
+                    Text(l10n.t(L10n.Settings.licenseStatusActive))
                         .font(TTZipTheme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -270,19 +277,19 @@ public struct SettingsView: View {
             #else
             if !isPro {
                 VStack(alignment: .leading, spacing: TTZipTheme.Spacing.xs) {
-                    Text(isZh ? "输入激活序列号解除全功能与企业商业使用限制：" : "Enter activation license key:")
+                    Text(l10n.t(L10n.Settings.enterActivationKey))
                         .font(TTZipTheme.Typography.subheadline)
                         .foregroundStyle(.secondary)
                     
                     HStack(spacing: TTZipTheme.Spacing.xs) {
-                        TTSecureTextField(isZh ? "例如: AURA-PRO1-KEY8-2026" : "e.g. AURA-PRO1-KEY8-2026", text: $licenseKeyInput)
+                        TTSecureTextField("AURA-PRO1-KEY8-2026", text: $licenseKeyInput)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.primary.opacity(0.04))
                             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         
                         Button(action: activateLicense) {
-                            Text(isZh ? "立即激活 Pro 版" : "Activate Pro")
+                            Text(l10n.t(L10n.Settings.activateProButton))
                                 .font(TTZipTheme.Typography.callout)
                                 .foregroundStyle(Color.white)
                                 .padding(.horizontal, TTZipTheme.Spacing.sm)
@@ -296,17 +303,17 @@ public struct SettingsView: View {
             } else {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(isZh ? "您已拥有全功能无限商业授权" : "Commercial License Active")
+                        Text(l10n.t(L10n.Settings.licenseStatusActive))
                             .font(TTZipTheme.Typography.bodyMedium)
-                        Text(isZh ? "感谢支持 TTZip 独立研发，硬件拓扑调优已全面解锁。" : "All hardware vector pipelines unlocked.")
+                        Text(l10n.t(L10n.Sidebar.zeroCopyAcceleration))
                             .font(TTZipTheme.Typography.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button(isZh ? "注销授权" : "Deactivate") {
+                    Button(l10n.t(L10n.Settings.deactivateButton)) {
                         LicenseManager.shared.deactivate()
                         isPro = false
-                        activationStatus = isZh ? "授权已注销" : "Deactivated"
+                        activationStatus = l10n.t(L10n.Settings.deactivateButton)
                     }
                     .buttonStyle(.plain)
                     .font(TTZipTheme.Typography.caption)
@@ -326,7 +333,7 @@ public struct SettingsView: View {
             
             Spacer().frame(height: 12)
             
-            Label(isZh ? "Apple Silicon 硬件加速拓扑" : "Apple Silicon Hardware Topology", systemImage: "cpu.fill")
+            Label(l10n.t(L10n.Settings.hardwareTopology), systemImage: "cpu.fill")
                 .font(TTZipTheme.Typography.sectionHeader)
                 .foregroundStyle(TTZipTheme.bambooGreen)
             
@@ -337,7 +344,7 @@ public struct SettingsView: View {
             let tuner = AppleSiliconTuner.shared
             Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 10) {
                 GridRow {
-                    Text(isZh ? "芯片型号:" : "Chip Model:")
+                    Text(l10n.t(L10n.Settings.chipModel) + ":")
                         .font(TTZipTheme.Typography.subheadline)
                         .foregroundStyle(.secondary)
                     Text(tuner.topology.chipName)
@@ -345,18 +352,18 @@ public struct SettingsView: View {
                 }
                 
                 GridRow {
-                    Text(isZh ? "核心构架:" : "Cores:")
+                    Text(l10n.t(L10n.Settings.cpuCores) + ":")
                         .font(TTZipTheme.Typography.subheadline)
                         .foregroundStyle(.secondary)
-                    Text("\(tuner.topology.totalCores) Cores (\(tuner.topology.performanceCores)P + \(tuner.topology.efficiencyCores)E)")
+                    Text(l10n.format(L10n.Benchmark.hardwareCoresFormat, tuner.topology.totalCores, tuner.topology.performanceCores, tuner.topology.efficiencyCores))
                         .font(TTZipTheme.Typography.body)
                 }
                 
                 GridRow {
-                    Text(isZh ? "统一内存:" : "Unified Memory:")
+                    Text(l10n.t(L10n.Settings.unifiedMemory) + ":")
                         .font(TTZipTheme.Typography.subheadline)
                         .foregroundStyle(.secondary)
-                    Text("\(String(format: "%.1f", tuner.topology.unifiedMemoryGB)) GB Unified Memory")
+                    Text(l10n.format(L10n.Benchmark.hardwareMemoryFormat, tuner.topology.unifiedMemoryGB))
                         .font(TTZipTheme.Typography.body)
                 }
             }
@@ -366,9 +373,9 @@ public struct SettingsView: View {
     private func activateLicense() {
         if LicenseManager.shared.activate(key: licenseKeyInput) {
             isPro = true
-            activationStatus = isZh ? "已成功激活 TTZip Pro 商业版" : "Activated TTZip Pro successfully"
+            activationStatus = l10n.t(L10n.Settings.proLicenseActive)
         } else {
-            activationStatus = isZh ? "激活码无效，请核对输入格式" : "Invalid license key format"
+            activationStatus = l10n.t(L10n.Settings.invalidKeyError)
         }
     }
 }

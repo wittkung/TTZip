@@ -31,10 +31,14 @@ public final class SystemNotificationManager: @unchecked Sendable {
         durationSeconds: Double,
         bytesProcessed: Int64
     ) {
+        let manager = TTZipLocalizationManager.shared
         let content = UNMutableNotificationContent()
-        content.title = "\(operationType.capitalized) Completed"
-        let formattedSize = ByteCountFormatter.string(fromByteCount: bytesProcessed, countStyle: .file)
-        content.body = "\(taskName) (\(formattedSize)) finished in \(String(format: "%.1fs", durationSeconds))"
+        let titleTemplate = manager.string(for: L10n.Notification.taskCompletedTitle)
+        content.title = String(format: titleTemplate, operationType.capitalized)
+        
+        let formattedSize = ByteSizeFormatter.format(bytes: bytesProcessed, style: .metricSI, language: manager.currentLanguage)
+        let bodyTemplate = manager.string(for: L10n.Notification.taskCompletedBody)
+        content.body = String(format: bodyTemplate, taskName, formattedSize, durationSeconds)
         content.sound = UNNotificationSound.default
         
         let request = UNNotificationRequest(
@@ -52,9 +56,29 @@ public final class SystemNotificationManager: @unchecked Sendable {
     
     /// Posts an alert notification when a task fails.
     public func postTaskFailedNotification(taskName: String, errorMessage: String) {
+        let manager = TTZipLocalizationManager.shared
         let content = UNMutableNotificationContent()
-        content.title = "Operation Failed"
-        content.body = "\(taskName): \(errorMessage)"
+        content.title = manager.string(for: L10n.Notification.taskFailedTitle)
+        let bodyTemplate = manager.string(for: L10n.Notification.taskFailedBody)
+        content.body = String(format: bodyTemplate, taskName, errorMessage)
+        content.sound = UNNotificationSound.default
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request)
+    }
+    
+    /// Posts a security warning notification when a malicious traversal entry is blocked.
+    public func postThreatInterceptedNotification(entryPath: String) {
+        let manager = TTZipLocalizationManager.shared
+        let content = UNMutableNotificationContent()
+        content.title = manager.string(for: L10n.Notification.threatInterceptedTitle)
+        let bodyTemplate = manager.string(for: L10n.Notification.threatInterceptedBody)
+        content.body = String(format: bodyTemplate, entryPath)
         content.sound = UNNotificationSound.default
         
         let request = UNNotificationRequest(

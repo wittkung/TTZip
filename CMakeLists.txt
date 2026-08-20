@@ -147,3 +147,90 @@ install(EXPORT TTZipTargets
     NAMESPACE TTZip::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TTZip
 )
+
+# ==============================================================================
+# 9. 自动化 C11 测试套件与 CTest 接入 (Zero-Dependency Pure C11 Harness)
+# ==============================================================================
+option(BUILD_TESTING "Build TTZip automated C test suite" ON)
+option(ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+
+if(ENABLE_SANITIZERS)
+    if(MSVC)
+        target_compile_options(ttzip PUBLIC /fsanitize=address)
+    else()
+        target_compile_options(ttzip PUBLIC 
+            -fsanitize=address,undefined 
+            -fno-omit-frame-pointer
+            -fno-sanitize-recover=all
+        )
+        target_link_options(ttzip PUBLIC 
+            -fsanitize=address,undefined
+        )
+    endif()
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
+    include(CTest)
+
+    set(TTZIP_TEST_SOURCES
+        tests/c/test_main.c
+        tests/c/test_crc_neon.c
+        tests/c/test_magic_sniff.c
+        tests/c/test_strnatcmp.c
+        tests/c/test_deflate_zopfli.c
+        tests/c/test_7z_lzma2.c
+        tests/c/test_tar_container.c
+        tests/c/test_security_zipslip.c
+        tests/c/test_concurrency_threadpool.c
+    )
+
+    add_executable(ttzip_c_test_runner ${TTZIP_TEST_SOURCES})
+    target_link_libraries(ttzip_c_test_runner PRIVATE ttzip)
+    target_include_directories(ttzip_c_test_runner PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/c
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/native_deflate
+    )
+
+    if(ENABLE_SANITIZERS)
+        if(MSVC)
+            target_compile_options(ttzip_c_test_runner PRIVATE /fsanitize=address)
+        else()
+            target_compile_options(ttzip_c_test_runner PRIVATE 
+                -fsanitize=address,undefined 
+                -fno-omit-frame-pointer
+                -fno-sanitize-recover=all
+            )
+            target_link_options(ttzip_c_test_runner PRIVATE 
+                -fsanitize=address,undefined
+            )
+        endif()
+    endif()
+
+    set(TEST_SUITES
+        crc_neon
+        magic_sniff
+        strnatcmp
+        deflate_zopfli
+        7z_lzma2
+        tar_container
+        security_zipslip
+        concurrency_threadpool
+    )
+
+    foreach(suite IN LISTS TEST_SUITES)
+        add_test(NAME "c_test_${suite}" COMMAND ttzip_c_test_runner "${suite}")
+        set_tests_properties("c_test_${suite}" PROPERTIES
+            TIMEOUT 10
+            LABELS "microkernel;c11"
+        )
+    endforeach()
+
+    add_test(NAME "c_test_all" COMMAND ttzip_c_test_runner "all")
+    set_tests_properties("c_test_all" PROPERTIES
+        TIMEOUT 30
+        LABELS "full;c11"
+    )
+endif()
+

@@ -313,14 +313,6 @@ final class ObserverPatternTests: XCTestCase {
         let eventCenter = ArchiveEventCenter.shared
         let cancellationCenter = TaskCancellationObserverCenter.shared
         
-        let queues: [DispatchQueue] = [
-            .main,
-            .global(qos: .userInitiated),
-            .global(qos: .background),
-            DispatchQueue(label: "round3.serial.queue1"),
-            DispatchQueue(label: "round3.concurrent.queue2", attributes: .concurrent)
-        ]
-        
         let observerCountPerBatch = 1000
         let taskId = "Round3_Task_Exhaustive"
         cancellationCenter.registerTask(taskId)

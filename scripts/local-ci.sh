@@ -11,21 +11,26 @@ echo "================================================================"
 echo "         TTZip Local CI Verification Suite (Local Only)         "
 echo "================================================================"
 
-# 1. CMake Native C Engine & CLI Build
-echo "==> [1/4] Building libttzip.a and ttzip-cli via CMake (Release)..."
-cmake -B build -DCMAKE_BUILD_TYPE=Release -Wno-dev > /dev/null
+# 1. CMake Native C Engine, Test Runner & CLI Build
+echo "==> [1/5] Building libttzip.a, ttzip-cli & ttzip_c_test_runner via CMake (Release)..."
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON > /dev/null
 cmake --build build --config Release -j8 > /dev/null
-echo "    ✅ CMake build passed: build/libttzip.a & build/ttzip-cli generated successfully."
+echo "    ✅ CMake build passed: libttzip.a, ttzip-cli & ttzip_c_test_runner ready."
 
-# 2. Pure C CLI Functional & Benchmark Verification
-echo "==> [2/4] Testing Standalone ttzip-cli & C SDK Quickstart..."
+# 2. Native C11 Microkernel Test Suites (CTest)
+echo "==> [2/5] Running Native C11 Microkernel Test Suites (< 50ms)..."
+ctest --test-dir build --output-on-failure
+echo "    ✅ All C11 microkernel test suites passed 100% green."
+
+# 3. Pure C CLI Functional & Benchmark Verification
+echo "==> [3/5] Testing Standalone ttzip-cli & C SDK Quickstart..."
 ./build/ttzip-cli --version
 ./build/ttzip-cli --benchmark
 ./build/ttzip-quickstart
 echo "    ✅ Standalone C CLI & C SDK quickstart verification passed."
 
-# 3. Zero-GCD Audit in TTZipCore
-echo "==> [3/4] Auditing Zero Apple GCD Calls in TTZipCore..."
+# 4. Zero-GCD Audit in TTZipCore
+echo "==> [4/5] Auditing Zero Apple GCD Calls in TTZipCore..."
 GCD_MATCHES=$(grep -rn "DispatchQueue\|DispatchSemaphore\|DispatchGroup" Sources/TTZipCore/ --include="*.swift" | grep -v "FileWatcherEngine.swift" | grep -v "ConcurrencyBridge.swift:.*///" || true)
 if [ -n "${GCD_MATCHES}" ]; then
     echo "    ❌ ERROR: Found residual GCD calls in TTZipCore:"
@@ -34,8 +39,8 @@ if [ -n "${GCD_MATCHES}" ]; then
 fi
 echo "    ✅ Zero-GCD audit passed: 0 Apple GCD calls in TTZipCore."
 
-# 4. Swift Matrix & Concurrency Test Suites
-echo "==> [4/4] Running Swift Core & Concurrency Test Matrix..."
+# 5. Swift Matrix & Concurrency Test Suites
+echo "==> [5/5] Running Swift Core & Concurrency Test Matrix..."
 swift test --filter "ConcurrencyBridgeTests|AllFormatsAndAdvancedParametersMatrixTests|AllFormatDiagnosticSuiteTests|Blosc2PluginRegistryTests|EntropyAdaptiveExtremeRoutingTests|ObserverPatternTests|DiskSortOptionTests"
 echo "    ✅ Swift test suites passed 100% green."
 

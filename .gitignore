@@ -20,6 +20,7 @@ Icon?
 .build/
 .build_*/
 build/
+build_*/
 dist/
 build_dist/
 build_app/

@@ -22,30 +22,7 @@ public enum ArchiveError: Error, LocalizedError, Equatable {
     case invalidState
     
     public var errorDescription: String? {
-        switch self {
-        case .fileNotFound:
-            return "Archive file not found at specified path"
-        case .readFailed(let code):
-            return "Failed to read archive header or entries (code: \(code))"
-        case .invalidFormat:
-            return "Unrecognized or invalid archive format"
-        case .passwordRequired:
-            return "Archive is password-protected. Please enter password"
-        case .passwordRequiredDetailed(_, let tier):
-            return tier == .headerAndData
-                ? "Archive header and entries are encrypted. Password required to list contents"
-                : "Archive payload data is encrypted. Password required to extract"
-        case .wrongPassword:
-            return "Incorrect password for archive"
-        case .unsupportedEncryptionMethod(_, let method):
-            return "Unsupported cryptographic algorithm or encryption method: \(method)"
-        case .corruptedData(_, let entryPath):
-            return "Data corruption or checksum mismatch detected in entry: \(entryPath)"
-        case .cancelled:
-            return "Archive operation was cancelled by user"
-        case .invalidState:
-            return "Archive engine task entered an invalid state"
-        }
+        return localizedDescription()
     }
 }
 

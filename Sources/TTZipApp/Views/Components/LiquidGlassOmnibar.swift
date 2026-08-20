@@ -11,6 +11,7 @@ import AppKit
 
 /// Liquid Glass styled unified Address and Search Omnibar.
 public struct LiquidGlassOmnibar: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     @Binding public var searchQuery: String
     @ObservedObject public var searchService: SpotlightSearchService
     @ObservedObject public var viewModel: AppViewState
@@ -68,7 +69,7 @@ public struct LiquidGlassOmnibar: View {
                         
                         OmnibarTextField(
                             text: $inputText,
-                            placeholder: "Enter directory path (~/...) or search...",
+                            placeholder: l10n.t(L10n.Common.search),
                             isFocused: isEditing,
                             onCommit: {
                                 commitNavigation()
@@ -272,13 +273,13 @@ public struct LiquidGlassOmnibar: View {
             let result = DestinationDispatcher.classify(path: sanitized, rawInput: inputText)
             
             if result.destinationType == .notFound {
-                triggerErrorFeedback("Path not found")
+                triggerErrorFeedback(l10n.t(L10n.Errors.fileNotFound))
             } else {
                 let success = DestinationDispatcher.dispatch(result: result, appViewState: viewModel)
                 if success {
                     cancelEditing()
                 } else {
-                    triggerErrorFeedback("Failed to navigate")
+                    triggerErrorFeedback(l10n.t(L10n.Errors.readError))
                 }
             }
         } else {

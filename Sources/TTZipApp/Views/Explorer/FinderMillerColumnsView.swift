@@ -363,7 +363,7 @@ public struct FinderMillerColumnsView: View {
                 let dir = dirURL
                 let sortOpt = currentSort
                 let scanned = await MillerColumnDirectoryScanner.loadContentsOf(dirURL: dir)
-                let sorted = DiskDirectoryBrowserView.sortItems(scanned, option: sortOpt)
+                let sorted = DiskItemSorter.sort(scanned, by: sortOpt)
                 cachedColumnItems[cacheKey] = sorted
                 if cachedColumnItems.count > 64 {
                     let activeKeys = Set(columnPaths.enumerated().map { idx, path in

@@ -10,6 +10,7 @@ import TTZipCore
 import AppKit
 
 public struct CompressModalView: View {
+    @ObservedObject private var l10n = AppLocalizationState.shared
     @Binding public var isPresented: Bool
     public let initialInputPaths: [String]
     public var onCompleteOpenArchive: ((String) -> Void)? = nil
@@ -132,7 +133,7 @@ public struct CompressModalView: View {
                     Image(systemName: "circle.grid.2x2.fill")
                         .font(.system(size: 10))
                         .foregroundStyle(TTZipTheme.bambooGreen)
-                    Text("Total \(itemsList.count) items · \(ByteCountFormatterCache.string(fromByteCount: totalSizeBytes))")
+                    Text(l10n.plural(key: L10n.Units.itemsCount, count: itemsList.count) + " · " + l10n.formatBytes(totalSizeBytes))
                         .font(.system(size: 11.5, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
@@ -140,7 +141,7 @@ public struct CompressModalView: View {
                 Spacer()
                 
                 Button(action: { isPresented = false }) {
-                    Text("Cancel")
+                    Text(l10n.t(L10n.Common.cancel))
                         .font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
@@ -153,7 +154,7 @@ public struct CompressModalView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.up.forward.app.fill")
                             .font(.system(size: 11, weight: .bold))
-                        Text("Compress (⌘↵)")
+                        Text(l10n.t(L10n.Compress.startAction) + " (⌘↵)")
                             .font(.system(size: 12, weight: .bold))
                     }
                     .foregroundStyle(.white)
@@ -188,7 +189,7 @@ public struct CompressModalView: View {
             VStack {
                 HStack {
                     Spacer()
-                    Button("Close") { isPasswordVaultPresented = false }
+                    Button(l10n.t(L10n.Common.close)) { isPasswordVaultPresented = false }
                 }
                 .padding()
                 PasswordVaultView(onSelectPassword: { pwd in

@@ -266,7 +266,14 @@ int ttzip_extract_zip_c_parallel(
 
     ttzip_once(&g_fd_once, init_fd_sem);
 
-    ttzip_parsed_entry_t* entries = (ttzip_parsed_entry_t*)malloc(sizeof(ttzip_parsed_entry_t) * (total_entries > 0 ? total_entries : 1));
+    size_t alloc_entries = total_entries > 0 ? (size_t)total_entries : 1;
+    size_t alloc_bytes = 0;
+    if (ttzip_mul_overflow(sizeof(ttzip_parsed_entry_t), alloc_entries, &alloc_bytes)) {
+        munmap((void*)mapped, file_size);
+        return TTZIP_ERR_OUT_OF_MEMORY;
+    }
+
+    ttzip_parsed_entry_t* entries = (ttzip_parsed_entry_t*)malloc(alloc_bytes);
     if (!entries) {
         munmap((void*)mapped, file_size);
         return TTZIP_ERR_OUT_OF_MEMORY;

@@ -20,18 +20,18 @@ final class GUILocalizationTests: XCTestCase {
         XCTAssertEqual(state.currentLanguage, .en)
         XCTAssertEqual(TTZipLocalizationManager.shared.currentLanguage, .en)
         
-        let extractEn = state.t(L10n.Archive.extract)
+        let extractEn = state.t(L10n.Extract.title)
         XCTAssertFalse(extractEn.isEmpty)
-        XCTAssertEqual(extractEn, "Extract")
+        XCTAssertEqual(extractEn, "Extract Archive")
         
-        // 2. Switch to
+        // 2. Switch to Chinese
         state.setLanguage(.zhHans)
         XCTAssertEqual(state.currentLanguage, .zhHans)
         XCTAssertEqual(TTZipLocalizationManager.shared.currentLanguage, .zhHans)
         
-        let extractZh = state.t(L10n.Archive.extract)
+        let extractZh = state.t(L10n.Extract.title)
         XCTAssertFalse(extractZh.isEmpty)
-        XCTAssertEqual(extractZh, "解压")
+        XCTAssertEqual(extractZh, "解压归档包")
     }
     
     @MainActor
@@ -51,8 +51,8 @@ final class GUILocalizationTests: XCTestCase {
             L10n.Common.cancel,
             L10n.Common.save,
             L10n.Common.done,
-            L10n.Archive.compress,
-            L10n.Archive.extract,
+            L10n.Compress.title,
+            L10n.Extract.title,
             L10n.Settings.general,
             L10n.Settings.language,
             L10n.Settings.byteUnits,
