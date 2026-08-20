@@ -8,7 +8,7 @@ import CTTZipBridge
 
 /// High-performance deterministic in-memory corpus generator.
 /// Reproduces zlib-ng / Google Benchmark data_type.cc workloads with 0 internal heap allocation.
-public enum BenchmarkCorpusType: String, CaseIterable, Sendable {
+public enum BenchmarkCorpusType: String, CaseIterable, Codable, Sendable {
     case text
     case shortMatch = "short_match"
     case dna

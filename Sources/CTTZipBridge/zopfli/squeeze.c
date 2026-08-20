@@ -386,6 +386,7 @@ static void FollowPath(ZopfliBlockState* s,
 
     pos += length;
   }
+  (void)total_length_test;
 }
 
 /* Calculates the entropy of the statistics */

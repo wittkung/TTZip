@@ -129,7 +129,6 @@ class Varint {
   }
 
   static const char* Parse32WithLimit(const char* p, const char* l, uint32* OUTPUT) {
-    const char* orig_p = p;
     uint32 b;
     uint32 result;
     if (p >= l) return nullptr;

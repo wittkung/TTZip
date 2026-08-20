@@ -57,8 +57,8 @@ const uint8_t s_offset_extra_bits[30] = {
 };
 
 /* Fast reverse-lookup mapping tables */
-uint8_t s_length_slot[259];
-uint8_t s_offset_slot[32769];
+__attribute__((aligned(64))) uint8_t s_length_slot[259] = {0};
+__attribute__((aligned(64))) uint8_t s_offset_slot[32769] = {0};
 #include <pthread.h>
 
 static pthread_once_t s_slot_once = PTHREAD_ONCE_INIT;

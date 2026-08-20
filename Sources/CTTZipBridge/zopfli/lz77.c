@@ -425,6 +425,7 @@ void ZopfliFindLongestMatch(ZopfliBlockState* s, const ZopfliHash* h,
   unsigned short* hprev = h->prev;
   int* hhashval = h->hashval;
   int hval = h->val;
+  (void)hhashval;
 
 #ifdef ZOPFLI_LONGEST_MATCH_CACHE
   if (TryGetFromLongestMatchCache(s, pos, &limit, sublen, distance, length)) {

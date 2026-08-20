@@ -6,7 +6,7 @@
 import Foundation
 import CTTZipBridge
 
-public struct CodecBenchmarkPointResult: Sendable {
+public struct CodecBenchmarkPointResult: Codable, Sendable {
     public let engineName: String
     public let corpusType: BenchmarkCorpusType
     public let payloadSizeBytes: Int
@@ -49,7 +49,7 @@ public struct CodecBenchmarkPointResult: Sendable {
     }
 }
 
-public struct CodecBenchmarkMatrixSummary: Sendable {
+public struct CodecBenchmarkMatrixSummary: Codable, Sendable {
     public let totalPoints: Int
     public let totalDurationMs: Double
     public let medianCvPercentage: Double

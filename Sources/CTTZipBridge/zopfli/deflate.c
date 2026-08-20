@@ -329,6 +329,7 @@ static void AddLZ77Data(const ZopfliLZ77Store* lz77,
       testlength += litlen;
     }
   }
+  (void)testlength;
   assert(expected_data_size == 0 || testlength == expected_data_size);
 }
 

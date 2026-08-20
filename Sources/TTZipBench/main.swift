@@ -381,7 +381,14 @@ case "plot":
         }
     }
 
-    let summary = TTZipCoreCodecBenchmarks().runUnifiedMatrix()
+    let summary: CodecBenchmarkMatrixSummary
+    if let jsonPath = jsonInputPath,
+       let data = try? Data(contentsOf: URL(fileURLWithPath: jsonPath)),
+       let decoded = try? JSONDecoder().decode(CodecBenchmarkMatrixSummary.self, from: data) {
+        summary = decoded
+    } else {
+        summary = TTZipCoreCodecBenchmarks().runUnifiedMatrix()
+    }
     if let svgPath = svgOutputPath {
         let paretoPoints: [ParetoPoint] = summary.results.map { pt in
             let savings = max(0.0, (1.0 - pt.compressionRatio) * 100.0)
