@@ -78,10 +78,19 @@ static void collect_c_items_recursive(const char* src_path, const char* rel_path
             while ((de = readdir(dir)) != NULL) {
                 if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
                 if (skip_mac_junk && (strcmp(de->d_name, ".DS_Store") == 0 || strncmp(de->d_name, "._", 2) == 0)) continue;
+                size_t base_rel_len = strlen(rel_path);
+                while (base_rel_len > 0 && rel_path[base_rel_len - 1] == '/') {
+                    base_rel_len--;
+                }
+                char clean_parent_rel[4096];
+                if (base_rel_len >= sizeof(clean_parent_rel)) base_rel_len = sizeof(clean_parent_rel) - 1;
+                memcpy(clean_parent_rel, rel_path, base_rel_len);
+                clean_parent_rel[base_rel_len] = '\0';
+
                 char child_src[4096];
                 char child_rel[4096];
                 snprintf(child_src, sizeof(child_src), "%s/%s", src_path, de->d_name);
-                snprintf(child_rel, sizeof(child_rel), "%s/%s", rel_path, de->d_name);
+                snprintf(child_rel, sizeof(child_rel), "%s/%s", clean_parent_rel, de->d_name);
 
                 if (de->d_type == DT_REG) {
                     struct stat cst;

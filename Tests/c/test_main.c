@@ -8,7 +8,7 @@
 
 #include "ttzip_test_harness.h"
 
-// Forward declarations of all 19 test suite runners
+// Forward declarations of all 21 test suite runners
 void run_crc_neon_tests(void);
 void run_magic_sniff_tests(void);
 void run_strnatcmp_tests(void);
@@ -28,6 +28,8 @@ void run_entropy_evaluator_tests(void);
 void run_matchfinder_advanced_tests(void);
 void run_blosc_slicing_tests(void);
 void run_crypto_lz4_snappy_tests(void);
+void run_deflate_stream_coder_tests(void);
+void run_platform_isa_tests(void);
 
 int main(int argc, char** argv) {
     const char* suite_filter = (argc > 1) ? argv[1] : "all";
@@ -114,6 +116,14 @@ int main(int argc, char** argv) {
     }
     if (strcmp(suite_filter, "all") == 0 || strcmp(suite_filter, "crypto_lz4_snappy") == 0) {
         run_crypto_lz4_snappy_tests();
+        overall_failures += (ttzip_test_get_global_ctx()->failed_tests > 0 ? 1 : 0);
+    }
+    if (strcmp(suite_filter, "all") == 0 || strcmp(suite_filter, "deflate_stream_coder") == 0) {
+        run_deflate_stream_coder_tests();
+        overall_failures += (ttzip_test_get_global_ctx()->failed_tests > 0 ? 1 : 0);
+    }
+    if (strcmp(suite_filter, "all") == 0 || strcmp(suite_filter, "platform_isa") == 0) {
+        run_platform_isa_tests();
         overall_failures += (ttzip_test_get_global_ctx()->failed_tests > 0 ? 1 : 0);
     }
 

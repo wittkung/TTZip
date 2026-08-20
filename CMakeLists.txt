@@ -197,6 +197,8 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         tests/c/test_matchfinder_advanced.c
         tests/c/test_blosc_slicing.c
         tests/c/test_crypto_lz4_snappy.c
+        tests/c/test_deflate_stream_coder.c
+        tests/c/test_platform_isa.c
     )
 
     add_executable(ttzip_c_test_runner ${TTZIP_TEST_SOURCES})
@@ -244,6 +246,8 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         matchfinder_advanced
         blosc_slicing
         crypto_lz4_snappy
+        deflate_stream_coder
+        platform_isa
     )
 
     foreach(suite IN LISTS TEST_SUITES)
