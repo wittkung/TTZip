@@ -77,63 +77,73 @@ final class ComprehensiveCorpusBenchmarkPkTests: XCTestCase {
         
         // 2. Competitor matrix (7-Zip / pigz / Apple Native): live rerun or golden snapshot.
         if CompetitorBaselineSnapshotManager.shouldRerunCompetitors {
-            let sevenZipLevels = [1, 3, 5, 7, 9]
-            for mx in sevenZipLevels {
-                candidates.append(BenchmarkCandidate(name: "7-Zip 26.02 (mx=\(mx))", level: mx) { corpus in
-                    let outZip = NSTemporaryDirectory() + "sevenzip_\(mx)_\(UUID().uuidString).zip"
-                    defer { try? FileManager.default.removeItem(atPath: outZip) }
-                    let start = mach_absolute_time()
-                    let p = Process()
-                    p.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/7z")
-                    p.arguments = ["a", "-tzip", "-mx=\(mx)", "-mmt=on", "-bso0", "-bsp0", outZip, corpus.path]
-                    try p.run()
-                    p.waitUntilExit()
-                    let elapsed = Double(mach_absolute_time() - start) * 1e-9
-                    let outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
-                    let speed = (Double(corpus.sizeBytes) / 1024.0 / 1024.0) / max(0.0001, elapsed)
-                    let ratio = Double(corpus.sizeBytes) / Double(max(1, outSize))
-                    let savings = (1.0 - Double(outSize) / Double(corpus.sizeBytes)) * 100.0
-                    return (speed, ratio, savings, outSize)
-                })
+            let sevenZipPath = SystemBinaryResolver.shared.resolve(name: "7z") ?? SystemBinaryResolver.shared.resolve(name: "7zz")
+            let pigzPath = SystemBinaryResolver.shared.resolve(name: "pigz")
+            let zipPath = SystemBinaryResolver.shared.resolve(name: "zip")
+
+            if let sevenZip = sevenZipPath {
+                let sevenZipLevels = [1, 3, 5, 7, 9]
+                for mx in sevenZipLevels {
+                    candidates.append(BenchmarkCandidate(name: "7-Zip 26.02 (mx=\(mx))", level: mx) { corpus in
+                        let outZip = NSTemporaryDirectory() + "sevenzip_\(mx)_\(UUID().uuidString).zip"
+                        defer { try? FileManager.default.removeItem(atPath: outZip) }
+                        let start = mach_absolute_time()
+                        let p = Process()
+                        p.executableURL = URL(fileURLWithPath: sevenZip)
+                        p.arguments = ["a", "-tzip", "-mx=\(mx)", "-mmt=on", "-bso0", "-bsp0", outZip, corpus.path]
+                        try p.run()
+                        p.waitUntilExit()
+                        let elapsed = Double(mach_absolute_time() - start) * 1e-9
+                        let outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
+                        let speed = (Double(corpus.sizeBytes) / 1024.0 / 1024.0) / max(0.0001, elapsed)
+                        let ratio = Double(corpus.sizeBytes) / Double(max(1, outSize))
+                        let savings = (1.0 - Double(outSize) / Double(corpus.sizeBytes)) * 100.0
+                        return (speed, ratio, savings, outSize)
+                    })
+                }
             }
-            for lvl in 1...9 {
-                candidates.append(BenchmarkCandidate(name: "pigz (-\(lvl))", level: lvl) { corpus in
-                    let outGz = NSTemporaryDirectory() + "pigz_\(lvl)_\(UUID().uuidString).gz"
-                    defer { try? FileManager.default.removeItem(atPath: outGz) }
-                    let start = mach_absolute_time()
-                    let p = Process()
-                    p.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/pigz")
-                    p.arguments = ["-\(lvl)", "-k", "-c", corpus.path]
-                    let outPipe = Pipe()
-                    p.standardOutput = outPipe
-                    try p.run()
-                    let data = outPipe.fileHandleForReading.readDataToEndOfFile()
-                    p.waitUntilExit()
-                    let elapsed = Double(mach_absolute_time() - start) * 1e-9
-                    let outSize = Int64(data.count)
-                    let speed = (Double(corpus.sizeBytes) / 1024.0 / 1024.0) / max(0.0001, elapsed)
-                    let ratio = Double(corpus.sizeBytes) / Double(max(1, outSize))
-                    let savings = (1.0 - Double(outSize) / Double(corpus.sizeBytes)) * 100.0
-                    return (speed, ratio, savings, outSize)
-                })
+            if let pigz = pigzPath {
+                for lvl in 1...9 {
+                    candidates.append(BenchmarkCandidate(name: "pigz (-\(lvl))", level: lvl) { corpus in
+                        let outGz = NSTemporaryDirectory() + "pigz_\(lvl)_\(UUID().uuidString).gz"
+                        defer { try? FileManager.default.removeItem(atPath: outGz) }
+                        let start = mach_absolute_time()
+                        let p = Process()
+                        p.executableURL = URL(fileURLWithPath: pigz)
+                        p.arguments = ["-\(lvl)", "-k", "-c", corpus.path]
+                        let outPipe = Pipe()
+                        p.standardOutput = outPipe
+                        try p.run()
+                        let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+                        p.waitUntilExit()
+                        let elapsed = Double(mach_absolute_time() - start) * 1e-9
+                        let outSize = Int64(data.count)
+                        let speed = (Double(corpus.sizeBytes) / 1024.0 / 1024.0) / max(0.0001, elapsed)
+                        let ratio = Double(corpus.sizeBytes) / Double(max(1, outSize))
+                        let savings = (1.0 - Double(outSize) / Double(corpus.sizeBytes)) * 100.0
+                        return (speed, ratio, savings, outSize)
+                    })
+                }
             }
-            for lvl in 1...9 {
-                candidates.append(BenchmarkCandidate(name: "Apple Native (zip -\(lvl))", level: lvl) { corpus in
-                    let outZip = NSTemporaryDirectory() + "apple_zip_\(lvl)_\(UUID().uuidString).zip"
-                    defer { try? FileManager.default.removeItem(atPath: outZip) }
-                    let start = mach_absolute_time()
-                    let p = Process()
-                    p.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
-                    p.arguments = ["-\(lvl)", "-q", "-j", outZip, corpus.path]
-                    try p.run()
-                    p.waitUntilExit()
-                    let elapsed = Double(mach_absolute_time() - start) * 1e-9
-                    let outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
-                    let speed = (Double(corpus.sizeBytes) / 1024.0 / 1024.0) / max(0.0001, elapsed)
-                    let ratio = Double(corpus.sizeBytes) / Double(max(1, outSize))
-                    let savings = (1.0 - Double(outSize) / Double(corpus.sizeBytes)) * 100.0
-                    return (speed, ratio, savings, outSize)
-                })
+            if let zipBin = zipPath {
+                for lvl in 1...9 {
+                    candidates.append(BenchmarkCandidate(name: "Apple Native (zip -\(lvl))", level: lvl) { corpus in
+                        let outZip = NSTemporaryDirectory() + "apple_zip_\(lvl)_\(UUID().uuidString).zip"
+                        defer { try? FileManager.default.removeItem(atPath: outZip) }
+                        let start = mach_absolute_time()
+                        let p = Process()
+                        p.executableURL = URL(fileURLWithPath: zipBin)
+                        p.arguments = ["-\(lvl)", "-q", "-j", outZip, corpus.path]
+                        try p.run()
+                        p.waitUntilExit()
+                        let elapsed = Double(mach_absolute_time() - start) * 1e-9
+                        let outSize = (try? FileManager.default.attributesOfItem(atPath: outZip)[.size] as? Int64) ?? 1
+                        let speed = (Double(corpus.sizeBytes) / 1024.0 / 1024.0) / max(0.0001, elapsed)
+                        let ratio = Double(corpus.sizeBytes) / Double(max(1, outSize))
+                        let savings = (1.0 - Double(outSize) / Double(corpus.sizeBytes)) * 100.0
+                        return (speed, ratio, savings, outSize)
+                    })
+                }
             }
             candidates.append(BenchmarkCandidate(name: "Apple Native (ditto)", level: 6) { corpus in
                 let outZip = NSTemporaryDirectory() + "apple_ditto_\(UUID().uuidString).zip"

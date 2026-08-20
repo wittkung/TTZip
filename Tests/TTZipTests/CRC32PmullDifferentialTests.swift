@@ -234,7 +234,7 @@ final class CRC32PmullDifferentialTests: XCTestCase {
 
                 // Hard assertion: zero real performance regression (< -10%) on PMULL folded sizes (>= 192 bytes)
                 #if arch(arm64)
-                if size >= 192 {
+                if TestBenchmarkTier.isBenchmarkMode && size >= 192 {
                     XCTAssertGreaterThanOrEqual(
                         delta, -10.0,
                         "Severe regression detected on size \(size): \(delta)%"

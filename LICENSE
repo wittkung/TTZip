@@ -40,3 +40,11 @@ You may **NOT** under any circumstances, directly or indirectly:
 
 ## 4. Trademark & Trade Dress Protection
 "TTZip", the official icons, brand identities, and the signature Kintsugi Gold Zen visual layout (Trade Dress) are exclusive protected properties of Witt Kung.
+
+---
+
+## 5. Patent Peace & Defensive Anti-Trolling Clause
+1. **Prohibition of Reverse Patenting**:
+   No licensee, reader, entity, or contributor inspecting, building, or using this source code may use the novel algorithms, multi-threaded scheduling architectures, SIMD vectorization pipelines, or methods disclosed in TTZip to file patent applications anywhere in the world without the prior explicit written consent of Witt Kung. Any unauthorized patent filing derived from or referencing this repository shall be deemed a material breach of this License.
+2. **Defensive Patent Retaliation**:
+   If any entity institutes, finances, or participates in any patent infringement litigation or legal claim against Witt Kung, TTZip, or official contributors (including cross-claims or counterclaims in a lawsuit) alleging that TTZip, `ttzip-cli`, `TTZipCore`, or any associated component constitutes direct or contributory patent infringement, then any and all licenses, permissions, and rights granted to that entity under this License shall automatically and immediately terminate with prejudice.

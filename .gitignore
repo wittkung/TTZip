@@ -104,3 +104,11 @@ GEMINI.md
 .specify/
 specs/
 
+
+# ------------------------------------------------------------------------------
+# 9. Upstream Drafts, Study & Private Methodology
+# ------------------------------------------------------------------------------
+docs/upstream/
+docs/study/
+docs/an_open_letter*.md
+scripts/upstream_*

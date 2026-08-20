@@ -101,8 +101,7 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         // ==============================================
         // 3. pigz Parallel Deflate (Mark Adler Multi-Threaded Engine)
         // ==============================================
-        let pigzPath = "/opt/homebrew/bin/pigz"
-        if FileManager.default.fileExists(atPath: pigzPath) {
+        if let pigzPath = SystemBinaryResolver.shared.resolve(name: "pigz") {
             let pigzLevels: [(Int, String)] = [(1, "pigz -1 (Fast)"), (3, "pigz -3 (Fast2)"), (6, "pigz -6 (Normal)"), (9, "pigz -9 (Ultra)")]
             for (pzLvl, label) in pigzLevels {
                 let outPath = tempDir.appendingPathComponent("pigz_\(pzLvl).zip").path
@@ -169,11 +168,11 @@ final class SoftwareParetoFrontierPkTests: XCTestCase {
         // ==============================================
         // 5. AdvanceCOMP (advzip -4 Iterative Optimizer)
         // ==============================================
-        let advzipPath = "/opt/homebrew/bin/advzip"
-        if FileManager.default.fileExists(atPath: advzipPath) {
+        if let advzipPath = SystemBinaryResolver.shared.resolve(name: "advzip"),
+           let zipPath = SystemBinaryResolver.shared.resolve(name: "zip") {
             let advOut = tempDir.appendingPathComponent("advzip_sample.zip").path
             let initialZip = Process()
-            initialZip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+            initialZip.executableURL = URL(fileURLWithPath: zipPath)
             initialZip.arguments = ["-1", "-q", advOut, realSamplePath]
             try? initialZip.run()
             initialZip.waitUntilExit()

@@ -33,6 +33,7 @@
 #include "CTTZipParser.h"
 #include "CTTZipSliceProfiler.h"
 #include "CTTZipPlatformTimer.h"
+#include "CTTZipCorpusGen.h"
 #include "CTTZipBridge_Zstd.h"
 #include "lz4.h"
 #include "ttzip_bcj_arm64_neon.h"

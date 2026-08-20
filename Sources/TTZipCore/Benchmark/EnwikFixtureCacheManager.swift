@@ -106,12 +106,11 @@ public enum EnwikFixtureCacheManager {
             }
             
             if isMixed100MB {
-                let enwik8Path = try? obtainCorpusPath(named: "enwik8", allowSyntheticFallback: true)
-                try MultiModalDatasetGenerator.generateCompoundMixed100MBDataset(destinationPath: tempURL.path, textSourcePath: enwik8Path)
+                try BenchmarkCorpusType.mixed.writeToDisk(filePath: tempURL.path, totalBytes: Int(targetSize))
             } else if isBinary100MB {
-                try MultiModalDatasetGenerator.generateDeterministicBinaryDataset(destinationPath: tempURL.path, sizeBytes: Int(targetSize))
+                try BenchmarkCorpusType.literals.writeToDisk(filePath: tempURL.path, totalBytes: Int(targetSize))
             } else if isStructured100MB {
-                try MultiModalDatasetGenerator.generateStructuredJsonDataset(destinationPath: tempURL.path, recordCount: 700_000)
+                try BenchmarkCorpusType.stripedRGB.writeToDisk(filePath: tempURL.path, totalBytes: Int(targetSize))
             } else {
                 // 4. Download from mirrors for enwik8/enwik9
                 var downloadSucceeded = false
@@ -137,13 +136,7 @@ public enum EnwikFixtureCacheManager {
                 // 5. Fallback to deterministic synthesis generator if remote download fails
                 if !downloadSucceeded {
                     if allowSyntheticFallback {
-                        let config = SyntheticXmlCorpusConfig(
-                            totalByteCount: targetSize,
-                            repeatDistanceBytes: isEnwik9 ? 32 * 1024 * 1024 : 16 * 1024 * 1024,
-                            repeatProbability: 0.70,
-                            seed: isEnwik9 ? 0x9876543210FEDCBA : 0x123456789ABCDEF0
-                        )
-                        try SyntheticXmlCorpusGenerator.generate(config: config, to: tempURL)
+                        try BenchmarkCorpusType.text.writeToDisk(filePath: tempURL.path, totalBytes: Int(targetSize))
                     } else {
                         throw NSError(
                             domain: "EnwikFixtureCacheManager",

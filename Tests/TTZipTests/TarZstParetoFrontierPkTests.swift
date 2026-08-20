@@ -52,9 +52,8 @@ final class TarZstParetoFrontierPkTests: XCTestCase {
             }
         }
         
-        // 2. Meta official Zstandard CLI (/opt/homebrew/bin/zstd -T0 -1, -3, -6, -9, -15, -19).
-        let zstdPath = "/opt/homebrew/bin/zstd"
-        if FileManager.default.fileExists(atPath: zstdPath) {
+        // 2. Meta official Zstandard CLI (zstd -T0 -1, -3, -6, -9, -15, -19).
+        if let zstdPath = SystemBinaryResolver.shared.resolve(name: "zstd") {
             for zLvl in [1, 3, 6, 9, 15, 19] {
                 let outPath = tempDir.appendingPathComponent("meta_zstd_\(zLvl).zst").path
                 let p = Process()
