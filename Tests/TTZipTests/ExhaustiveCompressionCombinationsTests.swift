@@ -43,9 +43,10 @@ final class ExhaustiveCompressionCombinationsTests: XCTestCase {
     
     // MARK: - 1. ExhaustiveBenchmarkRunner ZIP Matrix
     func testExhaustiveZipBenchmarkRunnerScenarios() async throws {
-        let zipLevels: [ArchiveCompressionLevel] = TestBenchmarkTier.isBenchmarkMode
-            ? [.store, .level1, .level6, .level9]
-            : [.store, .level6]
+        guard TestBenchmarkTier.isBenchmarkMode else {
+            throw XCTSkip("全量 ZIP 场景矩阵压测需设置 TTZIP_RUN_BENCHMARKS=1 触发，常规 swift test 自动跳过以防止测试卡顿")
+        }
+        let zipLevels: [ArchiveCompressionLevel] = [.store, .level1, .level6, .level9]
         
         TTLogger.info("\n================================================================================")
         TTLogger.info("    📊 [TTZip Core Bench] Full ZIP scenarios (Store/Levels x Encrypted/Plain) empirical benchmark")

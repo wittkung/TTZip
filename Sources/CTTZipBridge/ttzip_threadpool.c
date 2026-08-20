@@ -164,6 +164,15 @@ ttzip_threadpool_t* ttzip_threadpool_create(uint32_t num_threads, size_t queue_c
     pthread_cond_init(&pool->all_idle, NULL);
     
     pool->threads = (pthread_t*)calloc(num_threads, sizeof(pthread_t));
+    if (!pool->threads) {
+        pthread_mutex_destroy(&pool->lock);
+        pthread_cond_destroy(&pool->queue_not_empty);
+        pthread_cond_destroy(&pool->queue_not_full);
+        pthread_cond_destroy(&pool->all_idle);
+        free(pool->task_queue);
+        free(pool);
+        return NULL;
+    }
     for (uint32_t i = 0; i < num_threads; i++) {
         pthread_create(&pool->threads[i], NULL, ttzip_worker_routine, pool);
     }
@@ -270,12 +279,23 @@ void ttzip_parallel_for(ttzip_threadpool_t* pool, size_t count, ttzip_parallel_f
         if (end > count) end = count;
         
         ttzip_parallel_for_chunk_t* chunk = (ttzip_parallel_for_chunk_t*)malloc(sizeof(ttzip_parallel_for_chunk_t));
+        if (!chunk) {
+            for (size_t i = start; i < end; i++) {
+                fn(i, user_data);
+            }
+            continue;
+        }
         chunk->fn = fn;
         chunk->user_data = user_data;
         chunk->start_index = start;
         chunk->end_index = end;
         
-        ttzip_threadpool_submit(pool, ttzip_parallel_for_chunk_worker, chunk);
+        if (ttzip_threadpool_submit(pool, ttzip_parallel_for_chunk_worker, chunk) != 0) {
+            for (size_t i = start; i < end; i++) {
+                fn(i, user_data);
+            }
+            free(chunk);
+        }
     }
     
     ttzip_threadpool_wait_all(pool);

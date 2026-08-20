@@ -65,6 +65,7 @@ static inline void ttzip_aes256_expand_keys(const uint8_t* key, uint8x16_t rk[15
         uint32_t raw_rk[4] = { w[i*4], w[i*4+1], w[i*4+2], w[i*4+3] };
         rk[i] = vld1q_u8((const uint8_t*)raw_rk);
     }
+    ttzip_secure_zero(w, sizeof(w));
 }
 
 static void ttzip_aes256_ctr_neon_chunk(

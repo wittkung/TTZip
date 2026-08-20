@@ -216,13 +216,17 @@ int ttzip_7z_parse_header_metadata(
                         if (rd == 0) break;
                         hpos += rd;
                         if (out_info->num_coder_unpack_sizes >= coder_unpack_sizes_cap) {
-                            coder_unpack_sizes_cap = (coder_unpack_sizes_cap * 2) + 64;
-                            uint64_t* new_arr = (uint64_t*)realloc(out_info->coder_unpack_sizes, coder_unpack_sizes_cap * sizeof(uint64_t));
-                            if (new_arr) out_info->coder_unpack_sizes = new_arr;
+                            size_t new_cap = (coder_unpack_sizes_cap * 2) + 64;
+                            size_t alloc_bytes = 0;
+                            if (ttzip_mul_overflow(sizeof(uint64_t), new_cap, &alloc_bytes)) {
+                                return TTZIP_ERR_OUT_OF_MEMORY;
+                            }
+                            uint64_t* new_arr = (uint64_t*)realloc(out_info->coder_unpack_sizes, alloc_bytes);
+                            if (!new_arr) return TTZIP_ERR_OUT_OF_MEMORY;
+                            out_info->coder_unpack_sizes = new_arr;
+                            coder_unpack_sizes_cap = new_cap;
                         }
-                        if (out_info->num_coder_unpack_sizes < coder_unpack_sizes_cap) {
-                            out_info->coder_unpack_sizes[out_info->num_coder_unpack_sizes++] = folder_unpack_sz;
-                        }
+                        out_info->coder_unpack_sizes[out_info->num_coder_unpack_sizes++] = folder_unpack_sz;
                     }
                 } else if (utag == 0x0A) { // kCRC
                     uint8_t allDefined = hp[hpos++];
@@ -250,11 +254,17 @@ int ttzip_7z_parse_header_metadata(
                         if (rd == 0) break;
                         hpos += rd;
                         if (out_info->num_stream_sizes >= stream_sizes_cap) {
-                            stream_sizes_cap = (stream_sizes_cap * 2) + (size_t)num_streams_val + 64;
-                            uint64_t* new_stream_sizes = (uint64_t*)realloc(out_info->stream_sizes, stream_sizes_cap * sizeof(uint64_t));
-                            if (new_stream_sizes) out_info->stream_sizes = new_stream_sizes;
+                            size_t new_cap = (stream_sizes_cap * 2) + (size_t)num_streams_val + 64;
+                            size_t alloc_bytes = 0;
+                            if (ttzip_mul_overflow(sizeof(uint64_t), new_cap, &alloc_bytes)) {
+                                return TTZIP_ERR_OUT_OF_MEMORY;
+                            }
+                            uint64_t* new_stream_sizes = (uint64_t*)realloc(out_info->stream_sizes, alloc_bytes);
+                            if (!new_stream_sizes) return TTZIP_ERR_OUT_OF_MEMORY;
+                            out_info->stream_sizes = new_stream_sizes;
+                            stream_sizes_cap = new_cap;
                         }
-                        if (out_info->num_stream_sizes < stream_sizes_cap) out_info->stream_sizes[out_info->num_stream_sizes++] = sval;
+                        out_info->stream_sizes[out_info->num_stream_sizes++] = sval;
                     }
                 } else if (stag == 0x0A) { // kCRC
                     uint8_t allDefined = hp[hpos++];
@@ -390,13 +400,17 @@ int ttzip_7z_parse_header_metadata(
         }
         if (folder_unpack > sum_streams) {
             if (out_info->num_stream_sizes >= stream_sizes_cap) {
-                stream_sizes_cap += 64;
-                uint64_t* new_arr = (uint64_t*)realloc(out_info->stream_sizes, stream_sizes_cap * sizeof(uint64_t));
-                if (new_arr) out_info->stream_sizes = new_arr;
+                size_t new_cap = stream_sizes_cap + 64;
+                size_t alloc_bytes = 0;
+                if (ttzip_mul_overflow(sizeof(uint64_t), new_cap, &alloc_bytes)) {
+                    return TTZIP_ERR_OUT_OF_MEMORY;
+                }
+                uint64_t* new_arr = (uint64_t*)realloc(out_info->stream_sizes, alloc_bytes);
+                if (!new_arr) return TTZIP_ERR_OUT_OF_MEMORY;
+                out_info->stream_sizes = new_arr;
+                stream_sizes_cap = new_cap;
             }
-            if (out_info->num_stream_sizes < stream_sizes_cap) {
-                out_info->stream_sizes[out_info->num_stream_sizes++] = folder_unpack - sum_streams;
-            }
+            out_info->stream_sizes[out_info->num_stream_sizes++] = folder_unpack - sum_streams;
         }
     } else if (out_info->num_stream_sizes == 0 && out_info->num_coder_unpack_sizes > 0) {
         if (out_info->is_encrypted && out_info->total_folders == 1) {
@@ -406,13 +420,17 @@ int ttzip_7z_parse_header_metadata(
         } else {
             for (size_t i = 0; i < out_info->num_coder_unpack_sizes; i++) {
                 if (out_info->num_stream_sizes >= stream_sizes_cap) {
-                    stream_sizes_cap += 64;
-                    uint64_t* new_arr = (uint64_t*)realloc(out_info->stream_sizes, stream_sizes_cap * sizeof(uint64_t));
-                    if (new_arr) out_info->stream_sizes = new_arr;
+                    size_t new_cap = stream_sizes_cap + 64;
+                    size_t alloc_bytes = 0;
+                    if (ttzip_mul_overflow(sizeof(uint64_t), new_cap, &alloc_bytes)) {
+                        return TTZIP_ERR_OUT_OF_MEMORY;
+                    }
+                    uint64_t* new_arr = (uint64_t*)realloc(out_info->stream_sizes, alloc_bytes);
+                    if (!new_arr) return TTZIP_ERR_OUT_OF_MEMORY;
+                    out_info->stream_sizes = new_arr;
+                    stream_sizes_cap = new_cap;
                 }
-                if (out_info->num_stream_sizes < stream_sizes_cap) {
-                    out_info->stream_sizes[out_info->num_stream_sizes++] = out_info->coder_unpack_sizes[i];
-                }
+                out_info->stream_sizes[out_info->num_stream_sizes++] = out_info->coder_unpack_sizes[i];
             }
         }
     }

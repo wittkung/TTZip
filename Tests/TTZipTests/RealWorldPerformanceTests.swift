@@ -10,7 +10,7 @@ final class RealWorldPerformanceTests: XCTestCase {
     
     func testZipPackaging_BasicFunctional() async throws {
         let sandbox = try IsolatedTempSandbox()
-        defer { try? sandbox.cleanup() }
+        defer { sandbox.cleanup() }
         
         let inputDir = sandbox.fileURL(named: "small_files_in")
         try TestFileGenerator.createBatchSmallFiles(in: inputDir, count: 10, sizePerFileInKB: 2)

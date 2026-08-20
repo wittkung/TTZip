@@ -82,15 +82,46 @@ public final class PasswordVaultViewModel: ObservableObject {
     
     public func unlockVault() {
         guard !masterPasswordInput.isEmpty else { return }
-        let success = (try? repository.unlock(masterPassword: masterPasswordInput)) ?? manager.unlockVault(with: masterPasswordInput)
-        if success {
-            isUnlocked = true
-            unlockErrorMessage = ""
-            masterPasswordInput = ""
-            refreshState()
-        } else {
-            unlockErrorMessage = "Incorrect master password. Please try again."
+        let password = masterPasswordInput
+        let repo = self.repository
+        let mgr = self.manager
+        
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            let success = await Task.detached(priority: .userInitiated) {
+                return (try? repo.unlock(masterPassword: password)) ?? mgr.unlockVault(with: password)
+            }.value
+            
+            if success {
+                self.isUnlocked = true
+                self.unlockErrorMessage = ""
+                self.masterPasswordInput = ""
+                self.refreshState()
+            } else {
+                self.unlockErrorMessage = "Incorrect master password. Please try again."
+            }
         }
+    }
+    
+    public func unlockVaultAsync() async -> Bool {
+        guard !masterPasswordInput.isEmpty else { return false }
+        let password = masterPasswordInput
+        let repo = self.repository
+        let mgr = self.manager
+        
+        let success = await Task.detached(priority: .userInitiated) {
+            return (try? repo.unlock(masterPassword: password)) ?? mgr.unlockVault(with: password)
+        }.value
+        
+        if success {
+            self.isUnlocked = true
+            self.unlockErrorMessage = ""
+            self.masterPasswordInput = ""
+            self.refreshState()
+        } else {
+            self.unlockErrorMessage = "Incorrect master password. Please try again."
+        }
+        return success
     }
     
     public func lockVault() {

@@ -123,6 +123,7 @@ static void zip_extract_entry_worker(size_t i, void* arg) {
         int dec_res = ttzip_aes256_decrypt_and_verify(ctx->password, raw_payload, raw_payload_len, decrypted_buf, &actual_plain_len);
         if (dec_res != TTZIP_OK) {
             atomic_store(&ctx->global_error, dec_res);
+            ttzip_secure_zero(decrypted_buf, cipher_len > 0 ? cipher_len : 1);
             free(decrypted_buf);
             ttzip_semaphore_signal(g_fd_sem);
             return;

@@ -130,6 +130,7 @@ int ttzip_inspect_archive_v2(
                             size_t tar_size = tar_capacity;
                             if (ttzip_snappy_framed_decompress(file_mem, file_size, tar_mem, &tar_size) == TTZIP_SNAPPY_OK) {
                                 free(file_mem);
+                                file_mem = NULL;
                                 struct archive* a = archive_read_new();
                                 if (a) {
                                     archive_read_support_format_all(a);

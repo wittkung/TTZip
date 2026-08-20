@@ -99,11 +99,14 @@ public final class BatchArchiveEngine: @unchecked Sendable {
         let results = await withTaskGroup(of: BatchTaskResult.self) { group in
             for item in items {
                 group.addTask {
+                    var caughtError: Error? = nil
                     do {
                         if let res = try await self.workerPool.executeAndAwait(item) as? BatchTaskResult {
                             return res
                         }
-                    } catch {}
+                    } catch {
+                        caughtError = error
+                    }
 
                     if let task = tasks.first(where: { $0.id.uuidString == item.itemID }) {
                         return BatchTaskResult(
@@ -111,7 +114,7 @@ public final class BatchArchiveEngine: @unchecked Sendable {
                             success: false,
                             targetPath: task.outputPath,
                             durationSeconds: 0,
-                            errorMessage: "Task execution failed"
+                            errorMessage: caughtError?.localizedDescription ?? "Task execution failed"
                         )
                     }
                     return BatchTaskResult(id: UUID(), success: false, targetPath: "", durationSeconds: 0, errorMessage: nil)
@@ -190,11 +193,14 @@ public final class BatchArchiveEngine: @unchecked Sendable {
         let results = await withTaskGroup(of: BatchTaskResult.self) { group in
             for item in items {
                 group.addTask {
+                    var caughtError: Error? = nil
                     do {
                         if let res = try await self.workerPool.executeAndAwait(item) as? BatchTaskResult {
                             return res
                         }
-                    } catch {}
+                    } catch {
+                        caughtError = error
+                    }
 
                     if let task = tasks.first(where: { $0.id.uuidString == item.itemID }) {
                         return BatchTaskResult(
@@ -202,7 +208,7 @@ public final class BatchArchiveEngine: @unchecked Sendable {
                             success: false,
                             targetPath: task.destinationDir,
                             durationSeconds: 0,
-                            errorMessage: "Task execution failed"
+                            errorMessage: caughtError?.localizedDescription ?? "Task execution failed"
                         )
                     }
                     return BatchTaskResult(id: UUID(), success: false, targetPath: "", durationSeconds: 0, errorMessage: nil)

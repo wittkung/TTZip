@@ -136,7 +136,8 @@ int ttzip_7z_crypto_session_init(
     
     // Cryptographically secure random IV
     if (SecRandomCopyBytes(kSecRandomDefault, 16, session->aes_iv) != errSecSuccess) {
-        memset(session->aes_iv, 0x5A, 16);
+        session->is_active = false;
+        return TTZIP_ERR_ARCHIVE_INIT_FAILED;
     }
 
     return ttzip_7z_kdf_sha256_armv8(password, salt, salt_len, session->num_cycles_power, session->aes_key);

@@ -97,6 +97,10 @@ elseif(APPLE)
     if(COMPRESSION_LIB)
         target_link_libraries(ttzip PRIVATE ${COMPRESSION_LIB})
     endif()
+    find_library(SECURITY_LIB Security)
+    if(SECURITY_LIB)
+        target_link_libraries(ttzip PUBLIC ${SECURITY_LIB})
+    endif()
     target_link_libraries(ttzip PRIVATE bz2 z)
 elseif(UNIX)
     target_link_libraries(ttzip PRIVATE pthread m dl)
@@ -182,6 +186,17 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         tests/c/test_tar_container.c
         tests/c/test_security_zipslip.c
         tests/c/test_concurrency_threadpool.c
+        tests/c/test_blosc_engine.c
+        tests/c/test_huffman_inplace.c
+        tests/c/test_snappy_engine.c
+        tests/c/test_dmg_lzfse.c
+        tests/c/test_archive_tree.c
+        tests/c/test_matchfinder_neon.c
+        tests/c/test_adler_crc64.c
+        tests/c/test_entropy_evaluator.c
+        tests/c/test_matchfinder_advanced.c
+        tests/c/test_blosc_slicing.c
+        tests/c/test_crypto_lz4_snappy.c
     )
 
     add_executable(ttzip_c_test_runner ${TTZIP_TEST_SOURCES})
@@ -191,6 +206,7 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/include
         ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge
         ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/native_deflate
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/lzfse
     )
 
     if(ENABLE_SANITIZERS)
@@ -217,6 +233,17 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         tar_container
         security_zipslip
         concurrency_threadpool
+        blosc_engine
+        huffman_inplace
+        snappy_engine
+        dmg_lzfse
+        archive_tree
+        matchfinder_neon
+        adler_crc64
+        entropy_evaluator
+        matchfinder_advanced
+        blosc_slicing
+        crypto_lz4_snappy
     )
 
     foreach(suite IN LISTS TEST_SUITES)

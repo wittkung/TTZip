@@ -13,7 +13,7 @@ final class DirectoryScanPerformanceTests: XCTestCase {
               ProcessInfo.processInfo.environment["TTZIP_RUN_STRESS_BENCHMARKS"] == "1" else {
             // Fast functional scan test in standard mode
             let sandbox = try IsolatedTempSandbox()
-            defer { try? sandbox.cleanup() }
+            defer { sandbox.cleanup() }
             
             let inputDir = sandbox.fileURL(named: "scan_test_dir")
             try TestFileGenerator.createBatchSmallFiles(in: inputDir, count: 20, sizePerFileInKB: 1)

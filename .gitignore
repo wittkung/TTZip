@@ -85,7 +85,8 @@ test*.7z
 test*.zip
 test*.tar*
 test*.txt
-test_*
+/test_*
+!tests/c/**
 
 # ------------------------------------------------------------------------------
 # 7. Environment, IDE & Local Overrides

@@ -23,6 +23,8 @@ public final class ArchiveTreeStore: ObservableObject {
     private var cachedSourceEntries: [ArchiveEntry] = []
     private var activeBuildTask: Task<[ArchiveTreeNode], Never>?
     private var activeFilterTask: Task<[ArchiveEntry], Never>?
+    private var buildGeneration: UInt64 = 0
+    private var filterGeneration: UInt64 = 0
     
     public init() {}
     
@@ -50,15 +52,19 @@ public final class ArchiveTreeStore: ObservableObject {
         
         isBuildingTree = true
         let source = entries
+        let currentGen = buildGeneration &+ 1
+        buildGeneration = currentGen
         
-        activeBuildTask = Task.detached(priority: .userInitiated) {
+        let buildTask = Task.detached(priority: .userInitiated) {
             let tree = ArchiveTreeBuilder.buildTree(from: source)
             return tree
         }
+        activeBuildTask = buildTask
         
         Task { [weak self] in
-            guard let self = self, let task = self.activeBuildTask else { return }
-            let nodes = await task.value
+            let nodes = await buildTask.value
+            guard let self = self else { return }
+            guard self.buildGeneration == currentGen else { return }
             guard !Task.isCancelled else { return }
             self.rootNodes = nodes
             self.isBuildingTree = false
@@ -85,12 +91,14 @@ public final class ArchiveTreeStore: ObservableObject {
         
         isFiltering = true
         let source = cachedSourceEntries
+        let currentFilterGen = filterGeneration &+ 1
+        filterGeneration = currentFilterGen
         
-        activeFilterTask = Task.detached(priority: .userInitiated) {
+        let filterTask: Task<[ArchiveEntry], Never> = Task.detached(priority: .userInitiated) {
             if debounceMs > 0 {
                 try? await Task.sleep(nanoseconds: debounceMs * 1_000_000)
             }
-            guard !Task.isCancelled else { return [] }
+            guard !Task.isCancelled else { return [ArchiveEntry]() }
             
             let lowerQuery = trimmed.lowercased()
             let matched = source.filter { entry in
@@ -98,12 +106,14 @@ public final class ArchiveTreeStore: ObservableObject {
             }
             return matched
         }
+        activeFilterTask = filterTask
         
         Task { [weak self] in
-            guard let self = self, let task = self.activeFilterTask else { return }
-            let results = await task.value
+            let matched = await filterTask.value
+            guard let self = self else { return }
+            guard self.filterGeneration == currentFilterGen else { return }
             guard !Task.isCancelled else { return }
-            self.filteredEntries = results
+            self.filteredEntries = matched
             self.isFiltering = false
         }
     }

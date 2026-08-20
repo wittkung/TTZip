@@ -113,6 +113,7 @@ int ttzip_7z_write_metadata_and_flush(
     size_t header_cap = 1024 * 1024 + num_files * 512 + total_names_len * 4;
     uint8_t* header_buf = (uint8_t*)malloc(header_cap);
     if (!header_buf) {
+        close(out_fd);
         return TTZIP_ERR_OUT_OF_MEMORY;
     }
     size_t h = 0;

@@ -1,0 +1,155 @@
+{
+  "durationMs" : 1569.3130493164062,
+  "endTime" : "2026-08-16T20:17:39Z",
+  "environment" : {
+    "cpuArchitecture" : "arm64 (Apple Silicon)",
+    "logicalCores" : 18,
+    "osVersion" : "Version 26.6 (Build 25G72)",
+    "swiftVersion" : "6.0"
+  },
+  "options" : {
+    "dumpOnFailure" : false,
+    "filterPattern" : "",
+    "jsonReportPath" : "docs\/test_reports\/local_ci_report.json",
+    "keepTempFiles" : false,
+    "markdownReportPath" : "docs\/test_reports\/local_ci_report.md",
+    "verbosity" : 0
+  },
+  "sessionId" : "TEST-20260816T201738Z",
+  "startTime" : "2026-08-16T20:17:38Z",
+  "suites" : [
+    {
+      "cases" : [
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_7z",
+          "durationMs" : 27.832984924316406,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_zip",
+          "durationMs" : 15.632987022399902,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_tar",
+          "durationMs" : 10.557055473327637,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_zst",
+          "durationMs" : 13.740062713623047,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_gz",
+          "durationMs" : 12.59303092956543,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_bz2",
+          "durationMs" : 133.79096984863281,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_xz",
+          "durationMs" : 220.26300430297852,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_lzip",
+          "durationMs" : 226.20594501495361,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_lz4",
+          "durationMs" : 215.58094024658203,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_brotli",
+          "durationMs" : 15.645980834960938,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_lrzip",
+          "durationMs" : 226.112961769104,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_aar",
+          "durationMs" : 11.255025863647461,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_wim",
+          "durationMs" : 11.432051658630371,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_dmg",
+          "durationMs" : 12.34591007232666,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_iso",
+          "durationMs" : 7.9600811004638672,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_tar.gz",
+          "durationMs" : 12.816071510314941,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_tar.zst",
+          "durationMs" : 11.58297061920166,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_tar.bz2",
+          "durationMs" : 143.07999610900879,
+          "status" : "passed"
+        },
+        {
+          "assertionCount" : 5,
+          "caseName" : "diagnostic_tar.xz",
+          "durationMs" : 238.6479377746582,
+          "status" : "passed"
+        }
+      ],
+      "durationMs" : 1567.4340724945068,
+      "failedCount" : 0,
+      "passedCount" : 19,
+      "skippedCount" : 0,
+      "suiteName" : "NativeFormatDiagnosticSuite",
+      "totalAssertions" : 95
+    }
+  ],
+  "summary" : {
+    "failedCases" : 0,
+    "passedCases" : 19,
+    "passRate" : 100,
+    "skippedCases" : 0,
+    "totalAssertions" : 95,
+    "totalCases" : 19,
+    "totalSuites" : 1
+  }
+}

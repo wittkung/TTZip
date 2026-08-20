@@ -359,6 +359,9 @@ int ttzip_spawn_7zz_compress_in_dir(
 
     int ret = ttzip_core_posix_spawn_fast(bin_path, (const char* const*)argv, actual_working_dir);
     free(argv);
+    if (has_pass) {
+        ttzip_secure_zero(pass_arg, sizeof(pass_arg));
+    }
     if (ret != 0) {
         ttzip_log_c(3, "[TTZip C] posix_spawn failed ret=%d, bin_path='%s'\n", ret, bin_path ? bin_path : "NULL");
         return ret;

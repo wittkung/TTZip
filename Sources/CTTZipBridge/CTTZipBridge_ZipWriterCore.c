@@ -202,7 +202,12 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
         write_u16_le(eocd_ptr + 20, 0);
         current_offset += 22;
 
-        pwrite_all(out_fd, out_mem, (size_t)current_offset, 0);
+        if (pwrite_all(out_fd, out_mem, (size_t)current_offset, 0) < 0) {
+            if (out_mem != stack_out_mem) free(out_mem);
+            if (offsets != stack_offsets) free(offsets);
+            close(out_fd);
+            return TTZIP_ERR_OPEN_FAILED;
+        }
 
         if (out_mem != stack_out_mem) free(out_mem);
         if (offsets != stack_offsets) free(offsets);
@@ -242,10 +247,10 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
         write_u16_le(local_header + 26, filename_len);
         write_u16_le(local_header + 28, extra_field_len);
 
-        pwrite_all(out_fd, local_header, 30, (off_t)current_offset);
+        if (pwrite_all(out_fd, local_header, 30, (off_t)current_offset) < 0) goto cleanup_fail;
         current_offset += 30;
 
-        pwrite_all(out_fd, item->rel_path, filename_len, (off_t)current_offset);
+        if (pwrite_all(out_fd, item->rel_path, filename_len, (off_t)current_offset) < 0) goto cleanup_fail;
         current_offset += filename_len;
 
         if (needs_z64) {
@@ -254,7 +259,7 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
             write_u16_le(z64_extra + 2, 16);
             write_u64_le(z64_extra + 4, (uint64_t)item->uncompressed_size);
             write_u64_le(z64_extra + 12, (uint64_t)item->compressed_size);
-            pwrite_all(out_fd, z64_extra, 20, (off_t)current_offset);
+            if (pwrite_all(out_fd, z64_extra, 20, (off_t)current_offset) < 0) goto cleanup_fail;
             current_offset += 20;
         }
 
@@ -265,7 +270,7 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
             write_u16_le(aes_extra + 4, 0x0002);
             aes_extra[6] = 'A'; aes_extra[7] = 'E'; aes_extra[8] = 0x03;
             write_u16_le(aes_extra + 9, item->actual_method);
-            pwrite_all(out_fd, aes_extra, 11, (off_t)current_offset);
+            if (pwrite_all(out_fd, aes_extra, 11, (off_t)current_offset) < 0) goto cleanup_fail;
             current_offset += 11;
         }
 
@@ -273,21 +278,28 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
             if (item->is_mmapped) {
                 madvise(item->compressed_payload, (size_t)item->compressed_size, MADV_WILLNEED);
             }
-            pwrite_all(out_fd, item->compressed_payload, (size_t)item->compressed_size, (off_t)current_offset);
+            if (pwrite_all(out_fd, item->compressed_payload, (size_t)item->compressed_size, (off_t)current_offset) < 0) goto cleanup_fail;
             current_offset += (uint64_t)item->compressed_size;
         } else if (item->uncompressed_size > 0 && !item->is_directory) {
             int in_fd = open(item->src_path, O_RDONLY);
             if (in_fd >= 0) {
                 void* mptr = mmap(NULL, (size_t)item->uncompressed_size, PROT_READ, MAP_SHARED, in_fd, 0);
                 if (mptr != MAP_FAILED) {
-                    pwrite_all(out_fd, mptr, (size_t)item->uncompressed_size, (off_t)current_offset);
+                    if (pwrite_all(out_fd, mptr, (size_t)item->uncompressed_size, (off_t)current_offset) < 0) {
+                        munmap(mptr, (size_t)item->uncompressed_size);
+                        close(in_fd);
+                        goto cleanup_fail;
+                    }
                     munmap(mptr, (size_t)item->uncompressed_size);
                 } else {
                     char stream_buf[256 * 1024];
                     ssize_t rbytes = 0;
                     off_t dst_off = (off_t)current_offset;
                     while ((rbytes = read(in_fd, stream_buf, sizeof(stream_buf))) > 0) {
-                        pwrite_all(out_fd, stream_buf, (size_t)rbytes, dst_off);
+                        if (pwrite_all(out_fd, stream_buf, (size_t)rbytes, dst_off) < 0) {
+                            close(in_fd);
+                            goto cleanup_fail;
+                        }
                         dst_off += rbytes;
                     }
                 }
@@ -323,10 +335,10 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
         write_u32_le(cd_header + 38, item->is_directory ? (0040755u << 16 | 0x10u) : (0100644u << 16 | 0x20u));
         write_u32_le(cd_header + 42, needs_z64 ? 0xFFFFFFFF : (uint32_t)offsets[i]);
 
-        pwrite_all(out_fd, cd_header, 46, (off_t)current_offset);
+        if (pwrite_all(out_fd, cd_header, 46, (off_t)current_offset) < 0) goto cleanup_fail;
         current_offset += 46;
 
-        pwrite_all(out_fd, item->rel_path, filename_len, (off_t)current_offset);
+        if (pwrite_all(out_fd, item->rel_path, filename_len, (off_t)current_offset) < 0) goto cleanup_fail;
         current_offset += filename_len;
 
         if (needs_z64) {
@@ -336,7 +348,7 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
             write_u64_le(z64_extra + 4, (uint64_t)item->uncompressed_size);
             write_u64_le(z64_extra + 12, (uint64_t)item->compressed_size);
             write_u64_le(z64_extra + 20, (uint64_t)offsets[i]);
-            pwrite_all(out_fd, z64_extra, 28, (off_t)current_offset);
+            if (pwrite_all(out_fd, z64_extra, 28, (off_t)current_offset) < 0) goto cleanup_fail;
             current_offset += 28;
         }
 
@@ -347,7 +359,7 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
             write_u16_le(aes_extra + 4, 0x0002);
             aes_extra[6] = 'A'; aes_extra[7] = 'E'; aes_extra[8] = 0x03;
             write_u16_le(aes_extra + 9, item->actual_method);
-            pwrite_all(out_fd, aes_extra, 11, (off_t)current_offset);
+            if (pwrite_all(out_fd, aes_extra, 11, (off_t)current_offset) < 0) goto cleanup_fail;
             current_offset += 11;
         }
     }
@@ -368,7 +380,7 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
         write_u64_le(z64_eocd + 32, (uint64_t)list.count);
         write_u64_le(z64_eocd + 40, cd_size);
         write_u64_le(z64_eocd + 48, cd_start_offset);
-        pwrite_all(out_fd, z64_eocd, 56, (off_t)current_offset);
+        if (pwrite_all(out_fd, z64_eocd, 56, (off_t)current_offset) < 0) goto cleanup_fail;
         current_offset += 56;
 
         uint8_t z64_loc[20];
@@ -376,7 +388,7 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
         write_u32_le(z64_loc + 4, 0);
         write_u64_le(z64_loc + 8, z64_eocd_off);
         write_u32_le(z64_loc + 16, 1);
-        pwrite_all(out_fd, z64_loc, 20, (off_t)current_offset);
+        if (pwrite_all(out_fd, z64_loc, 20, (off_t)current_offset) < 0) goto cleanup_fail;
         current_offset += 20;
     }
 
@@ -390,7 +402,7 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
     write_u32_le(eocd + 16, global_z64 ? 0xFFFFFFFF : (uint32_t)cd_start_offset);
     write_u16_le(eocd + 20, 0);
 
-    pwrite_all(out_fd, eocd, 22, (off_t)current_offset);
+    if (pwrite_all(out_fd, eocd, 22, (off_t)current_offset) < 0) goto cleanup_fail;
     current_offset += 22;
 
     ftruncate(out_fd, (off_t)current_offset);
@@ -398,4 +410,9 @@ int ttzip_write_zip_archive_disk(const char* output_zip_path, ttzip_c_item_list_
     free(offsets);
 
     return TTZIP_OK;
+
+cleanup_fail:
+    close(out_fd);
+    free(offsets);
+    return TTZIP_ERR_OPEN_FAILED;
 }
