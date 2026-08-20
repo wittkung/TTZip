@@ -8,6 +8,7 @@
 #include "include/ttzip_api.h"
 #include "include/CTTZipStreamCoder.h"
 #include "include/ttzip_zopfli_engine.h"
+#include "include/CTTZipCRC32Neon.h"
 #include "fast-lzma2/fast-lzma2.h"
 #include "lzfse/lzfse.h"
 #include "snappy/snappy-c.h"
@@ -133,4 +134,9 @@ size_t ttzip_decompress_buffer(
     default:
         return 0;
     }
+}
+
+uint32_t ttzip_crc32(uint32_t init_crc, const void *buf, size_t len) {
+    if (!buf || len == 0) return init_crc;
+    return ttzip_crc32_fast(init_crc, (const uint8_t *)buf, len);
 }

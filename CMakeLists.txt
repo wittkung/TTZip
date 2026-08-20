@@ -98,6 +98,16 @@ elseif(APPLE)
         target_link_libraries(ttzip PRIVATE ${COMPRESSION_LIB})
     endif()
     target_link_libraries(ttzip PRIVATE bz2 z)
+elseif(UNIX)
+    target_link_libraries(ttzip PRIVATE pthread m dl)
+    find_package(ZLIB QUIET)
+    if(ZLIB_FOUND)
+        target_link_libraries(ttzip PRIVATE ZLIB::ZLIB)
+    endif()
+    find_package(BZip2 QUIET)
+    if(BZIP2_FOUND)
+        target_link_libraries(ttzip PRIVATE BZip2::BZip2)
+    endif()
 endif()
 
 # 6. 构建独立纯 C 命令行工具 ttzip-cli
@@ -110,13 +120,22 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cli/main.c")
     )
 endif()
 
-# 7. 安装与导出配置
+# 7. 构建 C SDK 开发者示例 ttzip-quickstart
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/quickstart.c")
+    add_executable(ttzip-quickstart examples/quickstart.c)
+    target_link_libraries(ttzip-quickstart PRIVATE ttzip)
+    target_include_directories(ttzip-quickstart PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge
+    )
+endif()
+
+# 8. 安装与导出配置
 include(GNUInstallDirs)
 install(TARGETS ttzip ttzip-cli
     EXPORT TTZipTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )

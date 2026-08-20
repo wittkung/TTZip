@@ -18,10 +18,11 @@ cmake --build build --config Release -j8 > /dev/null
 echo "    ✅ CMake build passed: build/libttzip.a & build/ttzip-cli generated successfully."
 
 # 2. Pure C CLI Functional & Benchmark Verification
-echo "==> [2/4] Testing Standalone ttzip-cli Binary & In-Memory Benchmark..."
+echo "==> [2/4] Testing Standalone ttzip-cli & C SDK Quickstart..."
 ./build/ttzip-cli --version
 ./build/ttzip-cli --benchmark
-echo "    ✅ Standalone C CLI verification passed."
+./build/ttzip-quickstart
+echo "    ✅ Standalone C CLI & C SDK quickstart verification passed."
 
 # 3. Zero-GCD Audit in TTZipCore
 echo "==> [3/4] Auditing Zero Apple GCD Calls in TTZipCore..."

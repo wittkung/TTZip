@@ -106,6 +106,11 @@ TTZIP_API size_t ttzip_decompress_buffer(
     size_t dst_cap
 );
 
+/**
+ * @brief Computes hardware-vector accelerated CRC32 checksum.
+ */
+TTZIP_API uint32_t ttzip_crc32(uint32_t init_crc, const void *buf, size_t len);
+
 #ifdef __cplusplus
 }
 #endif
