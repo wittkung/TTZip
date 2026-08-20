@@ -4,7 +4,6 @@
 // All rights reserved.
 
 import Foundation
-import TTZipCore
 
 /// 零依赖自包含 Zen UI 帕累托基准测试 HTML5 仪表盘生成器
 public final class HTMLParetoDashboardGenerator: @unchecked Sendable {

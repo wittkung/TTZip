@@ -8,7 +8,6 @@
 import XCTest
 import QuartzCore
 @testable import TTZipCore
-@testable import TTZipBench
 
 /// Isomorphic TAR.ZST / Zstandard format Pareto benchmark PK test suite (TTZip vs. Meta zstd CLI).
 final class TarZstParetoFrontierPkTests: XCTestCase {

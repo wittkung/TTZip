@@ -7,7 +7,6 @@
 
 import XCTest
 @testable import TTZipCore
-@testable import TTZipBench
 import CTTZipBridge
 
 /// Comprehensive 5-Tier multi-modality corpus benchmark suite using weighted geometric mean index.

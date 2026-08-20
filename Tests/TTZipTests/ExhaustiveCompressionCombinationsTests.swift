@@ -7,7 +7,6 @@
 
 import XCTest
 @testable import TTZipCore
-@testable import TTZipBench
 
 final class ExhaustiveCompressionCombinationsTests: XCTestCase {
     

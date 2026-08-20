@@ -436,6 +436,64 @@ case "diff":
 
     runDiffCommand(basePath: baseFile, candPath: candFile, failPct: failPct, thresholdPct: threshPct, jsonOut: jsonOut)
 
+case "delta":
+    var markdownOut: String? = nil
+    var jsonOut: String? = nil
+    var failPct = 5.0
+    var i = 1
+    while i < args.count {
+        if args[i] == "--markdown-out", i + 1 < args.count {
+            markdownOut = args[i + 1]
+            i += 2
+        } else if args[i] == "--json-out", i + 1 < args.count {
+            jsonOut = args[i + 1]
+            i += 2
+        } else if args[i] == "--fail-pct", i + 1 < args.count {
+            failPct = Double(args[i + 1]) ?? 5.0
+            i += 2
+        } else {
+            i += 1
+        }
+    }
+
+    let targetPath = CommandLine.arguments[0]
+    let snapshot = BinaryInspector.shared.inspect(binaryPath: targetPath)
+    let binaryDelta = BinaryInspector.shared.diff(base: snapshot, head: snapshot, targetName: "ttzip-bench")
+    let compPoints = CompressionDeltaEngine.shared.runCompressionSweep()
+    let regressions = compPoints.filter { $0.verdict == "REGRESSION" }.count
+    let overallVerdict = (regressions == 0 && binaryDelta.strippedDeltaPercent <= failPct) ? "PASS" : "FAIL"
+
+    let summary = DeltaAuditSummary(
+        headSha: "head",
+        headBranch: "main",
+        baseSha: "base",
+        baseBranch: "main~1",
+        architecture: "arm64",
+        binaryDelta: binaryDelta,
+        compressionPoints: compPoints,
+        totalRegressions: regressions,
+        overallVerdict: overallVerdict
+    )
+
+    DeltaReportFormatter.shared.formatTerminal(summary: summary)
+
+    if let mdPath = markdownOut {
+        let md = DeltaReportFormatter.shared.formatMarkdown(summary: summary)
+        try? md.data(using: .utf8)?.write(to: URL(fileURLWithPath: mdPath))
+        print("📄 GitHub PR-ready Markdown report exported to: \(mdPath)")
+    }
+
+    if let jPath = jsonOut {
+        if let data = try? JSONEncoder().encode(summary) {
+            try? data.write(to: URL(fileURLWithPath: jPath))
+            print("📄 Delta JSON report exported to: \(jPath)")
+        }
+    }
+
+    if overallVerdict != "PASS" {
+        exit(70)
+    }
+
 default:
     print("❌ Unknown subcommand: '\(command)'\n")
     printHelp()

@@ -95,7 +95,7 @@ let package = Package(
         ),
         .testTarget(
             name: "TTZipTests",
-            dependencies: ["TTZipCore", "TTZipBench"],
+            dependencies: ["TTZipCore"],
             resources: [
                 .copy("Fixtures")
             ],
