@@ -42,6 +42,19 @@ int ttzip_7z_decode_payload_parallel(
     size_t* out_total_unpacked
 );
 
+int ttzip_7z_decode_solid_entry_stream(
+    const uint8_t* payload_start,
+    size_t payload_len,
+    uint64_t primary_method_id,
+    const uint8_t* coder_props,
+    size_t coder_props_len,
+    uint64_t pre_entry_skip_bytes,
+    uint64_t target_entry_size,
+    uint8_t* out_buffer,
+    int out_fd,
+    uint32_t* out_crc32
+);
+
 #ifdef __cplusplus
 }
 #endif

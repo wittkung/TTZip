@@ -224,3 +224,99 @@ int ttzip_7z_decode_payload_parallel(
     *out_total_unpacked = total_unpack_bytes;
     return TTZIP_OK;
 }
+
+#include <lzma.h>
+#include <unistd.h>
+
+int ttzip_7z_decode_solid_entry_stream(
+    const uint8_t* payload_start,
+    size_t payload_len,
+    uint64_t primary_method_id,
+    const uint8_t* coder_props,
+    size_t coder_props_len,
+    uint64_t pre_entry_skip_bytes,
+    uint64_t target_entry_size,
+    uint8_t* out_buffer,
+    int out_fd,
+    uint32_t* out_crc32
+) {
+    if (!payload_start || payload_len == 0) return TTZIP_ERR_INVALID_PARAM;
+    if (!out_buffer && out_fd < 0) return TTZIP_ERR_INVALID_PARAM;
+    (void)primary_method_id;
+    (void)coder_props;
+    (void)coder_props_len;
+
+    lzma_stream strm = LZMA_STREAM_INIT;
+    lzma_ret ret = lzma_auto_decoder(&strm, UINT64_MAX, 0);
+    if (ret != LZMA_OK) return TTZIP_ERR_CORRUPT_HEADER;
+
+    strm.next_in = payload_start;
+    strm.avail_in = payload_len;
+
+    uint8_t discard_buf[65536];
+    uint64_t discarded = 0;
+
+    // Phase 1: Fast-forward and discard prior bytes in solid stream
+    while (discarded < pre_entry_skip_bytes) {
+        size_t to_discard = sizeof(discard_buf);
+        if (pre_entry_skip_bytes - discarded < to_discard) {
+            to_discard = (size_t)(pre_entry_skip_bytes - discarded);
+        }
+        strm.next_out = discard_buf;
+        strm.avail_out = to_discard;
+
+        ret = lzma_code(&strm, LZMA_RUN);
+        size_t produced = to_discard - strm.avail_out;
+        discarded += produced;
+
+        if (ret == LZMA_STREAM_END) break;
+        if (ret != LZMA_OK) {
+            lzma_end(&strm);
+            return TTZIP_ERR_CORRUPT_HEADER;
+        }
+    }
+
+    // Phase 2: Direct streaming of target entry
+    uint64_t extracted = 0;
+    uint32_t running_crc = 0;
+
+    while (extracted < target_entry_size) {
+        size_t chunk_req = (size_t)target_entry_size - extracted;
+        uint8_t* write_ptr = NULL;
+
+        if (out_buffer) {
+            write_ptr = out_buffer + extracted;
+            strm.next_out = write_ptr;
+            strm.avail_out = chunk_req;
+        } else {
+            if (chunk_req > sizeof(discard_buf)) chunk_req = sizeof(discard_buf);
+            write_ptr = discard_buf;
+            strm.next_out = write_ptr;
+            strm.avail_out = chunk_req;
+        }
+
+        ret = lzma_code(&strm, LZMA_RUN);
+        size_t produced = chunk_req - strm.avail_out;
+
+        if (produced > 0) {
+            running_crc = (uint32_t)ttzip_simd_crc32(running_crc, write_ptr, produced);
+            if (out_fd >= 0) {
+                ssize_t w = write(out_fd, write_ptr, produced);
+                (void)w;
+            }
+            extracted += produced;
+        }
+
+        if (ret == LZMA_STREAM_END) break;
+        if (ret != LZMA_OK) {
+            lzma_end(&strm);
+            return TTZIP_ERR_CORRUPT_HEADER;
+        }
+    }
+
+    // Phase 3: Immediate early termination
+    lzma_end(&strm);
+
+    if (out_crc32) *out_crc32 = running_crc;
+    return (extracted == target_entry_size) ? TTZIP_OK : TTZIP_ERR_CORRUPT_HEADER;
+}

@@ -201,6 +201,7 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         tests/c/test_compat_archives.c
         tests/c/test_fs_metadata.c
         tests/c/test_cpu_topology.c
+        tests/c/test_7z_crypto_neon.c
     )
 
     add_executable(ttzip_c_test_runner ${TTZIP_TEST_SOURCES})
@@ -253,6 +254,7 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         compat_archives
         fs_metadata
         cpu_topology
+        7z_crypto_neon
     )
 
     foreach(suite IN LISTS TEST_SUITES)

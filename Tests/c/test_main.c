@@ -34,6 +34,7 @@ void run_cve_regressions_tests(void);
 void run_compat_archives_tests(void);
 void run_fs_metadata_tests(void);
 void run_cpu_topology_tests(void);
+void run_7z_crypto_neon_tests(void);
 
 int main(int argc, char** argv) {
     const char* suite_filter = (argc > 1) ? argv[1] : "all";
@@ -144,6 +145,10 @@ int main(int argc, char** argv) {
     }
     if (strcmp(suite_filter, "all") == 0 || strcmp(suite_filter, "cpu_topology") == 0) {
         run_cpu_topology_tests();
+        overall_failures += (ttzip_test_get_global_ctx()->failed_tests > 0 ? 1 : 0);
+    }
+    if (strcmp(suite_filter, "all") == 0 || strcmp(suite_filter, "7z_crypto_neon") == 0) {
+        run_7z_crypto_neon_tests();
         overall_failures += (ttzip_test_get_global_ctx()->failed_tests > 0 ? 1 : 0);
     }
 
