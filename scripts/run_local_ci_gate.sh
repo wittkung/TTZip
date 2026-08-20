@@ -73,7 +73,7 @@ declare -a STAGE_NAMES=(
     "Differential System Oracle"
     "Malformed Stream Fuzzing"
     "Libarchive Golden Corpus"
-    "Hard Performance Floors"
+    "Deflate-Bench 50-Point Matrix Gate"
 )
 
 declare -a STAGE_KEYS=(
@@ -91,7 +91,7 @@ declare -a STAGE_COMMANDS=(
     "swift test --filter DifferentialOracleTests"
     "swift test --filter ArchiveMutationFuzzTests"
     "swift test --filter LibarchiveGoldenCorpusTests"
-    "swift test --filter XCTestPerformanceMeasureTests"
+    "swift run ttzip-bench gate"
 )
 
 TOTAL_STAGES=${#STAGE_NAMES[@]}

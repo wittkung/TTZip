@@ -1,3 +1,4 @@
+import TTZipCore
 // SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
 // Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>

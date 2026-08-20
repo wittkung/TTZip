@@ -19,6 +19,10 @@ let package = Package(
         .executable(
             name: "ttzip-cli",
             targets: ["TTZipCLI"]
+        ),
+        .executable(
+            name: "ttzip-bench",
+            targets: ["TTZipBench"]
         )
     ],
     dependencies: [
@@ -79,9 +83,19 @@ let package = Package(
             name: "TTZipCLI",
             dependencies: ["TTZipCore"]
         ),
+        .executableTarget(
+            name: "TTZipBench",
+            dependencies: [
+                "TTZipCore",
+                "CTTZipBridge"
+            ],
+            swiftSettings: [
+                .unsafeFlags(["-no-whole-module-optimization", "-enable-batch-mode"])
+            ]
+        ),
         .testTarget(
             name: "TTZipTests",
-            dependencies: ["TTZipCore"],
+            dependencies: ["TTZipCore", "TTZipBench"],
             resources: [
                 .copy("Fixtures")
             ],

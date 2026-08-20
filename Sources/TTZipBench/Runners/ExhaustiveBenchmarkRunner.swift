@@ -1,3 +1,4 @@
+import TTZipCore
 // SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
 //
 // Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
@@ -7,24 +8,10 @@
 
 import Foundation
 import CryptoKit
-import QuartzCore
+
 
 /// Metrics row representing a single benchmark permutation.
-public struct ExhaustiveBenchmarkRow: Sendable, Identifiable, Codable {
-    public var id: String { "\(dimensionName)_\(format.rawValue)_\(level.rawValue)_\(isEncrypted)" }
-    public let dimensionName: String
-    public let format: ArchiveCompressionFormat
-    public let level: ArchiveCompressionLevel
-    public let isEncrypted: Bool
-    public let datasetSizeBytes: Int64
-    public let archiveSizeBytes: Int64
-    public let compressDurationSeconds: Double
-    public let compressThroughputMBs: Double
-    public let extractDurationSeconds: Double
-    public let extractThroughputMBs: Double
-    public let compressionRatioPercent: Double
-    public let sha256Matched: Bool
-}
+// ExhaustiveBenchmarkRow imported from TTZipCore
 
 /// Exhaustive matrix benchmark runner across formats, levels, encryption modes, and datasets.
 public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
@@ -139,7 +126,7 @@ public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
 
                         progressHandler?("[\(currentStep)/\(totalSteps)] Testing [\(payload.name)] - Format: \(fmt.rawValue) | Level: \(lvl.rawValue) | Encrypted: \(isEnc)")
 
-                        let t0 = CACurrentMediaTime()
+                        let t0 = PlatformMonotonicTimer.nowSeconds()
                         do {
                             _ = try await ArchivePipelineBuilder()
                                 .withWriter(writer)
@@ -149,20 +136,20 @@ public final class ExhaustiveBenchmarkRunner: @unchecked Sendable {
                                 .addInputPath(payload.path)
                                 .withPassword(passwordStr)
                                 .executeCreate()
-                            let t1 = CACurrentMediaTime()
+                            let t1 = PlatformMonotonicTimer.nowSeconds()
                             let compDuration = max(0.001, t1 - t0)
                             let compThroughput = (Double(payload.bytes) / (1024.0 * 1024.0)) / compDuration
                             let archiveBytes = (try? FileManager.default.attributesOfItem(atPath: outArc.path)[.size] as? Int64) ?? 0
                             let ratio = payload.bytes > 0 ? (Double(archiveBytes) / Double(payload.bytes)) * 100.0 : 100.0
 
-                            let t2 = CACurrentMediaTime()
+                            let t2 = PlatformMonotonicTimer.nowSeconds()
                             _ = try await ArchivePipelineBuilder()
                                 .withExtractor(extractor)
                                 .withArchivePath(outArc.path)
                                 .withDestinationDir(extractDest.path)
                                 .withPassword(passwordStr)
                                 .executeExtract()
-                            let t3 = CACurrentMediaTime()
+                            let t3 = PlatformMonotonicTimer.nowSeconds()
                             let extractDuration = max(0.001, t3 - t2)
                             let extractThroughput = (Double(payload.bytes) / (1024.0 * 1024.0)) / extractDuration
 

@@ -36,41 +36,13 @@ public enum CLIBenchmarkRunner {
             }
         }
         
-        do {
-            print("\n========================================================================================================================")
-            print("📊 Full-Matrix Multidimensional Peak Performance Benchmark (Apple Silicon M-Series Native)")
-            print("========================================================================================================================")
-            let hDim = "Dimension"
-            let hFmt = "Format"
-            let hLvl = "Level"
-            let hEnc = "Enc"
-            let hComp = "Compress MB/s"
-            let hDecomp = "Extract MB/s"
-            let hTime = "Time (C/D)"
-            let hRatio = "Ratio"
-            let hSha = "Integrity"
-            
-            print("\(hDim.padding(toLength: 26, withPad: " ", startingAt: 0)) | \(hFmt.padding(toLength: 6, withPad: " ", startingAt: 0)) | \(hLvl.padding(toLength: 10, withPad: " ", startingAt: 0)) | \(hEnc.padding(toLength: 6, withPad: " ", startingAt: 0)) | \(hComp.padding(toLength: 14, withPad: " ", startingAt: 0)) | \(hDecomp.padding(toLength: 14, withPad: " ", startingAt: 0)) | \(hTime.padding(toLength: 18, withPad: " ", startingAt: 0)) | \(hRatio.padding(toLength: 10, withPad: " ", startingAt: 0)) | \(hSha)")
-            print("------------------------------------------------------------------------------------------------------------------------")
-            fflush(stdout)
-
-            let _ = try await ExhaustiveBenchmarkRunner.runExhaustiveMatrix(
-                selectedFormats: selectedFormats,
-                selectedLevels: selectedLevels
-            ) { msg in
-                if msg.hasPrefix("ROW:") {
-                    let rowStr = String(msg.dropFirst(4))
-                    print(rowStr)
-                    fflush(stdout)
-                } else {
-                    print(msg)
-                    fflush(stdout)
-                }
-            }
-            print("========================================================================================================================\n")
-        } catch {
-            print("❌ Exhaustive matrix benchmark failed: \(error.localizedDescription)")
-        }
+        _ = selectedFormats
+        _ = selectedLevels
+        print("\n========================================================================================================================")
+        print("📊 Full-Matrix Multidimensional Peak Performance Benchmark (Apple Silicon M-Series Native)")
+        print("========================================================================================================================")
+        print("⚡️ Full-matrix multi-dimensional benchmark is available via 'ttzip-bench matrix'.")
+        print("========================================================================================================================\n")
     }
     
     public static func runCompetitorBenchmark(config: BenchmarkRunConfig) async {
@@ -337,26 +309,19 @@ public enum CLIBenchmarkRunner {
 
             print("\n" + engine.generateTurboBenchTable(report: report))
 
-            // 2. 帕累托最优前沿分析与真实图像文件导出 (PNG / SVG)
-            let paretoResult = ParetoFrontierCalculator.shared.calculateFrontier(from: report.results)
+            // 2. 帕累托最优前沿分析 (绘图已收敛至 ttzip-bench)
+            let _ = ParetoFrontierCalculator.shared.calculateFrontier(from: report.results)
 
             if let pngPath = options.pngOutPath {
-                try RasterParetoPlotter.shared.exportPNG(result: paretoResult, to: pngPath)
-                print("🖼️  High-resolution PNG Pareto chart exported: \(pngPath)")
+                print("🖼️  High-resolution PNG Pareto chart generation is available via 'ttzip-bench plot --png-out \(pngPath)'.")
             }
 
             if let svgPath = options.svgOutPath {
-                try SVGParetoPlotter.shared.exportSVG(result: paretoResult, to: svgPath)
-                print("📈 Interactive SVG Pareto chart exported: \(svgPath)")
+                print("📈 Interactive SVG Pareto chart generation is available via 'ttzip-bench plot --svg-out \(svgPath)'.")
             }
 
             if (options.pareto || options.plot) && options.pngOutPath == nil && options.svgOutPath == nil {
-                let defaultPng = "docs/benchmarks/pareto_frontier.png"
-                let defaultSvg = "docs/benchmarks/pareto_frontier.svg"
-                try? RasterParetoPlotter.shared.exportPNG(result: paretoResult, to: defaultPng)
-                try? SVGParetoPlotter.shared.exportSVG(result: paretoResult, to: defaultSvg)
-                print("🖼️  High-resolution Pareto graphic image generated: \(defaultPng)")
-                print("📈 Interactive SVG vector graphic generated: \(defaultSvg)")
+                print("📈 Interactive Pareto charts are generated via 'ttzip-bench plot'.")
             }
 
             // 3. 物理传输介质端到端耗时投影表

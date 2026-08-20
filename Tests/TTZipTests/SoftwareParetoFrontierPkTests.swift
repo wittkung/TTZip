@@ -8,6 +8,7 @@
 import XCTest
 import QuartzCore
 @testable import TTZipCore
+@testable import TTZipBench
 
 /// Pure ZIP / Deflate software-level Pareto benchmark PK test suite across competing tools.
 final class SoftwareParetoFrontierPkTests: XCTestCase {

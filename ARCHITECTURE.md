@@ -73,13 +73,17 @@ TTZip Pro is an enterprise-grade, high-performance macOS archive management soft
 - **ARM64 PMULL Vector Acceleration**: 4-way unrolled Galois Field polynomial multiplication (`vmull_p64`) yielding **48,160 MB/s (47.0 GB/s)** checksum throughput.
 - **Performance Whitepaper**: See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for full 16-format throughput matrices and 1v1 competitor benchmarks.
 
-### 2.5 Dual-Tier Deflate & Hybrid Hardware Acceleration Pipeline
+### 2.5 Dual-Tier Deflate & Upstream Codec Topology
+- **Single-Core Architecture Invariant**:
+  - TTZip strictly utilizes `libdeflate` as the Layer 0 single-core and chunked Deflate/Inflate engine, avoiding custom micro-optimizations that yield diminishing returns and high maintenance overhead.
+  - TTZip's core competitive moat is built on multi-core scheduling (Apple Silicon P/E-core topology), APFS `clonefile`/`fstore_t` zero-copy I/O, and container-level parallel pipelines.
+  - **Optimization Policy**: We explicitly prohibit branching logic for custom compression kernels in favor of static linking against highly-optimized upstream C libraries, ensuring binary size stability and cache-friendly code alignment.
 - **Tier 1 (Fast-Path Memory & Chunk Plane)**:
-  - `libdeflate` (`ttzip_libdeflate_compress` / `decompress`): Whole-buffer and 1MB chunked compression with Thread-Local compressor/decompressor pooling (>1,500 MB/s compression, >7,500 MB/s decompression).
+  - `libdeflate` (`ttzip_libdeflate_compress` / `decompress`): Whole-buffer, memory-page-flyweight, and 512KB/1MB chunked compression with lock-free C11 `_Thread_local` compressor/decompressor pooling (>1,500 MB/s compression, >7,500 MB/s decompression).
 - **Tier 2 (Stateful Streaming Pipeline & libarchive Plane)**:
   - `zlib-ng` (`ttzip_deflate_stream_*` / `ttzip_inflate_stream_*`): RFC 1951/1952 stateful sliding window pipeline with `DYNAMIC_CPU_DISPATCH` (AVX2/AVX-512/NEON), replacing legacy scalar `libz.dylib` / `zlib1.dll` and yielding >1,200 MB/s streaming compression.
-- **Hybrid SWAR+NEON Match Finder**:
-  - `ttzip_hybrid_match_len_neon`: Tier 0 64-bit SWAR GPR fast-fail (<=3 cycles, 0 cross-domain penalty for matches < 8 bytes) + Tier 1 128-bit NEON unrolling for extended runs up to 258/273 bytes.
+- **Research & Oracle Baseline Isolation**:
+  - Custom native in-process Deflate prototypes (`native_deflate/` / `native_inflate/`) are preserved strictly as internal differential oracles and benchmarking baselines (`ttzip_native_deflate_*`), keeping production runtime pipelines 100% focused on `libdeflate` and `zlib-ng`.
 
 ---
 

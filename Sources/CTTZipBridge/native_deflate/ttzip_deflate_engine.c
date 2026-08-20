@@ -7,9 +7,12 @@
 
 /**
  * @file ttzip_deflate_engine.c
- * @brief Native in-process Apple Silicon Deflate block & streaming compression pipeline (Instant Incremental).
+ * @brief Internal Research Oracle & Educational Baseline Deflate compression pipeline.
  * @details Coordinates greedy/fast-lazy/deep-lazy LZ77 parsing, length/distance slot translation,
  *          dynamic/static canonical Huffman coding, and RFC 1951 continuous bitstream serialization.
+ *          NOTE: Production single-core Deflate operations in TTZip strictly route to libdeflate
+ *          (ttzip_libdeflate_compress); this implementation is retained as a differential oracle.
+ *          Baseline established for comparative performance verification against C-based LZ77 heuristics.
  */
 
 #include "ttzip_deflate_engine.h"
