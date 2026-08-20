@@ -128,7 +128,12 @@ static void* ttzip_worker_routine(void* arg) {
 #endif
 }
 
-ttzip_threadpool_t* ttzip_threadpool_create(uint32_t num_threads, size_t queue_capacity) {
+#if defined(__APPLE__)
+#include <pthread/qos.h>
+#endif
+#include "include/ttzip_thread_budget.h"
+
+ttzip_threadpool_t* ttzip_threadpool_create_qos(uint32_t num_threads, size_t queue_capacity, ttzip_qos_tier_t tier) {
     if (num_threads == 0) {
         num_threads = ttzip_detect_hardware_threads();
     }
@@ -156,6 +161,11 @@ ttzip_threadpool_t* ttzip_threadpool_create(uint32_t num_threads, size_t queue_c
     pool->threads = (HANDLE*)calloc(num_threads, sizeof(HANDLE));
     for (uint32_t i = 0; i < num_threads; i++) {
         pool->threads[i] = (HANDLE)_beginthreadex(NULL, 0, ttzip_worker_routine, pool, 0, NULL);
+        if (tier == TTZIP_QOS_PERFORMANCE) {
+            SetThreadPriority(pool->threads[i], THREAD_PRIORITY_HIGHEST);
+        } else if (tier == TTZIP_QOS_EFFICIENCY) {
+            SetThreadPriority(pool->threads[i], THREAD_PRIORITY_BELOW_NORMAL);
+        }
     }
 #else
     pthread_mutex_init(&pool->lock, NULL);
@@ -173,12 +183,27 @@ ttzip_threadpool_t* ttzip_threadpool_create(uint32_t num_threads, size_t queue_c
         free(pool);
         return NULL;
     }
-    for (uint32_t i = 0; i < num_threads; i++) {
-        pthread_create(&pool->threads[i], NULL, ttzip_worker_routine, pool);
+    
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+#if defined(__APPLE__)
+    if (tier == TTZIP_QOS_PERFORMANCE) {
+        pthread_attr_set_qos_class_np(&attr, QOS_CLASS_USER_INTERACTIVE, 0);
+    } else if (tier == TTZIP_QOS_EFFICIENCY) {
+        pthread_attr_set_qos_class_np(&attr, QOS_CLASS_UTILITY, 0);
     }
+#endif
+    for (uint32_t i = 0; i < num_threads; i++) {
+        pthread_create(&pool->threads[i], &attr, ttzip_worker_routine, pool);
+    }
+    pthread_attr_destroy(&attr);
 #endif
     
     return pool;
+}
+
+ttzip_threadpool_t* ttzip_threadpool_create(uint32_t num_threads, size_t queue_capacity) {
+    return ttzip_threadpool_create_qos(num_threads, queue_capacity, TTZIP_QOS_ALL);
 }
 
 int ttzip_threadpool_submit(ttzip_threadpool_t* pool, ttzip_task_fn fn, void* user_data) {
@@ -384,6 +409,58 @@ ttzip_threadpool_t* ttzip_threadpool_shared(void) {
     pthread_once(&g_shared_once, ttzip_init_shared_pool);
 #endif
     return g_shared_pool;
+}
+
+static ttzip_threadpool_t* g_shared_pool_p = NULL;
+static ttzip_threadpool_t* g_shared_pool_e = NULL;
+#if defined(TTZIP_OS_WINDOWS)
+// Windows fallback
+#else
+static pthread_once_t g_shared_p_once = PTHREAD_ONCE_INIT;
+static pthread_once_t g_shared_e_once = PTHREAD_ONCE_INIT;
+
+static void ttzip_init_shared_pool_p(void) {
+    ttzip_cpu_topology_t topo = ttzip_cpu_topology_detect();
+    uint32_t count = topo.p_cores > 0 ? topo.p_cores : topo.total_logical_cores;
+    g_shared_pool_p = ttzip_threadpool_create_qos(count, 4096, TTZIP_QOS_PERFORMANCE);
+}
+
+static void ttzip_init_shared_pool_e(void) {
+    ttzip_cpu_topology_t topo = ttzip_cpu_topology_detect();
+    uint32_t count = topo.e_cores > 0 ? topo.e_cores : (topo.total_logical_cores > 2 ? topo.total_logical_cores / 2 : 1);
+    g_shared_pool_e = ttzip_threadpool_create_qos(count, 4096, TTZIP_QOS_EFFICIENCY);
+}
+#endif
+
+ttzip_threadpool_t* ttzip_threadpool_shared_p(void) {
+#if defined(TTZIP_OS_WINDOWS)
+    return ttzip_threadpool_shared();
+#else
+    pthread_once(&g_shared_p_once, ttzip_init_shared_pool_p);
+    return g_shared_pool_p ? g_shared_pool_p : ttzip_threadpool_shared();
+#endif
+}
+
+ttzip_threadpool_t* ttzip_threadpool_shared_e(void) {
+#if defined(TTZIP_OS_WINDOWS)
+    return ttzip_threadpool_shared();
+#else
+    pthread_once(&g_shared_e_once, ttzip_init_shared_pool_e);
+    return g_shared_pool_e ? g_shared_pool_e : ttzip_threadpool_shared();
+#endif
+}
+
+void ttzip_parallel_for_qos(ttzip_threadpool_t* pool, size_t count, ttzip_parallel_for_fn fn, void* user_data, ttzip_qos_tier_t tier) {
+    if (pool == NULL) {
+        if (tier == TTZIP_QOS_PERFORMANCE) {
+            pool = ttzip_threadpool_shared_p();
+        } else if (tier == TTZIP_QOS_EFFICIENCY) {
+            pool = ttzip_threadpool_shared_e();
+        } else {
+            pool = ttzip_threadpool_shared();
+        }
+    }
+    ttzip_parallel_for(pool, count, fn, user_data);
 }
 
 /* ============================================================================

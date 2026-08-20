@@ -67,6 +67,7 @@ TEST_CASE(test_compat_gtar_longlink_extraction) {
     if (f) {
         char buf[128] = {0};
         size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+        (void)n;
         fclose(f);
         ASSERT_TRUE(strstr(buf, "longlink extraction payload") != NULL);
     }

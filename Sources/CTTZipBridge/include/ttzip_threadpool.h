@@ -93,10 +93,36 @@ TTZIP_API uint32_t ttzip_threadpool_get_thread_count(const ttzip_threadpool_t* p
  */
 TTZIP_API void ttzip_threadpool_destroy(ttzip_threadpool_t* pool);
 
+typedef enum {
+    TTZIP_QOS_PERFORMANCE = 0, // Latency-critical decompression & UI-blocking jobs (P-cores)
+    TTZIP_QOS_EFFICIENCY  = 1, // Energy-efficient background batch compression (E-cores)
+    TTZIP_QOS_ALL         = 2  // Full-throughput parallel processing (P + E cores)
+} ttzip_qos_tier_t;
+
 /**
  * @brief Retrieves the global process-wide shared thread pool.
  */
 TTZIP_API ttzip_threadpool_t* ttzip_threadpool_shared(void);
+
+/**
+ * @brief Retrieves the dedicated Performance-core shared thread pool.
+ */
+TTZIP_API ttzip_threadpool_t* ttzip_threadpool_shared_p(void);
+
+/**
+ * @brief Retrieves the dedicated Efficiency-core shared thread pool.
+ */
+TTZIP_API ttzip_threadpool_t* ttzip_threadpool_shared_e(void);
+
+/**
+ * @brief Executes a parallel for-loop across iterations [0, count - 1] with targeted QoS routing.
+ * @param pool Thread pool handle (if NULL, routes automatically to P or E pool based on tier).
+ * @param count Total number of iterations.
+ * @param fn Iteration body callback.
+ * @param user_data Argument passed to fn.
+ * @param tier Target QoS tier.
+ */
+TTZIP_API void ttzip_parallel_for_qos(ttzip_threadpool_t* pool, size_t count, ttzip_parallel_for_fn fn, void* user_data, ttzip_qos_tier_t tier);
 
 /* ============================================================================
  * 2. Once-initialization Primitive (cross-platform dispatch_once replacement)
