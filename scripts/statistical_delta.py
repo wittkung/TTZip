@@ -207,6 +207,7 @@ def process_benchmark_runs(base_runs_logs, cand_runs_logs, meta, regression_thre
     regressions = 0
     noise = 0
     
+    thresh_pct = max(1.0, regression_threshold * 100.0)
     for k in common_keys:
         cat, disp, unit, hib = metric_meta[k]
         s_a = base_samples[k]
@@ -220,8 +221,8 @@ def process_benchmark_runs(base_runs_logs, cand_runs_logs, meta, regression_thre
         delta_pct = ((m_b - m_a) / m_a * 100.0) if m_a != 0 else 0.0
         t_stat, df, p_val = welch_t_test(s_a, s_b)
         
-        is_improved = (delta_pct > 1.0) if hib else (delta_pct < -1.0)
-        is_regressed = (delta_pct < -1.0) if hib else (delta_pct > 1.0)
+        is_improved = (delta_pct > thresh_pct) if hib else (delta_pct < -thresh_pct)
+        is_regressed = (delta_pct < -thresh_pct) if hib else (delta_pct > thresh_pct)
         
         if p_val < 0.05 and is_improved:
             verdict = "SIGNIFICANT_SPEEDUP"
