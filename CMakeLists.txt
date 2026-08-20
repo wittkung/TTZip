@@ -259,5 +259,40 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/test_main.c")
         TIMEOUT 30
         LABELS "full;c11"
     )
+
+    # 10. TTZip C11 Native Benchmark Runner
+    set(TTZIP_BENCH_SOURCES
+        tests/c/bench_main.c
+        tests/c/bench_codecs.c
+        tests/c/bench_checksums.c
+        tests/c/bench_pareto.c
+        tests/c/bench_stress_vfs.c
+    )
+    add_executable(ttzip_benchmark_runner ${TTZIP_BENCH_SOURCES})
+    target_link_libraries(ttzip_benchmark_runner PRIVATE ttzip)
+    target_include_directories(ttzip_benchmark_runner PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/c
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/native_deflate
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/lzfse
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/fast-lzma2
+    )
+    if(ENABLE_SANITIZERS AND NOT MSVC)
+        target_compile_options(ttzip_benchmark_runner PRIVATE 
+            -fsanitize=address,undefined 
+            -fno-omit-frame-pointer
+            -fno-sanitize-recover=all
+        )
+        target_link_options(ttzip_benchmark_runner PRIVATE 
+            -fsanitize=address,undefined
+        )
+    endif()
+
+    add_test(NAME "c_bench_all" COMMAND ttzip_benchmark_runner "--all")
+    set_tests_properties("c_bench_all" PROPERTIES
+        TIMEOUT 60
+        LABELS "benchmark;c11"
+    )
 endif()
 

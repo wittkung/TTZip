@@ -243,12 +243,16 @@ typedef struct {
     void*                 user_data;
     size_t                start_index;
     size_t                end_index;
+    ttzip_semaphore_t*    done_sem;
 } ttzip_parallel_for_chunk_t;
 
 static void ttzip_parallel_for_chunk_worker(void* arg) {
     ttzip_parallel_for_chunk_t* chunk = (ttzip_parallel_for_chunk_t*)arg;
     for (size_t i = chunk->start_index; i < chunk->end_index; i++) {
         chunk->fn(i, chunk->user_data);
+    }
+    if (chunk->done_sem) {
+        ttzip_semaphore_signal(chunk->done_sem);
     }
     free(chunk);
 }
@@ -267,10 +271,19 @@ void ttzip_parallel_for(ttzip_threadpool_t* pool, size_t count, ttzip_parallel_f
         return;
     }
     
+    ttzip_semaphore_t* done_sem = ttzip_semaphore_create(0);
+    if (!done_sem) {
+        for (size_t i = 0; i < count; i++) {
+            fn(i, user_data);
+        }
+        return;
+    }
+    
     size_t num_chunks = pool->num_threads * 2;
     if (num_chunks > count) num_chunks = count;
     
     size_t items_per_chunk = (count + num_chunks - 1) / num_chunks;
+    size_t submitted_chunks = 0;
     
     for (size_t c = 0; c < num_chunks; c++) {
         size_t start = c * items_per_chunk;
@@ -289,16 +302,22 @@ void ttzip_parallel_for(ttzip_threadpool_t* pool, size_t count, ttzip_parallel_f
         chunk->user_data = user_data;
         chunk->start_index = start;
         chunk->end_index = end;
+        chunk->done_sem = done_sem;
         
         if (ttzip_threadpool_submit(pool, ttzip_parallel_for_chunk_worker, chunk) != 0) {
             for (size_t i = start; i < end; i++) {
                 fn(i, user_data);
             }
             free(chunk);
+        } else {
+            submitted_chunks++;
         }
     }
     
-    ttzip_threadpool_wait_all(pool);
+    for (size_t i = 0; i < submitted_chunks; i++) {
+        ttzip_semaphore_wait(done_sem);
+    }
+    ttzip_semaphore_destroy(done_sem);
 }
 
 uint32_t ttzip_threadpool_get_thread_count(const ttzip_threadpool_t* pool) {

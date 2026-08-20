@@ -152,3 +152,17 @@ public enum TTZipAssertions {
         XCTAssertEqual(st.st_size, 0, "Assertion Failed: Expected empty file at \(url.path), but size is \(st.st_size)", file: file, line: line)
     }
 }
+
+public enum TestBenchmarkTier {
+    public static var isBenchmarkMode: Bool {
+        ProcessInfo.processInfo.environment["TTZIP_BENCHMARK"] != nil
+    }
+    
+    public static func fuzzIterations(default def: Int, deep: Int) -> Int {
+        if ProcessInfo.processInfo.environment["TTZIP_DEEP_FUZZ"] != nil {
+            return deep
+        }
+        return def
+    }
+}
+

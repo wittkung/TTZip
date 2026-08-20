@@ -20,8 +20,16 @@ extension ArchiveError {
             return "\(template) (Code: \(code))"
         case .invalidFormat:
             return manager.string(for: L10n.Errors.unsupportedFormat, language: language)
-        case .passwordRequired, .passwordRequiredDetailed:
+        case .passwordRequired:
             return manager.string(for: L10n.Errors.passwordRequired, language: language)
+        case .passwordRequiredDetailed(let archivePath, let tier):
+            let base = manager.string(for: L10n.Errors.passwordRequired, language: language)
+            let fileName = (archivePath as NSString).lastPathComponent
+            if tier == .headerAndData {
+                return "\(base): header and entries are encrypted (\(fileName))"
+            } else {
+                return "\(base): payload data is encrypted (\(fileName))"
+            }
         case .wrongPassword:
             return manager.string(for: L10n.Errors.incorrectPassword, language: language)
         case .unsupportedEncryptionMethod(_, let method):

@@ -128,7 +128,7 @@ final class FastContainerStreamTests: XCTestCase {
         }
 
         let elapsedNanos = PlatformMonotonicTimer.nowNanoseconds() - start
-        let totalMB = Double(payloadSize * iterations) / (1024.0 * 1024.0)
+        let totalMB = (Double(payloadSize) * Double(iterations)) / (1024.0 * 1024.0)
         let elapsedSeconds = Double(elapsedNanos) / 1_000_000_000.0
         let throughputMBs = totalMB / elapsedSeconds
 

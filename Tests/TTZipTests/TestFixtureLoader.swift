@@ -52,9 +52,4 @@ public enum TestFixtureLoader {
     public static func encryptedFixturePath(named filename: String) throws -> String {
         return try encryptedFixtureURL(named: filename).path
     }
-    
-    /// HyperCompress
-    public static func hyperCompressGenerator(profile: MicroCorpusProfile = .standardCiGate) -> HyperCompressCorpusGenerator {
-        return HyperCompressCorpusGenerator(profile: profile)
-    }
 }
