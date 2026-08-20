@@ -29,6 +29,10 @@ struct libdeflate_decompressor* ttzip_get_tls_decompressor(void);
 
 size_t ttzip_libdeflate_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity, int level);
 size_t ttzip_libdeflate_decompress(const void* src, size_t src_size, void* dst, size_t dst_capacity);
+size_t ttzip_brotli_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity);
+size_t ttzip_brotli_decompress(const void* src, size_t src_size, void* dst, size_t dst_capacity);
+size_t ttzip_bzip2_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity, int level);
+size_t ttzip_bzip2_decompress(const void* src, size_t src_size, void* dst, size_t dst_capacity);
 size_t ttzip_raw_deflate_block_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity, int level, bool is_final);
 size_t ttzip_raw_deflate_block_compress_with_dict(const void* src, size_t src_size, const void* dict_ptr, size_t dict_size, void* dst, size_t dst_capacity, int level, bool is_final);
 

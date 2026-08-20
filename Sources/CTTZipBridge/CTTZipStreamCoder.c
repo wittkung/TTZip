@@ -53,6 +53,44 @@ size_t ttzip_libdeflate_decompress(const void* src, size_t src_size, void* dst, 
     return (res == LIBDEFLATE_SUCCESS) ? actual_out : 0;
 }
 
+#if defined(__APPLE__)
+#include <compression.h>
+#endif
+#include <bzlib.h>
+
+size_t ttzip_brotli_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity) {
+    if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
+#if defined(__APPLE__)
+    return compression_encode_buffer((uint8_t*)dst, dst_capacity, (const uint8_t*)src, src_size, NULL, COMPRESSION_BROTLI);
+#else
+    return 0;
+#endif
+}
+
+size_t ttzip_brotli_decompress(const void* src, size_t src_size, void* dst, size_t dst_capacity) {
+    if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
+#if defined(__APPLE__)
+    return compression_decode_buffer((uint8_t*)dst, dst_capacity, (const uint8_t*)src, src_size, NULL, COMPRESSION_BROTLI);
+#else
+    return 0;
+#endif
+}
+
+size_t ttzip_bzip2_compress(const void* src, size_t src_size, void* dst, size_t dst_capacity, int level) {
+    if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
+    unsigned int dest_len = (unsigned int)dst_capacity;
+    int bz_lvl = (level < 1) ? 1 : (level > 9 ? 9 : level);
+    int ret = BZ2_bzBuffToBuffCompress((char*)dst, &dest_len, (char*)src, (unsigned int)src_size, bz_lvl, 0, 30);
+    return (ret == BZ_OK) ? (size_t)dest_len : 0;
+}
+
+size_t ttzip_bzip2_decompress(const void* src, size_t src_size, void* dst, size_t dst_capacity) {
+    if (!src || !dst || src_size == 0 || dst_capacity == 0) return 0;
+    unsigned int dest_len = (unsigned int)dst_capacity;
+    int ret = BZ2_bzBuffToBuffDecompress((char*)dst, &dest_len, (char*)src, (unsigned int)src_size, 0, 0);
+    return (ret == BZ_OK) ? (size_t)dest_len : 0;
+}
+
 static _Thread_local z_stream s_tls_raw_deflate_strm[13];
 static _Thread_local bool s_tls_raw_deflate_inited[13] = { false };
 

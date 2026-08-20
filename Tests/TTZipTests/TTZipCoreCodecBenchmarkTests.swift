@@ -73,8 +73,17 @@ final class TTZipCoreCodecBenchmarkTests: XCTestCase {
         print(sumLine)
         print("==========================================================================================================================")
 
-        XCTAssertGreaterThanOrEqual(summary.totalPoints, 40)
+        XCTAssertEqual(summary.totalPoints, 80)
         XCTAssertTrue(summary.allIntegrityPassed)
-        XCTAssertLessThanOrEqual(summary.totalDurationMs, 2000.0)
+        XCTAssertLessThanOrEqual(summary.totalDurationMs, 2500.0)
+
+        let engines = Set(summary.results.map { $0.engineName })
+        XCTAssertTrue(engines.contains("libdeflate"))
+        XCTAssertTrue(engines.contains("zstd"))
+        XCTAssertTrue(engines.contains("lz4"))
+        XCTAssertTrue(engines.contains("lzfse"))
+        XCTAssertTrue(engines.contains("snappy"))
+        XCTAssertTrue(engines.contains("brotli"))
+        XCTAssertTrue(engines.contains("bzip2"))
     }
 }
