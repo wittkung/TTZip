@@ -42,7 +42,7 @@ public final class ZipBlockParallelDecompressor: @unchecked Sendable {
             let inPointerBox = SendablePointerBox(pointer: srcBase, size: compressedData.count)
             let outPointerBox = SendablePointerBox(pointer: dstBytePtr, size: Int(uncompressedSize))
             
-            DispatchQueue.concurrentPerform(iterations: totalBlocks) { blockIdx in
+            ConcurrencyBridge.parallelFor(iterations: totalBlocks) { blockIdx in
                 let inOff = blockOffsets[blockIdx]
                 let cSize = blockCompressedSizes[blockIdx]
                 let uSize = blockUncompressedSizes[blockIdx]

@@ -77,28 +77,6 @@ public final class ArchiveEngineRegistry: @unchecked Sendable {
 
 // MARK: - Concrete Format Engine Strategies
 
-private final class StrategySyncBox<T>: @unchecked Sendable {
-    var value: T?
-    var error: Error?
-}
-
-private func executeStrategyBridgeSync<T: Sendable>(_ block: @Sendable @escaping () async throws -> T) throws -> T {
-    let box = StrategySyncBox<T>()
-    let sema = DispatchSemaphore(value: 0)
-    Task.detached {
-        do {
-            box.value = try await block()
-        } catch {
-            box.error = error
-        }
-        sema.signal()
-    }
-    sema.wait()
-    if let val = box.value { return val }
-    if let err = box.error { throw err }
-    throw ArchiveError.readFailed(code: -999)
-}
-
 /// ZIP format engine strategy implementation.
 public final class ZipFormatEngineStrategy: ArchiveFormatEngineStrategy {
     public let format: ArchiveCompressionFormat = .zip

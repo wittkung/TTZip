@@ -25,18 +25,16 @@ public final class ArchiveEventCenter: ArchiveEventCenterProtocol, @unchecked Se
     /// - Parameters:
     ///   - observer: Observer conforming to `ArchiveEventObserverProtocol`.
     ///   - events: Target event types filter (or nil for all events).
-    ///   - dispatchQueue: Target dispatch queue for callbacks.
     public func addObserver(
         _ observer: ArchiveEventObserverProtocol,
-        forEvents events: Set<ArchiveEventType>? = nil,
-        dispatchQueue: DispatchQueue? = nil
+        forEvents events: Set<ArchiveEventType>? = nil
     ) {
         lock.lock()
         defer { lock.unlock() }
         
         subscriptions.removeAll { !$0.wrapper.isAlive }
         
-        let wrapper = WeakObserverWrapper(observer, dispatchQueue: dispatchQueue)
+        let wrapper = WeakObserverWrapper(observer)
         let newSub = EventSubscription(wrapper: wrapper, filterEvents: events)
         if let idx = subscriptions.firstIndex(where: { $0.wrapper.observer === observer }) {
             subscriptions[idx] = newSub

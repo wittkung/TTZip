@@ -73,7 +73,7 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
             if Thread.isMainThread {
                 component.receive(event: event)
             } else {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     component.receive(event: event)
                 }
             }
@@ -94,7 +94,7 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
             if Thread.isMainThread {
                 component.receive(event: event)
             } else {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     component.receive(event: event)
                 }
             }
@@ -111,7 +111,7 @@ public final class ArchiveAppMediator: ArchiveMediatorProtocol, @unchecked Senda
         if Thread.isMainThread {
             component.receive(event: event)
         } else {
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 component.receive(event: event)
             }
         }

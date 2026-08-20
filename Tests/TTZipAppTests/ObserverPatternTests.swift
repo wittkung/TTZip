@@ -222,22 +222,14 @@ final class ObserverPatternTests: XCTestCase {
         XCTAssertEqual(center.registeredObserverTaskCount, 0)
     }
     
-    func testWeakObserverQueueDispatching() {
+    func testWeakObserverDirectDispatching() {
         let broadcaster = ArchiveProgressBroadcaster.shared
-        let customQueue = DispatchQueue(label: "test.observer.queue")
-        let expectation = XCTestExpectation(description: "Queue dispatch finished")
-        
         let mockObs = MockProgressObserver()
-        broadcaster.addObserver(mockObs, dispatchQueue: customQueue)
+        broadcaster.addObserver(mockObs)
         
         broadcaster.broadcastProgress(ArchiveProgressInfo(bytesProcessed: 10, totalBytes: 100))
         
-        customQueue.async {
-            expectation.fulfill()
-        }
-        
-        wait(for: [expectation], timeout: 2.0)
-        XCTAssertEqual(mockObs.receivedCount, 1, "指定自定义队列分发的观察者应在目标队列收到通知")
+        XCTAssertEqual(mockObs.receivedCount, 1, "观察者应直接收到通知")
     }
     
     // MARK: - 4. MB/s ETA 0 、NaN Infinity
@@ -338,19 +330,17 @@ final class ObserverPatternTests: XCTestCase {
             var eventObservers: [MockEventObserver] = []
             var cancelObservers: [MockCancellationObserver] = []
             
-            for i in 0..<observerCountPerBatch {
-                let q = queues[i % queues.count]
-                
+            for _ in 0..<observerCountPerBatch {
                 let pObs = MockProgressObserver()
-                broadcaster.addObserver(pObs, dispatchQueue: q)
+                broadcaster.addObserver(pObs)
                 progressObservers.append(pObs)
                 
                 let eObs = MockEventObserver()
-                eventCenter.addObserver(eObs, dispatchQueue: q)
+                eventCenter.addObserver(eObs)
                 eventObservers.append(eObs)
                 
                 let cObs = MockCancellationObserver()
-                cancellationCenter.addObserver(cObs, forTask: taskId, dispatchQueue: q)
+                cancellationCenter.addObserver(cObs, forTask: taskId)
                 cancelObservers.append(cObs)
             }
             
@@ -406,9 +396,9 @@ final class ObserverPatternTests: XCTestCase {
                 
                 cancellationCenter.registerTask(tId)
                 
-                broadcaster.addObserver(pObs, dispatchQueue: .global())
-                eventCenter.addObserver(eObs, forEvents: [.archiveCompleted], dispatchQueue: .global())
-                cancellationCenter.addObserver(cObs, forTask: tId, dispatchQueue: .global())
+                broadcaster.addObserver(pObs)
+                eventCenter.addObserver(eObs, forEvents: [.archiveCompleted])
+                cancellationCenter.addObserver(cObs, forTask: tId)
                 
                 broadcaster.broadcastProgress(ArchiveProgressInfo(bytesProcessed: Int64(i), totalBytes: 200))
                 broadcaster.broadcastBatchProgress(BatchProgressInfo(completedTasks: 1, totalTasks: 5))
@@ -432,29 +422,22 @@ final class ObserverPatternTests: XCTestCase {
         XCTAssertEqual(result, .success, "极端交叉多线程 register/unregister/broadcast/finishTask 必须绝对并发安全")
     }
     
-    func testRound3ObserverReRegistrationWithUpdatedDispatchQueueAndFilter() {
+    func testRound3ObserverReRegistrationWithUpdatedFilter() {
         let eventCenter = ArchiveEventCenter.shared
         let obs = MockEventObserver()
-        let customQueue = DispatchQueue(label: "re.registration.queue")
         
         eventCenter.addObserver(obs, forEvents: [.archiveCompleted])
         XCTAssertEqual(eventCenter.observerCount, 1)
         
-        // filter queue
-        eventCenter.addObserver(obs, forEvents: [.presetChanged], dispatchQueue: customQueue)
+        // filter
+        eventCenter.addObserver(obs, forEvents: [.presetChanged])
         XCTAssertEqual(eventCenter.observerCount, 1, "重新注册观察者不得重复追加，必须更新现有订阅结构")
         
         eventCenter.postArchiveCompleted(archivePath: "/tmp/a.zip", operationType: .compress, duration: 0.1, totalBytes: 10)
         XCTAssertEqual(obs.count, 0, "更新 filter 后不应接收 archiveCompleted 事件")
         
         eventCenter.postPresetChanged(oldPresetName: "O", newPresetName: "N")
-        
-        let exp = XCTestExpectation(description: "Wait for customQueue event")
-        customQueue.async {
-            exp.fulfill()
-        }
-        wait(for: [exp], timeout: 2.0)
-        XCTAssertEqual(obs.count, 1, "更新为 customQueue 后必须通过目标队列完成分发")
+        XCTAssertEqual(obs.count, 1, "更新 filter 后必须接收到 presetChanged 事件")
     }
 
     func testPasswordVaultEventObservationViaArchiveEventCenter() throws {

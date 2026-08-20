@@ -164,8 +164,7 @@ public protocol ArchiveEventObserverProtocol: AnyObject, Sendable {
 public protocol ArchiveEventCenterProtocol: Sendable {
     func addObserver(
         _ observer: ArchiveEventObserverProtocol,
-        forEvents events: Set<ArchiveEventType>?,
-        dispatchQueue: DispatchQueue?
+        forEvents events: Set<ArchiveEventType>?
     )
     func removeObserver(_ observer: ArchiveEventObserverProtocol)
     func removeAllObservers()

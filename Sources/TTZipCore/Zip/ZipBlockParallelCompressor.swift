@@ -44,7 +44,7 @@ public final class ZipBlockParallelCompressor: @unchecked Sendable {
             guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
             let ptrBox = SendablePointerBox(pointer: baseAddr, size: data.count)
             
-            DispatchQueue.concurrentPerform(iterations: totalBlocks) { blockIdx in
+            ConcurrencyBridge.parallelFor(iterations: totalBlocks) { blockIdx in
                 let offset = blockIdx * ZipBlockParallelCompressor.blockSize
                 let currentChunkSize = min(ZipBlockParallelCompressor.blockSize, ptrBox.size - offset)
                 let chunkPtr = ptrBox.pointer.advanced(by: offset)

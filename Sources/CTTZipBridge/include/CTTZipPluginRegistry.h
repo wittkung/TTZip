@@ -53,8 +53,26 @@ int ttzip_plugin_register_filter(const ttzip_filter_plugin_t* plugin);
 int ttzip_plugin_register_codec(const ttzip_codec_plugin_t* plugin);
 
 /**
- * @brief Dispatches filter forward transform with built-in fast path and lock-free plugin table lookup.
+ * @brief Invokes filter forward transform with built-in fast path and lock-free plugin table lookup.
  */
+int ttzip_plugin_invoke_filter_forward(
+    uint8_t filter_id,
+    const uint8_t* src,
+    uint8_t* dst,
+    size_t size,
+    uint8_t type_size,
+    uint8_t meta
+);
+
+int ttzip_plugin_invoke_filter_backward(
+    uint8_t filter_id,
+    const uint8_t* src,
+    uint8_t* dst,
+    size_t size,
+    uint8_t type_size,
+    uint8_t meta
+);
+
 int ttzip_plugin_dispatch_filter_forward(
     uint8_t filter_id,
     const uint8_t* src,
@@ -64,9 +82,6 @@ int ttzip_plugin_dispatch_filter_forward(
     uint8_t meta
 );
 
-/**
- * @brief Dispatches filter backward transform with built-in fast path and lock-free plugin table lookup.
- */
 int ttzip_plugin_dispatch_filter_backward(
     uint8_t filter_id,
     const uint8_t* src,

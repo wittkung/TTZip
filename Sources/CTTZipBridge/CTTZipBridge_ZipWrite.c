@@ -23,7 +23,7 @@
 #include <libgen.h>
 #include <dirent.h>
 #include <libdeflate.h>
-#include <dispatch/dispatch.h>
+#include "include/ttzip_threadpool.h"
 #include <errno.h>
 
 #define write_all ttzip_io_write_all
@@ -222,6 +222,221 @@ int ttzip_cluster_small_files_into_batches(
     return 0;
 }
 
+typedef struct {
+    ttzip_c_item_list_t* list;
+    ttzip_c_batch_list_t* batch_list;
+    uint8_t* payload_arena;
+    int level;
+    bool has_password;
+    const char* password;
+} zip_write_batch_arg_t;
+
+static void zip_write_batch_worker(size_t batch_idx, void* user_data) {
+    zip_write_batch_arg_t* ctx = (zip_write_batch_arg_t*)user_data;
+    size_t start_idx = batch_idx;
+    size_t item_span = 1;
+    if (ctx->batch_list->units && batch_idx < ctx->batch_list->count) {
+        start_idx = ctx->batch_list->units[batch_idx].start_index;
+        item_span = ctx->batch_list->units[batch_idx].count;
+    }
+
+    for (size_t sub = 0; sub < item_span; sub++) {
+        size_t idx = start_idx + sub;
+        if (idx >= ctx->list->count) break;
+
+        ttzip_c_item_t* item = &ctx->list->items[idx];
+        if (item->is_directory || item->uncompressed_size == 0) {
+            item->actual_method = 0;
+            item->compressed_size = 0;
+            item->crc32 = 0;
+            continue;
+        }
+
+        size_t item_unc_size = ttzip_clamp_size((uint64_t)item->uncompressed_size);
+
+        int fd = open(item->src_path, O_RDONLY);
+        if (fd < 0) {
+            continue;
+        }
+
+        uint8_t stack_in_buf[65536];
+        uint8_t stack_out_buf[65536 + 512];
+        void* src_buf = NULL;
+        uint8_t* heap_src = NULL;
+
+        if (item_unc_size <= sizeof(stack_in_buf)) {
+            ssize_t read_bytes = pread(fd, stack_in_buf, item_unc_size, 0);
+            if (read_bytes == (ssize_t)item_unc_size) {
+                src_buf = stack_in_buf;
+            }
+        } else if (item_unc_size >= 64 * 1024) {
+            src_buf = mmap(NULL, item_unc_size, PROT_READ, MAP_SHARED, fd, 0);
+            if (src_buf != MAP_FAILED) {
+                madvise(src_buf, item_unc_size, MADV_WILLNEED | MADV_SEQUENTIAL);
+            }
+        }
+
+        if (!src_buf || src_buf == MAP_FAILED) {
+            heap_src = (uint8_t*)malloc(item_unc_size);
+            if (heap_src) {
+                ssize_t read_bytes = pread(fd, heap_src, item_unc_size, 0);
+                if (read_bytes == (ssize_t)item_unc_size) {
+                    src_buf = heap_src;
+                }
+            }
+        }
+
+        if (!src_buf) {
+            close(fd);
+            continue;
+        }
+
+        uint32_t computed_crc = ttzip_compute_buffer_crc32_neon(0, src_buf, item_unc_size);
+        uint8_t* arena_slot = (ctx->payload_arena && item->arena_cap >= item_unc_size) ? (ctx->payload_arena + item->arena_offset) : NULL;
+
+        if (ctx->level == 0) {
+            item->actual_method = 0;
+            if (ctx->has_password) {
+                size_t enc_size = item_unc_size + 18 + 10;
+                uint8_t* enc_buf = arena_slot ? arena_slot : (uint8_t*)malloc(enc_size);
+                if (enc_buf) {
+                    arc4random_buf(enc_buf, 16);
+                    uint8_t derived_keys[66];
+                    size_t pass_len = strlen(ctx->password);
+                    if (ttzip_pbkdf2_sha1_fast(ctx->password, pass_len, enc_buf, 16, 1000, derived_keys, 66) == 0) {
+                        enc_buf[16] = derived_keys[64];
+                        enc_buf[17] = derived_keys[65];
+                        uint8_t* cipher_dst = enc_buf + 18;
+                        ttzip_aes256_encrypt_and_hmac_fused(derived_keys, (const uint8_t*)src_buf, item_unc_size, cipher_dst, enc_buf + 18 + item_unc_size);
+                        item->compressed_payload = enc_buf;
+                        item->compressed_size = (int64_t)enc_size;
+                    } else if (!arena_slot) {
+                        free(enc_buf);
+                    }
+                    ttzip_secure_zero(derived_keys, sizeof(derived_keys));
+                }
+            } else {
+                if (arena_slot) {
+                    memcpy(arena_slot, src_buf, item_unc_size);
+                    item->compressed_payload = arena_slot;
+                } else if (src_buf == stack_in_buf) {
+                    uint8_t* store_buf = (uint8_t*)malloc(item_unc_size);
+                    if (store_buf) {
+                        memcpy(store_buf, stack_in_buf, item_unc_size);
+                        item->compressed_payload = store_buf;
+                    }
+                } else {
+                    item->compressed_payload = src_buf;
+                    item->is_mmapped = (heap_src == NULL);
+                }
+                item->compressed_size = item->uncompressed_size;
+            }
+        } else {
+            struct libdeflate_compressor* compressor = ttzip_get_tls_compressor(ctx->level > 0 ? ctx->level : 6);
+            if (compressor) {
+                size_t max_comp_bound = libdeflate_deflate_compress_bound(compressor, item_unc_size);
+                uint8_t* comp_buf = arena_slot ? arena_slot : ((max_comp_bound <= sizeof(stack_out_buf)) ? stack_out_buf : (uint8_t*)malloc(max_comp_bound));
+
+                if (comp_buf) {
+                    size_t actual_comp_size = libdeflate_deflate_compress(compressor, src_buf, item_unc_size, comp_buf, max_comp_bound);
+                    if (actual_comp_size > 0 && (int64_t)actual_comp_size < item->uncompressed_size) {
+                        item->actual_method = 8;
+                        if (ctx->has_password) {
+                            size_t enc_size = actual_comp_size + 18 + 10;
+                            uint8_t* enc_buf = arena_slot ? arena_slot : (uint8_t*)malloc(enc_size);
+                            if (enc_buf) {
+                                uint8_t tmp_comp[65536];
+                                uint8_t* safe_comp_src = comp_buf;
+                                if (comp_buf == arena_slot && actual_comp_size <= sizeof(tmp_comp)) {
+                                    memcpy(tmp_comp, comp_buf, actual_comp_size);
+                                    safe_comp_src = tmp_comp;
+                                }
+                                arc4random_buf(enc_buf, 16);
+                                uint8_t derived_keys[66];
+                                size_t pass_len = strlen(ctx->password);
+                                if (ttzip_pbkdf2_sha1_fast(ctx->password, pass_len, enc_buf, 16, 1000, derived_keys, 66) == 0) {
+                                    enc_buf[16] = derived_keys[64];
+                                    enc_buf[17] = derived_keys[65];
+                                    uint8_t* cipher_dst = enc_buf + 18;
+                                    ttzip_aes256_encrypt_and_hmac_fused(derived_keys, safe_comp_src, actual_comp_size, cipher_dst, enc_buf + 18 + actual_comp_size);
+                                    item->compressed_payload = enc_buf;
+                                    item->compressed_size = (int64_t)enc_size;
+                                } else if (!arena_slot) {
+                                    free(enc_buf);
+                                }
+                                ttzip_secure_zero(derived_keys, sizeof(derived_keys));
+                            }
+                        } else {
+                            if (arena_slot) {
+                                item->compressed_payload = arena_slot;
+                                item->compressed_size = (int64_t)actual_comp_size;
+                            } else {
+                                uint8_t* final_comp = (uint8_t*)malloc(actual_comp_size);
+                                if (final_comp) {
+                                    memcpy(final_comp, comp_buf, actual_comp_size);
+                                    item->compressed_payload = final_comp;
+                                    item->compressed_size = (int64_t)actual_comp_size;
+                                }
+                            }
+                        }
+                    } else {
+                        item->actual_method = 0;
+                        if (ctx->has_password) {
+                            size_t enc_size = item_unc_size + 18 + 10;
+                            uint8_t* enc_buf = arena_slot ? arena_slot : (uint8_t*)malloc(enc_size);
+                            if (enc_buf) {
+                                arc4random_buf(enc_buf, 16);
+                                uint8_t derived_keys[66];
+                                size_t pass_len = strlen(ctx->password);
+                                if (ttzip_pbkdf2_sha1_fast(ctx->password, pass_len, enc_buf, 16, 1000, derived_keys, 66) == 0) {
+                                    enc_buf[16] = derived_keys[64];
+                                    enc_buf[17] = derived_keys[65];
+                                    uint8_t* cipher_dst = enc_buf + 18;
+                                    ttzip_aes256_encrypt_and_hmac_fused(derived_keys, (const uint8_t*)src_buf, item_unc_size, cipher_dst, enc_buf + 18 + item_unc_size);
+                                    item->compressed_payload = enc_buf;
+                                    item->compressed_size = (int64_t)enc_size;
+                                } else if (!arena_slot) {
+                                    free(enc_buf);
+                                }
+                                ttzip_secure_zero(derived_keys, sizeof(derived_keys));
+                            }
+                        } else {
+                            if (arena_slot) {
+                                memcpy(arena_slot, src_buf, item_unc_size);
+                                item->compressed_payload = arena_slot;
+                            } else if (src_buf == stack_in_buf) {
+                                uint8_t* store_buf = (uint8_t*)malloc(item_unc_size);
+                                if (store_buf) {
+                                    memcpy(store_buf, stack_in_buf, item_unc_size);
+                                    item->compressed_payload = store_buf;
+                                }
+                            } else {
+                                item->compressed_payload = src_buf;
+                                item->is_mmapped = (heap_src == NULL);
+                            }
+                            item->compressed_size = item->uncompressed_size;
+                        }
+                    }
+                    if (!arena_slot && comp_buf != stack_out_buf && item->compressed_payload != comp_buf) {
+                        free(comp_buf);
+                    }
+                }
+            }
+        }
+
+        item->crc32 = computed_crc;
+
+        if (item->compressed_payload != src_buf && src_buf != stack_in_buf) {
+            if (heap_src) {
+                free(heap_src);
+            } else if (src_buf && src_buf != MAP_FAILED) {
+                munmap(src_buf, (size_t)item->uncompressed_size);
+            }
+        }
+        close(fd);
+    }
+}
+
 int ttzip_create_zip_parallel_c(
     const char* output_zip_path,
     const char* const* input_paths,
@@ -261,7 +476,8 @@ int ttzip_create_zip_parallel_c(
         size_t curr_off = 0;
         for (size_t i = 0; i < list.count; i++) {
             if (!list.items[i].is_directory && list.items[i].uncompressed_size > 0) {
-                size_t bound = (size_t)list.items[i].uncompressed_size + 512;
+                size_t unc = (size_t)list.items[i].uncompressed_size;
+                size_t bound = (level == 0) ? (unc + 64) : (unc + 1024 + unc / 8);
                 size_t aligned_bound = (bound + 127) & ~((size_t)127);
                 list.items[i].arena_offset = curr_off;
                 list.items[i].arena_cap = aligned_bound;
@@ -293,225 +509,16 @@ int ttzip_create_zip_parallel_c(
     }
 
     // 3. Parallel zero-lock compression across batch units
-    size_t dispatch_count = (batch_list.count > 0) ? batch_list.count : list.count;
-    dispatch_apply(dispatch_count, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t batch_idx) {
-        size_t start_idx = batch_idx;
-        size_t item_span = 1;
-        if (batch_list.units && batch_idx < batch_list.count) {
-            start_idx = batch_list.units[batch_idx].start_index;
-            item_span = batch_list.units[batch_idx].count;
-        }
-
-        for (size_t sub = 0; sub < item_span; sub++) {
-            size_t idx = start_idx + sub;
-            if (idx >= list.count) break;
-
-            ttzip_c_item_t* item = &list.items[idx];
-            if (item->is_directory || item->uncompressed_size == 0) {
-                item->actual_method = 0;
-                item->compressed_size = 0;
-                item->crc32 = 0;
-                continue;
-            }
-
-            size_t item_unc_size = ttzip_clamp_size((uint64_t)item->uncompressed_size);
-
-            int fd = open(item->src_path, O_RDONLY);
-            if (fd < 0) {
-                continue;
-            }
-
-            uint8_t stack_in_buf[65536];
-            uint8_t stack_out_buf[65536 + 512];
-            void* src_buf = NULL;
-            uint8_t* heap_src = NULL;
-
-            if (item_unc_size <= sizeof(stack_in_buf)) {
-                ssize_t read_bytes = pread(fd, stack_in_buf, item_unc_size, 0);
-                if (read_bytes == (ssize_t)item_unc_size) {
-                    src_buf = stack_in_buf;
-                }
-            } else if (item_unc_size >= 64 * 1024) {
-                src_buf = mmap(NULL, item_unc_size, PROT_READ, MAP_SHARED, fd, 0);
-                if (src_buf != MAP_FAILED) {
-                    madvise(src_buf, item_unc_size, MADV_WILLNEED | MADV_SEQUENTIAL);
-                }
-            }
-
-            if (!src_buf || src_buf == MAP_FAILED) {
-                heap_src = (uint8_t*)malloc(item_unc_size);
-                if (heap_src) {
-                    ssize_t read_bytes = pread(fd, heap_src, item_unc_size, 0);
-                    if (read_bytes == (ssize_t)item_unc_size) {
-                        src_buf = heap_src;
-                    }
-                }
-            }
-
-            if (!src_buf) {
-                close(fd);
-                continue;
-            }
-
-            __block uint32_t computed_crc = 0;
-            dispatch_group_t crc_group = NULL;
-            if (item_unc_size >= 1024 * 1024 && list.count <= 4) {
-                crc_group = dispatch_group_create();
-                dispatch_group_async(crc_group, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
-                    computed_crc = ttzip_compute_buffer_crc32_neon(0, src_buf, item_unc_size);
-                });
-            } else {
-                computed_crc = ttzip_compute_buffer_crc32_neon(0, src_buf, item_unc_size);
-            }
-
-            uint8_t* arena_slot = (payload_arena && item->arena_cap >= item_unc_size) ? (payload_arena + item->arena_offset) : NULL;
-
-            if (level == 0) {
-                item->actual_method = 0;
-                if (has_password) {
-                    size_t enc_size = item_unc_size + 18 + 10;
-                    uint8_t* enc_buf = arena_slot ? arena_slot : (uint8_t*)malloc(enc_size);
-                    if (enc_buf) {
-                        arc4random_buf(enc_buf, 16);
-                        uint8_t derived_keys[66];
-                        size_t pass_len = strlen(password);
-                        if (ttzip_pbkdf2_sha1_fast(password, pass_len, enc_buf, 16, 1000, derived_keys, 66) == 0) {
-                            enc_buf[16] = derived_keys[64];
-                            enc_buf[17] = derived_keys[65];
-                            uint8_t* cipher_dst = enc_buf + 18;
-                            ttzip_aes256_encrypt_and_hmac_fused(derived_keys, (const uint8_t*)src_buf, item_unc_size, cipher_dst, enc_buf + 18 + item_unc_size);
-                            item->compressed_payload = enc_buf;
-                            item->compressed_size = (int64_t)enc_size;
-                        } else if (!arena_slot) {
-                            free(enc_buf);
-                        }
-                        ttzip_secure_zero(derived_keys, sizeof(derived_keys));
-                    }
-                } else {
-                    if (arena_slot) {
-                        memcpy(arena_slot, src_buf, item_unc_size);
-                        item->compressed_payload = arena_slot;
-                    } else if (src_buf == stack_in_buf) {
-                        uint8_t* store_buf = (uint8_t*)malloc(item_unc_size);
-                        if (store_buf) {
-                            memcpy(store_buf, stack_in_buf, item_unc_size);
-                            item->compressed_payload = store_buf;
-                        }
-                    } else {
-                        item->compressed_payload = src_buf;
-                        item->is_mmapped = (heap_src == NULL);
-                    }
-                    item->compressed_size = item->uncompressed_size;
-                }
-            } else {
-                struct libdeflate_compressor* compressor = ttzip_get_tls_compressor(level > 0 ? level : 6);
-                if (compressor) {
-                    size_t max_comp_bound = libdeflate_deflate_compress_bound(compressor, item_unc_size);
-                    uint8_t* comp_buf = arena_slot ? arena_slot : ((max_comp_bound <= sizeof(stack_out_buf)) ? stack_out_buf : (uint8_t*)malloc(max_comp_bound));
-
-                    if (comp_buf) {
-                        size_t actual_comp_size = libdeflate_deflate_compress(compressor, src_buf, item_unc_size, comp_buf, max_comp_bound);
-                        if (actual_comp_size > 0 && (int64_t)actual_comp_size < item->uncompressed_size) {
-                            item->actual_method = 8;
-                            if (has_password) {
-                                size_t enc_size = actual_comp_size + 18 + 10;
-                                uint8_t* enc_buf = arena_slot ? arena_slot : (uint8_t*)malloc(enc_size);
-                                if (enc_buf) {
-                                    uint8_t tmp_comp[65536];
-                                    uint8_t* safe_comp_src = comp_buf;
-                                    if (comp_buf == arena_slot && actual_comp_size <= sizeof(tmp_comp)) {
-                                        memcpy(tmp_comp, comp_buf, actual_comp_size);
-                                        safe_comp_src = tmp_comp;
-                                    }
-                                    arc4random_buf(enc_buf, 16);
-                                    uint8_t derived_keys[66];
-                                    size_t pass_len = strlen(password);
-                                    if (ttzip_pbkdf2_sha1_fast(password, pass_len, enc_buf, 16, 1000, derived_keys, 66) == 0) {
-                                        enc_buf[16] = derived_keys[64];
-                                        enc_buf[17] = derived_keys[65];
-                                        uint8_t* cipher_dst = enc_buf + 18;
-                                        ttzip_aes256_encrypt_and_hmac_fused(derived_keys, safe_comp_src, actual_comp_size, cipher_dst, enc_buf + 18 + actual_comp_size);
-                                        item->compressed_payload = enc_buf;
-                                        item->compressed_size = (int64_t)enc_size;
-                                    } else if (!arena_slot) {
-                                        free(enc_buf);
-                                    }
-                                    ttzip_secure_zero(derived_keys, sizeof(derived_keys));
-                                }
-                            } else {
-                                if (arena_slot) {
-                                    item->compressed_payload = arena_slot;
-                                    item->compressed_size = (int64_t)actual_comp_size;
-                                } else {
-                                    uint8_t* final_comp = (uint8_t*)malloc(actual_comp_size);
-                                    if (final_comp) {
-                                        memcpy(final_comp, comp_buf, actual_comp_size);
-                                        item->compressed_payload = final_comp;
-                                        item->compressed_size = (int64_t)actual_comp_size;
-                                    }
-                                }
-                            }
-                        } else {
-                            item->actual_method = 0;
-                            if (has_password) {
-                                size_t enc_size = item_unc_size + 18 + 10;
-                                uint8_t* enc_buf = arena_slot ? arena_slot : (uint8_t*)malloc(enc_size);
-                                if (enc_buf) {
-                                    arc4random_buf(enc_buf, 16);
-                                    uint8_t derived_keys[66];
-                                    size_t pass_len = strlen(password);
-                                    if (ttzip_pbkdf2_sha1_fast(password, pass_len, enc_buf, 16, 1000, derived_keys, 66) == 0) {
-                                        enc_buf[16] = derived_keys[64];
-                                        enc_buf[17] = derived_keys[65];
-                                        uint8_t* cipher_dst = enc_buf + 18;
-                                        ttzip_aes256_encrypt_and_hmac_fused(derived_keys, (const uint8_t*)src_buf, item_unc_size, cipher_dst, enc_buf + 18 + item_unc_size);
-                                        item->compressed_payload = enc_buf;
-                                        item->compressed_size = (int64_t)enc_size;
-                                    } else if (!arena_slot) {
-                                        free(enc_buf);
-                                    }
-                                    ttzip_secure_zero(derived_keys, sizeof(derived_keys));
-                                }
-                            } else {
-                                if (arena_slot) {
-                                    memcpy(arena_slot, src_buf, item_unc_size);
-                                    item->compressed_payload = arena_slot;
-                                } else if (src_buf == stack_in_buf) {
-                                    uint8_t* store_buf = (uint8_t*)malloc(item_unc_size);
-                                    if (store_buf) {
-                                        memcpy(store_buf, stack_in_buf, item_unc_size);
-                                        item->compressed_payload = store_buf;
-                                    }
-                                } else {
-                                    item->compressed_payload = src_buf;
-                                    item->is_mmapped = (heap_src == NULL);
-                                }
-                                item->compressed_size = item->uncompressed_size;
-                            }
-                        }
-                        if (!arena_slot && comp_buf != stack_out_buf) {
-                            free(comp_buf);
-                        }
-                    }
-                }
-            }
-
-            if (crc_group) {
-                dispatch_group_wait(crc_group, DISPATCH_TIME_FOREVER);
-                dispatch_release(crc_group);
-            }
-            item->crc32 = computed_crc;
-
-            if (item->compressed_payload != src_buf && src_buf != stack_in_buf) {
-                if (heap_src) {
-                    free(heap_src);
-                } else if (src_buf && src_buf != MAP_FAILED) {
-                    munmap(src_buf, (size_t)item->uncompressed_size);
-                }
-            }
-            close(fd);
-        }
-    });
+    size_t batch_count_to_process = (batch_list.count > 0) ? batch_list.count : list.count;
+    zip_write_batch_arg_t batch_arg = {
+        .list = &list,
+        .batch_list = &batch_list,
+        .payload_arena = payload_arena,
+        .level = level,
+        .has_password = has_password,
+        .password = password
+    };
+    ttzip_parallel_for(ttzip_threadpool_shared(), batch_count_to_process, zip_write_batch_worker, &batch_arg);
 
     if (batch_list.units) {
         free(batch_list.units);

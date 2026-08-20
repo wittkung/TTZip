@@ -14,7 +14,7 @@ private final class ExtractModalEventObserver: ObservableObject, ArchiveEventObs
     @Published var vaultUpdateTrigger: Int = 0
     
     init() {
-        ArchiveEventCenter.shared.addObserver(self, dispatchQueue: .main)
+        ArchiveEventCenter.shared.addObserver(self)
     }
     
     deinit {

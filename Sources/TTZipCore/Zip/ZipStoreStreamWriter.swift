@@ -96,7 +96,7 @@ public final class ZipStoreStreamWriter: @unchecked Sendable {
             guard let baseAddress = buffer.baseAddress else { return }
             let safeBuffer = UnsafeItemBuffer(base: baseAddress)
             
-            DispatchQueue.concurrentPerform(iterations: buffer.count) { i in
+            ConcurrencyBridge.parallelFor(iterations: buffer.count) { i in
                 let item = safeBuffer.base[i]
                 let nameBytes = Array(item.relPath.utf8)
                 let nameLen = UInt16(nameBytes.count)
@@ -147,7 +147,7 @@ public final class ZipStoreStreamWriter: @unchecked Sendable {
                             chunkCRCs.withUnsafeMutableBufferPointer { crcBuf in
                                 let rawCrcPtr = UInt(bitPattern: crcBuf.baseAddress)
                                 let rawInPtr = UInt(bitPattern: inBytePtr)
-                                DispatchQueue.concurrentPerform(iterations: numChunks) { idx in
+                                ConcurrencyBridge.parallelFor(iterations: numChunks) { idx in
                                     guard let basePtr = UnsafePointer<UInt8>(bitPattern: rawInPtr),
                                           let outBufPtr = UnsafeMutablePointer<UInt32>(bitPattern: rawCrcPtr) else { return }
                                     let offset = idx * crcChunkSize
@@ -180,7 +180,7 @@ public final class ZipStoreStreamWriter: @unchecked Sendable {
                             chunkCRCs.withUnsafeMutableBufferPointer { crcBuf in
                                 let rawCrcPtr = UInt(bitPattern: crcBuf.baseAddress)
                                 let rawInPtr = UInt(bitPattern: inBytePtr)
-                                DispatchQueue.concurrentPerform(iterations: numChunks) { idx in
+                                ConcurrencyBridge.parallelFor(iterations: numChunks) { idx in
                                     guard let basePtr = UnsafePointer<UInt8>(bitPattern: rawInPtr),
                                           let outBufPtr = UnsafeMutablePointer<UInt32>(bitPattern: rawCrcPtr) else { return }
                                     let offset = idx * crcChunkSize

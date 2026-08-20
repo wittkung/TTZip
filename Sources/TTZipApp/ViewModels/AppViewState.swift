@@ -209,8 +209,8 @@ public final class AppViewState: ObservableObject, ArchiveProgressObserverProtoc
             RootFolderAccessManager.shared.ensureAccess(for: self.currentDirectory, promptIfMissing: true)
         }
         
-        ArchiveProgressBroadcaster.shared.addObserver(self, dispatchQueue: .main)
-        ArchiveEventCenter.shared.addObserver(self, dispatchQueue: .main)
+        ArchiveProgressBroadcaster.shared.addObserver(self)
+        ArchiveEventCenter.shared.addObserver(self)
         
         NotificationCenter.default.addObserver(forName: NSNotification.Name("TTZipPerformUndoNotification"), object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in

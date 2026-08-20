@@ -18,6 +18,7 @@
 #include "native_deflate/ttzip_deflate_engine.h"
 #include "zopfli/deflate.h"
 #include "zopfli/zopfli.h"
+#include <libdeflate.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>

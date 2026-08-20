@@ -87,7 +87,7 @@ public final class ZipParallelExtractor: @unchecked Sendable {
         pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
         let t3 = CACurrentMediaTime()
         
-        DispatchQueue.concurrentPerform(iterations: fileDescriptors.count) { idx in
+        ConcurrencyBridge.parallelFor(iterations: fileDescriptors.count) { idx in
             pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
             let desc = fileDescriptors[idx]
             let targetPath = baseDestPath + desc.path

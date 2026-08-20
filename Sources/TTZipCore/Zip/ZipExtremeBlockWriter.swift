@@ -104,8 +104,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                 guard let baseAddr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
                 let ptrBox = SendablePointerBox(pointer: baseAddr, size: rawData.count)
                 let slabBox = SendableMutablePointerBox(pointer: totalOutputSlab, size: totalBlocks * maxChunkOut)
-                
-                DispatchQueue.concurrentPerform(iterations: totalBlocks) { blockIdx in
+                ConcurrencyBridge.parallelFor(iterations: totalBlocks) { blockIdx in
 
                     let offset = blockIdx * actualBlockSize
                     let currentChunkSize = min(actualBlockSize, ptrBox.size - offset)

@@ -183,28 +183,14 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
             )
 
         case .inspect:
-            let reader = ArchiveEngineFactory.makeReader()
-            let box = SyncResultBox()
-            let sema = DispatchSemaphore(value: 0)
-            Task.detached {
-                do {
-                    let entries = try await reader.inspect(archivePath: context.archivePath, password: context.password)
-                    box.result = WorkflowResult(
-                        isSuccess: true,
-                        outputPath: context.archivePath,
-                        unlockedPassword: context.password,
-                        entriesCount: entries.count,
-                        metrics: ["format": "zip", "inspection": "CentralDirectoryParsed"]
-                    )
-                } catch {
-                    box.error = error
-                }
-                sema.signal()
-            }
-            sema.wait()
-            if let r = box.result { return r }
-            if let e = box.error { throw e }
-            throw ArchiveError.readFailed(code: -999)
+            let entries = NativeZipEngine.shared.inspectZip(archivePath: context.archivePath) ?? []
+            return WorkflowResult(
+                isSuccess: true,
+                outputPath: context.archivePath,
+                unlockedPassword: context.password,
+                entriesCount: entries.count,
+                metrics: ["format": "zip", "inspection": "CentralDirectoryParsed"]
+            )
 
         case .repair, .recover, .batch:
             throw ArchiveError.readFailed(code: -400)

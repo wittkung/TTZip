@@ -3,40 +3,12 @@
 // Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
-// TTZip: High-performance native archiving and compression engine for macOS.
+// TTZip: High-performance native archiving and compression engine.
 
 /**
  * @file ttzip_crc64.c
- * @brief ARM64 PMULL hardware accelerated and scalar fallback CRC64 (ECMA-182 / XZ).
- * @details Implements 4-way 64-byte vector folding and Barrett reduction via ARMv8-A vmull_p64.
- *          Strictly matches 7Z/XZ specifications and lzma_crc64 standards (poly 0xC96C5795D7870F42ULL).
- *
- * ============================================================================
- * Mathematical Foundation & Algorithmic Invariant Proof:
- *
- * 1. Galois Field Polynomial Representation:
- *    Let message polynomial M(x) in F_2[x] of degree N-1.
- *    Generator polynomial P(x) = x^64 + x^62 + x^57 + ... + x + 1 (ECMA-182).
- *    Reflected generator: P'(x) = 0x9c3e466c172963d5ULL (high bit omitted).
- *    The CRC64 is defined as the remainder R(x) = M(x) * x^64 mod P(x).
- *
- * 2. 512-bit (64-byte) Parallel SIMD Vector Folding:
- *    By polynomial ring homomorphism over F_2[x]:
- *      V_i(x) * x^512 = (V_{i,hi}(x) * K_1) ^ (V_{i,lo}(x) * K_2) mod P(x)
- *    Precomputed constants:
- *      K_1 = x^(512 + 64) mod P(x) = 0x6ae3efbb9dd441f3ULL
- *      K_2 = x^(512)      mod P(x) = 0x081f6054a7842df4ULL
- *
- * 3. Barrett Reduction from 128-bit Residue to 64-bit CRC:
- *    Given unreduced product T(x) in F_2[x] of degree < 128:
- *      mu(x) = floor(x^128 / P(x)) = 0x92d8af2baf0e1e84ULL
- *      Q(x)  = floor((floor(T(x) / x^64) * mu(x)) / x^64)
- *      R(x)  = T(x) ^ (Q(x) * P(x))  (exact remainder in F_2[x])
- *
- * @complexity Time: O(size / 64) vector folds + O(1) Barrett reduction -> O(N)
- * @complexity Space: O(1) auxiliary stack registers (Zero dynamic heap allocation)
- * @threadsafe 100% Reentrant, stateless, and thread-safe.
- * ============================================================================
+ * @brief Dual-ISA hardware vector accelerated (ARM64 PMULL & x86_64 PCLMULQDQ) CRC64 (ECMA-182).
+ * @details Implements 4-way 64-byte vector folding and Barrett reduction on both ARM64 and x86_64.
  */
 
 #include "include/ttzip_crc64.h"
@@ -72,7 +44,7 @@ static inline uint8x16_t clmul_11(uint8x16_t a, uint8x16_t b) {
 			(poly64_t)vgetq_lane_u64(vreinterpretq_u64_u8(b), 1));
 }
 
-static inline uint8x16_t fold(uint8x16_t v, uint8x16_t fold_const) {
+static inline uint8x16_t fold_arm(uint8x16_t v, uint8x16_t fold_const) {
 	return veorq_u8(clmul_00(v, fold_const), clmul_11(v, fold_const));
 }
 
@@ -117,19 +89,19 @@ uint64_t ttzip_crc64_pmull(const uint8_t *buf, size_t size, uint64_t crc) {
 			v1 = vld1q_u8(buf); v2 = vld1q_u8(buf + 16); v3 = vld1q_u8(buf + 32);
 			buf += 48; size -= 48;
 			while (size >= 64) {
-				v0 = veorq_u8(fold(v0, fold512), vld1q_u8(buf));
-				v1 = veorq_u8(fold(v1, fold512), vld1q_u8(buf + 16));
-				v2 = veorq_u8(fold(v2, fold512), vld1q_u8(buf + 32));
-				v3 = veorq_u8(fold(v3, fold512), vld1q_u8(buf + 48));
+				v0 = veorq_u8(fold_arm(v0, fold512), vld1q_u8(buf));
+				v1 = veorq_u8(fold_arm(v1, fold512), vld1q_u8(buf + 16));
+				v2 = veorq_u8(fold_arm(v2, fold512), vld1q_u8(buf + 32));
+				v3 = veorq_u8(fold_arm(v3, fold512), vld1q_u8(buf + 48));
 				buf += 64; size -= 64;
 			}
-			v0 = veorq_u8(v1, fold(v0, fold128));
-			v0 = veorq_u8(v2, fold(v0, fold128));
-			v0 = veorq_u8(v3, fold(v0, fold128));
+			v0 = veorq_u8(v1, fold_arm(v0, fold128));
+			v0 = veorq_u8(v2, fold_arm(v0, fold128));
+			v0 = veorq_u8(v3, fold_arm(v0, fold128));
 		}
 
 		while (size >= 16) {
-			v0 = veorq_u8(fold(v0, fold128), vld1q_u8(buf));
+			v0 = veorq_u8(fold_arm(v0, fold128), vld1q_u8(buf));
 			buf += 16; size -= 16;
 		}
 
@@ -138,7 +110,7 @@ uint64_t ttzip_crc64_pmull(const uint8_t *buf, size_t size, uint64_t crc) {
 			v1 = vandq_u8(v1, vld1q_u8(vmasks_64 + size));
 			v1 = vorrq_u8(v1, vqtbl1q_u8(v0, vld1q_u8(vmasks_64 + 32 + size)));
 			v0 = vqtbl1q_u8(v0, vld1q_u8(vmasks_64 + 32 - (16 - size)));
-			v0 = veorq_u8(v1, fold(v0, fold128));
+			v0 = veorq_u8(v1, fold_arm(v0, fold128));
 		}
 
 		v1 = vextq_u8(v0, vdupq_n_u8(0), 8);
@@ -157,6 +129,79 @@ uint64_t ttzip_crc64_pmull(const uint8_t *buf, size_t size, uint64_t crc) {
 }
 #else
 uint64_t ttzip_crc64_pmull(const uint8_t *buf, size_t size, uint64_t crc) {
+	return ttzip_crc64_scalar(buf, size, crc);
+}
+#endif
+
+#if (defined(__x86_64__) || defined(_M_X64)) && (defined(__PCLMUL__) || defined(_MSC_VER))
+#include <wmmintrin.h>
+#include <emmintrin.h>
+#include <smmintrin.h>
+
+static inline __m128i fold_x86(__m128i v, __m128i fold_const) {
+	__m128i hi = _mm_clmulepi64_si128(v, fold_const, 0x11);
+	__m128i lo = _mm_clmulepi64_si128(v, fold_const, 0x00);
+	return _mm_xor_si128(hi, lo);
+}
+
+uint64_t ttzip_crc64_pclmul(const uint8_t *buf, size_t size, uint64_t crc) {
+	if (size == 0 || !buf) return crc;
+
+	const __m128i fold512 = _mm_set_epi64x(0x081f6054a7842df4ULL, 0x6ae3efbb9dd441f3ULL);
+	const __m128i fold128 = _mm_set_epi64x(0xdabe95afc7875f40ULL, 0xe05dd497ca393ae4ULL);
+	const __m128i mu_p    = _mm_set_epi64x(0x9c3e466c172963d5ULL, 0x92d8af2baf0e1e84ULL);
+
+	crc = ~crc;
+
+	if (size < 64) {
+		return ttzip_crc64_scalar(buf, size, ~crc);
+	}
+
+	__m128i v0 = _mm_xor_si128(_mm_set_epi64x(0, crc), _mm_loadu_si128((const __m128i*)buf));
+	__m128i v1 = _mm_loadu_si128((const __m128i*)(buf + 16));
+	__m128i v2 = _mm_loadu_si128((const __m128i*)(buf + 32));
+	__m128i v3 = _mm_loadu_si128((const __m128i*)(buf + 48));
+	buf += 64;
+	size -= 64;
+
+	while (size >= 64) {
+		v0 = _mm_xor_si128(fold_x86(v0, fold512), _mm_loadu_si128((const __m128i*)buf));
+		v1 = _mm_xor_si128(fold_x86(v1, fold512), _mm_loadu_si128((const __m128i*)(buf + 16)));
+		v2 = _mm_xor_si128(fold_x86(v2, fold512), _mm_loadu_si128((const __m128i*)(buf + 32)));
+		v3 = _mm_xor_si128(fold_x86(v3, fold512), _mm_loadu_si128((const __m128i*)(buf + 48)));
+		buf += 64;
+		size -= 64;
+	}
+
+	v0 = _mm_xor_si128(v1, fold_x86(v0, fold128));
+	v0 = _mm_xor_si128(v2, fold_x86(v0, fold128));
+	v0 = _mm_xor_si128(v3, fold_x86(v0, fold128));
+
+	while (size >= 16) {
+		v0 = _mm_xor_si128(fold_x86(v0, fold128), _mm_loadu_si128((const __m128i*)buf));
+		buf += 16;
+		size -= 16;
+	}
+
+	__m128i v_shift = _mm_srli_si128(v0, 8);
+	v0 = _mm_clmulepi64_si128(v0, fold128, 0x10);
+	v0 = _mm_xor_si128(v0, v_shift);
+
+	// Barrett Reduction
+	__m128i r1 = _mm_clmulepi64_si128(v0, mu_p, 0x10);
+	__m128i r2 = _mm_slli_si128(r1, 8);
+	r1 = _mm_clmulepi64_si128(r1, mu_p, 0x00);
+	v0 = _mm_xor_si128(v0, r2);
+	v0 = _mm_xor_si128(v0, r1);
+
+	uint64_t result = ~(uint64_t)_mm_extract_epi64(v0, 1);
+	if (size > 0) {
+		result = ttzip_crc64_scalar(buf, size, result);
+	}
+	return result;
+}
+#else
+uint64_t ttzip_crc64_pclmul(const uint8_t *buf, size_t size, uint64_t crc) {
 	return ttzip_crc64_scalar(buf, size, crc);
 }
 #endif
@@ -192,6 +237,8 @@ uint64_t ttzip_crc64_scalar(const uint8_t *buf, size_t size, uint64_t crc) {
 uint64_t ttzip_crc64(const uint8_t *buf, size_t size, uint64_t crc) {
 #if defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(__aarch64__)
 	return ttzip_crc64_pmull(buf, size, crc);
+#elif defined(__x86_64__) || defined(_M_X64)
+	return ttzip_crc64_pclmul(buf, size, crc);
 #else
 	return ttzip_crc64_scalar(buf, size, crc);
 #endif

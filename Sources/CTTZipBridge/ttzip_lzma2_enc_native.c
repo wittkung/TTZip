@@ -32,10 +32,10 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/uio.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <dispatch/dispatch.h>
+#include "include/ttzip_threadpool.h"
+#if defined(__APPLE__)
 #include <sys/sysctl.h>
+#endif
 #include <pthread.h>
 #include <math.h>
 
@@ -101,6 +101,66 @@ static int get_logical_cpu_count(void) {
         return count;
     }
     return get_p_core_count();
+}
+
+typedef struct {
+    ttzip_7z_store_list_t* list;
+    uint8_t* solid_buf;
+} lzma2_read_entry_arg_t;
+
+static void lzma2_read_entry_worker(size_t i, void* arg) {
+    lzma2_read_entry_arg_t* ctx = (lzma2_read_entry_arg_t*)arg;
+    ttzip_7z_store_entry_t* item = &ctx->list->entries[i];
+    if (item->is_directory || item->file_size == 0) {
+        item->crc32 = 0;
+        return;
+    }
+    uint64_t offset = (uint64_t)item->payload_buf;
+    uint8_t* dest_ptr = ctx->solid_buf + offset;
+    size_t fsize = (size_t)item->file_size;
+
+    int in_fd = open(item->src_path, O_RDONLY);
+    if (in_fd >= 0) {
+#if defined(TTZIP_OS_WINDOWS)
+        int rd = _read(in_fd, dest_ptr, (unsigned int)fsize);
+#else
+        ssize_t rd = pread(in_fd, dest_ptr, fsize, 0);
+#endif
+        close(in_fd);
+        item->crc32 = (rd > 0) ? ttzip_compute_buffer_crc32_neon(0, dest_ptr, (size_t)rd) : 0;
+    } else {
+        item->crc32 = 0;
+    }
+}
+
+typedef struct {
+    ttzip_lzma2_block_task_t* blocks;
+    const uint8_t* solid_buf;
+    size_t num_streams;
+    bool is_zero_copy;
+    int level;
+} lzma2_compress_block_arg_t;
+
+static void lzma2_compress_block_worker(size_t b, void* arg) {
+    lzma2_compress_block_arg_t* ctx = (lzma2_compress_block_arg_t*)arg;
+    ttzip_lzma2_block_task_t* blk = &ctx->blocks[b];
+    const uint8_t* blk_src = ctx->solid_buf + blk->unpack_offset;
+    blk->is_zero_block = ttzip_is_block_all_zero_neon(blk_src, blk->unpack_size);
+    blk->block_crc32 = (ctx->num_streams == 1 && ctx->is_zero_copy) ? ttzip_compute_buffer_crc32_neon(0, blk_src, blk->unpack_size) : 0;
+
+    uint64_t t0 = ttzip_slice_now_ns();
+    blk->status = ttzip_fl2_compress_block(
+        blk_src,
+        blk->unpack_size,
+        blk->pack_buf,
+        blk->pack_capacity,
+        &blk->pack_size,
+        ctx->level,
+        blk->is_zero_block,
+        &blk->dict_size,
+        1
+    );
+    blk->encode_time_ns = ttzip_slice_now_ns() - t0;
 }
 
 int ttzip_create_7z_lzma2_native_c(
@@ -176,7 +236,6 @@ int ttzip_create_7z_lzma2_native_c(
 
     int p_cores = get_p_core_count();
     if (p_cores < 1) p_cores = 1;
-    dispatch_queue_t user_interactive_q = dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0);
 
     if (num_streams == 1 && total_uncompressed_bytes >= 1 * 1024 * 1024) {
         size_t single_idx = 0;
@@ -212,40 +271,11 @@ int ttzip_create_7z_lzma2_native_c(
         }
     }
     if (!is_zero_copy) {
-        void (^read_entry_task)(size_t) = ^(size_t i) {
-            ttzip_7z_store_entry_t* item = &list.entries[i];
-            if (item->is_directory || item->file_size == 0) {
-                item->crc32 = 0;
-                return;
-            }
-            uint64_t offset = (uint64_t)item->payload_buf;
-            uint8_t* dest_ptr = solid_buf + offset;
-            size_t fsize = (size_t)item->file_size;
-
-            int in_fd = open(item->src_path, O_RDONLY);
-            if (in_fd >= 0) {
-                ssize_t rd = pread(in_fd, dest_ptr, fsize, 0);
-                close(in_fd);
-                item->crc32 = (rd > 0) ? ttzip_compute_buffer_crc32_neon(0, dest_ptr, (size_t)rd) : 0;
-            } else {
-                item->crc32 = 0;
-            }
+        lzma2_read_entry_arg_t read_arg = {
+            .list = &list,
+            .solid_buf = solid_buf
         };
-
-        if (num_files <= 8) {
-            for (size_t i = 0; i < num_files; i++) read_entry_task(i);
-        } else {
-            size_t num_chunks = (size_t)(p_cores > 0 ? p_cores : 1);
-            size_t chunk_len = (num_files + num_chunks - 1) / num_chunks;
-            dispatch_apply(num_chunks, user_interactive_q, ^(size_t chunk_idx) {
-                size_t start_i = chunk_idx * chunk_len;
-                size_t end_i = start_i + chunk_len;
-                if (end_i > num_files) end_i = num_files;
-                for (size_t i = start_i; i < end_i; i++) {
-                    read_entry_task(i);
-                }
-            });
-        }
+        ttzip_parallel_for(ttzip_threadpool_shared(), num_files, lzma2_read_entry_worker, &read_arg);
     }
     TTZIP_SLICE_SCOPE_END("2_SolidBuf_IO_and_CRC32");
 
@@ -304,26 +334,14 @@ int ttzip_create_7z_lzma2_native_c(
             blocks[b].pack_capacity = per_block_cap;
             blocks[b].pack_buf = pack_arena ? (pack_arena + b * per_block_cap) : (uint8_t*)malloc(per_block_cap);
         }
-        dispatch_apply(num_blocks, user_interactive_q, ^(size_t b) {
-            ttzip_lzma2_block_task_t* blk = &blocks[b];
-            const uint8_t* blk_src = solid_buf + blk->unpack_offset;
-            blk->is_zero_block = ttzip_is_block_all_zero_neon(blk_src, blk->unpack_size);
-            blk->block_crc32 = (num_streams == 1 && is_zero_copy) ? ttzip_compute_buffer_crc32_neon(0, blk_src, blk->unpack_size) : 0;
-
-            uint64_t t0 = ttzip_slice_now_ns();
-            blk->status = ttzip_fl2_compress_block(
-                blk_src,
-                blk->unpack_size,
-                blk->pack_buf,
-                blk->pack_capacity,
-                &blk->pack_size,
-                level,
-                blk->is_zero_block,
-                &blk->dict_size,
-                1
-            );
-            blk->encode_time_ns = ttzip_slice_now_ns() - t0;
-        });
+        lzma2_compress_block_arg_t compress_arg = {
+            .blocks = blocks,
+            .solid_buf = solid_buf,
+            .num_streams = num_streams,
+            .is_zero_copy = is_zero_copy,
+            .level = level
+        };
+        ttzip_parallel_for(ttzip_threadpool_shared(), num_blocks, lzma2_compress_block_worker, &compress_arg);
     } else if (level == 0) {
         blocks[0].unpack_offset = 0;
         blocks[0].unpack_size = (size_t)total_uncompressed_bytes;

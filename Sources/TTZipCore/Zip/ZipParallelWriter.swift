@@ -44,7 +44,7 @@ public final class ZipParallelWriter: @unchecked Sendable {
         let processedBytesBox = StateBoxInt64(0)
         let lock = NSLock()
         
-        DispatchQueue.concurrentPerform(iterations: captureItems.count) { idx in
+        ConcurrencyBridge.parallelFor(iterations: captureItems.count) { idx in
             let item = captureItems[idx]
             if item.isDirectory {
                 let dirPath = item.relPath.hasSuffix("/") ? item.relPath : item.relPath + "/"

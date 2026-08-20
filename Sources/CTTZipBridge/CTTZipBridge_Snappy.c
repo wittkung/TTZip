@@ -15,8 +15,10 @@
 #include <string.h>
 #include <stdbool.h>
 #include <sys/types.h>
+#include "include/ttzip_threadpool.h"
+#if defined(__APPLE__)
 #include <sys/sysctl.h>
-#include <dispatch/dispatch.h>
+#endif
 #include <sys/mman.h>
 #include <dirent.h>
 #include <archive.h>
@@ -34,7 +36,7 @@
 // MARK: - Castagnoli CRC32C Engine with ARM64 ACLE & Slice-by-8 Fallback
 
 static uint32_t s_crc32c_table[8][256];
-static dispatch_once_t s_crc32c_once;
+static ttzip_once_t s_crc32c_once = TTZIP_ONCE_INIT;
 
 static void init_crc32c_slice8_table_impl(void) {
     const uint32_t poly = 0x82F63B78U; // Castagnoli reflected polynomial
@@ -55,9 +57,7 @@ static void init_crc32c_slice8_table_impl(void) {
 }
 
 static void init_crc32c_slice8_table(void) {
-    dispatch_once(&s_crc32c_once, ^{
-        init_crc32c_slice8_table_impl();
-    });
+    ttzip_once(&s_crc32c_once, init_crc32c_slice8_table_impl);
 }
 
 static bool has_arm64_crc32_hardware(void) {

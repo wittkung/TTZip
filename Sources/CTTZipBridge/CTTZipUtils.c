@@ -16,11 +16,19 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <math.h>
+#if defined(__aarch64__) || defined(__arm64__)
 #include <arm_neon.h>
+#if defined(__has_include)
+#if __has_include(<arm_acle.h>)
 #include <arm_acle.h>
+#endif
+#endif
+#endif
 #include <zlib.h>
+#if !defined(TTZIP_OS_WINDOWS)
 #include <readpassphrase.h>
-#include <dispatch/dispatch.h>
+#endif
+#include "include/ttzip_threadpool.h"
 #include <libdeflate.h>
 
 #define AURA_IO_BUFFER_SIZE (4 * 1024 * 1024)
@@ -28,28 +36,20 @@
 const char* ttzip_detect_encoding_fast(const uint8_t* bytes, size_t len) {
     if (!bytes || len == 0) return "UTF-8";
     
-    size_t i = 0;
+    // Quick UTF-8 validation
     bool is_utf8 = true;
+    size_t i = 0;
     while (i < len) {
-        // Fast-path: 64-bit SWAR bulk scan for consecutive ASCII bytes
-        while (i + 8 <= len) {
-            uint64_t v;
-            memcpy(&v, bytes + i, 8);
-            if ((v & 0x8080808080808080ULL) == 0) {
-                i += 8;
-                continue;
-            }
-            break;
-        }
-        if (i >= len) break;
-
         if (bytes[i] <= 0x7F) {
             i++;
-        } else if ((bytes[i] & 0xE0) == 0xC0 && i + 1 < len && (bytes[i+1] & 0xC0) == 0x80) {
+        } else if ((bytes[i] & 0xE0) == 0xC0) {
+            if (i + 1 >= len || (bytes[i + 1] & 0xC0) != 0x80) { is_utf8 = false; break; }
             i += 2;
-        } else if ((bytes[i] & 0xF0) == 0xE0 && i + 2 < len && (bytes[i+1] & 0xC0) == 0x80 && (bytes[i+2] & 0xC0) == 0x80) {
+        } else if ((bytes[i] & 0xF0) == 0xE0) {
+            if (i + 2 >= len || (bytes[i + 1] & 0xC0) != 0x80 || (bytes[i + 2] & 0xC0) != 0x80) { is_utf8 = false; break; }
             i += 3;
-        } else if ((bytes[i] & 0xF8) == 0xF0 && i + 3 < len && (bytes[i+1] & 0xC0) == 0x80 && (bytes[i+2] & 0xC0) == 0x80 && (bytes[i+3] & 0xC0) == 0x80) {
+        } else if ((bytes[i] & 0xF8) == 0xF0) {
+            if (i + 3 >= len || (bytes[i + 1] & 0xC0) != 0x80 || (bytes[i + 2] & 0xC0) != 0x80 || (bytes[i + 3] & 0xC0) != 0x80) { is_utf8 = false; break; }
             i += 4;
         } else {
             is_utf8 = false;
@@ -58,6 +58,19 @@ const char* ttzip_detect_encoding_fast(const uint8_t* bytes, size_t len) {
     }
     if (is_utf8) return "UTF-8";
     
+    // Check for Shift-JIS / CP932 patterns
+    size_t sjis_matches = 0;
+    for (size_t j = 0; j + 1 < len; j++) {
+        uint8_t b1 = bytes[j];
+        uint8_t b2 = bytes[j + 1];
+        if (((b1 >= 0x81 && b1 <= 0x9F) || (b1 >= 0xE0 && b1 <= 0xFC)) &&
+            ((b2 >= 0x40 && b2 <= 0x7E) || (b2 >= 0x80 && b2 <= 0xFC))) {
+            sjis_matches++;
+            j++;
+        }
+    }
+    
+    // Check for GBK / GB2312 / CP936 patterns
     size_t gbk_matches = 0;
     for (size_t j = 0; j + 1 < len; j++) {
         uint8_t b1 = bytes[j];
@@ -67,9 +80,11 @@ const char* ttzip_detect_encoding_fast(const uint8_t* bytes, size_t len) {
             j++;
         }
     }
-    if (gbk_matches > 0) return "GB18030";
     
-    return "UTF-8";
+    if (sjis_matches > gbk_matches && sjis_matches > 0) return "Shift-JIS";
+    if (gbk_matches > 0) return "GBK";
+    
+    return "CP437";
 }
 
 char* ttzip_detect_charset(const char* bytes, size_t length) {
@@ -88,6 +103,24 @@ uint32_t ttzip_compute_buffer_crc32_neon(uint32_t initial_crc, const void* buf, 
     return libdeflate_crc32(initial_crc, buf, len);
 }
 
+typedef struct {
+    const uint8_t* byte_ptr;
+    size_t chunk_size;
+    size_t len;
+    uint32_t* p_crcs;
+    size_t* p_lens;
+} crc_chunk_arg_t;
+
+static void crc_chunk_worker(size_t i, void* arg) {
+    crc_chunk_arg_t* ctx = (crc_chunk_arg_t*)arg;
+    size_t offset = i * ctx->chunk_size;
+    if (offset < ctx->len) {
+        size_t this_len = (offset + ctx->chunk_size <= ctx->len) ? ctx->chunk_size : (ctx->len - offset);
+        ctx->p_crcs[i] = libdeflate_crc32(0, ctx->byte_ptr + offset, this_len);
+        ctx->p_lens[i] = this_len;
+    }
+}
+
 uint32_t ttzip_compute_buffer_crc32_parallel(const void* buf, size_t len) {
     if (!buf || len == 0) return 0;
     if (len < 4 * 1024 * 1024) {
@@ -97,18 +130,16 @@ uint32_t ttzip_compute_buffer_crc32_parallel(const void* buf, size_t len) {
     const size_t chunk_size = (len + num_chunks - 1) / num_chunks;
     uint32_t chunk_crcs[8] = {0};
     size_t chunk_lens[8] = {0};
-    uint32_t* p_crcs = chunk_crcs;
-    size_t* p_lens = chunk_lens;
 
-    const uint8_t* byte_ptr = (const uint8_t*)buf;
-    dispatch_apply(num_chunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t i) {
-        size_t offset = i * chunk_size;
-        if (offset < len) {
-            size_t this_len = (offset + chunk_size <= len) ? chunk_size : (len - offset);
-            p_crcs[i] = libdeflate_crc32(0, byte_ptr + offset, this_len);
-            p_lens[i] = this_len;
-        }
-    });
+    crc_chunk_arg_t arg = {
+        .byte_ptr = (const uint8_t*)buf,
+        .chunk_size = chunk_size,
+        .len = len,
+        .p_crcs = chunk_crcs,
+        .p_lens = chunk_lens
+    };
+
+    ttzip_parallel_for(ttzip_threadpool_shared(), num_chunks, crc_chunk_worker, &arg);
 
     uint32_t combined = chunk_crcs[0];
     for (size_t i = 1; i < num_chunks; i++) {
@@ -117,6 +148,26 @@ uint32_t ttzip_compute_buffer_crc32_parallel(const void* buf, size_t len) {
         }
     }
     return combined;
+}
+
+typedef struct {
+    uint8_t* dst_ptr;
+    const uint8_t* byte_ptr;
+    size_t chunk_size;
+    size_t len;
+    uint32_t* p_crcs;
+    size_t* p_lens;
+} crc_copy_chunk_arg_t;
+
+static void crc_copy_chunk_worker(size_t i, void* arg) {
+    crc_copy_chunk_arg_t* ctx = (crc_copy_chunk_arg_t*)arg;
+    size_t offset = i * ctx->chunk_size;
+    if (offset < ctx->len) {
+        size_t this_len = (offset + ctx->chunk_size <= ctx->len) ? ctx->chunk_size : (ctx->len - offset);
+        if (ctx->dst_ptr) memcpy(ctx->dst_ptr + offset, ctx->byte_ptr + offset, this_len);
+        ctx->p_crcs[i] = libdeflate_crc32(0, ctx->byte_ptr + offset, this_len);
+        ctx->p_lens[i] = this_len;
+    }
 }
 
 uint32_t ttzip_compute_crc32_and_memcpy_parallel(void* dst, const void* src, size_t len) {
@@ -146,20 +197,17 @@ uint32_t ttzip_compute_crc32_and_memcpy_parallel(void* dst, const void* src, siz
     const size_t chunk_size = (len + num_chunks - 1) / num_chunks;
     uint32_t chunk_crcs[12] = {0};
     size_t chunk_lens[12] = {0};
-    uint32_t* p_crcs = chunk_crcs;
-    size_t* p_lens = chunk_lens;
 
-    const uint8_t* byte_ptr = (const uint8_t*)src;
-    uint8_t* dst_ptr = (uint8_t*)dst;
-    dispatch_apply(num_chunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t i) {
-        size_t offset = i * chunk_size;
-        if (offset < len) {
-            size_t this_len = (offset + chunk_size <= len) ? chunk_size : (len - offset);
-            if (dst_ptr) memcpy(dst_ptr + offset, byte_ptr + offset, this_len);
-            p_crcs[i] = libdeflate_crc32(0, byte_ptr + offset, this_len);
-            p_lens[i] = this_len;
-        }
-    });
+    crc_copy_chunk_arg_t arg = {
+        .dst_ptr = (uint8_t*)dst,
+        .byte_ptr = (const uint8_t*)src,
+        .chunk_size = chunk_size,
+        .len = len,
+        .p_crcs = chunk_crcs,
+        .p_lens = chunk_lens
+    };
+
+    ttzip_parallel_for(ttzip_threadpool_shared(), num_chunks, crc_copy_chunk_worker, &arg);
 
     uint32_t combined = chunk_crcs[0];
     for (size_t i = 1; i < num_chunks; i++) {

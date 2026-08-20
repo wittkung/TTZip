@@ -16,17 +16,17 @@ public final class ArchiveProgressBroadcaster: @unchecked Sendable {
     
     private init() {}
     
-    /// Registers a progress observer with optional dispatch queue specification.
-    public func addObserver(_ observer: ArchiveProgressObserverProtocol, dispatchQueue: DispatchQueue? = nil) {
+    /// Registers a progress observer.
+    public func addObserver(_ observer: ArchiveProgressObserverProtocol) {
         lock.lock()
         defer { lock.unlock() }
         
         observers.removeAll { !$0.isAlive }
         
         if let idx = observers.firstIndex(where: { $0.observer === observer }) {
-            observers[idx] = WeakObserverWrapper(observer, dispatchQueue: dispatchQueue)
+            observers[idx] = WeakObserverWrapper(observer)
         } else {
-            observers.append(WeakObserverWrapper(observer, dispatchQueue: dispatchQueue))
+            observers.append(WeakObserverWrapper(observer))
         }
     }
     

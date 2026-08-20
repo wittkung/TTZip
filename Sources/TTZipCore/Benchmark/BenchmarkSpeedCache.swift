@@ -37,7 +37,7 @@ public struct CombinationMetrics: Codable, Sendable {
 public final class BenchmarkSpeedCache: @unchecked Sendable {
     public static let shared = BenchmarkSpeedCache()
     
-    private let queue = DispatchQueue(label: "com.ttzip.benchmark.cache", attributes: .concurrent)
+    private let lock = NSLock()
     private var metricsData: [String: CombinationMetrics] = [:]
     
     private init() {
@@ -46,7 +46,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
     
     /// Clears cached metrics in memory and on disk.
     public func clearCache() {
-        queue.sync(flags: .barrier) {
+        lock.withLock {
             self.metricsData.removeAll()
             try? FileManager.default.removeItem(at: self.cacheFileURL)
         }
@@ -65,8 +65,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
         ratioPercent: Double = 100.0
     ) {
         guard compressMBs > 0 && !compressMBs.isNaN && !compressMBs.isInfinite else { return }
-        queue.async(flags: .barrier) { [weak self] in
-            guard let self = self else { return }
+        lock.withLock {
             let key = self.cacheKey(format: format, level: level)
             let latest = CombinationMetrics(
                 formatRaw: format.rawValue,
@@ -83,7 +82,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
     
     /// Retrieves latest metrics for target format and compression level.
     public func getLatestMetrics(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel) -> CombinationMetrics? {
-        queue.sync {
+        lock.withLock {
             let key = cacheKey(format: format, level: level)
             return metricsData[key]
         }
@@ -91,7 +90,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
     
     /// Calculates relative speed percentage compared to maximum observed throughput for the format (100% = max throughput).
     public func relativeSpeedPercentage(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel) -> Int {
-        return queue.sync {
+        return lock.withLock {
             let key = cacheKey(format: format, level: level)
             let current = metricsData[key]?.compressThroughputMBs ?? 0.0
             
@@ -114,7 +113,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
     
     /// Retrieves latest compression ratio percentage for target format and level.
     public func compressionRatioPercent(format: ArchiveCompressionFormat, level: ArchiveCompressionLevel) -> Double {
-        return queue.sync {
+        return lock.withLock {
             let key = cacheKey(format: format, level: level)
             if let m = metricsData[key] {
                 return m.compressionRatioPercent
@@ -161,8 +160,7 @@ public final class BenchmarkSpeedCache: @unchecked Sendable {
     
     /// Batch persists comprehensive benchmark report JSON to disk.
     public func saveFullReport(rows: [ExhaustiveBenchmarkRow]) {
-        queue.async(flags: .barrier) { [weak self] in
-            guard let self = self else { return }
+        lock.withLock {
             for row in rows {
                 let key = self.cacheKey(format: row.format, level: row.level)
                 let latest = CombinationMetrics(

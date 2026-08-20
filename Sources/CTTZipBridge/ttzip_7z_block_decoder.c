@@ -18,10 +18,33 @@
 #include "include/CTTZipBridge_Zstd.h"
 #include "include/CTTZipStreamCoder.h"
 #include "include/ttzip_platform.h"
+#include "include/ttzip_threadpool.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdatomic.h>
-#include <dispatch/dispatch.h>
+
+typedef struct {
+    ttzip_7z_dec_chunk_t* blocks;
+    uint8_t* unpack_buf;
+    size_t total_unpack_bytes;
+    _Atomic int decode_error;
+} lzma2_block_decode_arg_t;
+
+static void lzma2_block_decode_worker(size_t b, void* arg) {
+    lzma2_block_decode_arg_t* ctx = (lzma2_block_decode_arg_t*)arg;
+    size_t actual_block_unpacked = 0;
+    size_t cap = ctx->blocks[b].unpack_size > 0 ? ctx->blocks[b].unpack_size : (ctx->total_unpack_bytes - ctx->blocks[b].unpack_offset);
+    int dec_res = ttzip_lzma2_decode_block_native(
+        ctx->blocks[b].pack_ptr,
+        ctx->blocks[b].pack_size,
+        ctx->unpack_buf + ctx->blocks[b].unpack_offset,
+        cap,
+        &actual_block_unpacked
+    );
+    if (dec_res != 0) {
+        atomic_store(&ctx->decode_error, dec_res);
+    }
+}
 
 int ttzip_7z_decode_payload_parallel(
     const uint8_t* payload_start,
@@ -62,7 +85,6 @@ int ttzip_7z_decode_payload_parallel(
         bool is_dict_reset = (control == 1) || (control >= 0xE0);
         if (is_dict_reset && pos > current_block_start) {
             blocks[block_count].pack_ptr = payload_start + current_block_start;
-
             blocks[block_count].pack_size = pos - current_block_start;
             blocks[block_count].unpack_offset = current_unpack_offset;
             blocks[block_count].unpack_size = current_block_unpack_size;
@@ -131,6 +153,11 @@ int ttzip_7z_decode_payload_parallel(
         size_t zstd_dec = ttzip_zstd_decompress(payload_start, payload_len, unpack_buf, total_unpack_bytes);
         if (zstd_dec > 0) {
             total_unpack_bytes = zstd_dec;
+        } else {
+            TTZIP_SLICE_SCOPE_END("2_7zDec_ParallelLZMA2Decode");
+            free(blocks);
+            ttzip_platform_aligned_free(unpack_buf);
+            return TTZIP_ERR_CORRUPT_HEADER;
         }
     } else if (primary_method_id == 0x040108 || primary_method_id == 0x40108) {
         // 7z-Deflate libdeflate NEON pass-through (Method ID 0x040108)
@@ -164,22 +191,14 @@ int ttzip_7z_decode_payload_parallel(
             return TTZIP_ERR_CORRUPT_HEADER;
         }
     } else if (block_count > 1) {
-        __block _Atomic int decode_error = 0;
-        dispatch_apply(block_count, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t b) {
-            size_t actual_block_unpacked = 0;
-            size_t cap = blocks[b].unpack_size > 0 ? blocks[b].unpack_size : (total_unpack_bytes - blocks[b].unpack_offset);
-            int dec_res = ttzip_lzma2_decode_block_native(
-                blocks[b].pack_ptr,
-                blocks[b].pack_size,
-                unpack_buf + blocks[b].unpack_offset,
-                cap,
-                &actual_block_unpacked
-            );
-            if (dec_res != 0) {
-                atomic_store(&decode_error, dec_res);
-            }
-        });
-        if (atomic_load(&decode_error) != 0) {
+        lzma2_block_decode_arg_t decode_arg = {
+            .blocks = blocks,
+            .unpack_buf = unpack_buf,
+            .total_unpack_bytes = total_unpack_bytes,
+            .decode_error = 0
+        };
+        ttzip_parallel_for(ttzip_threadpool_shared(), block_count, lzma2_block_decode_worker, &decode_arg);
+        if (atomic_load(&decode_arg.decode_error) != 0) {
             TTZIP_SLICE_SCOPE_END("2_7zDec_ParallelLZMA2Decode");
             free(blocks);
             ttzip_platform_aligned_free(unpack_buf);

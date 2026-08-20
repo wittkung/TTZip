@@ -163,7 +163,8 @@ public enum EnwikFixtureCacheManager {
             var data: Data?
         }
         let box = ResultBox()
-        let semaphore = DispatchSemaphore(value: 0)
+        let sema = ttzip_semaphore_create(0)
+        defer { ttzip_semaphore_destroy(sema) }
         
         var request = URLRequest(url: url)
         request.timeoutInterval = 10.0
@@ -172,10 +173,10 @@ public enum EnwikFixtureCacheManager {
             if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200, let data = data {
                 box.data = data
             }
-            semaphore.signal()
+            ttzip_semaphore_signal(sema)
         }
         task.resume()
-        _ = semaphore.wait(timeout: .now() + 12.0)
+        _ = ttzip_semaphore_wait(sema)
         return box.data
     }
     

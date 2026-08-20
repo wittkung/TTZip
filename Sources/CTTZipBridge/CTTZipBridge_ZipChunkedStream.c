@@ -3,19 +3,21 @@
 // Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
 // All rights reserved.
 //
-// TTZip: High-performance native archiving and compression engine for macOS.
+// TTZip: High-performance native archiving and compression engine.
 
 /**
  * @file CTTZipBridge_ZipChunkedStream.c
  * @brief TTZip large file 1MB chunked multithreaded DEFLATE stream compressor.
  * @details Strictly conforms to PKWARE ZIP Method 8 and RFC 1951 byte alignment,
  *          bounding resident memory consumption within <= 64MB via a 32-slot ring buffer.
+ *          Powered by cross-platform ttzip_threadpool (zero Apple GCD/Blocks dependency).
  */
 
 #include "include/CTTZipBridge_ZipChunkedStream.h"
 #include "include/CTTZipPlatform.h"
 #include "include/CTTZipStreamCoder.h"
 #include "include/CTTZipCommon.h"
+#include "include/ttzip_threadpool.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,8 +26,10 @@
 #include <pthread.h>
 #include <libdeflate.h>
 
-#if defined(TTZIP_OS_MACOS)
-#include <dispatch/dispatch.h>
+#if defined(TTZIP_OS_WINDOWS)
+#include <io.h>
+#else
+#include <unistd.h>
 #endif
 
 typedef struct {
@@ -47,7 +51,7 @@ struct ttzip_zip_chunked_stream {
     uint64_t total_compressed_bytes;
     uint32_t running_crc32;
     
-    uint64_t next_seq_to_dispatch;
+    uint64_t next_seq_to_submit;
     uint64_t next_seq_to_write;
     
     chunk_result_slot_t slots[TTZIP_CHUNK_MAX_IN_FLIGHT];
@@ -55,14 +59,10 @@ struct ttzip_zip_chunked_stream {
     pthread_mutex_t mutex;
     pthread_cond_t cond;
     bool has_error;
-    
-#if defined(TTZIP_OS_MACOS)
-    dispatch_queue_t compress_queue;
-#endif
 };
 
 static void flush_ready_slots_locked(ttzip_zip_chunked_stream_t* s) {
-    while (s->next_seq_to_write < s->next_seq_to_dispatch) {
+    while (s->next_seq_to_write < s->next_seq_to_submit) {
         size_t slot_idx = (size_t)(s->next_seq_to_write % TTZIP_CHUNK_MAX_IN_FLIGHT);
         if (!s->slots[slot_idx].is_ready) {
             break;
@@ -100,32 +100,57 @@ static void flush_ready_slots_locked(ttzip_zip_chunked_stream_t* s) {
     }
 }
 
-static void compress_chunk_worker(ttzip_zip_chunked_stream_t* s, uint64_t seq, uint8_t* uncompressed_data, size_t uncompressed_len, bool is_final) {
-    int z_level = s->level > 0 ? (s->level > 12 ? 12 : s->level) : 6;
-    struct libdeflate_compressor* compressor = ttzip_get_tls_compressor(z_level);
+static void compress_chunk_worker(ttzip_zip_chunked_stream_t* s, uint64_t seq, uint8_t* uncompressed_data, size_t uncompressed_size, bool is_final) {
+    struct libdeflate_compressor* compressor = libdeflate_alloc_compressor(s->level);
+    if (!compressor) {
+        pthread_mutex_lock(&s->mutex);
+        s->has_error = true;
+        pthread_cond_broadcast(&s->cond);
+        pthread_mutex_unlock(&s->mutex);
+        free(uncompressed_data);
+        return;
+    }
     
-    size_t max_out = libdeflate_deflate_compress_bound(compressor, uncompressed_len) + 16;
+    size_t max_out = libdeflate_deflate_compress_bound(compressor, uncompressed_size);
+    // Add extra padding to guarantee room for final uncompressed sync block
+    max_out += 64;
+    
     uint8_t* out_buf = (uint8_t*)malloc(max_out);
-    size_t final_size = 0;
+    if (!out_buf) {
+        libdeflate_free_compressor(compressor);
+        pthread_mutex_lock(&s->mutex);
+        s->has_error = true;
+        pthread_cond_broadcast(&s->cond);
+        pthread_mutex_unlock(&s->mutex);
+        free(uncompressed_data);
+        return;
+    }
     
-    if (out_buf && compressor) {
-        size_t comp_size = libdeflate_deflate_compress(compressor, uncompressed_data, uncompressed_len, out_buf, max_out);
-        if (comp_size > 0) {
-            if (!is_final) {
-                // 1. Clear BFINAL bit on first byte (marks non-final block)
-                out_buf[0] &= 0xFE;
-                
-                // 2. Inject RFC 1951 byte-aligned sync marker (0x00, 0x00, 0xFF, 0xFF)
-                out_buf[comp_size]     = 0x00;
-                out_buf[comp_size + 1] = 0x00;
-                out_buf[comp_size + 2] = 0xFF;
-                out_buf[comp_size + 3] = 0xFF;
-                final_size = comp_size + 4;
-            } else {
-                // Final block: retains libdeflate generated BFINAL = 1 state
-                final_size = comp_size;
-            }
-        }
+    size_t actual_out = 0;
+    if (uncompressed_size > 0) {
+        actual_out = libdeflate_deflate_compress(compressor, uncompressed_data, uncompressed_size, out_buf, max_out);
+    }
+    libdeflate_free_compressor(compressor);
+    
+    if (uncompressed_size > 0 && actual_out == 0) {
+        pthread_mutex_lock(&s->mutex);
+        s->has_error = true;
+        pthread_cond_broadcast(&s->cond);
+        pthread_mutex_unlock(&s->mutex);
+        free(out_buf);
+        free(uncompressed_data);
+        return;
+    }
+    
+    // RFC 1951 Deflate sync block alignment:
+    // If not final chunk, append an empty uncompressed block (BFINAL=0, BTYPE=00) to force byte alignment
+    size_t final_size = actual_out;
+    if (!is_final) {
+        out_buf[final_size++] = 0x00;
+        out_buf[final_size++] = 0x00;
+        out_buf[final_size++] = 0x00;
+        out_buf[final_size++] = 0xFF;
+        out_buf[final_size++] = 0xFF;
     }
     
     free(uncompressed_data);
@@ -141,13 +166,29 @@ static void compress_chunk_worker(ttzip_zip_chunked_stream_t* s, uint64_t seq, u
     pthread_mutex_unlock(&s->mutex);
 }
 
-static int dispatch_current_buffer_locked(ttzip_zip_chunked_stream_t* s, bool is_final) {
+typedef struct {
+    ttzip_zip_chunked_stream_t* s;
+    uint64_t seq;
+    uint8_t* uncompressed_data;
+    size_t uncompressed_size;
+    bool is_final;
+} chunk_worker_arg_t;
+
+static void chunk_worker_trampoline(void* arg) {
+    chunk_worker_arg_t* w = (chunk_worker_arg_t*)arg;
+    if (w) {
+        compress_chunk_worker(w->s, w->seq, w->uncompressed_data, w->uncompressed_size, w->is_final);
+        free(w);
+    }
+}
+
+static int flush_current_buffer_locked(ttzip_zip_chunked_stream_t* s, bool is_final) {
     if (s->current_in_len == 0 && !is_final) {
         return 0;
     }
     
     // Backpressure: wait if in-flight slots reach maximum limit
-    while ((s->next_seq_to_dispatch - s->next_seq_to_write) >= TTZIP_CHUNK_MAX_IN_FLIGHT && !s->has_error) {
+    while ((s->next_seq_to_submit - s->next_seq_to_write) >= TTZIP_CHUNK_MAX_IN_FLIGHT && !s->has_error) {
         pthread_cond_wait(&s->cond, &s->mutex);
     }
     
@@ -155,7 +196,7 @@ static int dispatch_current_buffer_locked(ttzip_zip_chunked_stream_t* s, bool is
         return -1;
     }
     
-    uint64_t seq = s->next_seq_to_dispatch++;
+    uint64_t seq = s->next_seq_to_submit++;
     uint8_t* chunk_copy = (uint8_t*)malloc(s->current_in_len > 0 ? s->current_in_len : 1);
     if (!chunk_copy) {
         s->has_error = true;
@@ -171,13 +212,22 @@ static int dispatch_current_buffer_locked(ttzip_zip_chunked_stream_t* s, bool is
     size_t len_to_compress = s->current_in_len;
     s->current_in_len = 0;
     
-#if defined(TTZIP_OS_MACOS)
-    dispatch_async(s->compress_queue, ^{
-        compress_chunk_worker(s, seq, chunk_copy, len_to_compress, is_final);
-    });
-#else
-    compress_chunk_worker(s, seq, chunk_copy, len_to_compress, is_final);
-#endif
+    chunk_worker_arg_t* w = (chunk_worker_arg_t*)malloc(sizeof(chunk_worker_arg_t));
+    if (!w) {
+        free(chunk_copy);
+        s->has_error = true;
+        return -1;
+    }
+    w->s = s;
+    w->seq = seq;
+    w->uncompressed_data = chunk_copy;
+    w->uncompressed_size = len_to_compress;
+    w->is_final = is_final;
+    
+    if (ttzip_threadpool_submit(ttzip_threadpool_shared(), chunk_worker_trampoline, w) != 0) {
+        // Fallback synchronously if pool queue rejected
+        chunk_worker_trampoline(w);
+    }
     
     return 0;
 }
@@ -196,10 +246,6 @@ ttzip_zip_chunked_stream_t* ttzip_zip_chunked_stream_create(int out_fd, int leve
     
     pthread_mutex_init(&s->mutex, NULL);
     pthread_cond_init(&s->cond, NULL);
-    
-#if defined(TTZIP_OS_MACOS)
-    s->compress_queue = dispatch_queue_create("com.ttzip.chunked_deflate_compress", DISPATCH_QUEUE_CONCURRENT);
-#endif
     
     return s;
 }
@@ -222,7 +268,7 @@ int64_t ttzip_zip_chunked_stream_write(ttzip_zip_chunked_stream_t* s, const void
         
         if (s->current_in_len >= TTZIP_CHUNK_SIZE_BYTES) {
             pthread_mutex_lock(&s->mutex);
-            int res = dispatch_current_buffer_locked(s, false);
+            int res = flush_current_buffer_locked(s, false);
             pthread_mutex_unlock(&s->mutex);
             if (res != 0) return -1;
         }
@@ -235,11 +281,11 @@ int ttzip_zip_chunked_stream_finish(ttzip_zip_chunked_stream_t* s, uint64_t* out
     if (!s) return -1;
     
     pthread_mutex_lock(&s->mutex);
-    dispatch_current_buffer_locked(s, true);
+    flush_current_buffer_locked(s, true);
     
-    while (s->next_seq_to_write < s->next_seq_to_dispatch && !s->has_error) {
+    while (s->next_seq_to_write < s->next_seq_to_submit && !s->has_error) {
         flush_ready_slots_locked(s);
-        if (s->next_seq_to_write < s->next_seq_to_dispatch) {
+        if (s->next_seq_to_write < s->next_seq_to_submit) {
             pthread_cond_wait(&s->cond, &s->mutex);
         }
     }
@@ -268,12 +314,6 @@ void ttzip_zip_chunked_stream_destroy(ttzip_zip_chunked_stream_t* s) {
         }
     }
     pthread_mutex_unlock(&s->mutex);
-    
-#if defined(TTZIP_OS_MACOS)
-    if (s->compress_queue) {
-        s->compress_queue = NULL;
-    }
-#endif
     
     pthread_mutex_destroy(&s->mutex);
     pthread_cond_destroy(&s->cond);

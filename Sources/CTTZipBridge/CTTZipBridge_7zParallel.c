@@ -15,7 +15,6 @@
 #include <sys/mman.h>
 #include <string.h>
 #include <stdio.h>
-#include <dispatch/dispatch.h>
 
 int ttzip_7z_extract_parallel_c(
     const char* archive_path,

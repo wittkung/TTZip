@@ -14,7 +14,7 @@
 #include <string.h>
 #include <CommonCrypto/CommonCrypto.h>
 #include <CommonCrypto/CommonKeyDerivation.h>
-#include <dispatch/dispatch.h>
+#include "include/ttzip_threadpool.h"
 
 #if defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(__aarch64__)
 #include <arm_neon.h>
@@ -326,6 +326,25 @@ int ttzip_pbkdf2_sha256_fast(
     return (status == kCCSuccess) ? TTZIP_OK : TTZIP_ERR_INVALID_PARAM;
 }
 
+#if defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(__aarch64__)
+typedef struct {
+    const uint8x16_t* rk_ptr;
+    uint64_t initial_block_count;
+    const uint8_t* src;
+    size_t length;
+    uint8_t* dst;
+    size_t chunk_blocks;
+    size_t num_blocks;
+} aes_ctr_arg_t;
+
+static void aes_ctr_chunk_worker(size_t chunk_idx, void* user_data) {
+    aes_ctr_arg_t* ctx = (aes_ctr_arg_t*)user_data;
+    size_t start = chunk_idx * ctx->chunk_blocks;
+    size_t count = (start + ctx->chunk_blocks <= ctx->num_blocks) ? ctx->chunk_blocks : (ctx->num_blocks - start);
+    ttzip_aes256_ctr_neon_chunk(ctx->rk_ptr, ctx->initial_block_count, ctx->src, ctx->length, ctx->dst, start, count);
+}
+#endif
+
 int ttzip_aes256_ctr_crypt(
     const uint8_t* key,
     uint64_t initial_block_count,
@@ -347,11 +366,17 @@ int ttzip_aes256_ctr_crypt(
     if (total_chunks <= 1) {
         ttzip_aes256_ctr_neon_chunk(rk_ptr, initial_block_count, src, length, dst, 0, num_blocks);
     } else {
-        dispatch_apply(total_chunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunk_idx) {
-            size_t start = chunk_idx * chunk_blocks;
-            size_t count = (start + chunk_blocks <= num_blocks) ? chunk_blocks : (num_blocks - start);
-            ttzip_aes256_ctr_neon_chunk(rk_ptr, initial_block_count, src, length, dst, start, count);
-        });
+        aes_ctr_arg_t arg = {
+            .rk_ptr = rk_ptr,
+            .initial_block_count = initial_block_count,
+            .src = src,
+            .length = length,
+            .dst = dst,
+            .chunk_blocks = chunk_blocks,
+            .num_blocks = num_blocks
+        };
+
+        ttzip_parallel_for(ttzip_threadpool_shared(), total_chunks, aes_ctr_chunk_worker, &arg);
     }
     return TTZIP_OK;
 #else
@@ -366,6 +391,7 @@ int ttzip_aes256_ctr_crypt_parallel(
     uint8_t* dst,
     int threads
 ) {
+    (void)threads;
     return ttzip_aes256_ctr_crypt(key, 1, src, length, dst);
 }
 

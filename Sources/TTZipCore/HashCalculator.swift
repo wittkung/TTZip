@@ -46,7 +46,7 @@ public final class HashCalculator: HashCalculating, @unchecked Sendable {
 
                     chunkCRCs.withUnsafeMutableBufferPointer { crcBuf in
                         let rawCrcPtr = UInt(bitPattern: crcBuf.baseAddress)
-                        DispatchQueue.concurrentPerform(iterations: numChunks) { idx in
+                        ConcurrencyBridge.parallelFor(iterations: numChunks) { idx in
                             guard let basePtr = UnsafePointer<UInt8>(bitPattern: rawInPtr),
                                   let outBufPtr = UnsafeMutablePointer<UInt32>(bitPattern: rawCrcPtr) else { return }
                             let offset = idx * crcChunkSize

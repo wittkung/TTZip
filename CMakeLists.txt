@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TTZip LANGUAGES C CXX)
+project(TTZip VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -24,12 +24,10 @@ else()
     add_compile_options(
         -Wall
         -Wextra
+        -Wno-unused-parameter
+        -Wno-unused-function
         -O3
-        -fvisibility=hidden
     )
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
-        add_compile_options(-march=armv8.2-a+crypto)
-    endif()
 endif()
 
 # 2. 第三方子模块与外部依赖 (zlib-ng 现代化流式 Deflate 加速)
@@ -49,90 +47,84 @@ endif()
 # 3. 头文件全局搜索路径
 set(TTZIP_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge
+    ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/fast-lzma2
+    ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/zopfli
+    ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/lzfse
+    ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/snappy
+    ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/native_deflate
     ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/include/uchardet
 )
 
-# 导出 zlib-ng include 目录
-if(TARGET zlibstatic)
-    list(APPEND TTZIP_INCLUDE_DIRS
-        $<TARGET_PROPERTY:zlibstatic,INCLUDE_DIRECTORIES>
-        ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/zlib-ng
-        ${CMAKE_CURRENT_BINARY_DIR}/Vendor/zlib-ng
-    )
-elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/zlib-ng")
-    list(APPEND TTZIP_INCLUDE_DIRS
-        ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/zlib-ng
-        ${CMAKE_CURRENT_BINARY_DIR}/Vendor/zlib-ng
-    )
-endif()
-
 # 4. 收集 CTTZipBridge 核心源码
-set(CTTZIP_CORE_SOURCES
-    Sources/CTTZipBridge/CTTZipBridge.c
-    Sources/CTTZipBridge/CTTZipCommon.c
-    Sources/CTTZipBridge/CTTZipStreamCoder.c
-    Sources/CTTZipBridge/CTTZipPlatformTimer.c
-    Sources/CTTZipBridge/CTTZipDiagnostics.c
-    Sources/CTTZipBridge/CTTZipCoreArchitecture.c
-    Sources/CTTZipBridge/CTTZipSysAlloc.c
-    Sources/CTTZipBridge/CTTZipUtils.c
-    Sources/CTTZipBridge/CTTZipParser.c
-    Sources/CTTZipBridge/CTTZipSliceProfiler.c
-    Sources/CTTZipBridge/CTTZipIO.c
-    Sources/CTTZipBridge/CTTZipBridge_ZipChunkedStream.c
-    Sources/CTTZipBridge/CTTZipAdler32Neon.c
-    Sources/CTTZipBridge/CTTZipSuperChunk.c
-    Sources/CTTZipBridge/CTTZipHeuristicTuner.c
-    Sources/CTTZipBridge/ttzip_platform_detect.c
-    Sources/CTTZipBridge/ttzip_lzma2_fast_encoder.c
-    Sources/CTTZipBridge/ttzip_lzma2_branchless_rc.c
-    Sources/CTTZipBridge/ttzip_7z_header_parser.c
-    Sources/CTTZipBridge/ttzip_7z_header_writer.c
-    Sources/CTTZipBridge/ttzip_tar_native.c
-    Sources/CTTZipBridge/ttzip_native_archive.c
-    Sources/CTTZipBridge/ttzip_crc64.c
-    Sources/CTTZipBridge/ttzip_huffman_inplace.c
-    Sources/CTTZipBridge/ttzip_adaptive_block_split.c
-    Sources/CTTZipBridge/ttzip_container_fast.c
+file(GLOB CTTZIP_CORE_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/fast-lzma2/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/zopfli/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/lzfse/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/snappy/*.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/native_deflate/*.c"
 )
 
-# 架构硬件加速分支
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64" AND (APPLE OR MSVC))
-    list(APPEND CTTZIP_CORE_SOURCES
-        Sources/CTTZipBridge/CTTZipCRC32Neon.c
-        Sources/CTTZipBridge/ttzip_bcj_arm64_neon.c
-        Sources/CTTZipBridge/ttzip_7z_crypto_neon.c
-        Sources/CTTZipBridge/ttzip_7z_kdf_arm64.c
-        Sources/CTTZipBridge/ttzip_lzma_hc4_neon.c
-    )
+# 5. 构建静态库与目标
+add_library(ttzip STATIC ${CTTZIP_CORE_SOURCES})
+target_include_directories(ttzip PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/include>
+    $<INSTALL_INTERFACE:include/ttzip>
+)
+target_include_directories(ttzip PRIVATE
+    ${TTZIP_INCLUDE_DIRS}
+)
+target_compile_definitions(ttzip PUBLIC TTZIP_BUILD_STATIC)
+
+# 平台专有系统链接库与外部依赖
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/libTTZipVendor.a")
+    target_link_libraries(ttzip PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/libTTZipVendor.a")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/lib")
+    file(GLOB VENDOR_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/lib/*.a")
+    target_link_libraries(ttzip PUBLIC ${VENDOR_LIBS})
 endif()
 
-# 平台专有源码分支 (macOS APFS / Linux / Windows)
-if(APPLE)
-    list(APPEND CTTZIP_CORE_SOURCES
-        Sources/CTTZipBridge/CTTZipBridge_APFS.c
-        Sources/CTTZipBridge/CTTZipBridge_LZFSE.c
-    )
-endif()
-
-# 5. 构建目标：CTTZipBridge 静态库
-add_library(CTTZipBridge STATIC ${CTTZIP_CORE_SOURCES})
-target_include_directories(CTTZipBridge PUBLIC ${TTZIP_INCLUDE_DIRS})
-target_compile_definitions(CTTZipBridge PUBLIC TTZIP_BUILD_STATIC)
-
-# 6. 链接第三方与系统库
-if(TARGET zlibstatic)
-    target_link_libraries(CTTZipBridge PUBLIC zlibstatic)
-elseif(MSVC)
-    target_link_libraries(CTTZipBridge PUBLIC zlibstatic)
-endif()
-
-# Windows 平台系统链接库
 if(WIN32)
-    target_link_libraries(CTTZipBridge PRIVATE
+    target_link_libraries(ttzip PRIVATE
         Bcrypt
         Synchronization
         Shlwapi
     )
+elseif(APPLE)
+    find_library(COMPRESSION_LIB Compression)
+    if(COMPRESSION_LIB)
+        target_link_libraries(ttzip PRIVATE ${COMPRESSION_LIB})
+    endif()
+    target_link_libraries(ttzip PRIVATE bz2 z)
 endif()
+
+# 6. 构建独立纯 C 命令行工具 ttzip-cli
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cli/main.c")
+    add_executable(ttzip-cli cli/main.c)
+    target_link_libraries(ttzip-cli PRIVATE ttzip)
+    target_include_directories(ttzip-cli PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/CTTZipBridge
+    )
+endif()
+
+# 7. 安装与导出配置
+include(GNUInstallDirs)
+install(TARGETS ttzip ttzip-cli
+    EXPORT TTZipTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(DIRECTORY Sources/CTTZipBridge/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ttzip
+)
+install(EXPORT TTZipTargets
+    FILE TTZipTargets.cmake
+    NAMESPACE TTZip::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TTZip
+)

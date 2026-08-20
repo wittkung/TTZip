@@ -67,15 +67,14 @@ public final class TaskCancellationObserverCenter: @unchecked Sendable {
     /// Adds cancellation observer for a specific task.
     public func addObserver(
         _ observer: TaskCancellationObserverProtocol,
-        forTask taskId: String,
-        dispatchQueue: DispatchQueue? = nil
+        forTask taskId: String
     ) {
         lock.lock()
         defer { lock.unlock() }
         
         var list = observers[taskId] ?? []
         list.removeAll { !$0.isAlive }
-        let wrapper = WeakObserverWrapper(observer, dispatchQueue: dispatchQueue)
+        let wrapper = WeakObserverWrapper(observer)
         if let idx = list.firstIndex(where: { $0.observer === observer }) {
             list[idx] = wrapper
         } else {

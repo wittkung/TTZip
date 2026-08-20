@@ -55,12 +55,17 @@
 #include "CTTZipHeuristicTuner.h"
 #include "CTTZipPluginRegistry.h"
 #include "CTTZipBitGroom.h"
+#include "ttzip_threadpool.h"
+#include "ttzip_fs.h"
+#include "ttzip_thread_budget.h"
+#include "ttzip_mem_budget.h"
 #include "ttzip_blosclz.h"
 #include "ttzip_context_pool.h"
 #include "ttzip_huffman_inplace.h"
 #include "ttzip_adaptive_block_split.h"
 #include "ttzip_container_fast.h"
 #include "ttzip_zopfli_engine.h"
+#include "ttzip_api.h"
 
 #ifdef __cplusplus
 

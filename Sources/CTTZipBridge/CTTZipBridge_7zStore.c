@@ -21,11 +21,83 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <dispatch/dispatch.h>
+#include "include/ttzip_threadpool.h"
 #include <errno.h>
 
 static uint64_t ttzip_posix_to_filetime(time_t sec) {
     return ((uint64_t)sec + 11644473600ULL) * 10000000ULL;
+}
+
+typedef struct {
+    ttzip_7z_store_list_t* list;
+    int out_fd;
+    ttzip_semaphore_t* fd_sem;
+} store_copy_arg_t;
+
+static void store_copy_worker(size_t i, void* arg) {
+    store_copy_arg_t* ctx = (store_copy_arg_t*)arg;
+    ttzip_7z_store_entry_t* item = &ctx->list->entries[i];
+    if (item->is_directory || item->file_size == 0) {
+        item->crc32 = 0;
+        return;
+    }
+    ttzip_semaphore_wait(ctx->fd_sem);
+    int in_fd = open(item->src_path, O_RDONLY);
+    if (in_fd >= 0) {
+        uint64_t offset = (uint64_t)item->payload_buf;
+        char buf[65536];
+        uint32_t crc = 0;
+        size_t total_rd = 0;
+        while (total_rd < (size_t)item->file_size) {
+            ssize_t rd = read(in_fd, buf, sizeof(buf));
+            if (rd <= 0) break;
+            crc = libdeflate_crc32(crc, buf, (size_t)rd);
+#if defined(TTZIP_OS_WINDOWS)
+            _lseeki64(ctx->out_fd, offset + total_rd, SEEK_SET);
+            _write(ctx->out_fd, buf, (unsigned int)rd);
+#else
+            ssize_t wr = pwrite(ctx->out_fd, buf, (size_t)rd, offset + total_rd);
+            if (wr < 0) {
+                ttzip_log(1, "pwrite error: %s (fd=%d, offset=%llu, size=%zd)\n", strerror(errno), ctx->out_fd, offset + total_rd, (size_t)rd);
+            }
+#endif
+            total_rd += rd;
+        }
+        if (total_rd != (size_t)item->file_size) {
+            memset(buf, 0, sizeof(buf));
+            while (total_rd < (size_t)item->file_size) {
+                size_t chunk = ((size_t)item->file_size - total_rd) > sizeof(buf) ? sizeof(buf) : ((size_t)item->file_size - total_rd);
+                crc = libdeflate_crc32(crc, buf, chunk);
+#if defined(TTZIP_OS_WINDOWS)
+                _lseeki64(ctx->out_fd, offset + total_rd, SEEK_SET);
+                _write(ctx->out_fd, buf, (unsigned int)chunk);
+#else
+                pwrite(ctx->out_fd, buf, chunk, offset + total_rd);
+#endif
+                total_rd += chunk;
+            }
+        }
+        item->crc32 = crc;
+        close(in_fd);
+    } else {
+        uint64_t offset = (uint64_t)item->payload_buf;
+        char buf[65536] = {0};
+        uint32_t crc = 0;
+        size_t total_rd = 0;
+        while (total_rd < (size_t)item->file_size) {
+            size_t chunk = ((size_t)item->file_size - total_rd) > sizeof(buf) ? sizeof(buf) : ((size_t)item->file_size - total_rd);
+            crc = libdeflate_crc32(crc, buf, chunk);
+#if defined(TTZIP_OS_WINDOWS)
+            _lseeki64(ctx->out_fd, offset + total_rd, SEEK_SET);
+            _write(ctx->out_fd, buf, (unsigned int)chunk);
+#else
+            pwrite(ctx->out_fd, buf, chunk, offset + total_rd);
+#endif
+            total_rd += chunk;
+        }
+        item->crc32 = crc;
+    }
+    ttzip_semaphore_signal(ctx->fd_sem);
 }
 
 int ttzip_create_7z_store_fast_c(
@@ -80,57 +152,14 @@ int ttzip_create_7z_store_fast_c(
         }
     }
 
-    dispatch_queue_t concurrent_q = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0);
-    dispatch_semaphore_t fd_sem = dispatch_semaphore_create(128);
-    dispatch_apply(list.count, concurrent_q, ^(size_t i) {
-        ttzip_7z_store_entry_t* item = &list.entries[i];
-        if (item->is_directory || item->file_size == 0) {
-            item->crc32 = 0;
-            return;
-        }
-        dispatch_semaphore_wait(fd_sem, DISPATCH_TIME_FOREVER);
-        int in_fd = open(item->src_path, O_RDONLY);
-        if (in_fd >= 0) {
-            uint64_t offset = (uint64_t)item->payload_buf;
-            char buf[65536];
-            uint32_t crc = 0;
-            size_t total_rd = 0;
-            while (total_rd < (size_t)item->file_size) {
-                ssize_t rd = read(in_fd, buf, sizeof(buf));
-                if (rd <= 0) break;
-                crc = libdeflate_crc32(crc, buf, (size_t)rd);
-                ssize_t wr = pwrite(out_fd, buf, (size_t)rd, offset + total_rd);
-                if (wr < 0) {
-                    ttzip_log(1, "pwrite error: %s (fd=%d, offset=%llu, size=%zd)\n", strerror(errno), out_fd, offset + total_rd, (size_t)rd);
-                }
-                total_rd += rd;
-            }
-            if (total_rd != (size_t)item->file_size) {
-                memset(buf, 0, sizeof(buf));
-                while (total_rd < (size_t)item->file_size) {
-                    size_t chunk = ((size_t)item->file_size - total_rd) > sizeof(buf) ? sizeof(buf) : ((size_t)item->file_size - total_rd);
-                    crc = libdeflate_crc32(crc, buf, chunk);
-                    pwrite(out_fd, buf, chunk, offset + total_rd);
-                    total_rd += chunk;
-                }
-            }
-            item->crc32 = crc;
-            close(in_fd);
-        } else {
-            uint64_t offset = (uint64_t)item->payload_buf;
-            char buf[65536] = {0};
-            uint32_t crc = 0;
-            size_t total_rd = 0;
-            while (total_rd < (size_t)item->file_size) {
-                size_t chunk = ((size_t)item->file_size - total_rd) > sizeof(buf) ? sizeof(buf) : ((size_t)item->file_size - total_rd);
-                crc = libdeflate_crc32(crc, buf, chunk);
-                pwrite(out_fd, buf, chunk, offset + total_rd);
-                total_rd += chunk;
-            }
-            item->crc32 = crc;
-        }
-        dispatch_semaphore_signal(fd_sem);
-    });
+    ttzip_semaphore_t* fd_sem = ttzip_semaphore_create(128);
+    store_copy_arg_t copy_arg = {
+        .list = &list,
+        .out_fd = out_fd,
+        .fd_sem = fd_sem
+    };
+    ttzip_parallel_for(ttzip_threadpool_shared(), list.count, store_copy_worker, &copy_arg);
+    ttzip_semaphore_destroy(fd_sem);
 
     size_t num_files = list.count;
     size_t num_streams = 0;

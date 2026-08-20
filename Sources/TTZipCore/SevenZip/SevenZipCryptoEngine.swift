@@ -98,8 +98,7 @@ public final class SevenZipCryptoEngine: SevenZipCryptoEngineProtocol, @unchecke
             let atomicFlag = SendableAtomicFlag()
             let dstBox = SendablePointerBox(pointer: dstBytePtr, size: totalSize)
             
-            // Multi-core parallel chunk decryption
-            DispatchQueue.concurrentPerform(iterations: numChunks) { chunkIdx in
+            ConcurrencyBridge.parallelFor(iterations: numChunks) { chunkIdx in
                 let offset = chunkIdx * chunkSize
                 let length = min(chunkSize, totalSize - offset)
                 

@@ -28,7 +28,7 @@ public final class ZipMemoryEngine: @unchecked Sendable {
             let resultsBox = StateBoxResults([(path: String, data: Data)?](repeating: nil, count: fileDescriptors.count))
             let pointerBox = SendablePointerBox(pointer: bytePtr, size: fileSize)
             
-            DispatchQueue.concurrentPerform(iterations: fileDescriptors.count) { idx in
+            ConcurrencyBridge.parallelFor(iterations: fileDescriptors.count) { idx in
                 let desc = fileDescriptors[idx]
                 let lfhPos = Int(desc.lfhOffset)
                 let currentBytePtr = pointerBox.pointer
@@ -78,7 +78,7 @@ public final class ZipMemoryEngine: @unchecked Sendable {
         let fileDescriptors = descriptors.filter { !$0.isDirectory }
         let resultsBox = StateBoxResults([(path: String, data: Data)?](repeating: nil, count: fileDescriptors.count))
         
-        DispatchQueue.concurrentPerform(iterations: fileDescriptors.count) { idx in
+        ConcurrencyBridge.parallelFor(iterations: fileDescriptors.count) { idx in
             let desc = fileDescriptors[idx]
             let lfhPos = Int(desc.lfhOffset)
             

@@ -54,29 +54,23 @@ public final class SubprocessExecutor: Sendable {
         arguments: [String],
         currentDirectory: String? = nil
     ) async throws -> (exitCode: Int32, output: String) {
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: executablePath)
-                process.arguments = arguments
-                if let dir = currentDirectory {
-                    process.currentDirectoryURL = URL(fileURLWithPath: dir)
-                }
-                let pipe = Pipe()
-                process.standardInput = FileHandle.nullDevice
-                process.standardOutput = pipe
-                process.standardError = pipe
-
-                do {
-                    try process.run()
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    process.waitUntilExit()
-                    let text = String(data: data, encoding: .utf8) ?? ""
-                    continuation.resume(returning: (process.terminationStatus, text))
-                } catch {
-                    continuation.resume(throwing: error)
-                }
+        return try await Task.detached(priority: .userInitiated) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: executablePath)
+            process.arguments = arguments
+            if let dir = currentDirectory {
+                process.currentDirectoryURL = URL(fileURLWithPath: dir)
             }
-        }
+            let pipe = Pipe()
+            process.standardInput = FileHandle.nullDevice
+            process.standardOutput = pipe
+            process.standardError = pipe
+
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            let text = String(data: data, encoding: .utf8) ?? ""
+            return (process.terminationStatus, text)
+        }.value
     }
 }

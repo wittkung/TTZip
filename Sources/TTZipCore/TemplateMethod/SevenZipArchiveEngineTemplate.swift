@@ -108,28 +108,14 @@ public final class SevenZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @un
             )
 
         case .inspect:
-            let reader = ArchiveEngineFactory.makeReader()
-            let box = SyncResultBox()
-            let sema = DispatchSemaphore(value: 0)
-            Task.detached {
-                do {
-                    let entries = try await reader.inspect(archivePath: context.archivePath, password: context.password)
-                    box.result = WorkflowResult(
-                        isSuccess: true,
-                        outputPath: context.archivePath,
-                        unlockedPassword: context.password,
-                        entriesCount: entries.count,
-                        metrics: ["format": "7z", "solidBlockStream": "inspected"]
-                    )
-                } catch {
-                    box.error = error
-                }
-                sema.signal()
-            }
-            sema.wait()
-            if let r = box.result { return r }
-            if let e = box.error { throw e }
-            throw ArchiveError.readFailed(code: -999)
+            let entries = NativeSevenZipEngine.shared.inspectSevenZip(archivePath: context.archivePath, password: context.password) ?? []
+            return WorkflowResult(
+                isSuccess: true,
+                outputPath: context.archivePath,
+                unlockedPassword: context.password,
+                entriesCount: entries.count,
+                metrics: ["format": "7z", "solidBlockStream": "inspected"]
+            )
 
         case .repair, .recover, .batch:
             throw ArchiveError.readFailed(code: -400)

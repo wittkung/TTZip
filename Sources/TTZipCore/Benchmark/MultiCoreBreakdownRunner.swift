@@ -67,7 +67,7 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
 
         let mutexLock = NSLock()
         let t0 = PlatformMonotonicTimer.nowNanoseconds()
-        DispatchQueue.concurrentPerform(iterations: chunkCount) { _ in
+        ConcurrencyBridge.parallelFor(iterations: chunkCount) { _ in
             var outBuf = [UInt8](repeating: 0, count: chunkSize + 512)
             let outCap = outBuf.count
             mutexLock.lock()
@@ -82,7 +82,7 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
         let baseSec = max(0.000001, Double(t1 - t0) / 1_000_000_000.0)
 
         let t2 = PlatformMonotonicTimer.nowNanoseconds()
-        DispatchQueue.concurrentPerform(iterations: chunkCount) { _ in
+        ConcurrencyBridge.parallelFor(iterations: chunkCount) { _ in
             var outBuf = [UInt8](repeating: 0, count: chunkSize + 512)
             let outCap = outBuf.count
             _ = testData.withUnsafeBytes { inPtr in

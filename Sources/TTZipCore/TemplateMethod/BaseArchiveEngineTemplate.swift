@@ -131,28 +131,14 @@ open class BaseArchiveEngineTemplate: @unchecked Sendable {
         }
     }
 
-    /// 3. Core algorithm execution primitive (synchronous bridging to async implementation).
+    /// 3. Core algorithm execution primitive (overridden by concrete format templates).
     open func executeCoreAlgorithm(context: ArchiveTemplateContext) throws -> WorkflowResult {
-        let box = SyncResultBox()
-        let sema = DispatchSemaphore(value: 0)
-        Task.detached {
-            do {
-                box.result = try await self.executeCoreAlgorithmAsync(context: context)
-            } catch {
-                box.error = error
-            }
-            sema.signal()
-        }
-        sema.wait()
-
-        if let res = box.result { return res }
-        if let err = box.error { throw err }
         throw ArchiveError.readFailed(code: -999)
     }
 
     /// 3b. Asynchronous core algorithm execution primitive (overridden by concrete format templates).
     open func executeCoreAlgorithmAsync(context: ArchiveTemplateContext) async throws -> WorkflowResult {
-        throw ArchiveError.readFailed(code: -999)
+        return try executeCoreAlgorithm(context: context)
     }
 
     /// 4. Output integrity validation hook (verifies CRC32/SHA256 checksums and destination structure).

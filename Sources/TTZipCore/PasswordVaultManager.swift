@@ -111,7 +111,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
     public static let vaultDidChangeNotification = Notification.Name("PasswordVaultDidChangeNotification")
     
     private func notifyChange() {
-        DispatchQueue.main.async {
+        Task { @MainActor in
             NotificationCenter.default.post(name: PasswordVaultManager.vaultDidChangeNotification, object: nil)
             ArchiveEventCenter.shared.postPasswordVaultUnlocked(archivePath: "", password: "", isVaultUnlocked: self.isUnlocked)
         }

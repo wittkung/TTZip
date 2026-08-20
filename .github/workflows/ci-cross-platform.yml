@@ -1,0 +1,49 @@
+name: TTZip Cross-Platform CI (Manual Dispatch Only)
+
+# Manual dispatch only - disabled on push/PR to prevent cloud quota usage
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS ARM64 (Xcode & CMake)
+            os: macos-14
+            cmake_generator: "Ninja"
+            enable_swift: true
+          - name: Ubuntu 22.04 (GCC & CMake)
+            os: ubuntu-22.04
+            cmake_generator: "Ninja"
+            enable_swift: false
+          - name: Windows MSVC (CMake)
+            os: windows-2022
+            cmake_generator: "Visual Studio 17 2022"
+            enable_swift: false
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Ninja (Linux/macOS)
+        if: matrix.os != 'windows-2022'
+        uses: ashley-taylor/setup-ninja@v1.0.0
+
+      - name: Configure CMake
+        run: >
+          cmake -B build
+          -G "${{ matrix.cmake_generator }}"
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build TTZip Native Engine
+        run: cmake --build build --config Release --parallel
+
+      - name: Run Swift Matrix Tests (macOS)
+        if: matrix.enable_swift
+        run: swift test --filter "ConcurrencyBridgeTests|AllFormatsAndAdvancedParametersMatrixTests|AllFormatDiagnosticSuiteTests"

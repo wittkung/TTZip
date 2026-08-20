@@ -16,6 +16,7 @@
 #include "include/CTTZipBridge_Archive.h"
 #include "include/CTTZipCommon.h"
 #include "include/CTTZipCoreArchitecture.h"
+#include "include/ttzip_threadpool.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +28,62 @@
 #include <zstd.h>
 #include <archive.h>
 #include <archive_entry.h>
-#include <dispatch/dispatch.h>
+
+typedef struct {
+    uint64_t total_tar;
+    size_t kMaxBlock;
+    uint8_t* out_map;
+    uint64_t fsize;
+    void* mapped_in;
+    const uint8_t* ustar_ptr;
+    int in_fd;
+} tar_zstd_chunk_ctx_t;
+
+static void tar_zstd_chunk_worker(size_t chunk_idx, void* user_data) {
+    tar_zstd_chunk_ctx_t* ctx = (tar_zstd_chunk_ctx_t*)user_data;
+    uint64_t tar_pos = chunk_idx * ctx->kMaxBlock;
+    size_t chunk_len = (ctx->total_tar - tar_pos) > ctx->kMaxBlock ? ctx->kMaxBlock : (size_t)(ctx->total_tar - tar_pos);
+    bool is_last = (tar_pos + chunk_len == ctx->total_tar);
+    
+    size_t out_chunk_offset = 9 + chunk_idx * (3 + ctx->kMaxBlock);
+    
+    uint32_t b_hdr_val = (uint32_t)((chunk_len << 3) | (0 << 1) | (is_last ? 1 : 0));
+    ctx->out_map[out_chunk_offset] = (uint8_t)(b_hdr_val & 0xFF);
+    ctx->out_map[out_chunk_offset + 1] = (uint8_t)((b_hdr_val >> 8) & 0xFF);
+    ctx->out_map[out_chunk_offset + 2] = (uint8_t)((b_hdr_val >> 16) & 0xFF);
+    
+    uint8_t* payload_dst = ctx->out_map + out_chunk_offset + 3;
+    
+    // Fast Branchless Middle Chunks Optimization:
+    if (tar_pos >= 512 && (tar_pos + chunk_len) <= (512 + ctx->fsize) && ctx->mapped_in != MAP_FAILED) {
+        uint64_t f_off = tar_pos - 512;
+        memcpy(payload_dst, (const uint8_t*)ctx->mapped_in + f_off, chunk_len);
+        return;
+    }
+
+    size_t filled = 0;
+    while (filled < chunk_len) {
+        uint64_t cur = tar_pos + filled;
+        if (cur < 512) {
+            size_t c = (512 - cur) < (chunk_len - filled) ? (512 - cur) : (chunk_len - filled);
+            memcpy(payload_dst + filled, ctx->ustar_ptr + cur, c);
+            filled += c;
+        } else if (cur < 512 + ctx->fsize) {
+            uint64_t f_off = cur - 512;
+            size_t c = (ctx->fsize - f_off) < (chunk_len - filled) ? (ctx->fsize - f_off) : (chunk_len - filled);
+            if (ctx->mapped_in != MAP_FAILED) {
+                memcpy(payload_dst + filled, (const uint8_t*)ctx->mapped_in + f_off, c);
+            } else {
+                pread(ctx->in_fd, payload_dst + filled, c, (off_t)f_off);
+            }
+            filled += c;
+        } else {
+            size_t c = chunk_len - filled;
+            memset(payload_dst + filled, 0, c);
+            filled += c;
+        }
+    }
+}
 
 static void format_ustar_header(
     uint8_t header[512],
@@ -302,51 +358,16 @@ static int ttzip_create_tar_zstd_raw_direct_c(const char* output_path, const cha
         madvise(mapped_in, fsize, MADV_SEQUENTIAL | MADV_WILLNEED);
     }
     
-    dispatch_queue_t q = dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0);
-    dispatch_apply(num_chunks, q, ^(size_t chunk_idx) {
-        uint64_t tar_pos = chunk_idx * kMaxBlock;
-        size_t chunk_len = (total_tar - tar_pos) > kMaxBlock ? kMaxBlock : (size_t)(total_tar - tar_pos);
-        bool is_last = (tar_pos + chunk_len == total_tar);
-        
-        size_t out_chunk_offset = 9 + chunk_idx * (3 + kMaxBlock);
-        
-        uint32_t b_hdr_val = (uint32_t)((chunk_len << 3) | (0 << 1) | (is_last ? 1 : 0));
-        out_map[out_chunk_offset] = (uint8_t)(b_hdr_val & 0xFF);
-        out_map[out_chunk_offset + 1] = (uint8_t)((b_hdr_val >> 8) & 0xFF);
-        out_map[out_chunk_offset + 2] = (uint8_t)((b_hdr_val >> 16) & 0xFF);
-        
-        uint8_t* payload_dst = out_map + out_chunk_offset + 3;
-        
-        // Fast Branchless Middle Chunks Optimization:
-        if (tar_pos >= 512 && (tar_pos + chunk_len) <= (512 + fsize) && mapped_in != MAP_FAILED) {
-            uint64_t f_off = tar_pos - 512;
-            memcpy(payload_dst, (const uint8_t*)mapped_in + f_off, chunk_len);
-            return;
-        }
-
-        size_t filled = 0;
-        while (filled < chunk_len) {
-            uint64_t cur = tar_pos + filled;
-            if (cur < 512) {
-                size_t c = (512 - cur) < (chunk_len - filled) ? (512 - cur) : (chunk_len - filled);
-                memcpy(payload_dst + filled, ustar_ptr + cur, c);
-                filled += c;
-            } else if (cur < 512 + fsize) {
-                uint64_t f_off = cur - 512;
-                size_t c = (fsize - f_off) < (chunk_len - filled) ? (fsize - f_off) : (chunk_len - filled);
-                if (mapped_in != MAP_FAILED) {
-                    memcpy(payload_dst + filled, (const uint8_t*)mapped_in + f_off, c);
-                } else {
-                    pread(in_fd, payload_dst + filled, c, (off_t)f_off);
-                }
-                filled += c;
-            } else {
-                size_t c = chunk_len - filled;
-                memset(payload_dst + filled, 0, c);
-                filled += c;
-            }
-        }
-    });
+    tar_zstd_chunk_ctx_t chunk_ctx = {
+        .total_tar = total_tar,
+        .kMaxBlock = kMaxBlock,
+        .out_map = out_map,
+        .fsize = fsize,
+        .mapped_in = mapped_in,
+        .ustar_ptr = ustar_ptr,
+        .in_fd = in_fd
+    };
+    ttzip_parallel_for(ttzip_threadpool_shared(), num_chunks, tar_zstd_chunk_worker, &chunk_ctx);
     
     if (mapped_in != MAP_FAILED) munmap(mapped_in, fsize);
     munmap(out_map, total_zstd_size);

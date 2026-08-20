@@ -37,7 +37,7 @@ public final class SevenZipBlockParallelDecompressor: @unchecked Sendable {
         let pointerBox = SendablePointerBox(pointer: archiveBytePtr, size: archiveFileSize)
         let atomicFlag = SendableAtomicFlag()
         
-        DispatchQueue.concurrentPerform(iterations: blocks.count) { blockIdx in
+        ConcurrencyBridge.parallelFor(iterations: blocks.count) { blockIdx in
             let block = blocks[blockIdx]
             let srcOffset = Int(block.offset)
             let cSize = Int(block.compressedSize)

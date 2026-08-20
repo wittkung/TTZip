@@ -47,7 +47,7 @@ int ttzip_plugin_register_codec(const ttzip_codec_plugin_t* plugin) {
     return 0;
 }
 
-int ttzip_plugin_dispatch_filter_forward(
+int ttzip_plugin_invoke_filter_forward(
     uint8_t filter_id,
     const uint8_t* src,
     uint8_t* dst,
@@ -91,7 +91,7 @@ int ttzip_plugin_dispatch_filter_forward(
     return -1; // Unregistered filter ID
 }
 
-int ttzip_plugin_dispatch_filter_backward(
+int ttzip_plugin_invoke_filter_backward(
     uint8_t filter_id,
     const uint8_t* src,
     uint8_t* dst,
@@ -131,4 +131,26 @@ int ttzip_plugin_dispatch_filter_backward(
     }
 
     return -1; // Unregistered filter ID
+}
+
+int ttzip_plugin_dispatch_filter_forward(
+    uint8_t filter_id,
+    const uint8_t* src,
+    uint8_t* dst,
+    size_t size,
+    uint8_t type_size,
+    uint8_t meta
+) {
+    return ttzip_plugin_invoke_filter_forward(filter_id, src, dst, size, type_size, meta);
+}
+
+int ttzip_plugin_dispatch_filter_backward(
+    uint8_t filter_id,
+    const uint8_t* src,
+    uint8_t* dst,
+    size_t size,
+    uint8_t type_size,
+    uint8_t meta
+) {
+    return ttzip_plugin_invoke_filter_backward(filter_id, src, dst, size, type_size, meta);
 }
