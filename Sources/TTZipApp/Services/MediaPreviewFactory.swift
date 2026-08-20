@@ -178,6 +178,22 @@ public enum MediaPreviewFactory {
         return "doc.fill"
     }
 
+    /// Detects MediaPreviewType directly from in-memory Data (Zero Disk I/O).
+    public static func detectTypeFromMemory(data: Data, suggestedName: String) -> MediaPreviewType {
+        let sniff = NativeMicrokernelBridge.sniffMagic(data: data)
+        if sniff.kind == TTZIP_KIND_IMAGE, let image = NSImage(data: data) {
+            return .image(image)
+        }
+        
+        let ext = (suggestedName as NSString).pathExtension.lowercased()
+        if textExtensions.contains(ext) || ext.isEmpty {
+            if let str = String(data: data.prefix(128 * 1024), encoding: .utf8) {
+                return .text(str)
+            }
+        }
+        return .unsupported("Format: \(sniff.format) (\(sniff.mime))")
+    }
+
     @MainActor
     public static func makePreviewView(url: URL, fileName: String = "") async -> AnyView {
         let previewType = await detectTypeAsync(url: url)

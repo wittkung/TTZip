@@ -26,13 +26,13 @@ public enum DiskItemSorter {
         // Priority 2: Primary sort key
         switch option {
         case .nameAsc:
-            let cmp = a.name.localizedStandardCompare(b.name)
+            let cmp = NativeMicrokernelBridge.naturalCompare(a.name, b.name)
             if cmp != .orderedSame {
                 return cmp == .orderedAscending
             }
             
         case .nameDesc:
-            let cmp = a.name.localizedStandardCompare(b.name)
+            let cmp = NativeMicrokernelBridge.naturalCompare(a.name, b.name)
             if cmp != .orderedSame {
                 return cmp == .orderedDescending
             }
@@ -83,7 +83,7 @@ public enum DiskItemSorter {
         }
         
         // Priority 3: Secondary natural name sort
-        let nameCmp = a.name.localizedStandardCompare(b.name)
+        let nameCmp = NativeMicrokernelBridge.naturalCompare(a.name, b.name)
         if nameCmp != .orderedSame {
             return nameCmp == .orderedAscending
         }
