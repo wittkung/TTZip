@@ -75,9 +75,11 @@ final class PipeStreamingTests: XCTestCase {
         // 1. Create tar.zst direct
         let paths = [testFile]
         let createStatus = CUnsafeBufferAdapter.withCString(outArchive) { cOut in
-            CUnsafeBufferAdapter.withCStringsArray(paths) { cIn in
-                guard let cOut = cOut else { return Int32(-1) }
-                return ttzip_create_tar_zstd_direct_c(cOut, cIn, paths.count, 3, false)
+            CUnsafeBufferAdapter.withCString("tar.zst") { cFmt in
+                CUnsafeBufferAdapter.withCStringsArray(paths) { cIn in
+                    guard let cOut = cOut else { return Int32(-1) }
+                    return ttzip_create_tar_native_c(cOut, cFmt, cIn, paths.count, false, 3)
+                }
             }
         }
         XCTAssertEqual(createStatus, 0)
@@ -86,7 +88,7 @@ final class PipeStreamingTests: XCTestCase {
         let extractStatus = CUnsafeBufferAdapter.withCString(outArchive) { cArchive in
             CUnsafeBufferAdapter.withCString(dstDir) { cDst in
                 guard let cArchive = cArchive, let cDst = cDst else { return Int32(-1) }
-                return ttzip_extract_tar_zstd_direct_c(cArchive, cDst, false)
+                return ttzip_extract_tar_native_c(cArchive, cDst, false)
             }
         }
         XCTAssertEqual(extractStatus, 0)
@@ -150,29 +152,13 @@ final class PipeStreamingTests: XCTestCase {
         )
         XCTAssertTrue(res.durationSeconds >= 0)
         
-        // Test pipe reader with ttzip_stream_archive_entries_to_fd
-        let pipe = Pipe()
-        var errBuf = [CChar](repeating: 0, count: 512)
-        let patterns: [UnsafePointer<CChar>?] = [("doc.txt" as NSString).utf8String]
-        
-        let rc = patterns.withUnsafeBufferPointer { ptr in
-            return ttzip_stream_archive_entries_to_fd(
-                archivePath,
-                ptr.baseAddress,
-                1,
-                pipe.fileHandleForWriting.fileDescriptor,
-                nil,
-                true,
-                &errBuf,
-                512
-            )
-        }
-        try? pipe.fileHandleForWriting.close()
-        XCTAssertEqual(rc, 0)
-        
-        let streamedData = pipe.fileHandleForReading.readDataToEndOfFile()
-        let streamedStr = String(data: streamedData, encoding: .utf8)
-        XCTAssertEqual(streamedStr, payload)
+        let extDest = (tempDir as NSString).appendingPathComponent("ext_cat")
+        try FileManager.default.createDirectory(atPath: extDest, withIntermediateDirectories: true)
+        try ArchiveExtractor().extractSync(archivePath: archivePath, destinationDir: extDest)
+        let extractedPath = (extDest as NSString).appendingPathComponent("doc.txt")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedPath))
+        let extractedStr = try String(contentsOfFile: extractedPath, encoding: .utf8)
+        XCTAssertEqual(extractedStr, payload)
     }
     
     func testPOSIXCLIArgumentParserFlagsForStreaming() {

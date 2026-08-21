@@ -56,14 +56,16 @@ public final class SevenZipBlockParallelDecompressor: @unchecked Sendable {
             let dstBytePtr = dstRawPtr.assumingMemoryBound(to: UInt8.self)
             
             // Two-pass block decompression fallback
-            let decompSize = ttzip_quantum_decompress_two_pass(srcPtr, cSize, dstBytePtr, uSize)
-            var actualSize = (decompSize == uSize) ? uSize : 0
-            if decompSize != uSize {
-                let zstdDecomp = ttzip_zstd_decompress(srcPtr, cSize, dstBytePtr, uSize)
-                if zstdDecomp == 0 {
-                    atomicFlag.markFailure()
+            var outLen: Int = 0
+            let status = ttzip_rust_fl2_decompress(srcPtr, cSize, dstBytePtr, uSize, 0, &outLen)
+            var actualSize = (status == TTZIP_STATUS_OK) ? outLen : 0
+            if actualSize == 0 {
+                var zstdLen: Int = 0
+                let zStatus = ttzip_rust_zstd_decompress(srcPtr, cSize, dstBytePtr, uSize, &zstdLen)
+                if zStatus == TTZIP_STATUS_OK {
+                    actualSize = zstdLen
                 } else {
-                    actualSize = zstdDecomp
+                    atomicFlag.markFailure()
                 }
             }
 

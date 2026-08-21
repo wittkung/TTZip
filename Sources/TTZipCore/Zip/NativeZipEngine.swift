@@ -21,33 +21,24 @@ public final class NativeZipEngine: @unchecked Sendable {
     // MARK: - 1. Zero-Copy mmap Central Directory Inspection (<1ms table lookup)
     
     public func inspectZip(archivePath: String) -> [ArchiveEntry]? {
-        let accumulator = MmapZipAccumulator()
-        let contextPtr = Unmanaged.passUnretained(accumulator).toOpaque()
-        
-        let status = withExtendedLifetime(accumulator) {
-            archivePath.withCString { pathPtr in
-                ttzip_mmap_zip_inspect(pathPtr, contextPtr) { ctx, cPathname, size, isDir in
-                    guard let ctx = ctx, let cPathname = cPathname else { return }
-                    let acc = Unmanaged<MmapZipAccumulator>.fromOpaque(ctx).takeUnretainedValue()
-                    let rawLen = strlen(cPathname)
-                    let pathData = Data(bytes: cPathname, count: rawLen)
-                    let sanitizedPath = CharsetDetector.sanitizeFilename(bytes: pathData)
-                    let detectedCharset = CharsetDetector.detectCharset(data: pathData)
-                    let entry = ArchiveEntry(
-                        path: sanitizedPath,
-                        uncompressedSize: size,
-                        isDirectory: isDir,
-                        detectedEncoding: detectedCharset
-                    )
-                    acc.entries.append(entry)
-                }
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: archivePath), options: .alwaysMapped) else {
+            return nil
+        }
+        return data.withUnsafeBytes { rawIn -> [ArchiveEntry]? in
+            guard let bytePtr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
+            guard let descs = ZipCentralDirectoryReader.shared.readDescriptors(from: bytePtr, fileSize: data.count, skipMacJunk: false) else {
+                return nil
+            }
+            return descs.map { d in
+                ArchiveEntry(
+                    path: d.path,
+                    uncompressedSize: d.uncompressedSize,
+                    isDirectory: d.isDirectory,
+                    detectedEncoding: "UTF-8",
+                    isEncrypted: d.isEncrypted
+                )
             }
         }
-        
-        if status == 0 && !accumulator.entries.isEmpty {
-            return accumulator.entries
-        }
-        return nil
     }
     
     // MARK: - 2. Multi-Core Parallel libdeflate Decompression Engine

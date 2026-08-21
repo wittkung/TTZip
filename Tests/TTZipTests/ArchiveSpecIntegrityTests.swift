@@ -59,17 +59,14 @@ final class ArchiveSpecIntegrityTests: XCTestCase {
         let mappedBytes = mapped.assumingMemoryBound(to: UInt8.self)
         defer { munmap(mapped, fileBytes) }
 
-        var eocd = ttzip_eocd_info_t()
-        let foundEocd = ttzip_find_eocd(mappedBytes, fileBytes, &eocd)
-        XCTAssertTrue(foundEocd, "EOCD must be found defensively by CTTZipParser")
-        XCTAssertGreaterThan(eocd.total_entries, 0)
-
-        var entry = ttzip_parsed_entry_t()
-        var nextPos: size_t = 0
-        let parsedEntry = ttzip_parse_cdfh_entry(mappedBytes, fileBytes, size_t(eocd.cd_offset), &entry, &nextPos)
-        XCTAssertTrue(parsedEntry, "CDFH entry must be parsed defensively without unaligned pointer faults")
-        XCTAssertFalse(entry.is_directory)
-        XCTAssertEqual(entry.uncompressed_size, UInt64("TTZip Spec Integrity Test Content".count))
+        guard let descriptors = ZipCentralDirectoryReader.shared.readDescriptors(from: mappedBytes, fileSize: fileBytes, skipMacJunk: false) else {
+            XCTFail("Failed to read descriptors")
+            return
+        }
+        XCTAssertGreaterThan(descriptors.count, 0)
+        let first = descriptors[0]
+        XCTAssertFalse(first.isDirectory)
+        XCTAssertEqual(first.uncompressedSize, Int64("TTZip Spec Integrity Test Content".count))
     }
 
     /// 2. WinZip AES-256 0x9901

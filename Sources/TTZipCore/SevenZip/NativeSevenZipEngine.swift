@@ -50,12 +50,29 @@ public final class NativeSevenZipEngine: @unchecked Sendable {
         
         let status = withExtendedLifetime(accumulator) {
             CUnsafeBufferAdapter.withCString(archivePath) { cPath in
-                guard let cPath = cPath else { return Int32(-1) }
-                return ttzip_native_inspect_archive(cPath, contextPtr, nativeSevenZipEntryCallback)
+                CUnsafeBufferAdapter.withCString(password) { cPwd in
+                    guard let cPath = cPath else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                    return ttzip_rust_inspect_archive(cPath, cPwd, true, { entryPtr, ctx in
+                        guard let entry = entryPtr?.pointee, let ctx = ctx else { return false }
+                        let acc = Unmanaged<SevenZipEntryAccumulator>.fromOpaque(ctx).takeUnretainedValue()
+                        let pathStr = entry.path != nil ? String(cString: entry.path!) : ""
+                        let lastComp = (pathStr as NSString).lastPathComponent
+                        if lastComp.hasPrefix("._") || lastComp == ".DS_Store" { return true }
+                        let encStr = "UTF-8"
+                        acc.entries.append(ArchiveEntry(
+                            path: pathStr,
+                            uncompressedSize: Int64(entry.uncompressed_size),
+                            isDirectory: entry.is_directory,
+                            detectedEncoding: encStr,
+                            isEncrypted: entry.is_encrypted
+                        ))
+                        return true
+                    }, contextPtr)
+                }
             }
         }
         
-        if status == 0 && !accumulator.entries.isEmpty {
+        if status == TTZIP_STATUS_OK && !accumulator.entries.isEmpty {
             return accumulator.entries
         }
         return nil

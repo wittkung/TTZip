@@ -15,7 +15,6 @@
 #include "fl2_pool.h"
 #include "fl2_internal.h"
 #include "fl2_threading.h"
-#include "../include/ttzip_threadpool.h"
 
 #ifndef FL2_SINGLETHREAD
 
@@ -33,22 +32,6 @@ typedef struct {
     void* opaque;
     ptrdiff_t n;
 } FL2POOL_task_t;
-
-static void FL2POOL_task_wrapper(void* arg) {
-    FL2POOL_task_t* task = (FL2POOL_task_t*)arg;
-    FL2POOL_ctx* ctx = task->pool_ctx;
-    
-    task->function(task->opaque, task->n);
-    
-    FL2_pthread_mutex_lock(&ctx->queueMutex);
-    if (ctx->numThreadsBusy > 0) {
-        --ctx->numThreadsBusy;
-    }
-    FL2_pthread_cond_signal(&ctx->busyCond);
-    FL2_pthread_mutex_unlock(&ctx->queueMutex);
-    
-    free(task);
-}
 
 FL2POOL_ctx* FL2POOL_create(size_t numThreads) {
     if (!numThreads) return NULL;
@@ -78,31 +61,10 @@ size_t FL2POOL_sizeof(FL2POOL_ctx* ctx) {
 }
 
 void FL2POOL_addRange(void* ctxVoid, FL2POOL_function function, void* opaque, ptrdiff_t first, ptrdiff_t end) {
-    FL2POOL_ctx* const ctx = (FL2POOL_ctx*)ctxVoid;
-    if (!ctx || first >= end) return;
-    
-    ttzip_threadpool_t* shared_tp = ttzip_threadpool_shared();
-    
+    (void)ctxVoid;
+    if (first >= end) return;
     for (ptrdiff_t i = first; i < end; ++i) {
-        FL2POOL_task_t* task = (FL2POOL_task_t*)malloc(sizeof(FL2POOL_task_t));
-        if (!task) {
-            // Run synchronously on alloc failure
-            function(opaque, i);
-            continue;
-        }
-        task->pool_ctx = ctx;
-        task->function = function;
-        task->opaque = opaque;
-        task->n = i;
-        
-        FL2_pthread_mutex_lock(&ctx->queueMutex);
-        ++ctx->numThreadsBusy;
-        FL2_pthread_mutex_unlock(&ctx->queueMutex);
-        
-        if (ttzip_threadpool_submit(shared_tp, FL2POOL_task_wrapper, task) != 0) {
-            // Fallback synchronously if pool rejected
-            FL2POOL_task_wrapper(task);
-        }
+        function(opaque, i);
     }
 }
 

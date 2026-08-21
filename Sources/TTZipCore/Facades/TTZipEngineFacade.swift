@@ -203,19 +203,19 @@ extension TTZipEngineFacading {
         return CommandHistoryManager.shared
     }
     
-    /// 初始化底层 C 引擎子系统（信号处理、C 结构化日志分发等）
+    /// 初始化底层引擎子系统（Rust 结构化日志分发等）
     public static func initializeSubsystems() {
-        ttzip_set_log_handler { level, message in
+        ttzip_rust_set_logger({ level, target, message, file, line, _ in
             guard let msg = message else { return }
             let str = String(cString: msg)
+            let tag = target != nil ? String(cString: target!) : "Rust"
             switch level {
-            case 0: TTLogger.debug("[C] \(str)")
-            case 1: TTLogger.info("[C] \(str)")
-            case 2: TTLogger.warning("[C] \(str)")
-            default: TTLogger.error("[C] \(str)")
+            case TTZIP_LOG_LEVEL_ERROR: TTLogger.error("[\(tag)] \(str)")
+            case TTZIP_LOG_LEVEL_WARNING: TTLogger.warning("[\(tag)] \(str)")
+            case TTZIP_LOG_LEVEL_INFO: TTLogger.info("[\(tag)] \(str)")
+            default: TTLogger.debug("[\(tag)] \(str)")
             }
-        }
-        ttzip_install_signal_handlers()
+        }, TTZIP_LOG_LEVEL_DEBUG, nil)
     }
     
     public var canUndoCommand: Bool {

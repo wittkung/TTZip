@@ -93,11 +93,12 @@ public final class ZipSeekTable: @unchecked Sendable {
                 guard let decrypted = ZipCryptoEngine.shared.decryptAES256(payloadPtr: payloadPtr, count: compSize, password: pwd) else { return nil }
                 let targetSize = Int(entry.uncompressedSize)
                 let rawDst = UnsafeMutablePointer<UInt8>.allocate(capacity: targetSize)
-                let uncompSize = decrypted.withUnsafeBytes { inBuf -> size_t in
-                    guard let src = inBuf.baseAddress else { return 0 }
-                    return ttzip_libdeflate_decompress(src, decrypted.count, rawDst, targetSize)
+                var outLen: Int = 0
+                let status = decrypted.withUnsafeBytes { inBuf -> CTTZipBridge.TTZipStatus in
+                    guard let src = inBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                    return ttzip_rust_deflate_decompress(src, decrypted.count, rawDst, targetSize, &outLen)
                 }
-                if uncompSize == entry.uncompressedSize {
+                if status == TTZIP_STATUS_OK && Int64(outLen) == entry.uncompressedSize {
                     return Data(bytesNoCopy: rawDst, count: targetSize, deallocator: .custom { ptr, _ in ptr.deallocate() })
                 } else {
                     rawDst.deallocate()
@@ -111,8 +112,9 @@ public final class ZipSeekTable: @unchecked Sendable {
         } else if entry.compressionMethod == 8 {
             let targetSize = Int(entry.uncompressedSize)
             let rawDst = UnsafeMutablePointer<UInt8>.allocate(capacity: targetSize)
-            let uncompSize = ttzip_libdeflate_decompress(payloadPtr, compSize, rawDst, targetSize)
-            if uncompSize == entry.uncompressedSize {
+            var outLen: Int = 0
+            let status = ttzip_rust_deflate_decompress(payloadPtr, compSize, rawDst, targetSize, &outLen)
+            if status == TTZIP_STATUS_OK && Int64(outLen) == entry.uncompressedSize {
                 return Data(bytesNoCopy: rawDst, count: targetSize, deallocator: .custom { ptr, _ in ptr.deallocate() })
             } else {
                 rawDst.deallocate()

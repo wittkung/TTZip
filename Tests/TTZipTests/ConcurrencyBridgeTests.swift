@@ -48,9 +48,6 @@ final class ConcurrencyBridgeTests: XCTestCase {
     func testThreadBudgetQueries() {
         let optimal = ConcurrencyBridge.ThreadBudget.optimalThreadCount()
         XCTAssertGreaterThan(optimal, 0, "Optimal thread count must be positive")
-        
-        let topo = ConcurrencyBridge.ThreadBudget.topology
-        XCTAssertGreaterThan(topo.total_logical_cores, 0, "Total logical cores must be positive")
     }
 
     func testMemoryBudgetQueries() {

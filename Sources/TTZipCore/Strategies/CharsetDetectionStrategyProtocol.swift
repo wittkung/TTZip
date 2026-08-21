@@ -24,9 +24,7 @@ public final class ASCIIFastPathCharsetStrategy: CharsetDetectionStrategyProtoco
     public init() {}
     
     public func canHandle(bytes: Data) -> Bool {
-        return CUnsafeBufferAdapter.withBufferPointer(bytes) { ptr, count in
-            return ttzip_is_ascii_fast(ptr, count)
-        }
+        return !bytes.contains { $0 >= 0x80 }
     }
     
     public func sanitize(bytes: Data) -> String? {
@@ -63,21 +61,18 @@ public final class CJKLegacyCharsetStrategy: CharsetDetectionStrategyProtocol {
     }
     
     public func sanitize(bytes: Data) -> String? {
-        let charsetName = CharsetDetector.detectCharset(data: bytes)
-        let encoding: String.Encoding
-        switch charsetName.uppercased() {
-        case "GB18030", "GBK", "GB2312", "CP936":
-            encoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
-        case "BIG5":
-            encoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.big5.rawValue)))
-        case "SHIFT-JIS", "SHIFT_JIS":
-            encoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.shiftJIS.rawValue)))
-        default:
-            encoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
-        }
-        
-        if let converted = String(data: bytes, encoding: encoding), !converted.isEmpty {
-            return converted
+        let encodings: [CFStringEncodings] = [
+            .GB_18030_2000,
+            .big5,
+            .shiftJIS,
+            .EUC_KR
+        ]
+        for enc in encodings {
+            let nsEnc = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(enc.rawValue))
+            let encoding = String.Encoding(rawValue: nsEnc)
+            if let converted = String(data: bytes, encoding: encoding), !converted.isEmpty {
+                return converted
+            }
         }
         return String(decoding: bytes, as: UTF8.self)
     }
@@ -97,31 +92,35 @@ public final class CharsetDetectionStrategyContext: @unchecked Sendable {
     private let sanitizeCache = ReadWriteLockCache<Data, String>(policy: .lru(maxEntries: 500))
     
     public func detectCharset(data: Data) -> String {
+        if data.isEmpty {
+            return "ASCII"
+        }
         if let cached = charsetCache.value(forKey: data) {
             return cached
         }
         
         let detected: String
-        for strategy in strategies {
-            if strategy.canHandle(bytes: data) {
-                if strategy is ASCIIFastPathCharsetStrategy {
-                    detected = "ASCII"
-                    charsetCache.setValue(detected, forKey: data)
-                    return detected
-                } else if strategy is UTF8CharsetStrategy {
-                    detected = "UTF-8"
-                    charsetCache.setValue(detected, forKey: data)
-                    return detected
+        if !data.contains(where: { $0 >= 0x80 }) {
+            detected = "ASCII"
+        } else if let _ = String(data: data, encoding: .utf8) {
+            detected = "UTF-8"
+        } else {
+            let encodings: [(String, CFStringEncodings)] = [
+                ("GB18030", .GB_18030_2000),
+                ("BIG5", .big5),
+                ("Shift-JIS", .shiftJIS),
+                ("EUC-KR", .EUC_KR)
+            ]
+            var found = "WINDOWS-1252"
+            for (name, enc) in encodings {
+                let nsEnc = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(enc.rawValue))
+                let encoding = String.Encoding(rawValue: nsEnc)
+                if let str = String(data: data, encoding: encoding), !str.isEmpty {
+                    found = name
+                    break
                 }
             }
-        }
-        
-        detected = CUnsafeBufferAdapter.withBufferPointer(data) { buffer, count -> String in
-            let baseAddress = buffer.assumingMemoryBound(to: UInt8.self)
-            if let cStr = ttzip_detect_encoding_fast(baseAddress, count) {
-                return String(cString: cStr)
-            }
-            return "UTF-8"
+            detected = found
         }
         
         charsetCache.setValue(detected, forKey: data)

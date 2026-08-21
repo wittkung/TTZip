@@ -19,7 +19,7 @@ public struct ArchiveDiskPreallocator: Sendable {
     @discardableResult
     public static func preallocate(fileDescriptor: Int32, targetSizeBytes: Int64) -> Bool {
         guard fileDescriptor >= 0, targetSizeBytes > 0 else { return false }
-        return ttzip_apfs_preallocate(fileDescriptor, targetSizeBytes) == 0
+        return ttzip_rust_apfs_preallocate(fileDescriptor, targetSizeBytes) == 0
     }
     
     /// Preallocates APFS space for specified physical file path.
@@ -34,8 +34,8 @@ public struct ArchiveDiskPreallocator: Sendable {
     
     /// Performs APFS block-level copy-on-write clone range expansion.
     @discardableResult
-    public static func cloneRange(sourceFd: Int32, sourceOffset: Int64 = 0, targetFd: Int32, targetOffset: Int64 = 0, countBytes: UInt64) -> Bool {
-        guard sourceFd >= 0, targetFd >= 0, countBytes > 0 else { return false }
-        return ttzip_apfs_clone_range(sourceFd, sourceOffset, targetFd, targetOffset, countBytes) == 0
+    public static func cloneRange(sourceFd: Int32, sourceOffset: Int64 = 0, targetFd: Int32, targetOffset: Int64 = 0, countBytes: UInt64 = 0) -> Bool {
+        guard sourceFd >= 0, targetFd >= 0 else { return false }
+        return ttzip_rust_apfs_clone_range(sourceFd, targetFd) == 0
     }
 }

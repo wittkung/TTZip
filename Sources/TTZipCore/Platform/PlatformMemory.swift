@@ -70,14 +70,13 @@ public enum PlatformMemory {
     @inlinable
     public static func allocateAlignedPages(alignment: Int, byteCount: Int) -> UnsafeMutableRawPointer? {
         guard byteCount > 0, alignment > 0 else { return nil }
-        return ttzip_platform_aligned_alloc(alignment, byteCount)
+        return UnsafeMutableRawPointer.allocate(byteCount: byteCount, alignment: alignment)
     }
     
     /// Deallocates memory previously allocated by ``allocateAlignedPages``.
     @inlinable
     public static func deallocateAlignedPages(pointer: UnsafeMutableRawPointer?) {
-        guard let pointer = pointer else { return }
-        ttzip_platform_aligned_free(pointer)
+        pointer?.deallocate()
     }
     
     /// Allocates page-aligned heap buffer conforming to default platform page alignment (16KB on Apple Silicon).
@@ -85,14 +84,13 @@ public enum PlatformMemory {
     public static func allocateAlignedPageBuffer(byteCount: Int) -> UnsafeMutableRawPointer? {
         guard byteCount > 0 else { return nil }
         let alignment = PlatformOperatingSystem.current.defaultPageAlignment
-        return ttzip_platform_aligned_alloc(alignment, byteCount)
+        return UnsafeMutableRawPointer.allocate(byteCount: byteCount, alignment: alignment)
     }
     
     /// Deallocates page-aligned heap buffer previously allocated by ``allocateAlignedPageBuffer(byteCount:)``.
     @inlinable
     public static func deallocateAlignedPageBuffer(_ pointer: UnsafeMutableRawPointer?) {
-        guard let pointer = pointer else { return }
-        ttzip_platform_aligned_free(pointer)
+        pointer?.deallocate()
     }
     
     /// Erases sensitive memory (passwords, keys, decryption state) with dead-store elimination immunity.

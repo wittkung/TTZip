@@ -51,8 +51,9 @@ public final class ZipBlockParallelDecompressor: @unchecked Sendable {
                 let srcPtr = inPointerBox.pointer.advanced(by: inOff)
                 let dstPtr = UnsafeMutablePointer<UInt8>(mutating: outPointerBox.pointer.advanced(by: outOff))
                 
-                let decompSize = ttzip_libdeflate_decompress(srcPtr, cSize, dstPtr, uSize)
-                if decompSize != uSize {
+                var outLen: Int = 0
+                let st = ttzip_rust_deflate_decompress(srcPtr, cSize, dstPtr, uSize, &outLen)
+                if st != TTZIP_STATUS_OK || outLen != uSize {
                     OSAtomicAdd64(1, &failedBox.value)
                 }
             }

@@ -7,6 +7,7 @@
 
 import Foundation
 import CTTZipBridge
+import zlib
 
 /// Adapter Pattern: Hardware-accelerated Adler-32 and CRC-32 checksum computation adapter.
 ///
@@ -30,7 +31,7 @@ public enum HardwareChecksumAdapter {
             guard let baseAddress = rawBuffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
                 return initial
             }
-            return ttzip_adler32_fast(initial, baseAddress, rawBuffer.count)
+            return ttzip_rust_adler32(initial, baseAddress, rawBuffer.count)
         }
     }
     
@@ -47,7 +48,7 @@ public enum HardwareChecksumAdapter {
     @inlinable
     public static func adler32(ptr: UnsafePointer<UInt8>, count: Int, initial: UInt32 = 1) -> UInt32 {
         guard count > 0 else { return initial }
-        return ttzip_adler32_fast(initial, ptr, count)
+        return ttzip_rust_adler32(initial, ptr, count)
     }
 
     /// Computes 32-bit CRC-32 checksum with PMULL hardware vector folding.
@@ -66,7 +67,7 @@ public enum HardwareChecksumAdapter {
             guard let baseAddress = rawBuffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
                 return initial
             }
-            return ttzip_crc32_fast(initial, baseAddress, rawBuffer.count)
+            return ttzip_rust_crc32(initial, baseAddress, rawBuffer.count)
         }
     }
 
@@ -83,6 +84,16 @@ public enum HardwareChecksumAdapter {
     @inlinable
     public static func crc32(ptr: UnsafePointer<UInt8>, count: Int, initial: UInt32 = 0) -> UInt32 {
         guard count > 0 else { return initial }
-        return ttzip_crc32_fast(initial, ptr, count)
+        return ttzip_rust_crc32(initial, ptr, count)
+    }
+
+    @inlinable
+    public static func computeCRC32(data: Data) -> UInt32 {
+        return crc32(for: data)
+    }
+
+    @inlinable
+    public static func combineCRC32(crc1: UInt32, crc2: UInt32, len2: Int) -> UInt32 {
+        return UInt32(crc32_combine(UInt(crc1), UInt(crc2), len2))
     }
 }

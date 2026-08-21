@@ -21,7 +21,15 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
     
     /// Computes CRC32 checksum string for a file (e.g. `"A1B2C3D4"`).
     public func computeCRC32(filePath: String) -> String {
-        let crc = ttzip_compute_file_crc32(filePath)
+        guard let handle = FileHandle(forReadingAtPath: filePath) else { return "00000000" }
+        defer { try? handle.close() }
+        var crc: UInt32 = 0
+        while let chunk = try? handle.read(upToCount: 65536), !chunk.isEmpty {
+            crc = chunk.withUnsafeBytes { ptr in
+                guard let base = ptr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return crc }
+                return ttzip_rust_crc32(crc, base, chunk.count)
+            }
+        }
         return String(format: "%08X", crc)
     }
     

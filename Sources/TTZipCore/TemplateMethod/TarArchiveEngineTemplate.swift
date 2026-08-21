@@ -89,22 +89,55 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
             case .wim: cFormat = "wim"
             default: cFormat = "tar"
             }
-            let threads = Int32(ProcessInfo.processInfo.activeProcessorCount)
-            let res = CUnsafeBufferAdapter.withCStringsArray(context.inputPaths) { cInputPaths in
-                ttzip_create_archive_tuned(
-                    context.archivePath,
-                    cFormat,
-                    cInputPaths,
-                    context.inputPaths.count,
-                    context.options.skipMacJunk,
-                    Int32(context.level.rawValue),
-                    0,
-                    threads,
-                    context.password
-                )
+            let mappedLevel: TTZipCompressionLevel
+            if context.level.rawValue <= 0 {
+                mappedLevel = TTZIP_COMPRESSION_LEVEL_STORE
+            } else if context.level.rawValue <= 1 {
+                mappedLevel = TTZIP_COMPRESSION_LEVEL_FASTEST
+            } else if context.level.rawValue <= 3 {
+                mappedLevel = TTZIP_COMPRESSION_LEVEL_FAST
+            } else if context.level.rawValue <= 6 {
+                mappedLevel = TTZIP_COMPRESSION_LEVEL_NORMAL
+            } else if context.level.rawValue <= 9 {
+                mappedLevel = TTZIP_COMPRESSION_LEVEL_MAXIMUM
+            } else {
+                mappedLevel = TTZIP_COMPRESSION_LEVEL_ULTRA
+            }
+            
+            let mappedFormat: TTZipArchiveFormat
+            switch fmt {
+            case .tarGz, .gz: mappedFormat = TTZIP_ARCHIVE_FORMAT_TAR_GZ
+            case .tarZst, .zst: mappedFormat = TTZIP_ARCHIVE_FORMAT_TAR_ZSTD
+            case .tarBz2, .bz2: mappedFormat = TTZIP_ARCHIVE_FORMAT_TAR_BZ2
+            case .tarXz, .xz: mappedFormat = TTZIP_ARCHIVE_FORMAT_TAR_XZ
+            case .snappy: mappedFormat = TTZIP_ARCHIVE_FORMAT_SNAPPY
+            case .dmg, .iso: mappedFormat = TTZIP_ARCHIVE_FORMAT_DMG
+            case .sevenZip: mappedFormat = TTZIP_ARCHIVE_FORMAT_SEVEN_ZIP
+            case .zip: mappedFormat = TTZIP_ARCHIVE_FORMAT_ZIP
+            default: mappedFormat = TTZIP_ARCHIVE_FORMAT_TAR
+            }
+
+            let threads = max(1, Int32(ProcessInfo.processInfo.activeProcessorCount))
+            let res = CUnsafeBufferAdapter.withCString(context.archivePath) { cOut in
+                CUnsafeBufferAdapter.withCStringsArray(context.inputPaths) { cInputs in
+                    CUnsafeBufferAdapter.withCString(context.password) { cPwd in
+                        guard let cOut = cOut else { return -1 }
+                        var opt = TTZipCreateOptions(
+                            format: mappedFormat,
+                            level: mappedLevel,
+                            encryption: (cPwd != nil) ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE,
+                            password: cPwd,
+                            thread_budget: UInt32(threads),
+                            solid_block_size_mb: 0,
+                            progress_callback: nil,
+                            user_data: nil
+                        )
+                        return ttzip_rust_create_archive(cInputs, context.inputPaths.count, cOut, &opt) == TTZIP_STATUS_OK ? 0 : -1
+                    }
+                }
             }
             if res != 0 {
-                throw ArchiveError.readFailed(code: res)
+                throw ArchiveError.readFailed(code: Int32(res))
             }
 
             var totalOrig: Int64 = 0
@@ -158,7 +191,22 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                     )
                 }
             } else if lower.hasSuffix(".tar.zst") || lower.hasSuffix(".tzst") || lower.hasSuffix(".zst") {
-                let status = ttzip_extract_tar_zstd_direct_c(context.archivePath, context.destinationDir, context.options.skipMacJunk)
+                let status = CUnsafeBufferAdapter.withCString(context.archivePath) { cArc in
+                    CUnsafeBufferAdapter.withCString(context.destinationDir) { cDest in
+                        guard let cArc = cArc, let cDest = cDest else { return -1 }
+                        var opt = TTZipExtractOptions(
+                            destination_path: cDest,
+                            password: nil,
+                            thread_budget: 0,
+                            overwrite_existing: true,
+                            preserve_permissions: true,
+                            dry_run: false,
+                            progress_callback: nil,
+                            user_data: nil
+                        )
+                        return ttzip_rust_extract_archive(cArc, cDest, &opt) == TTZIP_STATUS_OK ? 0 : -1
+                    }
+                }
                 if status == 0 {
                     let items = (try? FileManager.default.contentsOfDirectory(atPath: context.destinationDir)) ?? []
                     return WorkflowResult(

@@ -33,14 +33,14 @@ final class SecurityAndComplianceTests: XCTestCase {
         try? FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
         
         var dstBuf = [CChar](repeating: 0, count: 4096)
-        let res = ttzip_common_join_path(&dstBuf, dstBuf.count, destDir.path, "../../etc/passwd")
-        XCTAssertNotEqual(res, TTZIP_OK.rawValue, "Zip Slip path must be blocked by ttzip_common_join_path")
+        let res = ttzip_rust_validate_path(destDir.path, "../../etc/passwd", &dstBuf, dstBuf.count)
+        XCTAssertNotEqual(res, TTZIP_STATUS_OK, "Zip Slip path must be blocked by ttzip_rust_validate_path")
     }
 
     func testCBridgeInvalidPasswordAESRejection() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
+        try? FileManager.default.createDirectory(atPath: tempDir.path, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir.path) }
 
         let sampleFile = tempDir.appendingPathComponent("sample.txt")
         try "Secret Data Content".write(to: sampleFile, atomically: true, encoding: .utf8)
@@ -59,7 +59,7 @@ final class SecurityAndComplianceTests: XCTestCase {
         XCTAssertTrue(created)
 
         let extractDir = tempDir.appendingPathComponent("extract_out").path
-        _ = ttzip_extract_zip_c_parallel(zipPath, extractDir, true, wrongPassword)
+        _ = try? ArchiveExtractor().extractSync(archivePath: zipPath, destinationDir: extractDir, password: wrongPassword)
         let extractedFiles = (try? FileManager.default.contentsOfDirectory(atPath: extractDir)) ?? []
         XCTAssertEqual(extractedFiles.count, 0, "Extraction with wrong password must not produce files")
     }

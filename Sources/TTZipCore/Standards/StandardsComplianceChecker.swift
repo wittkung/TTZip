@@ -657,7 +657,7 @@ public enum StandardsComplianceChecker {
 
         // StartHeaderCRC verification (CRC of bytes 12..31)
         let startHeaderCRC = buffer.loadUnaligned(fromByteOffset: 8, as: UInt32.self).littleEndian
-        let computedStartCRC = ttzip_compute_buffer_crc32(base.advanced(by: 12), 20)
+        let computedStartCRC = ttzip_rust_crc32(0, base.advanced(by: 12).assumingMemoryBound(to: UInt8.self), 20)
         if computedStartCRC == startHeaderCRC {
             validatedHeaders.append("7-Zip: Signature Header Version and StartHeaderCRC")
         } else {
@@ -678,7 +678,7 @@ public enum StandardsComplianceChecker {
                     validatedHeaders.append("7-Zip: NextHeader Descriptor (\(desc))")
                 }
 
-                let computedHeaderCRC = ttzip_compute_buffer_crc32(base.advanced(by: Int(targetOffset)), Int(nextHeaderSize))
+                let computedHeaderCRC = ttzip_rust_crc32(0, base.advanced(by: Int(targetOffset)).assumingMemoryBound(to: UInt8.self), Int(nextHeaderSize))
                 if computedHeaderCRC == nextHeaderCRC {
                     validatedHeaders.append("7-Zip: NextHeader CRC32 Checksum Verified")
                 } else {

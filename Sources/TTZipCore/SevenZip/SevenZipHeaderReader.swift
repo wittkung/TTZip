@@ -15,17 +15,28 @@ public final class SevenZipHeaderReader: @unchecked Sendable {
     
     /// Parses and verifies the 32-byte 7z Signature Header.
     public func parseSignatureHeader(from bytePtr: UnsafePointer<UInt8>, fileSize: Int) -> SevenZipSignatureHeader? {
-        var cSig = ttzip_7z_signature_header_t()
-        let res = ttzip_7z_parse_signature_header(bytePtr, fileSize, &cSig)
-        guard res == 0 else { return nil }
+        guard fileSize >= 32 else { return nil }
+        guard bytePtr[0] == 0x37, bytePtr[1] == 0x7A, bytePtr[2] == 0xBC, bytePtr[3] == 0xAF, bytePtr[4] == 0x27, bytePtr[5] == 0x1C else {
+            return nil
+        }
+        let major = bytePtr[6]
+        let minor = bytePtr[7]
+        let rawBuffer = UnsafeRawPointer(bytePtr)
+        let startCRC = rawBuffer.loadUnaligned(fromByteOffset: 8, as: UInt32.self).littleEndian
+        let nextOffset = rawBuffer.loadUnaligned(fromByteOffset: 12, as: UInt64.self).littleEndian
+        let nextSize = rawBuffer.loadUnaligned(fromByteOffset: 20, as: UInt64.self).littleEndian
+        let nextCRC = rawBuffer.loadUnaligned(fromByteOffset: 28, as: UInt32.self).littleEndian
+
+        let computedCRC = ttzip_rust_crc32(0, bytePtr.advanced(by: 12), 20)
+        guard computedCRC == startCRC else { return nil }
 
         return SevenZipSignatureHeader(
-            majorVersion: cSig.major_version,
-            minorVersion: cSig.minor_version,
-            startHeaderCRC: cSig.start_header_crc,
-            nextHeaderOffset: cSig.next_header_offset,
-            nextHeaderSize: cSig.next_header_size,
-            nextHeaderCRC: cSig.next_header_crc
+            majorVersion: major,
+            minorVersion: minor,
+            startHeaderCRC: startCRC,
+            nextHeaderOffset: nextOffset,
+            nextHeaderSize: nextSize,
+            nextHeaderCRC: nextCRC
         )
     }
     

@@ -45,17 +45,38 @@ public final class ZipCentralDirectoryReader: @unchecked Sendable {
     public func readDescriptors(from bytePtr: UnsafePointer<UInt8>, fileSize: Int, skipMacJunk: Bool = true) -> [ZipEntryDescriptor]? {
         guard fileSize >= 22 else { return nil }
         
-        var eocdInfo = ttzip_eocd_info_t()
-        guard ttzip_find_eocd(bytePtr, fileSize, &eocdInfo) else { return nil }
+        let maxComment = min(fileSize - 22, 65535)
+        var eocdPos = -1
+        for i in 0...maxComment {
+            let pos = fileSize - 22 - i
+            if bytePtr[pos] == 0x50 && bytePtr[pos+1] == 0x4b && bytePtr[pos+2] == 0x05 && bytePtr[pos+3] == 0x06 {
+                eocdPos = pos
+                break
+            }
+        }
+        guard eocdPos >= 0 else { return nil }
         
-        let cdOffset = eocdInfo.cd_offset
-        let totalEntries = eocdInfo.total_entries
+        var totalEntries = Int(readU16(bytePtr, eocdPos + 10))
+        var cdOffset = Int(readU32(bytePtr, eocdPos + 16))
+        
+        if eocdPos >= 20 {
+            let locPos = eocdPos - 20
+            if readU32(bytePtr, locPos) == 0x07064b50 {
+                let zip64EocdOff = Int(readI64(bytePtr, locPos + 8))
+                if zip64EocdOff >= 0 && zip64EocdOff + 56 <= fileSize {
+                    if readU32(bytePtr, zip64EocdOff) == 0x06064b50 {
+                        totalEntries = Int(readI64(bytePtr, zip64EocdOff + 32))
+                        cdOffset = Int(readI64(bytePtr, zip64EocdOff + 48))
+                    }
+                }
+            }
+        }
         
         guard cdOffset < fileSize else { return nil }
         
         var descriptors: [ZipEntryDescriptor] = []
-        descriptors.reserveCapacity(min(Int(totalEntries), 65536))
-        var currPos = Int(cdOffset)
+        descriptors.reserveCapacity(min(totalEntries, 65536))
+        var currPos = cdOffset
         
         for _ in 0..<totalEntries {
             if currPos + 46 > fileSize { break }
@@ -77,14 +98,8 @@ public final class ZipCentralDirectoryReader: @unchecked Sendable {
             if currPos + recLen > fileSize { break }
             
             let fnPtr = bytePtr.advanced(by: currPos + 46)
-            let isAscii = ttzip_is_ascii_fast(fnPtr, fnLen)
-            let rawPath: String
-            if isAscii {
-                rawPath = String(decoding: UnsafeRawBufferPointer(start: fnPtr, count: fnLen), as: UTF8.self)
-            } else {
-                let fnBytes = Data(bytes: fnPtr, count: fnLen)
-                rawPath = CharsetDetector.sanitizeFilename(bytes: fnBytes)
-            }
+            let fnBytes = Data(bytes: fnPtr, count: fnLen)
+            let rawPath = String(data: fnBytes, encoding: .utf8) ?? CharsetDetector.sanitizeFilename(bytes: fnBytes)
             
             var encryption: ZipEncryptionMethod = .none
             let isEncrypted = (flag & 0x0001) != 0

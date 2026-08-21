@@ -73,7 +73,8 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
             mutexLock.lock()
             _ = testData.withUnsafeBytes { inPtr in
                 outBuf.withUnsafeMutableBytes { outPtr in
-                    ttzip_libdeflate_compress(inPtr.baseAddress!, chunkSize, outPtr.baseAddress!, outCap, 1)
+                    var outLen: Int = 0
+                    _ = ttzip_rust_deflate_compress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), chunkSize, outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), outCap, 1, &outLen)
                 }
             }
             mutexLock.unlock()
@@ -87,7 +88,8 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
             let outCap = outBuf.count
             _ = testData.withUnsafeBytes { inPtr in
                 outBuf.withUnsafeMutableBytes { outPtr in
-                    ttzip_libdeflate_compress(inPtr.baseAddress!, chunkSize, outPtr.baseAddress!, outCap, 1)
+                    var outLen: Int = 0
+                    _ = ttzip_rust_deflate_compress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), chunkSize, outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), outCap, 1, &outLen)
                 }
             }
         }
@@ -111,7 +113,8 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
         let outCap = singleOut.count
         _ = data.withUnsafeBytes { inPtr in
             singleOut.withUnsafeMutableBytes { outPtr in
-                ttzip_libdeflate_compress(inPtr.baseAddress!, size, outPtr.baseAddress!, outCap, 1)
+                var outLen: Int = 0
+                _ = ttzip_rust_deflate_compress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), size, outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), outCap, 1, &outLen)
             }
         }
         let t1 = PlatformMonotonicTimer.nowNanoseconds()
@@ -142,9 +145,10 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
         for _ in 0..<numChunks {
             var outBuf = Data(count: chunkSize + 512)
             let outCap = outBuf.count
-            let compSize = rawChunk.withUnsafeBytes { inPtr in
+            var compSize: Int = 0
+            _ = rawChunk.withUnsafeBytes { inPtr in
                 outBuf.withUnsafeMutableBytes { outPtr in
-                    ttzip_libdeflate_compress(inPtr.baseAddress!, chunkSize, outPtr.baseAddress!, outCap, 1)
+                    _ = ttzip_rust_deflate_compress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), chunkSize, outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), outCap, 1, &compSize)
                 }
             }
             let chunkData = outBuf.prefix(compSize)
@@ -163,7 +167,8 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
             let off = i * chunkSize
             _ = c.withUnsafeBytes { inPtr in
                 seqOut.withUnsafeMutableBytes { outPtr in
-                    ttzip_libdeflate_decompress(inPtr.baseAddress!, c.count, outPtr.baseAddress!.advanced(by: off), chunkSize)
+                    var outLen: Int = 0
+                    _ = ttzip_rust_deflate_decompress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), c.count, outPtr.baseAddress!.advanced(by: off).assumingMemoryBound(to: UInt8.self), chunkSize, &outLen)
                 }
             }
         }
@@ -286,7 +291,7 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
 
         let t2 = PlatformMonotonicTimer.nowNanoseconds()
         let optCRC = buffer.withUnsafeBytes { ptr in
-            ttzip_crc32_fast(0, ptr.baseAddress!, size)
+            ttzip_rust_crc32(0, ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
         }
         let t3 = PlatformMonotonicTimer.nowNanoseconds()
         let optSec = max(0.000001, Double(t3 - t2) / 1_000_000_000.0)

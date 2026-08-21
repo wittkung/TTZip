@@ -99,10 +99,10 @@ public enum SecureCredentialResolver: Sendable {
         }
         
         let res = prompt.withCString { pPtr in
-            ttzip_read_passphrase(pPtr, buffer, maxLen)
+            readpassphrase(pPtr, buffer, maxLen, RPP_REQUIRE_TTY)
         }
         
-        if res == 0 {
+        if res != nil {
             let str = String(cString: buffer)
             return str.isEmpty ? nil : str
         }

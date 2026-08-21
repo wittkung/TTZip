@@ -122,18 +122,36 @@ extension ArchiveWriter {
         // 🔒 API CONTRACT: ZIP Parallel Compression Engine Route
         // SEE: .agents/rules/zip-engine-freeze.md
         if format == .zip && (splitVolumeSizeBytes == nil || splitVolumeSizeBytes == 0) {
-            let cLevel = Int32(level.rawValue)
+            let lvlMap: TTZipCompressionLevel
+            switch level {
+            case .store: lvlMap = TTZIP_COMPRESSION_LEVEL_STORE
+            case .fastest, .fast: lvlMap = TTZIP_COMPRESSION_LEVEL_FASTEST
+            case .normal: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
+            case .maximum: lvlMap = TTZIP_COMPRESSION_LEVEL_MAXIMUM
+            case .ultra: lvlMap = TTZIP_COMPRESSION_LEVEL_ULTRA
+            default: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
+            }
+            let enc: TTZipEncryptionMethod = (password != nil && !password!.isEmpty) ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
+            let pwd = (password != nil && !password!.isEmpty) ? password : nil
             let res = CUnsafeBufferAdapter.withCString(outputPath) { cOutputPath in
                 CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
-                    CUnsafeBufferAdapter.withCString(password) { cPassword in
-                        guard let cOutputPath = cOutputPath else { return Int32(-1) }
-                        let status = ttzip_create_zip_parallel_c(cOutputPath, cInputPaths, inputPaths.count, cLevel, options.skipMacJunk, cPassword)
-                        if status == 0 { return Int32(0) }
-                        return ttzip_create_archive_tuned(cOutputPath, "zip", cInputPaths, inputPaths.count, options.skipMacJunk, cLevel, 0, 16, cPassword)
+                    CUnsafeBufferAdapter.withCString(pwd) { cPassword in
+                        guard let cOutputPath = cOutputPath else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                        var opt = TTZipCreateOptions(
+                            format: TTZIP_ARCHIVE_FORMAT_ZIP,
+                            level: lvlMap,
+                            encryption: enc,
+                            password: cPassword,
+                            thread_budget: 0,
+                            solid_block_size_mb: 0,
+                            progress_callback: nil,
+                            user_data: nil
+                        )
+                        return ttzip_rust_create_archive(cInputPaths, inputPaths.count, cOutputPath, &opt)
                     }
                 }
             }
-            if res == 0 {
+            if res == TTZIP_STATUS_OK {
                 notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "ZIP archive created", progressHandler: progressHandler)
                 return
             }
@@ -163,36 +181,15 @@ extension ArchiveWriter {
             return FileManager.default.fileExists(atPath: p, isDirectory: &isDir) && isDir.boolValue
         }
         if !hasDirectoryInput && (splitVolumeSizeBytes == nil || splitVolumeSizeBytes! == 0) && (format == .tarGz || format == .tarZst || format == .tarBz2 || format == .tarXz) && totalBytes < 50 * 1024 * 1024 && (password == nil || password!.isEmpty) {
-            let cores = (advancedOptions.cpuThreads > 0) ? advancedOptions.cpuThreads : hardwareTuner.totalCores
-            
-            let fmtStr: String
-            switch format {
-            case .zip: fmtStr = "zip"
-            case .sevenZip: fmtStr = "7z"
-            case .tarGz, .gz: fmtStr = "tar.gz"
-            case .tarZst, .zst: fmtStr = "tar.zst"
-            case .tarBz2, .bz2: fmtStr = "tar.bz2"
-            case .tarXz, .xz: fmtStr = "tar.xz"
-            default: fmtStr = format.rawValue
-            }
-            
-            let res = CUnsafeBufferAdapter.withCString(outputPath) { cOutputPath in
-                CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
-                    guard let cOutputPath = cOutputPath else { return Int32(-1) }
-                    return ttzip_create_archive_tuned(
-                        cOutputPath,
-                        fmtStr,
-                        cInputPaths,
-                        inputPaths.count,
-                        options.skipMacJunk,
-                        Int32(level.rawValue),
-                        0,
-                        Int32(cores),
-                        nil
-                    )
-                }
-            }
-            if res == 0 {
+            let res = createArchiveWithRust(
+                outputPath: outputPath,
+                format: format,
+                inputPaths: inputPaths,
+                level: level,
+                password: nil,
+                skipMacJunk: options.skipMacJunk
+            )
+            if res {
                 let duration = max(0.001, Date().timeIntervalSince(startTime))
                 let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
                 progressHandler?(ArchiveProgress(
@@ -223,18 +220,36 @@ extension ArchiveWriter {
                     return
                 }
             } else {
-                let cLevel = Int32(level.rawValue)
+                let lvlMap: TTZipCompressionLevel
+                switch level {
+                case .store: lvlMap = TTZIP_COMPRESSION_LEVEL_STORE
+                case .fastest, .fast: lvlMap = TTZIP_COMPRESSION_LEVEL_FASTEST
+                case .normal: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
+                case .maximum: lvlMap = TTZIP_COMPRESSION_LEVEL_MAXIMUM
+                case .ultra: lvlMap = TTZIP_COMPRESSION_LEVEL_ULTRA
+                default: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
+                }
+                let enc: TTZipEncryptionMethod = (password != nil && !password!.isEmpty) ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
+                let pwd = (password != nil && !password!.isEmpty) ? password : nil
                 let res = CUnsafeBufferAdapter.withCString(outputPath) { cOutputPath in
                     CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
-                        CUnsafeBufferAdapter.withCString(password) { cPassword in
-                            guard let cOutputPath = cOutputPath else { return Int32(-1) }
-                            let status = ttzip_create_zip_parallel_c(cOutputPath, cInputPaths, inputPaths.count, cLevel, options.skipMacJunk, cPassword)
-                            if status == 0 { return Int32(0) }
-                            return ttzip_create_archive_tuned(cOutputPath, "zip", cInputPaths, inputPaths.count, options.skipMacJunk, cLevel, 0, 16, cPassword)
+                        CUnsafeBufferAdapter.withCString(pwd) { cPassword in
+                            guard let cOutputPath = cOutputPath else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                            var opt = TTZipCreateOptions(
+                                format: TTZIP_ARCHIVE_FORMAT_ZIP,
+                                level: lvlMap,
+                                encryption: enc,
+                                password: cPassword,
+                                thread_budget: 0,
+                                solid_block_size_mb: 0,
+                                progress_callback: nil,
+                                user_data: nil
+                            )
+                            return ttzip_rust_create_archive(cInputPaths, inputPaths.count, cOutputPath, &opt)
                         }
                     }
                 }
-                if res == 0 {
+                if res == TTZIP_STATUS_OK {
                     try? Self.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
                     notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "ZIP multi-volume archive created", progressHandler: progressHandler)
                     return
@@ -260,10 +275,15 @@ extension ArchiveWriter {
         }
         
         if (format == .dmg || format == .iso) {
-            let res = CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
-                ttzip_create_tar_native_c(outputPath, "iso", cInputPaths, inputPaths.count, options.skipMacJunk, Int32(level.rawValue))
-            }
-            if res == 0 {
+            let res = createArchiveWithRust(
+                outputPath: outputPath,
+                format: format,
+                inputPaths: inputPaths,
+                level: level,
+                password: nil,
+                skipMacJunk: options.skipMacJunk
+            )
+            if res {
                 let duration = max(0.001, Date().timeIntervalSince(startTime))
                 let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
                 let msg = format == .dmg ? "DMG disk image created" : "ISO disk image created"
@@ -273,10 +293,15 @@ extension ArchiveWriter {
         }
         
         if format == .wim {
-            let res = CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
-                ttzip_create_archive_tuned(outputPath, "wim", cInputPaths, inputPaths.count, options.skipMacJunk, Int32(level.rawValue), 0, Int32(hardwareTuner.totalCores), password)
-            }
-            if res == 0 {
+            let res = createArchiveWithRust(
+                outputPath: outputPath,
+                format: .tar,
+                inputPaths: inputPaths,
+                level: level,
+                password: password,
+                skipMacJunk: options.skipMacJunk
+            )
+            if res {
                 let duration = max(0.001, Date().timeIntervalSince(startTime))
                 let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
                 progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "WIM archive created", throughputMBs: throughput))
@@ -285,110 +310,73 @@ extension ArchiveWriter {
         }
         
         let actualFormat = (format == .zst) ? .tarZst : format
-        if (actualFormat == .tarZst || actualFormat == .tarGz || actualFormat == .sevenZip || actualFormat == .tar || actualFormat == .bz2 || actualFormat == .xz || actualFormat == .lzip || actualFormat == .lz4 || actualFormat == .brotli || actualFormat == .lrzip || actualFormat == .snappy || actualFormat == .wim) {
-            let zstdLevel = Int32(level.rawValue)
-            let zstdWindow = advancedOptions.zstdEnableLDM ? Int32(hardwareTuner.optimalZstdLongWindowLog) : 0
-            let threads = Int32(hardwareTuner.totalCores)
-            
-            let cFormat: String
-            switch actualFormat {
-            case .tarGz, .gz: cFormat = "tar.gz"
-            case .tarZst, .zst: cFormat = "tar.zst"
-            case .sevenZip: cFormat = "7z"
-            case .bz2, .tarBz2: cFormat = "tar.bz2"
-            case .xz, .tarXz: cFormat = "tar.xz"
-            case .lzip: cFormat = "lzip"
-            case .lz4: cFormat = "lz4"
-            case .brotli: cFormat = "brotli"
-            case .lrzip: cFormat = "lrzip"
-            case .snappy: cFormat = "snappy"
-            case .wim: cFormat = "wim"
-            default: cFormat = "tar"
+        let res = createArchiveWithRust(
+            outputPath: outputPath,
+            format: actualFormat,
+            inputPaths: inputPaths,
+            level: level,
+            password: password,
+            skipMacJunk: options.skipMacJunk
+        )
+        if res {
+            if let splitBytes = splitVolumeSizeBytes, splitBytes > 0 {
+                try Self.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
             }
-            
-            let res = CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
-                ttzip_create_archive_tuned(
-                    outputPath,
-                    cFormat,
-                    cInputPaths,
-                    inputPaths.count,
-                    options.skipMacJunk,
-                    zstdLevel,
-                    zstdWindow,
-                    threads,
-                    password
-                )
-            }
-            if res == 0 {
-                if let splitBytes = splitVolumeSizeBytes, splitBytes > 0 {
-                    try Self.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
+            let duration = max(0.001, Date().timeIntervalSince(startTime))
+            let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
+            progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "Archive created", throughputMBs: throughput))
+            return
+        }
+        
+        throw ArchiveError.readFailed(code: -1)
+    }
+
+    private func createArchiveWithRust(
+        outputPath: String,
+        format: ArchiveCompressionFormat,
+        inputPaths: [String],
+        level: ArchiveCompressionLevel,
+        password: String?,
+        skipMacJunk: Bool
+    ) -> Bool {
+        let rustFormat: TTZipArchiveFormat
+        switch format {
+        case .zip: rustFormat = TTZIP_ARCHIVE_FORMAT_ZIP
+        case .sevenZip: rustFormat = TTZIP_ARCHIVE_FORMAT_SEVEN_ZIP
+        case .tar, .tarGz, .gz, .tarZst, .zst, .tarBz2, .bz2, .tarXz, .xz: rustFormat = TTZIP_ARCHIVE_FORMAT_TAR
+        default: rustFormat = TTZIP_ARCHIVE_FORMAT_TAR
+        }
+
+        let lvlMap: TTZipCompressionLevel
+        switch level {
+        case .store: lvlMap = TTZIP_COMPRESSION_LEVEL_STORE
+        case .fastest, .fast: lvlMap = TTZIP_COMPRESSION_LEVEL_FASTEST
+        case .normal: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
+        case .maximum: lvlMap = TTZIP_COMPRESSION_LEVEL_MAXIMUM
+        case .ultra: lvlMap = TTZIP_COMPRESSION_LEVEL_ULTRA
+        default: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
+        }
+
+        let enc: TTZipEncryptionMethod = (password != nil && !password!.isEmpty) ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
+        let pwd = (password != nil && !password!.isEmpty) ? password : nil
+
+        return CUnsafeBufferAdapter.withCString(outputPath) { cOutputPath in
+            CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
+                CUnsafeBufferAdapter.withCString(pwd) { cPassword in
+                    guard let cOutputPath = cOutputPath else { return false }
+                    var opt = TTZipCreateOptions(
+                        format: rustFormat,
+                        level: lvlMap,
+                        encryption: enc,
+                        password: cPassword,
+                        thread_budget: 0,
+                        solid_block_size_mb: 0,
+                        progress_callback: nil,
+                        user_data: nil
+                    )
+                    return ttzip_rust_create_archive(cInputPaths, inputPaths.count, cOutputPath, &opt) == TTZIP_STATUS_OK
                 }
-                let duration = max(0.001, Date().timeIntervalSince(startTime))
-                let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "Archive created", throughputMBs: throughput))
-                return
             }
         }
-        
-        // Fallback writer
-        let monitorBox = StateBoxBool(true)
-        let monitorTask = Task {
-            let start = Date()
-            while monitorBox.value {
-                try? await Task.sleep(nanoseconds: 100_000_000)
-                guard monitorBox.value else { break }
-                if let attrs = try? FileManager.default.attributesOfItem(atPath: outputPath),
-                   let writtenBytes = attrs[.size] as? Int64, writtenBytes > 0 {
-                    let elapsed = max(0.05, Date().timeIntervalSince(start))
-                    let throughput = (Double(writtenBytes) / (1024 * 1024)) / elapsed
-                    let pct = min(0.95, Double(writtenBytes) / Double(max(1, totalBytes)))
-                    progressHandler?(ArchiveProgress(
-                        state: .processing,
-                        bytesProcessed: min(totalBytes, Int64(Double(totalBytes) * pct)),
-                        totalBytes: totalBytes,
-                        currentFileName: (inputPaths.first as NSString?)?.lastPathComponent ?? "",
-                        throughputMBs: throughput
-                    ))
-                }
-            }
-        }
-        
-        let windowLog = advancedOptions.zstdEnableLDM ? hardwareTuner.optimalZstdLongWindowLog : 0
-        let effectiveLvl = level.rawValue != 0 ? level.rawValue : advancedOptions.zstdLevel
-        let status = CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
-            ttzip_create_archive_tuned(
-                outputPath,
-                format.rawValue,
-                cInputPaths,
-                inputPaths.count,
-                options.skipMacJunk,
-                Int32(effectiveLvl),
-                Int32(windowLog),
-                Int32(advancedOptions.cpuThreads),
-                password
-            )
-        }
-        
-        monitorBox.value = false
-        monitorTask.cancel()
-        
-        if status != 0 {
-            throw ArchiveError.readFailed(code: status)
-        }
-        
-        if let splitBytes = splitVolumeSizeBytes, splitBytes > 0 {
-            try Self.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
-        }
-        
-        let duration = max(0.01, Date().timeIntervalSince(startTime))
-        let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-        
-        progressHandler?(ArchiveProgress(
-            state: .completed,
-            bytesProcessed: totalBytes,
-            totalBytes: totalBytes,
-            currentFileName: "Compression completed",
-            throughputMBs: throughput
-        ))
     }
 }

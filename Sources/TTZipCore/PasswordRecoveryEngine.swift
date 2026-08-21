@@ -151,19 +151,38 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
         return result
     }
     
-    /// Probes archive header password in-process without extracting entire archive.
+    /// Probes archive header and stream password in-process without extracting entire archive.
     private static func testArchivePassword(archivePath: String, password: String) async -> Bool {
-        let tempDir = (NSTemporaryDirectory() as NSString).appendingPathComponent("TTZip_PwdTest_\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("probe_\(UUID().uuidString)").path
         defer { try? FileManager.default.removeItem(atPath: tempDir) }
-        
-        let ext = (archivePath as NSString).pathExtension.lowercased()
-        if ext == "zip" {
-            return ttzip_extract_zip_c_parallel(archivePath, tempDir, false, password) == 0
-        } else if ext == "7z" || ext == "cb7" {
-            return ttzip_extract_7z_native_c(archivePath, tempDir, password) == 0
-        } else {
-            return ttzip_extract_archive_advanced(archivePath, tempDir, false, password) == 0
+        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+
+        let pathLower = archivePath.lowercased()
+        if pathLower.contains(".7z") || pathLower.contains("sevenzip") {
+            return (try? SevenZipEngine.shared.extract(archivePath: archivePath, destinationDir: tempDir, password: password)) ?? false
+        }
+
+        return CUnsafeBufferAdapter.withCString(archivePath) { cPath in
+            CUnsafeBufferAdapter.withCString(tempDir) { cDest in
+                CUnsafeBufferAdapter.withCString(password) { cPwd in
+                    guard let cPath = cPath, let cDest = cDest else { return false }
+                    var opt = TTZipExtractOptions(
+                        destination_path: cDest,
+                        password: cPwd,
+                        thread_budget: 1,
+                        overwrite_existing: true,
+                        preserve_permissions: false,
+                        dry_run: true,
+                        progress_callback: nil,
+                        user_data: nil
+                    )
+                    let status = ttzip_rust_extract_archive(cPath, cDest, &opt)
+                    if status == TTZIP_STATUS_OK {
+                        return true
+                    }
+                    return ttzip_extract_archive_advanced(cPath, cDest, false, cPwd) == 0
+                }
+            }
         }
     }
 

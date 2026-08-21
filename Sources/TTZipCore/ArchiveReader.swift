@@ -49,8 +49,8 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
     }
     
     public func inspect(archivePath: String, password: String?, candidatePasswords: [String]? = nil) async throws -> [ArchiveEntry] {
-        var fileSize: Int64 = 0
-        guard ttzip_stat_file_info(archivePath, &fileSize, nil, nil) == 0 else {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: archivePath),
+              let fileSize = attrs[.size] as? Int64 else {
             throw ArchiveError.fileNotFound
         }
         
@@ -114,31 +114,7 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                                 acc.entries.append(entry)
                                 return true
                             }, contextPtr)
-                            if rustStatus == TTZIP_STATUS_OK && !accumulator.entries.isEmpty {
-                                return Int32(0)
-                            }
-                            return ttzip_inspect_archive_v2(pathPtr, pwdPtr, contextPtr) { ctx, cPathname, size, isDir, isDataEnc, isMetaEnc in
-                                guard let ctx = ctx, let cPathname = cPathname else { return }
-                                let acc = Unmanaged<EntryAccumulator>.fromOpaque(ctx).takeUnretainedValue()
-                                let rawLen = strlen(cPathname)
-                                let pathData = Data(bytes: cPathname, count: rawLen)
-                                let sanitizedPath = CharsetDetector.sanitizeFilename(bytes: pathData)
-                                let detectedCharset = CharsetDetector.detectCharset(data: pathData)
-                                let lastComp = (sanitizedPath as NSString).lastPathComponent
-                                if lastComp.hasPrefix("._") || lastComp == ".DS_Store" || sanitizedPath.hasPrefix("PaxHeader") || sanitizedPath.contains("/PaxHeader") {
-                                    return
-                                }
-                                let entry = ArchiveEntry(
-                                    path: sanitizedPath,
-                                    uncompressedSize: size,
-                                    isDirectory: isDir,
-                                    detectedEncoding: detectedCharset,
-                                    isEncrypted: isDataEnc || isMetaEnc,
-                                    isDataEncrypted: isDataEnc,
-                                    isMetadataEncrypted: isMetaEnc
-                                )
-                                acc.entries.append(entry)
-                            }
+                            return (rustStatus == TTZIP_STATUS_OK) ? Int32(0) : Int32(-1)
                         }
                     }
                 }
@@ -146,7 +122,67 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                     return accumulator.entries
                 }
                 
-                // For encrypted archives or complex 7z containers, fallback to sandboxed probing
+                // 1. Fast CLI listing probing via 7z -slt
+                if let bin7z = SevenZipBinaryResolver.resolveBinaryPath() {
+                    let proc = Process()
+                    proc.executableURL = URL(fileURLWithPath: bin7z)
+                    var args = ["l", "-slt"]
+                    if let p = pwd, !p.isEmpty {
+                        args.append("-p\(p)")
+                    } else {
+                        args.append("-p-")
+                    }
+                    args.append(archivePath)
+                    proc.arguments = args
+                    let pipe = Pipe()
+                    proc.standardOutput = pipe
+                    proc.standardError = FileHandle.nullDevice
+                    if (try? proc.run()) != nil {
+                        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                        proc.waitUntilExit()
+                        if proc.terminationStatus == 0, let text = String(data: data, encoding: .utf8) {
+                            var parsedEntries: [ArchiveEntry] = []
+                            let baseName = URL(fileURLWithPath: archivePath).lastPathComponent
+                            let blocks = text.components(separatedBy: "\n\n")
+                            for block in blocks {
+                                var currPath: String? = nil
+                                var currSize: Int64 = 0
+                                var currIsDir = false
+                                var currEnc = (pwd != nil)
+                                for line in block.components(separatedBy: .newlines) {
+                                    if line.hasPrefix("Path = ") {
+                                        currPath = String(line.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
+                                    } else if line.hasPrefix("Size = ") {
+                                        currSize = Int64(line.dropFirst(7).trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+                                    } else if line.hasPrefix("Attributes = ") {
+                                        if line.contains("D") { currIsDir = true }
+                                    } else if line.hasPrefix("Encrypted = +") {
+                                        currEnc = true
+                                    }
+                                }
+                                if let p = currPath, !p.isEmpty, p != archivePath, p != targetInspectPath, p != baseName, !p.hasSuffix(".7z"), !p.hasSuffix(".001") {
+                                    let lastComp = (p as NSString).lastPathComponent
+                                    if !lastComp.hasPrefix("._") && lastComp != ".DS_Store" {
+                                        parsedEntries.append(ArchiveEntry(
+                                            path: p,
+                                            uncompressedSize: currSize,
+                                            isDirectory: currIsDir,
+                                            detectedEncoding: "UTF-8",
+                                            isEncrypted: currEnc,
+                                            isDataEncrypted: currEnc,
+                                            isMetadataEncrypted: currEnc
+                                        ))
+                                    }
+                                }
+                            }
+                            if !parsedEntries.isEmpty {
+                                return parsedEntries
+                            }
+                        }
+                    }
+                }
+                
+                // 2. Sandboxed probing fallback
                 let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("inspect_temp_\(UUID().uuidString)").path
                 try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
                 defer { try? FileManager.default.removeItem(atPath: tempDir) }
@@ -154,23 +190,6 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                 var success = (try? SevenZipCAdapter.shared.extractArchive(archivePath: targetInspectPath, destinationDir: tempDir, skipMacJunk: true, password: pwd)) ?? false
                 if !success {
                     success = (ttzip_extract_archive_advanced(targetInspectPath, tempDir, true, pwd) == 0)
-                }
-                if !success, let bin7z = SevenZipBinaryResolver.resolveBinaryPath() {
-                    let proc = Process()
-                    proc.executableURL = URL(fileURLWithPath: bin7z)
-                    var args = ["x", "-y", "-o\(tempDir)", targetInspectPath]
-                    if let p = pwd, !p.isEmpty {
-                        args.append("-p\(p)")
-                    } else {
-                        args.append("-p-")
-                    }
-                    proc.arguments = args
-                    proc.standardOutput = Pipe()
-                    proc.standardError = Pipe()
-                    if (try? proc.run()) != nil {
-                        proc.waitUntilExit()
-                        success = (proc.terminationStatus == 0)
-                    }
                 }
                 TTLogger.debug("[Inspect] in-process extraction success=\(success), tempDir=\(tempDir)")
                 if success {

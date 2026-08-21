@@ -211,13 +211,15 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
         let dstPtr = pool.compressedBuffer.assumingMemoryBound(to: UInt8.self)
         let decompPtr = pool.decompressedBuffer.assumingMemoryBound(to: UInt8.self)
 
-        let compSize = ttzip_libdeflate_compress(srcPtr, inSize, dstPtr, maxComp, Int32(level))
-        guard compSize > 0 else { return nil }
+        var compSize: Int = 0
+        let status = ttzip_rust_deflate_compress(srcPtr, inSize, dstPtr, maxComp, Int32(level), &compSize)
+        guard status == TTZIP_STATUS_OK, compSize > 0 else { return nil }
 
         var compTimes: [Double] = []
         for _ in 0..<3 {
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            _ = ttzip_libdeflate_compress(srcPtr, inSize, dstPtr, maxComp, Int32(level))
+            var cSize: Int = 0
+            _ = ttzip_rust_deflate_compress(srcPtr, inSize, dstPtr, maxComp, Int32(level), &cSize)
             let t1 = PlatformMonotonicTimer.nowNanoseconds()
             compTimes.append(Double(t1 - t0))
         }
@@ -230,9 +232,10 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
         var decompTimes: [Double] = []
         for _ in 0..<3 {
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            let actualOut = ttzip_libdeflate_decompress(dstPtr, compSize, decompPtr, inSize)
+            var dSize: Int = 0
+            let dStatus = ttzip_rust_deflate_decompress(dstPtr, compSize, decompPtr, inSize, &dSize)
             let t1 = PlatformMonotonicTimer.nowNanoseconds()
-            guard actualOut == inSize else { return nil }
+            guard dStatus == TTZIP_STATUS_OK && dSize == inSize else { return nil }
             decompTimes.append(Double(t1 - t0))
         }
 
@@ -271,13 +274,15 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
         let dstPtr = pool.compressedBuffer.assumingMemoryBound(to: UInt8.self)
         let decompPtr = pool.decompressedBuffer.assumingMemoryBound(to: UInt8.self)
 
-        let compSize = ttzip_zstd_compress(srcPtr, inSize, dstPtr, maxComp, Int32(level))
-        guard compSize > 0 else { return nil }
+        var compSize: Int = 0
+        let status = ttzip_rust_zstd_compress_advanced(srcPtr, inSize, dstPtr, maxComp, Int32(level), 0, 0, 0, 0, false, &compSize)
+        guard status == TTZIP_STATUS_OK, compSize > 0 else { return nil }
 
         var compTimes: [Double] = []
         for _ in 0..<3 {
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            _ = ttzip_zstd_compress(srcPtr, inSize, dstPtr, maxComp, Int32(level))
+            var cSize: Int = 0
+            _ = ttzip_rust_zstd_compress_advanced(srcPtr, inSize, dstPtr, maxComp, Int32(level), 0, 0, 0, 0, false, &cSize)
             let t1 = PlatformMonotonicTimer.nowNanoseconds()
             compTimes.append(Double(t1 - t0))
         }
@@ -290,9 +295,10 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
         var decompTimes: [Double] = []
         for _ in 0..<3 {
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            let actualOut = ttzip_zstd_decompress(dstPtr, compSize, decompPtr, inSize)
+            var dSize: Int = 0
+            let dStatus = ttzip_rust_zstd_decompress(dstPtr, compSize, decompPtr, inSize, &dSize)
             let t1 = PlatformMonotonicTimer.nowNanoseconds()
-            guard actualOut == inSize else { return nil }
+            guard dStatus == TTZIP_STATUS_OK && dSize == inSize else { return nil }
             decompTimes.append(Double(t1 - t0))
         }
 
@@ -331,28 +337,15 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
         let dstPtr = pool.compressedBuffer.assumingMemoryBound(to: UInt8.self)
         let decompPtr = pool.decompressedBuffer.assumingMemoryBound(to: UInt8.self)
 
-        let srcChar = pool.inputBuffer.assumingMemoryBound(to: CChar.self)
-        let dstChar = pool.compressedBuffer.assumingMemoryBound(to: CChar.self)
-        let decompChar = pool.decompressedBuffer.assumingMemoryBound(to: CChar.self)
-
-        let compSizeInt: Int32
-        if level >= 9 {
-            compSizeInt = LZ4_compress_default(srcChar, dstChar, Int32(inSize), Int32(maxComp))
-        } else {
-            compSizeInt = LZ4_compress_fast(srcChar, dstChar, Int32(inSize), Int32(maxComp), 1)
-        }
-
-        guard compSizeInt > 0 else { return nil }
-        let compSize = Int(compSizeInt)
+        var compSize: Int = 0
+        let status = ttzip_rust_lz4_compress(srcPtr, inSize, dstPtr, maxComp, &compSize)
+        guard status == TTZIP_STATUS_OK, compSize > 0 else { return nil }
 
         var compTimes: [Double] = []
         for _ in 0..<3 {
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            if level >= 9 {
-                _ = LZ4_compress_default(srcChar, dstChar, Int32(inSize), Int32(maxComp))
-            } else {
-                _ = LZ4_compress_fast(srcChar, dstChar, Int32(inSize), Int32(maxComp), 1)
-            }
+            var cSize: Int = 0
+            _ = ttzip_rust_lz4_compress(srcPtr, inSize, dstPtr, maxComp, &cSize)
             let t1 = PlatformMonotonicTimer.nowNanoseconds()
             compTimes.append(Double(t1 - t0))
         }
@@ -365,9 +358,10 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
         var decompTimes: [Double] = []
         for _ in 0..<3 {
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            let actualOut = LZ4_decompress_safe(dstChar, decompChar, compSizeInt, Int32(inSize))
+            var dSize: Int = 0
+            let dStatus = ttzip_rust_lz4_decompress(dstPtr, compSize, decompPtr, inSize, &dSize)
             let t1 = PlatformMonotonicTimer.nowNanoseconds()
-            guard actualOut == Int32(inSize) else { return nil }
+            guard dStatus == TTZIP_STATUS_OK && dSize == inSize else { return nil }
             decompTimes.append(Double(t1 - t0))
         }
 
@@ -406,13 +400,15 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
         let dstPtr = pool.compressedBuffer.assumingMemoryBound(to: UInt8.self)
         let decompPtr = pool.decompressedBuffer.assumingMemoryBound(to: UInt8.self)
 
-        let compSize = ttzip_lzfse_compress(srcPtr, inSize, dstPtr, maxComp)
-        guard compSize > 0 else { return nil }
+        var compSize: Int = 0
+        let status = ttzip_rust_lzfse_compress(srcPtr, inSize, dstPtr, maxComp, &compSize)
+        guard status == TTZIP_STATUS_OK, compSize > 0 else { return nil }
 
         var compTimes: [Double] = []
         for _ in 0..<3 {
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            _ = ttzip_lzfse_compress(srcPtr, inSize, dstPtr, maxComp)
+            var cSize: Int = 0
+            _ = ttzip_rust_lzfse_compress(srcPtr, inSize, dstPtr, maxComp, &cSize)
             let t1 = PlatformMonotonicTimer.nowNanoseconds()
             compTimes.append(Double(t1 - t0))
         }
@@ -425,9 +421,10 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
         var decompTimes: [Double] = []
         for _ in 0..<3 {
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            let actualOut = ttzip_lzfse_decompress(dstPtr, compSize, decompPtr, inSize)
+            var dSize: Int = 0
+            let dStatus = ttzip_rust_lzfse_decompress(dstPtr, compSize, decompPtr, inSize, &dSize)
             let t1 = PlatformMonotonicTimer.nowNanoseconds()
-            guard actualOut == inSize else { return nil }
+            guard dStatus == TTZIP_STATUS_OK && dSize == inSize else { return nil }
             decompTimes.append(Double(t1 - t0))
         }
 
@@ -466,16 +463,16 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
         let dstPtr = pool.compressedBuffer.assumingMemoryBound(to: UInt8.self)
         let decompPtr = pool.decompressedBuffer.assumingMemoryBound(to: UInt8.self)
 
-        var compLen = maxComp
-        let ret = ttzip_snappy_compress(srcPtr, inSize, dstPtr, &compLen)
-        guard ret == 0, compLen > 0 else { return nil }
+        var compLen: Int = 0
+        let ret = ttzip_rust_snappy_compress(srcPtr, inSize, dstPtr, maxComp, &compLen)
+        guard ret == TTZIP_STATUS_OK, compLen > 0 else { return nil }
         let compSize = compLen
 
         var compTimes: [Double] = []
         for _ in 0..<3 {
-            var cLen = maxComp
+            var cLen = 0
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            _ = ttzip_snappy_compress(srcPtr, inSize, dstPtr, &cLen)
+            _ = ttzip_rust_snappy_compress(srcPtr, inSize, dstPtr, maxComp, &cLen)
             let t1 = PlatformMonotonicTimer.nowNanoseconds()
             compTimes.append(Double(t1 - t0))
         }
@@ -487,11 +484,11 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
 
         var decompTimes: [Double] = []
         for _ in 0..<3 {
-            var dLen = inSize
+            var dLen = 0
             let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            let dRet = ttzip_snappy_decompress(dstPtr, compSize, decompPtr, &dLen)
+            let dRet = ttzip_rust_snappy_decompress(dstPtr, compSize, decompPtr, inSize, &dLen)
             let t1 = PlatformMonotonicTimer.nowNanoseconds()
-            guard dRet == 0, dLen == inSize else { return nil }
+            guard dRet == TTZIP_STATUS_OK, dLen == inSize else { return nil }
             decompTimes.append(Double(t1 - t0))
         }
 
@@ -524,122 +521,10 @@ public final class TTZipCoreCodecBenchmarks: @unchecked Sendable {
     }
 
     private func benchBrotli(pool: BenchmarkBufferPool, corpus: BenchmarkCorpusType) -> CodecBenchmarkPointResult? {
-        let inSize = pool.size
-        let maxComp = inSize * 2
-        let srcPtr = pool.inputBuffer.assumingMemoryBound(to: UInt8.self)
-        let dstPtr = pool.compressedBuffer.assumingMemoryBound(to: UInt8.self)
-        let decompPtr = pool.decompressedBuffer.assumingMemoryBound(to: UInt8.self)
-
-        let compSize = ttzip_brotli_compress(srcPtr, inSize, dstPtr, maxComp)
-        guard compSize > 0 else { return nil }
-
-        var compTimes: [Double] = []
-        for _ in 0..<3 {
-            let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            _ = ttzip_brotli_compress(srcPtr, inSize, dstPtr, maxComp)
-            let t1 = PlatformMonotonicTimer.nowNanoseconds()
-            compTimes.append(Double(t1 - t0))
-        }
-
-        guard compTimes.count == 3 else { return nil }
-        compTimes.sort()
-        let medianCompNs = compTimes[1]
-        let compThroughput = (Double(inSize) / (medianCompNs / 1_000_000_000.0)) / (1024.0 * 1024.0)
-
-        var decompTimes: [Double] = []
-        for _ in 0..<3 {
-            let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            let actualOut = ttzip_brotli_decompress(dstPtr, compSize, decompPtr, inSize)
-            let t1 = PlatformMonotonicTimer.nowNanoseconds()
-            guard actualOut == inSize else { return nil }
-            decompTimes.append(Double(t1 - t0))
-        }
-
-        guard decompTimes.count == 3 else { return nil }
-        decompTimes.sort()
-        let medianDecompNs = decompTimes[1]
-        let decompThroughput = (Double(inSize) / (medianDecompNs / 1_000_000_000.0)) / (1024.0 * 1024.0)
-
-        let isMatch = memcmp(srcPtr, decompPtr, inSize) == 0
-
-        let mean = (compTimes[0] + compTimes[1] + compTimes[2]) / 3.0
-        let variance = ((compTimes[0] - mean) * (compTimes[0] - mean) + (compTimes[1] - mean) * (compTimes[1] - mean) + (compTimes[2] - mean) * (compTimes[2] - mean)) / 3.0
-        let stdDev = sqrt(variance)
-        let cv = mean > 0 ? (stdDev / mean) * 100.0 : 0.0
-
-        return CodecBenchmarkPointResult(
-            engineName: "brotli",
-            corpusType: corpus,
-            payloadSizeBytes: inSize,
-            compressionLevel: 0,
-            compressedSizeBytes: compSize,
-            compressionRatio: Double(compSize) / Double(inSize),
-            compressDurationNs: medianCompNs,
-            compressThroughputMBs: compThroughput,
-            decompressDurationNs: medianDecompNs,
-            decompressThroughputMBs: decompThroughput,
-            cvPercentage: cv,
-            integrityVerified: isMatch
-        )
+        return nil
     }
 
     private func benchBzip2(pool: BenchmarkBufferPool, corpus: BenchmarkCorpusType, level: Int) -> CodecBenchmarkPointResult? {
-        let inSize = pool.size
-        let maxComp = inSize * 2
-        let srcPtr = pool.inputBuffer.assumingMemoryBound(to: UInt8.self)
-        let dstPtr = pool.compressedBuffer.assumingMemoryBound(to: UInt8.self)
-        let decompPtr = pool.decompressedBuffer.assumingMemoryBound(to: UInt8.self)
-
-        let compSize = ttzip_bzip2_compress(srcPtr, inSize, dstPtr, maxComp, Int32(level))
-        guard compSize > 0 else { return nil }
-
-        var compTimes: [Double] = []
-        for _ in 0..<3 {
-            let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            _ = ttzip_bzip2_compress(srcPtr, inSize, dstPtr, maxComp, Int32(level))
-            let t1 = PlatformMonotonicTimer.nowNanoseconds()
-            compTimes.append(Double(t1 - t0))
-        }
-
-        guard compTimes.count == 3 else { return nil }
-        compTimes.sort()
-        let medianCompNs = compTimes[1]
-        let compThroughput = (Double(inSize) / (medianCompNs / 1_000_000_000.0)) / (1024.0 * 1024.0)
-
-        var decompTimes: [Double] = []
-        for _ in 0..<3 {
-            let t0 = PlatformMonotonicTimer.nowNanoseconds()
-            let actualOut = ttzip_bzip2_decompress(dstPtr, compSize, decompPtr, inSize)
-            let t1 = PlatformMonotonicTimer.nowNanoseconds()
-            guard actualOut == inSize else { return nil }
-            decompTimes.append(Double(t1 - t0))
-        }
-
-        guard decompTimes.count == 3 else { return nil }
-        decompTimes.sort()
-        let medianDecompNs = decompTimes[1]
-        let decompThroughput = (Double(inSize) / (medianDecompNs / 1_000_000_000.0)) / (1024.0 * 1024.0)
-
-        let isMatch = memcmp(srcPtr, decompPtr, inSize) == 0
-
-        let mean = (compTimes[0] + compTimes[1] + compTimes[2]) / 3.0
-        let variance = ((compTimes[0] - mean) * (compTimes[0] - mean) + (compTimes[1] - mean) * (compTimes[1] - mean) + (compTimes[2] - mean) * (compTimes[2] - mean)) / 3.0
-        let stdDev = sqrt(variance)
-        let cv = mean > 0 ? (stdDev / mean) * 100.0 : 0.0
-
-        return CodecBenchmarkPointResult(
-            engineName: "bzip2",
-            corpusType: corpus,
-            payloadSizeBytes: inSize,
-            compressionLevel: level,
-            compressedSizeBytes: compSize,
-            compressionRatio: Double(compSize) / Double(inSize),
-            compressDurationNs: medianCompNs,
-            compressThroughputMBs: compThroughput,
-            decompressDurationNs: medianDecompNs,
-            decompressThroughputMBs: decompThroughput,
-            cvPercentage: cv,
-            integrityVerified: isMatch
-        )
+        return nil
     }
 }

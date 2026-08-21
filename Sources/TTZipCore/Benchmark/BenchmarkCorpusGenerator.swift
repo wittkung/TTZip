@@ -18,24 +18,55 @@ public enum BenchmarkCorpusType: String, CaseIterable, Codable, Sendable {
     case realisticRGB = "realistic_rgb"
     case stripedRGB = "striped_rgb"
 
-    @inlinable
-    public var cEnumValue: ttzip_corpus_type_t {
-        switch self {
-        case .text: return TTZIP_CORPUS_TEXT
-        case .shortMatch: return TTZIP_CORPUS_SHORT_MATCH
-        case .dna: return TTZIP_CORPUS_DNA
-        case .random: return TTZIP_CORPUS_RANDOM
-        case .literals: return TTZIP_CORPUS_LITERALS
-        case .mixed: return TTZIP_CORPUS_MIXED
-        case .realisticRGB: return TTZIP_CORPUS_REALISTIC_RGB
-        case .stripedRGB: return TTZIP_CORPUS_STRIPED_RGB
-        }
-    }
-
     /// Generate corpus into a caller-allocated raw memory buffer.
     @inlinable
     public func fill(buffer: UnsafeMutableRawPointer, size: Int) {
-        ttzip_generate_corpus(cEnumValue, buffer, size)
+        guard size > 0 else { return }
+        let ptr = buffer.assumingMemoryBound(to: UInt8.self)
+        var state: UInt32 = 0x7e47da7a
+        
+        switch self {
+        case .text:
+            let alphabet = Array("abcdefghiklmnopqrstuvwy".utf8)
+            for i in 0..<size {
+                state = state &* 1103515245 &+ 12345
+                if i % 8 == 7 {
+                    ptr[i] = 0x20 // space
+                } else {
+                    ptr[i] = alphabet[Int(state % UInt32(alphabet.count))]
+                }
+            }
+        case .dna:
+            let bases: [UInt8] = [0x41, 0x43, 0x47, 0x54] // A, C, G, T
+            for i in 0..<size {
+                state = state &* 1103515245 &+ 12345
+                ptr[i] = bases[Int((state >> 16) & 3)]
+            }
+        case .random:
+            for i in 0..<size {
+                var x = state
+                x ^= x << 13
+                x ^= x >> 17
+                x ^= x << 5
+                state = x
+                ptr[i] = UInt8(truncatingIfNeeded: x)
+            }
+        case .literals:
+            for i in 0..<size {
+                state = state &* 1103515245 &+ 12345
+                ptr[i] = UInt8(truncatingIfNeeded: (state % 64) + 32)
+            }
+        case .shortMatch, .mixed:
+            for i in 0..<size {
+                state = state &* 1103515245 &+ 12345
+                ptr[i] = (i % 16 == 0) ? UInt8(truncatingIfNeeded: state & 0xFF) : ptr[max(0, i - 16)]
+            }
+        case .realisticRGB, .stripedRGB:
+            for i in 0..<size {
+                state = state &* 1103515245 &+ 12345
+                ptr[i] = (i % 3 == 0) ? 0xFF : UInt8(truncatingIfNeeded: state & 0x7F)
+            }
+        }
     }
 
     /// Convenience generation into Swift Data (for unit test fixtures).

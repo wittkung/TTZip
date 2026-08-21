@@ -7,6 +7,7 @@
 
 import Foundation
 import CTTZipBridge
+import zlib
 
 // MARK: - Deflate Stream Enums & Configuration
 
@@ -132,28 +133,34 @@ public struct DeflateStreamMetrics: Sendable, Equatable {
 
 // MARK: - DeflateStreamCompressor
 
-/// High-performance streaming Deflate compressor wrapping SIMD-accelerated C state machines.
+/// High-performance streaming Deflate compressor wrapping SIMD-accelerated zlib state machines.
 public final class DeflateStreamCompressor: @unchecked Sendable {
-    private var state = ttzip_deflate_stream_state_t()
+    private var stream = z_stream()
     private var isClosed = false
     public let sessionId: UUID
     public let config: DeflateStreamConfig
+    private var _totalIn: UInt64 = 0
+    private var _totalOut: UInt64 = 0
+    private var _adler: UInt32 = 1
+    private var _crc: UInt32 = 0
+    private var _isFinished: Bool = false
     
     public init(config: DeflateStreamConfig = DeflateStreamConfig()) throws {
         self.sessionId = UUID()
         self.config = config
         
-        var cConfig = ttzip_deflate_stream_config_t(
-            tier_mode: UInt32(config.tierMode.rawValue),
-            compression_level: Int32(config.compressionLevel),
-            window_bits: Int32(config.windowBits),
-            mem_level: Int32(config.memLevel),
-            strategy: config.strategy.rawValue
+        let st = deflateInit2_(
+            &self.stream,
+            Int32(config.compressionLevel),
+            Z_DEFLATED,
+            Int32(config.windowBits),
+            Int32(config.memLevel),
+            config.strategy.rawValue,
+            ZLIB_VERSION,
+            Int32(MemoryLayout<z_stream>.size)
         )
-        
-        let status = ttzip_deflate_stream_init(&self.state, &cConfig)
-        guard status == 0 else {
-            throw DeflateStreamError.initializationFailed(status)
+        guard st == Z_OK else {
+            throw DeflateStreamError.initializationFailed(st)
         }
     }
     
@@ -162,32 +169,32 @@ public final class DeflateStreamCompressor: @unchecked Sendable {
     }
     
     public var totalIn: UInt64 {
-        return state.total_in
+        return _totalIn
     }
     
     public var totalOut: UInt64 {
-        return state.total_out
+        return _totalOut
     }
     
     public var adler32: UInt32 {
-        return state.adler32_checksum
+        return _adler
     }
     
     public var crc32: UInt32 {
-        return state.crc32_checksum
+        return _crc
     }
     
     public var isFinished: Bool {
-        return state.is_finished
+        return _isFinished
     }
     
     public var metrics: DeflateStreamMetrics {
         return DeflateStreamMetrics(
-            totalIn: state.total_in,
-            totalOut: state.total_out,
-            adler32: state.adler32_checksum,
-            crc32: state.crc32_checksum,
-            isFinished: state.is_finished
+            totalIn: _totalIn,
+            totalOut: _totalOut,
+            adler32: _adler,
+            crc32: _crc,
+            isFinished: _isFinished
         )
     }
     
@@ -206,39 +213,49 @@ public final class DeflateStreamCompressor: @unchecked Sendable {
         let outBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: effectiveChunkSize)
         defer { outBuffer.deallocate() }
         
-        var offset = 0
-        while offset < count || (count == 0 && flush == .finish && !state.is_finished) {
-            let currentInPtr = count > 0 ? buffer.advanced(by: offset).assumingMemoryBound(to: UInt8.self) : nil
-            let remainingIn = count - offset
-            let beforeIn = state.total_in
-            let beforeOut = state.total_out
+        if count > 0 {
+            stream.next_in = UnsafeMutablePointer<UInt8>(mutating: buffer.assumingMemoryBound(to: UInt8.self))
+            stream.avail_in = uInt(count)
+        } else {
+            stream.next_in = nil
+            stream.avail_in = 0
+        }
+        
+        let zFlush: Int32
+        switch flush {
+        case .noFlush: zFlush = Z_NO_FLUSH
+        case .syncFlush: zFlush = Z_SYNC_FLUSH
+        case .fullFlush: zFlush = Z_FULL_FLUSH
+        case .finish: zFlush = Z_FINISH
+        }
+        
+        while stream.avail_in > 0 || (flush == .finish && !_isFinished) {
+            stream.next_out = outBuffer
+            stream.avail_out = uInt(effectiveChunkSize)
             
-            let produced = ttzip_deflate_stream_process(
-                &state,
-                currentInPtr,
-                remainingIn,
-                outBuffer,
-                effectiveChunkSize,
-                flush.rawValue
-            )
-            let consumed = Int(state.total_in - beforeIn)
+            let ret = deflate(&stream, zFlush)
+            if ret == Z_STREAM_ERROR {
+                throw DeflateStreamError.processingFailed("deflate failed with Z_STREAM_ERROR")
+            }
             
+            let produced = effectiveChunkSize - Int(stream.avail_out)
             if produced > 0 {
                 chunkHandler(UnsafeRawBufferPointer(start: outBuffer, count: produced))
             }
             
-            if consumed > 0 {
-                offset += consumed
-            }
-            
-            if flush == .finish && state.is_finished {
+            if ret == Z_STREAM_END {
+                _isFinished = true
                 break
             }
             
-            if consumed == 0 && state.total_out == beforeOut {
+            if produced == 0 && stream.avail_in == 0 {
                 break
             }
         }
+        
+        _totalIn = UInt64(stream.total_in)
+        _totalOut = UInt64(stream.total_out)
+        _adler = UInt32(stream.adler)
     }
     
     /// Streams compression on Data block.
@@ -285,29 +302,17 @@ public final class DeflateStreamCompressor: @unchecked Sendable {
         chunkHandler: (UnsafeRawBufferPointer) -> Void
     ) throws {
         guard !isClosed else { throw DeflateStreamError.streamAlreadyClosed }
-        if state.is_finished { return }
+        if _isFinished { return }
         
-        let effectiveChunkSize = max(1024, outputChunkSize)
-        let outBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: effectiveChunkSize)
-        defer { outBuffer.deallocate() }
-        
-        var dummy: UInt8 = 0
-        while !state.is_finished {
-            let beforeOut = state.total_out
-            let produced = ttzip_deflate_stream_process(
-                &state,
-                &dummy,
-                0,
-                outBuffer,
-                effectiveChunkSize,
-                DeflateFlushMode.finish.rawValue
+        let dummy = [UInt8]()
+        try dummy.withUnsafeBytes { dummyBuffer in
+            try compress(
+                buffer: dummyBuffer.baseAddress ?? UnsafeRawPointer(bitPattern: 1)!,
+                count: 0,
+                flush: .finish,
+                outputChunkSize: outputChunkSize,
+                chunkHandler: chunkHandler
             )
-            if produced > 0 {
-                chunkHandler(UnsafeRawBufferPointer(start: outBuffer, count: produced))
-            }
-            if state.is_finished || state.total_out == beforeOut {
-                break
-            }
         }
     }
     
@@ -324,25 +329,35 @@ public final class DeflateStreamCompressor: @unchecked Sendable {
     public func close() {
         guard !isClosed else { return }
         isClosed = true
-        ttzip_deflate_stream_free(&state)
+        deflateEnd(&stream)
     }
 }
 
 // MARK: - DeflateStreamDecompressor
 
-/// High-performance streaming Deflate/Inflate decompressor wrapping SIMD-accelerated C state machines.
+/// High-performance streaming Deflate/Inflate decompressor wrapping SIMD-accelerated zlib state machines.
 public final class DeflateStreamDecompressor: @unchecked Sendable {
-    private var state = ttzip_deflate_stream_state_t()
+    private var stream = z_stream()
     private var isClosed = false
     public let sessionId: UUID
     public let windowBits: Int
+    private var _totalIn: UInt64 = 0
+    private var _totalOut: UInt64 = 0
+    private var _adler: UInt32 = 1
+    private var _crc: UInt32 = 0
+    private var _isFinished: Bool = false
     
     public init(windowBits: Int = 15) throws {
         self.sessionId = UUID()
         self.windowBits = windowBits
-        let status = ttzip_inflate_stream_init(&self.state, Int32(windowBits))
-        guard status == 0 else {
-            throw DeflateStreamError.initializationFailed(status)
+        let st = inflateInit2_(
+            &self.stream,
+            Int32(windowBits),
+            ZLIB_VERSION,
+            Int32(MemoryLayout<z_stream>.size)
+        )
+        guard st == Z_OK else {
+            throw DeflateStreamError.initializationFailed(st)
         }
     }
     
@@ -351,32 +366,32 @@ public final class DeflateStreamDecompressor: @unchecked Sendable {
     }
     
     public var totalIn: UInt64 {
-        return state.total_in
+        return _totalIn
     }
     
     public var totalOut: UInt64 {
-        return state.total_out
+        return _totalOut
     }
     
     public var adler32: UInt32 {
-        return state.adler32_checksum
+        return _adler
     }
     
     public var crc32: UInt32 {
-        return state.crc32_checksum
+        return _crc
     }
     
     public var isFinished: Bool {
-        return state.is_finished
+        return _isFinished
     }
     
     public var metrics: DeflateStreamMetrics {
         return DeflateStreamMetrics(
-            totalIn: state.total_in,
-            totalOut: state.total_out,
-            adler32: state.adler32_checksum,
-            crc32: state.crc32_checksum,
-            isFinished: state.is_finished
+            totalIn: _totalIn,
+            totalOut: _totalOut,
+            adler32: _adler,
+            crc32: _crc,
+            isFinished: _isFinished
         )
     }
     
@@ -395,49 +410,45 @@ public final class DeflateStreamDecompressor: @unchecked Sendable {
         let outBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: effectiveChunkSize)
         defer { outBuffer.deallocate() }
         
-        var offset = 0
-        while offset < count || (count == 0 && flush == .finish && !state.is_finished) {
-            let currentInPtr = count > 0 ? buffer.advanced(by: offset).assumingMemoryBound(to: UInt8.self) : nil
-            let remainingIn = count - offset
-            let beforeIn = state.total_in
-            let beforeOut = state.total_out
+        if count > 0 {
+            stream.next_in = UnsafeMutablePointer<UInt8>(mutating: buffer.assumingMemoryBound(to: UInt8.self))
+            stream.avail_in = uInt(count)
+        } else {
+            stream.next_in = nil
+            stream.avail_in = 0
+        }
+        
+        let zFlush = (flush == .finish) ? Z_FINISH : Z_NO_FLUSH
+        
+        while stream.avail_in > 0 || (flush == .finish && !_isFinished) {
+            stream.next_out = outBuffer
+            stream.avail_out = uInt(effectiveChunkSize)
             
-            let produced = ttzip_inflate_stream_process(
-                &state,
-                currentInPtr,
-                remainingIn,
-                outBuffer,
-                effectiveChunkSize,
-                flush.rawValue
-            )
-            
-            if state.last_status < 0 && state.last_status != -5 /* Z_BUF_ERROR */ {
-                throw DeflateStreamError.corruptedData("Stream decompression failed with status: \(state.last_status)")
+            let ret = inflate(&stream, zFlush)
+            if ret < 0 && ret != Z_BUF_ERROR {
+                throw DeflateStreamError.corruptedData("Stream decompression failed with status: \(ret)")
             }
             
-            let consumed = Int(state.total_in - beforeIn)
-            
+            let produced = effectiveChunkSize - Int(stream.avail_out)
             if produced > 0 {
                 chunkHandler(UnsafeRawBufferPointer(start: outBuffer, count: produced))
             }
             
-            if consumed > 0 {
-                offset += consumed
-            }
-            
-            if state.is_finished {
+            if ret == Z_STREAM_END {
+                _isFinished = true
                 break
             }
             
-            if consumed == 0 && state.total_out == beforeOut {
-                if offset < count && !state.is_finished {
-                    throw DeflateStreamError.corruptedData("Stream decompression halted without completing input")
-                }
+            if produced == 0 && stream.avail_in == 0 {
                 break
             }
         }
         
-        if flush == .finish && !state.is_finished {
+        _totalIn = UInt64(stream.total_in)
+        _totalOut = UInt64(stream.total_out)
+        _adler = UInt32(stream.adler)
+        
+        if flush == .finish && !_isFinished {
             throw DeflateStreamError.corruptedData("Deflate stream ended prematurely without Z_STREAM_END")
         }
     }
@@ -486,35 +497,17 @@ public final class DeflateStreamDecompressor: @unchecked Sendable {
         chunkHandler: (UnsafeRawBufferPointer) -> Void
     ) throws {
         guard !isClosed else { throw DeflateStreamError.streamAlreadyClosed }
-        if state.is_finished { return }
+        if _isFinished { return }
         
-        let effectiveChunkSize = max(1024, outputChunkSize)
-        let outBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: effectiveChunkSize)
-        defer { outBuffer.deallocate() }
-        
-        var dummy: UInt8 = 0
-        while !state.is_finished {
-            let beforeOut = state.total_out
-            let produced = ttzip_inflate_stream_process(
-                &state,
-                &dummy,
-                0,
-                outBuffer,
-                effectiveChunkSize,
-                DeflateFlushMode.finish.rawValue
+        let dummy = [UInt8]()
+        try dummy.withUnsafeBytes { dummyBuffer in
+            try decompress(
+                buffer: dummyBuffer.baseAddress ?? UnsafeRawPointer(bitPattern: 1)!,
+                count: 0,
+                flush: .finish,
+                outputChunkSize: outputChunkSize,
+                chunkHandler: chunkHandler
             )
-            if state.last_status < 0 && state.last_status != -5 {
-                throw DeflateStreamError.corruptedData("Stream decompression failed with status: \(state.last_status)")
-            }
-            if produced > 0 {
-                chunkHandler(UnsafeRawBufferPointer(start: outBuffer, count: produced))
-            }
-            if state.is_finished || state.total_out == beforeOut {
-                break
-            }
-        }
-        if !state.is_finished {
-            throw DeflateStreamError.corruptedData("Deflate stream did not finish cleanly (status: \(state.last_status))")
         }
     }
     
@@ -531,7 +524,7 @@ public final class DeflateStreamDecompressor: @unchecked Sendable {
     public func close() {
         guard !isClosed else { return }
         isClosed = true
-        ttzip_inflate_stream_free(&state)
+        inflateEnd(&stream)
     }
 }
 
@@ -648,3 +641,4 @@ public enum DeflateStreamEngine: Sendable {
         }
     }
 }
+

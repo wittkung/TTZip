@@ -20,22 +20,6 @@ fn compile_native_codecs(repo_root: &Path, out_dir: &Path, target: &str) {
 
     let mut obj_files = Vec::new();
 
-    // Compile threadpool C source
-    let bridge_dir = repo_root.join("Sources/CTTZipBridge");
-    let threadpool_src = bridge_dir.join("ttzip_threadpool.c");
-    if threadpool_src.exists() {
-        let obj_path = out_dir.join("ttzip_threadpool.o");
-        let status = Command::new("clang")
-            .args(["-O3", "-c", "-target", target, "-mmacosx-version-min=14.0", "-I", bridge_dir.to_str().unwrap(), "-I", bridge_dir.join("include").to_str().unwrap()])
-            .arg(&threadpool_src)
-            .arg("-o")
-            .arg(&obj_path)
-            .status()
-            .expect("Failed to compile ttzip_threadpool.c");
-        assert!(status.success(), "Failed compiling ttzip_threadpool.c");
-        obj_files.push(obj_path);
-    }
-
     // Compile fast-lzma2 C files
     let fl2_sources = [
         "dict_buffer.c",

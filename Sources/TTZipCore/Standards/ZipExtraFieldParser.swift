@@ -139,79 +139,116 @@ public enum ZipExtraFieldParser {
         extraData: UnsafeRawBufferPointer,
         standardFilename: String? = nil
     ) -> ParsedZipExtraFields {
-        guard let base = extraData.baseAddress, !extraData.isEmpty else {
+        guard extraData.count >= 4 else {
             return ParsedZipExtraFields()
         }
 
-        var cFields = ttzip_zip_extra_fields_t()
-        let bytePtr = base.assumingMemoryBound(to: UInt8.self)
-
-        let res: Int32
-        if let stdName = standardFilename {
-            res = stdName.withCString { cName in
-                ttzip_zip_parse_extra_fields(bytePtr, extraData.count, cName, &cFields)
-            }
-        } else {
-            res = ttzip_zip_parse_extra_fields(bytePtr, extraData.count, nil, &cFields)
-        }
-
-        guard res == 0 else { return ParsedZipExtraFields() }
-
         var result = ParsedZipExtraFields()
+        var offset = 0
+        let total = extraData.count
 
-        if cFields.has_extended_timestamp {
-            let modDate = (cFields.timestamp_flags & 0x01 != 0) ? Date(timeIntervalSince1970: TimeInterval(cFields.mod_time)) : nil
-            let accDate = (cFields.timestamp_flags & 0x02 != 0) ? Date(timeIntervalSince1970: TimeInterval(cFields.acc_time)) : nil
-            let createDate = (cFields.timestamp_flags & 0x04 != 0) ? Date(timeIntervalSince1970: TimeInterval(cFields.create_time)) : nil
-            result.extendedTimestamp = ExtendedTimestamp(
-                modificationTime: modDate,
-                accessTime: accDate,
-                creationTime: createDate
-            )
-        }
+        while offset + 4 <= total {
+            let headerId = extraData.loadUnaligned(fromByteOffset: offset, as: UInt16.self).littleEndian
+            let dataSize = Int(extraData.loadUnaligned(fromByteOffset: offset + 2, as: UInt16.self).littleEndian)
+            offset += 4
 
-        if let uPathPtr = cFields.unicode_path, cFields.unicode_path_crc_valid {
-            let buf = UnsafeRawBufferPointer(start: uPathPtr, count: cFields.unicode_path_len)
-            result.unicodePath = String(decoding: buf, as: UTF8.self)
-        }
+            guard offset + dataSize <= total else { break }
+            let payload = extraData.baseAddress!.advanced(by: offset)
 
-        if cFields.has_posix_permissions {
-            result.posixPermissions = (uid: cFields.uid, gid: cFields.gid)
-        }
-
-        if cFields.has_zip64 {
-            let mask = cFields.zip64_presence_mask
-            let uncomp = (mask & 1 != 0) ? cFields.uncompressed_size : nil
-            let comp = (mask & 2 != 0) ? cFields.compressed_size : nil
-            let offset = (mask & 4 != 0) ? cFields.relative_offset : nil
-            let disk = (mask & 8 != 0) ? cFields.disk_number : nil
-            result.zip64Info = Zip64ExtraField(
-                uncompressedSize: uncomp,
-                compressedSize: comp,
-                relativeOffset: offset,
-                diskNumber: disk
-            )
-        }
-
-        if cFields.has_winzip_aes {
-            let strengthEnum: WinZipAESExtraField.Strength? = {
-                switch cFields.aes_strength {
-                case 128: return .aes128
-                case 192: return .aes192
-                case 256: return .aes256
-                default: return nil
+            switch headerId {
+            case 0x5455: // Extended Timestamp
+                if dataSize >= 1 {
+                    let flags = payload.load(as: UInt8.self)
+                    var pOffset = 1
+                    var modTime: Date? = nil
+                    var accTime: Date? = nil
+                    var crTime: Date? = nil
+                    if (flags & 1 != 0) && pOffset + 4 <= dataSize {
+                        let t = payload.loadUnaligned(fromByteOffset: pOffset, as: UInt32.self).littleEndian
+                        modTime = Date(timeIntervalSince1970: TimeInterval(t))
+                        pOffset += 4
+                    }
+                    if (flags & 2 != 0) && pOffset + 4 <= dataSize {
+                        let t = payload.loadUnaligned(fromByteOffset: pOffset, as: UInt32.self).littleEndian
+                        accTime = Date(timeIntervalSince1970: TimeInterval(t))
+                        pOffset += 4
+                    }
+                    if (flags & 4 != 0) && pOffset + 4 <= dataSize {
+                        let t = payload.loadUnaligned(fromByteOffset: pOffset, as: UInt32.self).littleEndian
+                        crTime = Date(timeIntervalSince1970: TimeInterval(t))
+                        pOffset += 4
+                    }
+                    result.extendedTimestamp = ExtendedTimestamp(modificationTime: modTime, accessTime: accTime, creationTime: crTime)
                 }
-            }()
-            if let str = strengthEnum {
-                result.winZipAES = WinZipAESExtraField(
-                    version: cFields.aes_version,
-                    vendorID: cFields.aes_vendor_id,
-                    strength: str,
-                    actualMethod: cFields.aes_actual_method
-                )
+            case 0x7075: // Info-ZIP Unicode Path
+                if dataSize >= 5 {
+                    let origCRC = payload.loadUnaligned(fromByteOffset: 1, as: UInt32.self).littleEndian
+                    if let stdName = standardFilename {
+                        let utf8Arr = Array(stdName.utf8)
+                        let calcCRC = utf8Arr.withUnsafeBytes { raw in
+                            NativeCoreArchitecture.shared.computeFastCRC32(buffer: raw.baseAddress!, length: raw.count)
+                        }
+                        if calcCRC != origCRC {
+                            break
+                        }
+                    }
+                    let pathBytes = UnsafeRawBufferPointer(start: payload.advanced(by: 5), count: dataSize - 5)
+                    result.unicodePath = String(decoding: pathBytes, as: UTF8.self)
+                }
+            case 0x7875: // Info-ZIP New Unix
+                if dataSize >= 4 {
+                    let uidSize = Int(payload.advanced(by: 1).load(as: UInt8.self))
+                    var pOff = 2
+                    var uid: UInt32 = 0
+                    if pOff + uidSize <= dataSize {
+                        if uidSize == 2 {
+                            uid = UInt32(payload.loadUnaligned(fromByteOffset: pOff, as: UInt16.self).littleEndian)
+                        } else if uidSize == 4 {
+                            uid = payload.loadUnaligned(fromByteOffset: pOff, as: UInt32.self).littleEndian
+                        }
+                        pOff += uidSize
+                    }
+                    var gid: UInt32 = 0
+                    if pOff < dataSize {
+                        let gidSize = Int(payload.advanced(by: pOff).load(as: UInt8.self))
+                        pOff += 1
+                        if pOff + gidSize <= dataSize {
+                            if gidSize == 2 {
+                                gid = UInt32(payload.loadUnaligned(fromByteOffset: pOff, as: UInt16.self).littleEndian)
+                            } else if gidSize == 4 {
+                                gid = payload.loadUnaligned(fromByteOffset: pOff, as: UInt32.self).littleEndian
+                            }
+                        }
+                    }
+                    result.posixPermissions = (uid: uid, gid: gid)
+                }
+            case 0x0001: // Zip64
+                var uncomp: UInt64? = nil
+                var comp: UInt64? = nil
+                var off: UInt64? = nil
+                var disk: UInt32? = nil
+                var pOff = 0
+                if pOff + 8 <= dataSize { uncomp = payload.loadUnaligned(fromByteOffset: pOff, as: UInt64.self).littleEndian; pOff += 8 }
+                if pOff + 8 <= dataSize { comp = payload.loadUnaligned(fromByteOffset: pOff, as: UInt64.self).littleEndian; pOff += 8 }
+                if pOff + 8 <= dataSize { off = payload.loadUnaligned(fromByteOffset: pOff, as: UInt64.self).littleEndian; pOff += 8 }
+                if pOff + 4 <= dataSize { disk = payload.loadUnaligned(fromByteOffset: pOff, as: UInt32.self).littleEndian; pOff += 4 }
+                result.zip64Info = Zip64ExtraField(uncompressedSize: uncomp, compressedSize: comp, relativeOffset: off, diskNumber: disk)
+            case 0x9901: // WinZip AES
+                if dataSize >= 7 {
+                    let ver = payload.loadUnaligned(fromByteOffset: 0, as: UInt16.self).littleEndian
+                    let vendor = payload.loadUnaligned(fromByteOffset: 2, as: UInt16.self).littleEndian
+                    let strength = payload.advanced(by: 4).load(as: UInt8.self)
+                    let method = payload.loadUnaligned(fromByteOffset: 5, as: UInt16.self).littleEndian
+                    let str: WinZipAESExtraField.Strength? = strength == 1 ? .aes128 : (strength == 2 ? .aes192 : (strength == 3 ? .aes256 : nil))
+                    if let s = str {
+                        result.winZipAES = WinZipAESExtraField(version: ver, vendorID: vendor, strength: s, actualMethod: method)
+                    }
+                }
+            default:
+                break
             }
+            offset += dataSize
         }
-
         return result
     }
 

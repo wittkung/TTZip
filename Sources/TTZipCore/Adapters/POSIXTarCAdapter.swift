@@ -49,8 +49,23 @@ public final class POSIXTarCAdapter: POSIXTarEngineProtocol, Sendable {
         destinationDir: String
     ) throws -> Bool {
         try FileManager.default.createDirectory(atPath: destinationDir, withIntermediateDirectories: true)
-        let status = ttzip_extract_tar_native_c(archivePath, destinationDir, false)
-        return status == 0
+        return CUnsafeBufferAdapter.withCString(archivePath) { cArchivePath in
+            CUnsafeBufferAdapter.withCString(destinationDir) { cDestDir in
+                guard let cArchivePath = cArchivePath, let cDestDir = cDestDir else { return false }
+                var opt = TTZipExtractOptions(
+                    destination_path: cDestDir,
+                    password: nil,
+                    thread_budget: 0,
+                    overwrite_existing: true,
+                    preserve_permissions: true,
+                    dry_run: false,
+                    progress_callback: nil,
+                    user_data: nil
+                )
+                let status = ttzip_rust_extract_archive(cArchivePath, cDestDir, &opt)
+                return status == TTZIP_STATUS_OK
+            }
+        }
     }
     
     /// Creates a TAR archive in-process using native C static library bindings.
@@ -73,9 +88,22 @@ public final class POSIXTarCAdapter: POSIXTarEngineProtocol, Sendable {
                 return p
             }
         }
-        let status = CUnsafeBufferAdapter.withCStringsArray(fullInputPaths) { cInputPaths in
-            ttzip_create_tar_native_c(outputPath, "tar", cInputPaths, fullInputPaths.count, false, 1)
+        return CUnsafeBufferAdapter.withCString(outputPath) { cOutputPath in
+            CUnsafeBufferAdapter.withCStringsArray(fullInputPaths) { cInputPaths in
+                guard let cOutputPath = cOutputPath else { return false }
+                var opt = TTZipCreateOptions(
+                    format: TTZIP_ARCHIVE_FORMAT_TAR,
+                    level: TTZIP_COMPRESSION_LEVEL_STORE,
+                    encryption: TTZIP_ENCRYPTION_NONE,
+                    password: nil,
+                    thread_budget: 0,
+                    solid_block_size_mb: 0,
+                    progress_callback: nil,
+                    user_data: nil
+                )
+                let status = ttzip_rust_create_archive(cInputPaths, fullInputPaths.count, cOutputPath, &opt)
+                return status == TTZIP_STATUS_OK
+            }
         }
-        return status == 0
     }
 }

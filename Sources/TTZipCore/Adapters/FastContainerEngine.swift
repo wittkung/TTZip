@@ -22,33 +22,35 @@ public enum FastContainerEngine {
     /// - Returns: GZIP container bytes, or `nil` on failure.
     public static func compressGzip(_ data: Data, level: Int = 6) -> Data? {
         guard !data.isEmpty else {
-            // Emits empty GZIP container
-            var emptyGzip = [UInt8](repeating: 0, count: 20)
-            let written = ttzip_gzip_compress_fast("", 0, &emptyGzip, emptyGzip.count, Int32(level))
-            guard written > 0 else { return nil }
+            var emptyGzip = [UInt8](repeating: 0, count: 64)
+            var written: Int = 0
+            let status = ttzip_rust_gzip_compress([UInt8](), 0, &emptyGzip, emptyGzip.count, Int32(level), &written)
+            guard status == TTZIP_STATUS_OK && written > 0 else { return nil }
             return Data(emptyGzip.prefix(written))
         }
 
-        let maxBound = ttzip_gzip_compress_bound(data.count)
+        let maxBound = data.count + (data.count >> 3) + 128
         let pageSize: MemoryPageSize = maxBound > 4096 ? .page64K : .page4K
 
         return MemoryPageFlyweightPool.shared.withBuffer(size: pageSize) { dstPtr, capacity in
             guard capacity >= maxBound else {
                 let uninitPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: maxBound)
-                let written = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                    ttzip_gzip_compress_fast(srcPtr, count, uninitPtr, maxBound, Int32(level))
+                var written: Int = 0
+                let status = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
+                    ttzip_rust_gzip_compress(srcPtr, count, uninitPtr, maxBound, Int32(level), &written)
                 }
-                guard written > 0 else {
+                guard status == TTZIP_STATUS_OK && written > 0 else {
                     uninitPtr.deallocate()
                     return nil
                 }
                 return Data(bytesNoCopy: uninitPtr, count: written, deallocator: .custom({ ptr, _ in ptr.deallocate() }))
             }
 
-            let written = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                ttzip_gzip_compress_fast(srcPtr, count, dstPtr, capacity, Int32(level))
+            var written: Int = 0
+            let status = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
+                ttzip_rust_gzip_compress(srcPtr, count, dstPtr, capacity, Int32(level), &written)
             }
-            guard written > 0 else { return nil }
+            guard status == TTZIP_STATUS_OK && written > 0 else { return nil }
             return Data(bytes: dstPtr, count: written)
         }
     }
@@ -59,7 +61,7 @@ public enum FastContainerEngine {
     ///   - expectedSize: Expected uncompressed size (if known, or 0 for dynamic sizing).
     /// - Returns: Decompressed uncompressed data, or `nil` on failure.
     public static func decompressGzip(_ data: Data, expectedSize: Int) -> Data? {
-        guard data.count >= 18 else { return nil }
+        guard data.count >= 10 else { return nil }
 
         let targetSize = expectedSize > 0 ? expectedSize : (data.count * 4 + 1024)
         let pageSize: MemoryPageSize = targetSize > 4096 ? .page64K : .page4K
@@ -67,20 +69,22 @@ public enum FastContainerEngine {
         return MemoryPageFlyweightPool.shared.withBuffer(size: pageSize) { dstPtr, capacity in
             guard capacity >= targetSize else {
                 let uninitPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: targetSize)
-                let actual = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                    ttzip_gzip_decompress_fast(srcPtr, count, uninitPtr, targetSize)
+                var actual: Int = 0
+                let status = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
+                    ttzip_rust_gzip_decompress(srcPtr, count, uninitPtr, targetSize, &actual)
                 }
-                guard actual > 0 else {
+                guard status == TTZIP_STATUS_OK && actual > 0 else {
                     uninitPtr.deallocate()
                     return nil
                 }
                 return Data(bytesNoCopy: uninitPtr, count: actual, deallocator: .custom({ ptr, _ in ptr.deallocate() }))
             }
 
-            let actual = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                ttzip_gzip_decompress_fast(srcPtr, count, dstPtr, capacity)
+            var actual: Int = 0
+            let status = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
+                ttzip_rust_gzip_decompress(srcPtr, count, dstPtr, capacity, &actual)
             }
-            guard actual > 0 else { return nil }
+            guard status == TTZIP_STATUS_OK && actual > 0 else { return nil }
             return Data(bytes: dstPtr, count: actual)
         }
     }
@@ -94,32 +98,35 @@ public enum FastContainerEngine {
     /// - Returns: ZLIB container bytes, or `nil` on failure.
     public static func compressZlib(_ data: Data, level: Int = 6) -> Data? {
         guard !data.isEmpty else {
-            var emptyZlib = [UInt8](repeating: 0, count: 16)
-            let written = ttzip_zlib_compress_fast("", 0, &emptyZlib, emptyZlib.count, Int32(level))
-            guard written > 0 else { return nil }
+            var emptyZlib = [UInt8](repeating: 0, count: 64)
+            var written: Int = 0
+            let status = ttzip_rust_zlib_compress([UInt8](), 0, &emptyZlib, emptyZlib.count, Int32(level), &written)
+            guard status == TTZIP_STATUS_OK && written > 0 else { return nil }
             return Data(emptyZlib.prefix(written))
         }
 
-        let maxBound = ttzip_zlib_compress_bound(data.count)
+        let maxBound = data.count + (data.count >> 3) + 128
         let pageSize: MemoryPageSize = maxBound > 4096 ? .page64K : .page4K
 
         return MemoryPageFlyweightPool.shared.withBuffer(size: pageSize) { dstPtr, capacity in
             guard capacity >= maxBound else {
                 let uninitPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: maxBound)
-                let written = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                    ttzip_zlib_compress_fast(srcPtr, count, uninitPtr, maxBound, Int32(level))
+                var written: Int = 0
+                let status = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
+                    ttzip_rust_zlib_compress(srcPtr, count, uninitPtr, maxBound, Int32(level), &written)
                 }
-                guard written > 0 else {
+                guard status == TTZIP_STATUS_OK && written > 0 else {
                     uninitPtr.deallocate()
                     return nil
                 }
                 return Data(bytesNoCopy: uninitPtr, count: written, deallocator: .custom({ ptr, _ in ptr.deallocate() }))
             }
 
-            let written = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                ttzip_zlib_compress_fast(srcPtr, count, dstPtr, capacity, Int32(level))
+            var written: Int = 0
+            let status = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
+                ttzip_rust_zlib_compress(srcPtr, count, dstPtr, capacity, Int32(level), &written)
             }
-            guard written > 0 else { return nil }
+            guard status == TTZIP_STATUS_OK && written > 0 else { return nil }
             return Data(bytes: dstPtr, count: written)
         }
     }
@@ -138,20 +145,22 @@ public enum FastContainerEngine {
         return MemoryPageFlyweightPool.shared.withBuffer(size: pageSize) { dstPtr, capacity in
             guard capacity >= targetSize else {
                 let uninitPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: targetSize)
-                let actual = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                    ttzip_zlib_decompress_fast(srcPtr, count, uninitPtr, targetSize)
+                var actual: Int = 0
+                let status = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
+                    ttzip_rust_zlib_decompress(srcPtr, count, uninitPtr, targetSize, &actual)
                 }
-                guard actual > 0 else {
+                guard status == TTZIP_STATUS_OK && actual > 0 else {
                     uninitPtr.deallocate()
                     return nil
                 }
                 return Data(bytesNoCopy: uninitPtr, count: actual, deallocator: .custom({ ptr, _ in ptr.deallocate() }))
             }
 
-            let actual = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                ttzip_zlib_decompress_fast(srcPtr, count, dstPtr, capacity)
+            var actual: Int = 0
+            let status = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
+                ttzip_rust_zlib_decompress(srcPtr, count, dstPtr, capacity, &actual)
             }
-            guard actual > 0 else { return nil }
+            guard status == TTZIP_STATUS_OK && actual > 0 else { return nil }
             return Data(bytes: dstPtr, count: actual)
         }
     }

@@ -125,7 +125,6 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
                 
                 progressHandler?("   ⏳ TTZip compressing (Pass \(pass + 1)/\(passCount))...")
                 AppleSiliconTuner.shared.boostCurrentThreadPriority()
-                ttzip_slice_reset()
                 let tt0 = CACurrentMediaTime()
                 do {
                     var advanced = ArchiveAdvancedOptions.defaultOptions
@@ -141,11 +140,6 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
                         advancedOptions: advanced
                     )
                     let tt1 = CACurrentMediaTime()
-                    let topName = String(cString: ttzip_slice_get_top_stage_name())
-                    let topRatio = ttzip_slice_get_top_stage_ratio()
-                    if topName != "N/A" && topRatio > 0.0 {
-                        ttCompressAopStage = String(format: "%@ (%.1f%%)", topName, topRatio)
-                    }
                     bestCompDur = min(bestCompDur, max(1e-6, tt1 - tt0))
                     let compMBs = (Double(payload.bytes) / (1024.0 * 1024.0)) / max(1e-6, tt1 - tt0)
                     progressHandler?("   ✅ TTZip compression complete: \(String(format: "%.1f", compMBs)) MB/s (\(String(format: "%.3f", tt1 - tt0))s)")

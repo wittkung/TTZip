@@ -16,8 +16,8 @@
 use crate::fs::apfs::apfs_preallocate;
 use crate::fs::safe_extract::{sanitize_and_validate_path, SafeExtractEngine};
 use crate::types::{
-    TTZipArchiveFormat, TTZipCreateOptions, TTZipEntryMetadata, TTZipExtractOptions,
-    TTZipInspectCallback, TTZipStatus,
+    TTZipArchiveFormat, TTZipCreateOptions, TTZipEncryptionMethod, TTZipEntryMetadata,
+    TTZipExtractOptions, TTZipInspectCallback, TTZipStatus,
 };
 use libc::{c_char, c_int, c_long, c_uint, c_void, mode_t, size_t, ssize_t, time_t};
 use std::ffi::{CStr, CString};
@@ -49,6 +49,8 @@ extern "C" {
     fn archive_entry_filetype(e: *mut c_void) -> mode_t;
     fn archive_entry_mode(e: *mut c_void) -> mode_t;
     fn archive_entry_mtime(e: *mut c_void) -> time_t;
+    fn archive_entry_symlink(e: *mut c_void) -> *const c_char;
+    fn archive_entry_set_symlink(e: *mut c_void, symlink: *const c_char);
     fn archive_entry_is_data_encrypted(e: *mut c_void) -> c_int;
     fn archive_entry_is_metadata_encrypted(e: *mut c_void) -> c_int;
 
@@ -69,6 +71,7 @@ extern "C" {
     fn archive_write_add_filter_xz(a: *mut c_void) -> c_int;
     fn archive_write_add_filter_zstd(a: *mut c_void) -> c_int;
     fn archive_write_set_passphrase(a: *mut c_void, passphrase: *const c_char) -> c_int;
+    fn archive_write_set_options(a: *mut c_void, opts: *const c_char) -> c_int;
     fn archive_write_open_filename(a: *mut c_void, filename: *const c_char) -> c_int;
     fn archive_write_header(a: *mut c_void, entry: *mut c_void) -> c_int;
     fn archive_write_data(a: *mut c_void, buff: *const c_void, len: size_t) -> ssize_t;
@@ -360,12 +363,20 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
             let mode = archive_entry_mode(entry) as u32;
             let mtime = archive_entry_mtime(entry) as i64;
             let filetype = archive_entry_filetype(entry);
+            let is_symlink = (filetype & (libc::S_IFMT as mode_t)) == (libc::S_IFLNK as mode_t);
             let is_dir = (filetype & (libc::S_IFMT as mode_t)) == (libc::S_IFDIR as mode_t)
                 || (mode & (libc::S_IFMT as u32)) == (libc::S_IFDIR as u32)
                 || entry_rel_str.ends_with('/');
 
             if dry_run {
-                archive_read_data_skip(a);
+                if !is_dir && !is_symlink && size > 0 {
+                    let r = archive_read_data(a, buf.as_mut_ptr() as *mut c_void, buf.len().min(size as usize));
+                    if r < 0 {
+                        return TTZipStatus::ErrInvalidPassword;
+                    }
+                } else {
+                    archive_read_data_skip(a);
+                }
                 total_processed = total_processed.saturating_add(size);
                 if let Some(cb) = progress_cb {
                     if !cb(total_processed, total_processed, raw_path, user_data) {
@@ -375,7 +386,23 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
                 continue;
             }
 
-            if is_dir {
+            if is_symlink {
+                let symlink_raw = archive_entry_symlink(entry);
+                if !symlink_raw.is_null() {
+                    if let Ok(symlink_target) = CStr::from_ptr(symlink_raw).to_str() {
+                        if target_path.exists() || fs::symlink_metadata(&target_path).is_ok() {
+                            let _ = fs::remove_file(&target_path);
+                        }
+                        if let Some(parent) = target_path.parent() {
+                            if !parent.exists() {
+                                let _ = fs::create_dir_all(parent);
+                            }
+                        }
+                        let _ = std::os::unix::fs::symlink(symlink_target, &target_path);
+                    }
+                }
+                archive_read_data_skip(a);
+            } else if is_dir {
                 if engine.create_dir_all_secure(&target_path, mode, mtime).is_err() {
                     return TTZipStatus::ErrExtractionFailed;
                 }
@@ -401,13 +428,17 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
                 loop {
                     let r = archive_read_data(a, buf.as_mut_ptr() as *mut c_void, buf.len());
                     if r < 0 {
-                        return TTZipStatus::ErrExtractionFailed;
+                        drop(file);
+                        let _ = fs::remove_file(&target_path);
+                        return TTZipStatus::ErrInvalidPassword;
                     }
                     if r == 0 {
                         break;
                     }
                     let n = r as usize;
                     if file.write_all(&buf[..n]).is_err() {
+                        drop(file);
+                        let _ = fs::remove_file(&target_path);
                         return TTZipStatus::ErrExtractionFailed;
                     }
                     total_processed = total_processed.saturating_add(n as u64);
@@ -453,10 +484,12 @@ fn collect_entries_recursive(
         out.push((current.to_path_buf(), rel_str));
     }
 
-    if current.is_dir() {
-        for entry in fs::read_dir(current)? {
-            let entry = entry?;
-            collect_entries_recursive(root, &entry.path(), out)?;
+    if let Ok(meta) = fs::symlink_metadata(current) {
+        if meta.is_dir() && !meta.file_type().is_symlink() {
+            for entry in fs::read_dir(current)? {
+                let entry = entry?;
+                collect_entries_recursive(root, &entry.path(), out)?;
+            }
         }
     }
     Ok(())
@@ -500,6 +533,9 @@ pub unsafe extern "C" fn ttzip_rust_create_archive(
                 archive_write_set_format_zip(a);
             }
             TTZipArchiveFormat::SevenZip => {
+                if !opt.password.is_null() {
+                    return TTZipStatus::ErrCompressionFailed;
+                }
                 archive_write_set_format_7zip(a);
             }
             TTZipArchiveFormat::Tar => {
@@ -527,10 +563,10 @@ pub unsafe extern "C" fn ttzip_rust_create_archive(
         }
 
         if !opt.password.is_null() {
-            if let Ok(p_str) = CStr::from_ptr(opt.password).to_str() {
-                if !p_str.is_empty() {
-                    archive_write_set_passphrase(a, opt.password);
-                }
+            archive_write_set_passphrase(a, opt.password);
+            if opt.encryption == TTZipEncryptionMethod::Aes256 {
+                let enc_opt = CString::new("zip:encryption=aes256").unwrap();
+                archive_write_set_options(a, enc_opt.as_ptr());
             }
         }
 
@@ -551,7 +587,7 @@ pub unsafe extern "C" fn ttzip_rust_create_archive(
                 Err(_) => continue,
             };
             let src_path = Path::new(src_str);
-            if !src_path.exists() {
+            if !src_path.exists() && fs::symlink_metadata(src_path).is_err() {
                 return TTZipStatus::ErrFileNotFound;
             }
 
@@ -563,7 +599,7 @@ pub unsafe extern "C" fn ttzip_rust_create_archive(
         let mut buf = vec![0u8; 64 * 1024];
 
         for (abs_path, rel_name) in entries_to_write {
-            let meta = match fs::metadata(&abs_path) {
+            let meta = match fs::symlink_metadata(&abs_path) {
                 Ok(m) => m,
                 Err(_) => continue,
             };
@@ -590,15 +626,34 @@ pub unsafe extern "C" fn ttzip_rust_create_archive(
                 .unwrap_or(0);
             archive_entry_set_mtime(entry, mtime, 0);
 
-            if meta.is_dir() {
+            if meta.file_type().is_symlink() {
+                archive_entry_set_filetype(entry, libc::S_IFLNK as u32);
+                archive_entry_set_size(entry, 0);
+                if let Ok(link_target) = fs::read_link(&abs_path) {
+                    if let Ok(link_c) = CString::new(link_target.to_string_lossy().as_bytes()) {
+                        archive_entry_set_symlink(entry, link_c.as_ptr());
+                    }
+                }
+                let r_hdr = archive_write_header(a, entry);
+                if r_hdr != 0 {
+                    return TTZipStatus::ErrCompressionFailed;
+                }
+                archive_write_finish_entry(a);
+            } else if meta.is_dir() {
                 archive_entry_set_filetype(entry, libc::S_IFDIR as u32);
                 archive_entry_set_size(entry, 0);
-                archive_write_header(a, entry);
+                let r_hdr = archive_write_header(a, entry);
+                if r_hdr != 0 {
+                    return TTZipStatus::ErrCompressionFailed;
+                }
                 archive_write_finish_entry(a);
             } else {
                 archive_entry_set_filetype(entry, libc::S_IFREG as u32);
                 archive_entry_set_size(entry, meta.len() as i64);
-                archive_write_header(a, entry);
+                let r_hdr = archive_write_header(a, entry);
+                if r_hdr != 0 {
+                    return TTZipStatus::ErrCompressionFailed;
+                }
 
                 let mut file = match File::open(&abs_path) {
                     Ok(f) => f,

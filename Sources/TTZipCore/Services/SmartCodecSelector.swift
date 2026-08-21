@@ -170,9 +170,10 @@ public final class SmartCodecSelector: @unchecked Sendable {
             memcpy(typedSrc + (i * strideSize), buffer + srcOffset, strideSize)
         }
 
-        let compressedBytes = ttzip_libdeflate_compress(typedSrc, totalTrialBytes, typedDst, totalTrialBytes + 4096, 1)
-        if compressedBytes > 0 {
-            return Double(compressedBytes) / Double(totalTrialBytes)
+        var outLen: Int = 0
+        let st = ttzip_rust_deflate_compress(typedSrc, totalTrialBytes, typedDst, totalTrialBytes + 4096, 1, &outLen)
+        if st == TTZIP_STATUS_OK && outLen > 0 {
+            return Double(outLen) / Double(totalTrialBytes)
         }
         return 1.0
     }

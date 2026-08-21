@@ -69,18 +69,19 @@ public final class TTLogger: @unchecked Sendable {
             self._level = .info
         }
         
-        ttzip_set_log_callback { level, msg in
-            guard let msg = msg else { return }
-            let str = String(cString: msg)
+        _ = ttzip_rust_set_logger({ level, targetModule, message, file, line, _ in
+            guard let message = message else { return }
+            let str = String(cString: message)
             let lvl: TTLogger.Level
             switch level {
-            case 0: lvl = .debug
-            case 1: lvl = .info
-            case 2: lvl = .warning
+            case TTZIP_LOG_LEVEL_DEBUG: lvl = .debug
+            case TTZIP_LOG_LEVEL_INFO: lvl = .info
+            case TTZIP_LOG_LEVEL_WARNING: lvl = .warning
             default: lvl = .error
             }
-            TTLogger.shared.log(level: lvl, message: str, file: "CBridge", line: 0)
-        }
+            let target = targetModule != nil ? String(cString: targetModule!) : "Rust"
+            TTLogger.shared.log(level: lvl, message: "[\(target)] \(str)", file: file != nil ? String(cString: file!) : "Rust", line: UInt(line))
+        }, TTZIP_LOG_LEVEL_DEBUG, nil)
     }
 
     // MARK: - Core Logging

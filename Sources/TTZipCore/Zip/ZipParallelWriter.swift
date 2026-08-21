@@ -70,8 +70,8 @@ public final class ZipParallelWriter: @unchecked Sendable {
                 crc = 0 // WinZip AES-256 specification requires CRC32 to be set to 0 in local header
             } else {
                 crc = rawData.withUnsafeBytes { ptr -> UInt32 in
-                    guard let base = ptr.baseAddress else { return 0 }
-                    return ttzip_compute_buffer_crc32(base, rawData.count)
+                    guard let base = ptr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                    return ttzip_rust_crc32(0, base, rawData.count)
                 }
             }
             
@@ -88,10 +88,12 @@ public final class ZipParallelWriter: @unchecked Sendable {
                 let dstPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: maxCap)
                 defer { dstPtr.deallocate() }
                 
-                let compSize = rawData.withUnsafeBytes { inPtr -> size_t in
-                    guard let src = inPtr.baseAddress else { return 0 }
-                    return ttzip_libdeflate_compress(src, rawData.count, dstPtr, maxCap, Int32(libdeflateLevel))
+                var outLen: Int = 0
+                let status = rawData.withUnsafeBytes { inPtr -> CTTZipBridge.TTZipStatus in
+                    guard let src = inPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                    return ttzip_rust_deflate_compress(src, rawData.count, dstPtr, maxCap, Int32(libdeflateLevel), &outLen)
                 }
+                let compSize = (status == TTZIP_STATUS_OK) ? outLen : 0
                 
                 if compSize > 0 && compSize < rawData.count {
                     payloadData = Data(bytes: dstPtr, count: compSize)

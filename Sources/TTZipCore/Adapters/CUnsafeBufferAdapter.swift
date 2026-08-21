@@ -138,14 +138,15 @@ public enum CUnsafeBufferAdapter {
     /// - Returns: Pointer to aligned buffer, or `nil` on failure.
     @inline(__always)
     public static func allocateAlignedBuffer(capacity: Int) -> UnsafeMutableRawPointer? {
-        return ttzip_core_aligned_alloc_16k(capacity)
+        guard capacity > 0 else { return nil }
+        return UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 16384)
     }
 
     /// Deallocates a 16KB hardware page-aligned memory buffer.
     /// - Parameter pointer: Pointer previously returned by `allocateAlignedBuffer`.
     @inline(__always)
     public static func deallocateAlignedBuffer(_ pointer: UnsafeMutableRawPointer) {
-        ttzip_core_aligned_free_16k(pointer)
+        pointer.deallocate()
     }
 
     /// Flyweight Pattern: Borrows a 4KB or 64KB page-aligned buffer from the shared flyweight pool.

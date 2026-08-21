@@ -38,26 +38,65 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws -> Bool {
         let raw = level.rawValue
-        let lvl: Int32 = raw <= 0 ? 0 : (raw >= 9 ? 9 : Int32(raw))
+        let lvlMap: TTZipCompressionLevel
+        switch raw {
+        case 0: lvlMap = TTZIP_COMPRESSION_LEVEL_STORE
+        case 1, 2: lvlMap = TTZIP_COMPRESSION_LEVEL_FASTEST
+        case 3, 4, 5: lvlMap = TTZIP_COMPRESSION_LEVEL_FAST
+        case 6, 7, 8: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
+        case 9: lvlMap = TTZIP_COMPRESSION_LEVEL_MAXIMUM
+        default: lvlMap = TTZIP_COMPRESSION_LEVEL_ULTRA
+        }
         let pwd = (password != nil && !password!.isEmpty) ? password : nil
+        let encMap: TTZipEncryptionMethod = (pwd != nil) ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
         
         return CUnsafeBufferAdapter.withCString(outputPath) { cOutputPath in
             CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
                 CUnsafeBufferAdapter.withCString(pwd) { cPassword in
                     guard let cOutputPath = cOutputPath else { return false }
-                    let status = ttzip_create_7z_native_c(
-                        cOutputPath,
-                        cInputPaths,
-                        inputPaths.count,
-                        lvl,
-                        cPassword
+                    var opt = TTZipCreateOptions(
+                        format: TTZIP_ARCHIVE_FORMAT_SEVEN_ZIP,
+                        level: lvlMap,
+                        encryption: encMap,
+                        password: cPassword,
+                        thread_budget: 0,
+                        solid_block_size_mb: UInt32(solidBlockSizeMb),
+                        progress_callback: nil,
+                        user_data: nil
                     )
-                    if status == 0 {
+                    let status = ttzip_rust_create_archive(cInputPaths, inputPaths.count, cOutputPath, &opt)
+                    if status == TTZIP_STATUS_OK {
                         progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: 100, totalBytes: 100, currentFileName: ""))
-                    } else {
-                        TTLogger.error("[SevenZipCAdapter] C layer compression failed with status=\(status), output=\(outputPath)")
+                        return true
                     }
-                    return status == 0
+                    
+                    // Fallback to 7z native binary if Rust libarchive cannot write encrypted 7z container
+                    if let bin7z = SevenZipBinaryResolver.resolveBinaryPath() {
+                        try? FileManager.default.removeItem(atPath: outputPath)
+                        let proc = Process()
+                        proc.executableURL = URL(fileURLWithPath: bin7z)
+                        var args = ["a", "-t7z", "-mx=\(raw)"]
+                        if let p = pwd, !p.isEmpty {
+                            args.append("-p\(p)")
+                            args.append("-mhe=on")
+                        }
+                        args.append(outputPath)
+                        args.append(contentsOf: inputPaths)
+                        proc.arguments = args
+                        let pipe = Pipe()
+                        proc.standardOutput = pipe
+                        proc.standardError = pipe
+                        if (try? proc.run()) != nil {
+                            _ = pipe.fileHandleForReading.readDataToEndOfFile()
+                            proc.waitUntilExit()
+                            if proc.terminationStatus == 0 {
+                                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: 100, totalBytes: 100, currentFileName: ""))
+                                return true
+                            }
+                        }
+                    }
+                    TTLogger.error("[SevenZipCAdapter] 7z compression failed with status=\(status.rawValue), output=\(outputPath)")
+                    return false
                 }
             }
         }
@@ -82,15 +121,45 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
             CUnsafeBufferAdapter.withCString(destinationDir) { cDestDir in
                 CUnsafeBufferAdapter.withCString(pwd) { cPassword in
                     guard let cArchivePath = cArchivePath, let cDestDir = cDestDir else { return false }
-                    let status = ttzip_extract_7z_native_c(
-                        cArchivePath,
-                        cDestDir,
-                        cPassword
+                    var opt = TTZipExtractOptions(
+                        destination_path: cDestDir,
+                        password: cPassword,
+                        thread_budget: 0,
+                        overwrite_existing: true,
+                        preserve_permissions: true,
+                        dry_run: false,
+                        progress_callback: nil,
+                        user_data: nil
                     )
-                    if status != 0 {
-                        TTLogger.debug("[SevenZipCAdapter] C layer extraction returned status=\(status), archive=\(archivePath), dest=\(destinationDir)")
+                    let status = ttzip_rust_extract_archive(cArchivePath, cDestDir, &opt)
+                    let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
+                    if status == TTZIP_STATUS_OK && !items.isEmpty {
+                        return true
                     }
-                    return status == 0
+                    if let bin7z = SevenZipBinaryResolver.resolveBinaryPath() {
+                        let proc = Process()
+                        proc.executableURL = URL(fileURLWithPath: bin7z)
+                        var args = ["x", "-y", "-o\(destinationDir)"]
+                        if let p = pwd, !p.isEmpty {
+                            args.append("-p\(p)")
+                        } else {
+                            args.append("-p-")
+                        }
+                        args.append(archivePath)
+                        proc.arguments = args
+                        let pipe = Pipe()
+                        proc.standardOutput = pipe
+                        proc.standardError = pipe
+                        if (try? proc.run()) != nil {
+                            _ = pipe.fileHandleForReading.readDataToEndOfFile()
+                            proc.waitUntilExit()
+                            if proc.terminationStatus == 0 {
+                                return true
+                            }
+                        }
+                    }
+                    TTLogger.debug("[SevenZipCAdapter] 7z extraction returned status=\(status.rawValue), archive=\(archivePath), dest=\(destinationDir)")
+                    return false
                 }
             }
         }
@@ -117,18 +186,15 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
         threadCount: Int = 0
     ) -> (status: Int32, compressedSize: Int, dictSize: UInt32) {
         var outLen: Int = 0
-        var outDict: UInt32 = 0
-        let status = ttzip_fl2_compress_block(
+        let status = ttzip_rust_fl2_compress(
             src,
             srcLength,
             dst,
             dstCapacity,
-            &outLen,
             Int32(level),
-            isZeroBlock,
-            &outDict,
-            Int32(threadCount)
+            UInt32(threadCount),
+            &outLen
         )
-        return (status, outLen, outDict)
+        return (status.rawValue, outLen, 1 << 24)
     }
 }

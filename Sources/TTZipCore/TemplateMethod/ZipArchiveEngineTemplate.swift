@@ -91,16 +91,36 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
             }
 
             if context.splitVolumeSizeBytes == nil || context.splitVolumeSizeBytes == 0 {
-                let cLevel = Int32(context.level.rawValue)
-                let cRes = CUnsafeBufferAdapter.withCString(context.archivePath) { cOutputPath in
+                let lvlMap: TTZipCompressionLevel
+                switch context.level {
+                case .store: lvlMap = TTZIP_COMPRESSION_LEVEL_STORE
+                case .fastest, .fast: lvlMap = TTZIP_COMPRESSION_LEVEL_FASTEST
+                case .normal: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
+                case .maximum: lvlMap = TTZIP_COMPRESSION_LEVEL_MAXIMUM
+                case .ultra: lvlMap = TTZIP_COMPRESSION_LEVEL_ULTRA
+                default: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
+                }
+                let enc: TTZipEncryptionMethod = (context.password != nil && !context.password!.isEmpty) ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
+                let pwd = (context.password != nil && !context.password!.isEmpty) ? context.password : nil
+                let status = CUnsafeBufferAdapter.withCString(context.archivePath) { cOutputPath in
                     CUnsafeBufferAdapter.withCStringsArray(context.inputPaths) { cInputPaths in
-                        CUnsafeBufferAdapter.withCString(context.password) { cPassword in
-                            guard let cOutputPath = cOutputPath else { return Int32(-1) }
-                            return ttzip_create_zip_parallel_c(cOutputPath, cInputPaths, context.inputPaths.count, cLevel, context.options.skipMacJunk, cPassword)
+                        CUnsafeBufferAdapter.withCString(pwd) { cPassword in
+                            guard let cOutputPath = cOutputPath else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                            var opt = TTZipCreateOptions(
+                                format: TTZIP_ARCHIVE_FORMAT_ZIP,
+                                level: lvlMap,
+                                encryption: enc,
+                                password: cPassword,
+                                thread_budget: 0,
+                                solid_block_size_mb: 0,
+                                progress_callback: nil,
+                                user_data: nil
+                            )
+                            return ttzip_rust_create_archive(cInputPaths, context.inputPaths.count, cOutputPath, &opt)
                         }
                     }
                 }
-                if cRes == 0 {
+                if status == TTZIP_STATUS_OK {
                     var totalOrig: Int64 = 0
                     for path in context.inputPaths {
                         totalOrig += ArchiveWriter.recursivePathSize(at: path)
@@ -119,7 +139,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                         processedBytes: totalOrig,
                         compressedBytes: compSize,
                         unlockedPassword: context.password,
-                        metrics: ["format": "zip", "engine": "NativeZipCreateC"]
+                        metrics: ["format": "zip", "engine": "RustZipEngine"]
                     )
                 }
             }

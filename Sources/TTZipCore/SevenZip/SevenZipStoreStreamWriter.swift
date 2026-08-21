@@ -38,17 +38,22 @@ public final class SevenZipStoreStreamWriter: @unchecked Sendable {
         let factory = ArchiveEntryFlyweightFactory.shared
         let internedInputPaths = inputPaths.map { factory.internPath($0) }
         let pwd = (password != nil && !password!.isEmpty) ? password : nil
+        let enc: TTZipEncryptionMethod = (pwd != nil) ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
         let success = CUnsafeBufferAdapter.withCString(outputPath) { cOutPath in
             CUnsafeBufferAdapter.withCStringsArray(internedInputPaths) { cInputPaths in
                 CUnsafeBufferAdapter.withCString(pwd) { cPassword in
                     guard let cOutPath = cOutPath else { return false }
-                    let res: Int32
-                    if cPassword == nil {
-                        res = ttzip_create_7z_store_fast_c(cOutPath, cInputPaths, internedInputPaths.count)
-                    } else {
-                        res = ttzip_create_7z_native_c(cOutPath, cInputPaths, internedInputPaths.count, 0, cPassword)
-                    }
-                    return res == 0
+                    var opt = TTZipCreateOptions(
+                        format: TTZIP_ARCHIVE_FORMAT_SEVEN_ZIP,
+                        level: TTZIP_COMPRESSION_LEVEL_STORE,
+                        encryption: enc,
+                        password: cPassword,
+                        thread_budget: 0,
+                        solid_block_size_mb: 0,
+                        progress_callback: nil,
+                        user_data: nil
+                    )
+                    return ttzip_rust_create_archive(cInputPaths, internedInputPaths.count, cOutPath, &opt) == TTZIP_STATUS_OK
                 }
             }
         }

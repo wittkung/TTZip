@@ -118,18 +118,22 @@ public final class CompressorConsumerGroup: @unchecked Sendable {
 
                             MemoryPageFlyweightPool.shared.withBuffer(size: pageSize) { dstPtr, capacity in
                                 if capacity >= maxCap {
-                                    compSize = rawData.withUnsafeBytes { inPtr -> size_t in
-                                        guard let src = inPtr.baseAddress else { return 0 }
-                                        return ttzip_libdeflate_compress(src, rawData.count, dstPtr, capacity, libdeflateLevel)
+                                    compSize = rawData.withUnsafeBytes { inPtr -> Int in
+                                        guard let src = inPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                                        var outLen: Int = 0
+                                        let st = ttzip_rust_deflate_compress(src, rawData.count, dstPtr, capacity, libdeflateLevel, &outLen)
+                                        return st == TTZIP_STATUS_OK ? outLen : 0
                                     }
                                     if compSize > 0 && compSize < rawData.count {
                                         payloadBuf = Data(bytes: dstPtr, count: compSize)
                                     }
                                 } else {
                                     let uninitPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: maxCap)
-                                    compSize = rawData.withUnsafeBytes { inPtr -> size_t in
-                                        guard let src = inPtr.baseAddress else { return 0 }
-                                        return ttzip_libdeflate_compress(src, rawData.count, uninitPtr, maxCap, libdeflateLevel)
+                                    compSize = rawData.withUnsafeBytes { inPtr -> Int in
+                                        guard let src = inPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                                        var outLen: Int = 0
+                                        let st = ttzip_rust_deflate_compress(src, rawData.count, uninitPtr, maxCap, libdeflateLevel, &outLen)
+                                        return st == TTZIP_STATUS_OK ? outLen : 0
                                     }
                                     if compSize > 0 && compSize < rawData.count {
                                         payloadBuf = Data(bytesNoCopy: uninitPtr, count: compSize, deallocator: .custom { ptr, _ in ptr.deallocate() })
@@ -145,8 +149,8 @@ public final class CompressorConsumerGroup: @unchecked Sendable {
                         }
 
                         let crc: UInt32 = rawData.withUnsafeBytes { ptr -> UInt32 in
-                            guard let base = ptr.baseAddress else { return 0 }
-                            return ttzip_compute_buffer_crc32(base, rawData.count)
+                            guard let base = ptr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                            return ttzip_rust_crc32(0, base, rawData.count)
                         }
 
                         let processedChunk = ArchiveDataChunk(

@@ -27,11 +27,13 @@ public final class ZipBlockParallelCompressor: @unchecked Sendable {
             // Small data fallback to single-block compression
             var outBuf = Data(count: data.count + 512)
             let outCap = outBuf.count
-            let compSize = data.withUnsafeBytes { inPtr -> size_t in
-                guard let src = inPtr.baseAddress else { return 0 }
-                return outBuf.withUnsafeMutableBytes { outPtr -> size_t in
-                    guard let dst = outPtr.baseAddress else { return 0 }
-                    return ttzip_libdeflate_compress(src, data.count, dst, outCap, level)
+            let compSize = data.withUnsafeBytes { inPtr -> Int in
+                guard let src = inPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                return outBuf.withUnsafeMutableBytes { outPtr -> Int in
+                    guard let dst = outPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                    var outLen: Int = 0
+                    let st = ttzip_rust_deflate_compress(src, data.count, dst, outCap, level, &outLen)
+                    return st == TTZIP_STATUS_OK ? outLen : 0
                 }
             }
             return compSize > 0 && compSize < data.count ? outBuf.prefix(compSize) : data
@@ -51,9 +53,11 @@ public final class ZipBlockParallelCompressor: @unchecked Sendable {
                 
                 var compressedBuf = Data(count: currentChunkSize + 512)
                 let compCap = compressedBuf.count
-                let compSize = compressedBuf.withUnsafeMutableBytes { outPtr -> size_t in
-                    guard let dst = outPtr.baseAddress else { return 0 }
-                    return ttzip_libdeflate_compress(chunkPtr, currentChunkSize, dst, compCap, level)
+                let compSize = compressedBuf.withUnsafeMutableBytes { outPtr -> Int in
+                    guard let dst = outPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                    var outLen: Int = 0
+                    let st = ttzip_rust_deflate_compress(chunkPtr, currentChunkSize, dst, compCap, level, &outLen)
+                    return st == TTZIP_STATUS_OK ? outLen : 0
                 }
                 
                 if compSize > 0 && compSize < currentChunkSize {

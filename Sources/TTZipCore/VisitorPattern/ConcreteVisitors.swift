@@ -281,7 +281,7 @@ public final class ChecksumCalculatorVisitor: ArchiveComponentVisitorProtocol, @
             let payloadData = payload.data(using: .utf8) ?? Data()
             crc = payloadData.withUnsafeBytes { buffer in
                 guard let base = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return UInt32(0) }
-                return ttzip_compute_buffer_crc32_neon(0, base, buffer.count)
+                return ttzip_rust_crc32(0, base, buffer.count)
             }
             shaData.append(payloadData)
         }

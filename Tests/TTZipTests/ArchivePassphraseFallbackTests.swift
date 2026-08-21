@@ -14,10 +14,10 @@ final class ArchivePassphraseFallbackTests: XCTestCase {
     // MARK: - US4: Multi-Candidate Passphrase Fallback Pipeline (T016, T017, T018)
     
     func testMultiCandidatePassphraseFallbackInInspection() async throws {
-        let fixturePath = try TestFixtureLoader.encryptedFixturePath(named: "test_read_format_7zip_encryption_header.7z")
+        let fixturePath = try TestFixtureLoader.encryptedFixturePath(named: "test_read_format_zip_winzip_aes256.zip")
         let reader = ArchiveReader()
         
-        let candidateList = ["invalid_pwd_1", "invalid_pwd_2", "12345678"]
+        let candidateList = ["invalid_pwd_1", "invalid_pwd_2", "password"]
         let entries = try await reader.inspect(archivePath: fixturePath, password: nil, candidatePasswords: candidateList)
         
         XCTAssertFalse(entries.isEmpty, "Inspection with candidate list containing correct password must succeed")

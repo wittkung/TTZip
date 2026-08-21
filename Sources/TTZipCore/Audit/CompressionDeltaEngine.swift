@@ -61,8 +61,10 @@ public final class CompressionDeltaEngine: Sendable {
 
             // 1. Deflate (libdeflate) L1..L12
             for lvl in 1...12 {
-                let compSize = ttzip_libdeflate_compress(srcPtr, inSize, dstPtr, maxComp, Int32(lvl))
-                guard compSize > 0 else { continue }
+                var outLen: Int = 0
+                let status = ttzip_rust_deflate_compress(srcPtr, inSize, dstPtr, maxComp, Int32(lvl), &outLen)
+                guard status == TTZIP_STATUS_OK && outLen > 0 else { continue }
+                let compSize = outLen
 
                 let key = "libdeflate_\(corpus.rawValue)_\(lvl)"
                 let baseSize = baselineMap?[key] ?? compSize
@@ -90,8 +92,10 @@ public final class CompressionDeltaEngine: Sendable {
 
             // 2. Zstandard L1..L19
             for lvl in 1...19 {
-                let compSize = ttzip_zstd_compress(srcPtr, inSize, dstPtr, maxComp, Int32(lvl))
-                guard compSize > 0 else { continue }
+                var outLen: Int = 0
+                let status = ttzip_rust_zstd_compress_advanced(srcPtr, inSize, dstPtr, maxComp, Int32(lvl), 0, 0, 0, 0, false, &outLen)
+                guard status == TTZIP_STATUS_OK && outLen > 0 else { continue }
+                let compSize = outLen
 
                 let key = "zstd_\(corpus.rawValue)_\(lvl)"
                 let baseSize = baselineMap?[key] ?? compSize
@@ -117,12 +121,14 @@ public final class CompressionDeltaEngine: Sendable {
                 ))
             }
 
-            // 3. Bzip2 L1..L9
+            // 3. Fast-LZMA2 L1..L9
             for lvl in 1...9 {
-                let compSize = ttzip_bzip2_compress(srcPtr, inSize, dstPtr, maxComp, Int32(lvl))
-                guard compSize > 0 else { continue }
+                var outLen: Int = 0
+                let status = ttzip_rust_fl2_compress(srcPtr, inSize, dstPtr, maxComp, Int32(lvl), 0, &outLen)
+                guard status == TTZIP_STATUS_OK && outLen > 0 else { continue }
+                let compSize = outLen
 
-                let key = "bzip2_\(corpus.rawValue)_\(lvl)"
+                let key = "fl2_\(corpus.rawValue)_\(lvl)"
                 let baseSize = baselineMap?[key] ?? compSize
                 let delta = compSize - baseSize
                 let pct = baseSize > 0 ? (Double(delta) / Double(baseSize)) * 100.0 : 0.0
@@ -134,9 +140,55 @@ public final class CompressionDeltaEngine: Sendable {
                 else { verdict = "IDENTICAL" }
 
                 points.append(MultiLevelCompressionPoint(
-                    engine: "bzip2",
+                    engine: "fl2",
                     corpus: corpus.rawValue,
                     level: lvl,
+                    uncompressedBytes: inSize,
+                    baseCompressedBytes: baseSize,
+                    headCompressedBytes: compSize,
+                    deltaBytes: delta,
+                    deltaPercent: pct,
+                    verdict: verdict
+                ))
+            }
+
+            // 4. LZFSE L1
+            var lzfseOutLen: Int = 0
+            if ttzip_rust_lzfse_compress(srcPtr, inSize, dstPtr, maxComp, &lzfseOutLen) == TTZIP_STATUS_OK && lzfseOutLen > 0 {
+                let compSize = lzfseOutLen
+                let key = "lzfse_\(corpus.rawValue)_1"
+                let baseSize = baselineMap?[key] ?? compSize
+                let delta = compSize - baseSize
+                let pct = baseSize > 0 ? (Double(delta) / Double(baseSize)) * 100.0 : 0.0
+                let verdict = (pct < -0.01) ? "OPTIMIZATION" : ((pct > 0.10) ? "REGRESSION" : ((pct > 0.01) ? "DRIFT" : "IDENTICAL"))
+
+                points.append(MultiLevelCompressionPoint(
+                    engine: "lzfse",
+                    corpus: corpus.rawValue,
+                    level: 1,
+                    uncompressedBytes: inSize,
+                    baseCompressedBytes: baseSize,
+                    headCompressedBytes: compSize,
+                    deltaBytes: delta,
+                    deltaPercent: pct,
+                    verdict: verdict
+                ))
+            }
+
+            // 5. Snappy L1
+            var snappyOutLen: Int = 0
+            if ttzip_rust_snappy_compress(srcPtr, inSize, dstPtr, maxComp, &snappyOutLen) == TTZIP_STATUS_OK && snappyOutLen > 0 {
+                let compSize = snappyOutLen
+                let key = "snappy_\(corpus.rawValue)_1"
+                let baseSize = baselineMap?[key] ?? compSize
+                let delta = compSize - baseSize
+                let pct = baseSize > 0 ? (Double(delta) / Double(baseSize)) * 100.0 : 0.0
+                let verdict = (pct < -0.01) ? "OPTIMIZATION" : ((pct > 0.10) ? "REGRESSION" : ((pct > 0.01) ? "DRIFT" : "IDENTICAL"))
+
+                points.append(MultiLevelCompressionPoint(
+                    engine: "snappy",
+                    corpus: corpus.rawValue,
+                    level: 1,
                     uncompressedBytes: inSize,
                     baseCompressedBytes: baseSize,
                     headCompressedBytes: compSize,

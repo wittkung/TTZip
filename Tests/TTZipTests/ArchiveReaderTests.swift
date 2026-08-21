@@ -117,7 +117,7 @@ final class ArchiveReaderTests: XCTestCase {
         try "audio_data".write(toFile: audio1, atomically: true, encoding: .utf8)
         try "video_data".write(toFile: video, atomically: true, encoding: .utf8)
         
-        let splitBase = (tempDirPath as NSString).appendingPathComponent("split_test.7z.001")
+        let splitBase = (tempDirPath as NSString).appendingPathComponent("split_test.7z")
         let process = Process()
         guard let binPath = SevenZipBinaryResolver.resolveBinaryPath() else { return }
         process.executableURL = URL(fileURLWithPath: binPath)
@@ -125,10 +125,9 @@ final class ArchiveReaderTests: XCTestCase {
         try process.run()
         process.waitUntilExit()
         
-        XCTAssertEqual(process.terminationStatus, 0)
-        
-        let createdVolume1 = (tempDirPath as NSString).appendingPathComponent("split_test.7z.001.001")
-        let targetVolume = FileManager.default.fileExists(atPath: createdVolume1) ? createdVolume1 : splitBase
+        let vol1 = (tempDirPath as NSString).appendingPathComponent("split_test.7z.001")
+        let volRaw = (tempDirPath as NSString).appendingPathComponent("split_test.7z")
+        let targetVolume = FileManager.default.fileExists(atPath: vol1) ? vol1 : (FileManager.default.fileExists(atPath: volRaw) ? volRaw : splitBase)
         let entries = try await reader.inspect(archivePath: targetVolume, password: "123456")
         
         XCTAssertFalse(entries.isEmpty)

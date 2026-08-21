@@ -39,14 +39,11 @@ let package = Package(
             exclude: [
                 "fast-lzma2",
                 "lzfse",
-                "snappy",
-                "ttzip_threadpool.c"
+                "snappy"
             ],
             cSettings: [
                 .headerSearchPath("include"),
-                .headerSearchPath("fast-lzma2"),
-                .headerSearchPath("lzfse"),
-                .headerSearchPath("snappy"),
+                .headerSearchPath("zopfli"),
                 .headerSearchPath("../../Vendor/include"),
                 .headerSearchPath("../../Vendor/include/uchardet"),
                 .unsafeFlags([

@@ -14,25 +14,21 @@ public final class LZ4LzoEngine: @unchecked Sendable {
     
     public func compressBound(for rawSize: Int) -> Int {
         guard rawSize > 0 else { return 0 }
-        return ttzip_lz4_compress_bound(rawSize)
+        return rawSize + (rawSize / 255) + 16
     }
     
     public func compress(data: Data, acceleration: Int = 1) -> Data {
         guard !data.isEmpty else { return Data() }
         let maxCapacity = max(compressBound(for: data.count), data.count + (data.count / 255) + 16)
         let dstPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: maxCapacity)
+        var written: Int = 0
         
-        let written = data.withUnsafeBytes { srcPtr in
-            ttzip_lz4_compress(
-                srcPtr.baseAddress,
-                data.count,
-                dstPtr,
-                maxCapacity,
-                Int32(acceleration)
-            )
+        let status = data.withUnsafeBytes { srcPtr -> CTTZipBridge.TTZipStatus in
+            guard let base = srcPtr.bindMemory(to: UInt8.self).baseAddress else { return CTTZipBridge.TTZIP_STATUS_ERR_INVALID_PARAM }
+            return ttzip_rust_lz4_compress(base, data.count, dstPtr, maxCapacity, &written)
         }
         
-        guard written > 0 else {
+        guard status == CTTZipBridge.TTZIP_STATUS_OK && written > 0 else {
             dstPtr.deallocate()
             return data
         }
@@ -40,42 +36,21 @@ public final class LZ4LzoEngine: @unchecked Sendable {
     }
     
     public func compressWithTLS(data: Data, acceleration: Int = 1) -> Data {
-        guard !data.isEmpty else { return Data() }
-        let maxCapacity = max(compressBound(for: data.count), data.count + (data.count / 255) + 16)
-        let dstPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: maxCapacity)
-        
-        let written = data.withUnsafeBytes { srcPtr in
-            ttzip_lz4_compress_fast_tls(
-                srcPtr.baseAddress,
-                data.count,
-                dstPtr,
-                maxCapacity,
-                Int32(acceleration)
-            )
-        }
-        
-        guard written > 0 else {
-            dstPtr.deallocate()
-            return data
-        }
-        return Data(bytesNoCopy: dstPtr, count: written, deallocator: .custom { ptr, _ in ptr.deallocate() })
+        return compress(data: data, acceleration: acceleration)
     }
     
     public func decompress(data: Data, originalSizeHint: Int? = nil) -> Data {
         guard !data.isEmpty else { return Data() }
         let capacity = originalSizeHint ?? (data.count * 4 + 65536)
         let dstPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
+        var written: Int = 0
         
-        let written = data.withUnsafeBytes { srcPtr in
-            ttzip_lz4_decompress(
-                srcPtr.baseAddress,
-                data.count,
-                dstPtr,
-                capacity
-            )
+        let status = data.withUnsafeBytes { srcPtr -> CTTZipBridge.TTZipStatus in
+            guard let base = srcPtr.bindMemory(to: UInt8.self).baseAddress else { return CTTZipBridge.TTZIP_STATUS_ERR_INVALID_PARAM }
+            return ttzip_rust_lz4_decompress(base, data.count, dstPtr, capacity, &written)
         }
         
-        guard written > 0 else {
+        guard status == CTTZipBridge.TTZIP_STATUS_OK && written > 0 else {
             dstPtr.deallocate()
             return Data()
         }
@@ -83,25 +58,7 @@ public final class LZ4LzoEngine: @unchecked Sendable {
     }
     
     public func decompressPartial(data: Data, targetSize: Int, dstCapacity: Int? = nil) -> Data {
-        guard !data.isEmpty, targetSize > 0 else { return Data() }
-        let capacity = max(targetSize, dstCapacity ?? targetSize)
-        let dstPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
-        
-        let written = data.withUnsafeBytes { srcPtr in
-            ttzip_lz4_decompress_partial(
-                srcPtr.baseAddress,
-                data.count,
-                dstPtr,
-                targetSize,
-                capacity
-            )
-        }
-        
-        guard written > 0 else {
-            dstPtr.deallocate()
-            return Data()
-        }
-        return Data(bytesNoCopy: dstPtr, count: written, deallocator: .custom { ptr, _ in ptr.deallocate() })
+        return decompress(data: data, originalSizeHint: targetSize)
     }
 }
 
@@ -117,18 +74,14 @@ public final class ZstdDictionaryEngine: @unchecked Sendable {
         guard !data.isEmpty else { return Data() }
         let capacity = data.count + (data.count / 16) + 512
         let dstPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
+        var written: Int = 0
         
-        let written = data.withUnsafeBytes { srcPtr in
-            ttzip_zstd_compress(
-                srcPtr.baseAddress,
-                data.count,
-                dstPtr,
-                capacity,
-                compressionLevel
-            )
+        let status = data.withUnsafeBytes { srcPtr -> CTTZipBridge.TTZipStatus in
+            guard let base = srcPtr.bindMemory(to: UInt8.self).baseAddress else { return CTTZipBridge.TTZIP_STATUS_ERR_INVALID_PARAM }
+            return ttzip_rust_zstd_compress(base, data.count, dstPtr, capacity, compressionLevel, &written)
         }
         
-        guard written > 0 else {
+        guard status == CTTZipBridge.TTZIP_STATUS_OK && written > 0 else {
             dstPtr.deallocate()
             return data
         }
@@ -139,17 +92,14 @@ public final class ZstdDictionaryEngine: @unchecked Sendable {
         guard !data.isEmpty else { return Data() }
         let capacity = uncompressedCapacityHint ?? (data.count * 4 + 65536)
         let dstPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
+        var written: Int = 0
         
-        let written = data.withUnsafeBytes { srcPtr in
-            ttzip_zstd_decompress(
-                srcPtr.baseAddress,
-                data.count,
-                dstPtr,
-                capacity
-            )
+        let status = data.withUnsafeBytes { srcPtr -> CTTZipBridge.TTZipStatus in
+            guard let base = srcPtr.bindMemory(to: UInt8.self).baseAddress else { return CTTZipBridge.TTZIP_STATUS_ERR_INVALID_PARAM }
+            return ttzip_rust_zstd_decompress(base, data.count, dstPtr, capacity, &written)
         }
         
-        guard written > 0 else {
+        guard status == CTTZipBridge.TTZIP_STATUS_OK && written > 0 else {
             dstPtr.deallocate()
             throw ArchiveError.readFailed(code: -503)
         }

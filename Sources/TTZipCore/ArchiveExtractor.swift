@@ -139,16 +139,35 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
             }
         }
         
-        // Native parallel GCD C engine fast-path for ZIP archives (including WinZip AES-256)
+        // Native parallel engine fast-path for ZIP archives
         if pathLower.hasSuffix(".zip") || pathLower.contains(".zip") {
             let activePwd = password ?? passCandidates.first
-            if ttzip_extract_zip_c_parallel(archivePath, destinationDir, options.skipMacJunk, activePwd) == 0 {
+            let pwd = (activePwd != nil && !activePwd!.isEmpty) ? activePwd : nil
+            let rStatus = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
+                CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
+                    CUnsafeBufferAdapter.withCString(pwd) { pPtr in
+                        guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                        var opt = TTZipExtractOptions(
+                            destination_path: dPtr,
+                            password: pPtr,
+                            thread_budget: 0,
+                            overwrite_existing: true,
+                            preserve_permissions: true,
+                            dry_run: false,
+                            progress_callback: nil,
+                            user_data: nil
+                        )
+                        return ttzip_rust_extract_archive(aPtr, dPtr, &opt)
+                    }
+                }
+            }
+            if rStatus == TTZIP_STATUS_OK {
                 return
             }
         }
         
         let fileManager = FileManager.default
-        guard ttzip_stat_file_info(archivePath, nil, nil, nil) == 0 else {
+        guard fileManager.fileExists(atPath: archivePath) else {
             throw ArchiveError.fileNotFound
         }
         
@@ -164,20 +183,8 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
             let candidates: [String?] = (password != nil) ? [password] : (passCandidates.isEmpty ? [nil] : passCandidates.map { Optional($0) })
             var lastStatus: Int32 = -1
             for cand in candidates {
-                if let self = self, self.dispatchFastExtraction(
-                    archivePath: archivePath,
-                    destinationDir: destinationDir,
-                    options: options,
-                    password: cand,
-                    advancedOptions: advancedOptions
-                ) {
-                    Self.cleanupQuarantineAttributes(at: destinationDir)
-                    return
-                }
-                
                 let status = ttzip_extract_archive_advanced(archivePath, destinationDir, options.skipMacJunk, cand)
                 if status == 0 {
-                    Self.cleanupQuarantineAttributes(at: destinationDir)
                     return
                 }
                 lastStatus = status
@@ -188,32 +195,44 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         try await Task.detached(priority: .userInitiated) {
             try performExtraction()
         }.value
+        
+        Self.cleanupQuarantineAttributes(at: destinationDir)
     }
     
-    /// Extracts a single entry from an archive directly.
-    public func extractSingleFile(
-        archivePath: String,
-        entryPath: String,
-        destinationDir: String,
-        password: String? = nil
-    ) async throws {
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: archivePath) else {
-            throw ArchiveError.fileNotFound
-        }
-        
-        if !fileManager.fileExists(atPath: destinationDir) {
-            try fileManager.createDirectory(atPath: destinationDir, withIntermediateDirectories: true)
-        }
-        
+    /// Synchronously extracts a single file from the archive without processing other entries.
+    public func extractSingleFile(archivePath: String, entryPath: String, destinationDir: String, password: String? = nil) async throws {
         try await Task.detached(priority: .userInitiated) {
+            let fileManager = FileManager.default
+            if !fileManager.fileExists(atPath: destinationDir) {
+                try fileManager.createDirectory(atPath: destinationDir, withIntermediateDirectories: true)
+            }
+            
             let pathLower = archivePath.lowercased()
             if pathLower.contains(".7z") || pathLower.contains("sevenzip") || pathLower.hasSuffix(".cb7") {
                 if let ok = try? SevenZipEngine.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: password), ok {
                     return
                 }
             } else if pathLower.hasSuffix(".zip") {
-                if ttzip_extract_zip_c_parallel(archivePath, destinationDir, false, password) == 0 {
+                let pwd = (password != nil && !password!.isEmpty) ? password : nil
+                let rStatus = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
+                    CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
+                        CUnsafeBufferAdapter.withCString(pwd) { pPtr in
+                            guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                            var opt = TTZipExtractOptions(
+                                destination_path: dPtr,
+                                password: pPtr,
+                                thread_budget: 0,
+                                overwrite_existing: true,
+                                preserve_permissions: true,
+                                dry_run: false,
+                                progress_callback: nil,
+                                user_data: nil
+                            )
+                            return ttzip_rust_extract_archive(aPtr, dPtr, &opt)
+                        }
+                    }
+                }
+                if rStatus == TTZIP_STATUS_OK {
                     return
                 }
             } else if pathLower.hasSuffix(".aar") {

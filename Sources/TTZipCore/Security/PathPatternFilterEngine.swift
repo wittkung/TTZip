@@ -40,26 +40,88 @@ public enum PathPatternFilterEngine: Sendable {
     
     /// Evaluates whether path matches POSIX.2 glob pattern.
     public static func matches(pattern: String, path: String, caseSensitive: Bool = true) -> Bool {
-        return pattern.withCString { cPattern in
-            path.withCString { cPath in
-                ttzip_path_matches(cPattern, cPath, caseSensitive)
+        let flags = (caseSensitive ? 0 : FNM_CASEFOLD) | FNM_PATHNAME
+        let cleanPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        let cleanPat = pattern.hasPrefix("/") ? String(pattern.dropFirst()) : pattern
+        
+        // 1. Direct path / fnmatch
+        if fnmatch(cleanPat, cleanPath, flags) == 0 {
+            return true
+        }
+        if fnmatch(pattern, path, flags) == 0 {
+            return true
+        }
+        
+        // 2. Double-star glob support
+        if pattern.contains("**") {
+            var regexPat = "^"
+            var idx = pattern.startIndex
+            while idx < pattern.endIndex {
+                if pattern[idx...].hasPrefix("**/") {
+                    regexPat += "(?:.+/)?"
+                    idx = pattern.index(idx, offsetBy: 3)
+                } else if pattern[idx...].hasPrefix("/**") {
+                    regexPat += "(?:/.*)?"
+                    idx = pattern.index(idx, offsetBy: 3)
+                } else if pattern[idx...].hasPrefix("**") {
+                    regexPat += ".*"
+                    idx = pattern.index(idx, offsetBy: 2)
+                } else if pattern[idx] == "*" {
+                    regexPat += "[^/]*"
+                    idx = pattern.index(after: idx)
+                } else if pattern[idx] == "?" {
+                    regexPat += "[^/]"
+                    idx = pattern.index(after: idx)
+                } else if pattern[idx] == "." {
+                    regexPat += "\\."
+                    idx = pattern.index(after: idx)
+                } else {
+                    regexPat.append(pattern[idx])
+                    idx = pattern.index(after: idx)
+                }
+            }
+            regexPat += "$"
+            if let regex = try? NSRegularExpression(pattern: regexPat, options: caseSensitive ? [] : [.caseInsensitive]) {
+                let range = NSRange(location: 0, length: cleanPath.utf16.count)
+                if regex.firstMatch(in: cleanPath, options: [], range: range) != nil {
+                    return true
+                }
+                let rawRange = NSRange(location: 0, length: path.utf16.count)
+                if regex.firstMatch(in: path, options: [], range: rawRange) != nil {
+                    return true
+                }
             }
         }
+        
+        // 3. Basename or component match for pattern without slashes
+        if !cleanPat.contains("/") {
+            let components = cleanPath.components(separatedBy: "/")
+            for comp in components {
+                if fnmatch(cleanPat, comp, caseSensitive ? 0 : FNM_CASEFOLD) == 0 {
+                    return true
+                }
+            }
+        }
+        return false
     }
     
     // MARK: - Metadata Evaluation Decisions
     
     /// Checks if path matches VCS metadata.
     public static func isVCSMetadata(_ path: String) -> Bool {
-        return path.withCString { cPath in
-            ttzip_path_is_vcs_metadata(cPath)
-        }
+        let parts = path.components(separatedBy: "/")
+        return parts.contains { vcsDirectoryNames.contains($0) || vcsFileNames.contains($0) }
     }
     
     /// Checks if path matches OS temporary junk or metadata files.
     public static func isMacMetadata(_ path: String) -> Bool {
+        let parts = path.components(separatedBy: "/")
+        for part in parts {
+            if macMetadataNames.contains(part) { return true }
+            if part.hasPrefix("._") { return true }
+        }
         return path.withCString { cPath in
-            ttzip_path_is_mac_metadata(cPath)
+            ttzip_rust_is_mac_junk(cPath)
         }
     }
     

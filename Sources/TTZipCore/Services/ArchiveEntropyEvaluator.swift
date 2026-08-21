@@ -32,19 +32,50 @@ public enum ArchiveEntropyEvaluator {
     /// Computes Shannon entropy (0.00 ~ 8.00) for a memory buffer.
     public static func estimateEntropy(buffer: UnsafeRawPointer, count: Int) -> Double {
         guard count > 0 else { return 0.0 }
-        return ttzip_estimate_buffer_entropy(buffer, count)
+        let ptr = buffer.assumingMemoryBound(to: UInt8.self)
+        var counts = [Int](repeating: 0, count: 256)
+        for i in 0..<count {
+            counts[Int(ptr[i])] += 1
+        }
+        var entropy: Double = 0.0
+        let total = Double(count)
+        for c in counts where c > 0 {
+            let p = Double(c) / total
+            entropy -= p * log2(p)
+        }
+        return entropy
     }
 
     /// Dynamically samples buffer across equidistant strides to evaluate Shannon entropy.
     public static func estimateEntropyDynamic(buffer: UnsafeRawPointer, count: Int) -> Double {
         guard count > 0 else { return 0.0 }
-        return ttzip_estimate_buffer_entropy_dynamic(buffer, count)
+        if count <= 65536 {
+            return estimateEntropy(buffer: buffer, count: count)
+        }
+        let sampleSize = 65536
+        let stride = count / sampleSize
+        let ptr = buffer.assumingMemoryBound(to: UInt8.self)
+        var counts = [Int](repeating: 0, count: 256)
+        for i in 0..<sampleSize {
+            counts[Int(ptr[i * stride])] += 1
+        }
+        var entropy: Double = 0.0
+        let total = Double(sampleSize)
+        for c in counts where c > 0 {
+            let p = Double(c) / total
+            entropy -= p * log2(p)
+        }
+        return entropy
     }
 
     /// Dynamically samples physical file across equidistant strides to evaluate Shannon entropy.
     public static func estimateFileEntropyDynamic(filePath: String) -> Double {
-        return filePath.withCString { cPath in
-            return ttzip_estimate_file_entropy_dynamic(cPath)
+        guard let handle = FileHandle(forReadingAtPath: filePath) else { return 0.0 }
+        defer { try? handle.close() }
+        let data = handle.readData(ofLength: 65536)
+        return data.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress else { return 0.0 }
+            return estimateEntropy(buffer: base, count: raw.count)
         }
     }
 

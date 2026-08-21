@@ -37,22 +37,22 @@ public final class ZstdCAdapter: ZstdEngineProtocol, Sendable {
         let tuner = AppleSiliconTuner.shared
         tuner.boostCurrentThreadPriority()
         
-        let workers = Int32(tuner.optimalCompressionThreads)
-        let jobSizeMB: Int32 = 0
+        let workers = UInt32(tuner.optimalCompressionThreads)
         let fileManager = FileManager.default
-        let srcBytes = (try? fileManager.attributesOfItem(atPath: srcPath)[.size] as? Int64) ?? 0
+        guard let srcData = try? Data(contentsOf: URL(fileURLWithPath: srcPath)) else { return false }
+        let srcBytes = Int64(srcData.count)
         
-        var windowLog: Int32 = 0
+        var windowLog: UInt32 = 0
         if enableLDM {
-            windowLog = Int32(tuner.optimalZstdLongWindowLog)
+            let optWindow = tuner.optimalZstdLongWindowLog
             if srcBytes > 0 {
-                let maxLog = Int32(ceil(log2(Double(srcBytes))))
-                if maxLog < windowLog {
-                    windowLog = max(10, maxLog)
-                }
+                let maxLog = Int(ceil(log2(Double(srcBytes))))
+                windowLog = UInt32(max(10, min(optWindow, maxLog)))
+            } else {
+                windowLog = UInt32(optWindow)
             }
         }
-        let overlapLog: Int32 = enableLDM ? 2 : 0
+        let overlapLog: UInt32 = enableLDM ? 2 : 0
         let compLevel = Int32(max(-5, min(22, level.rawValue)))
         let startTime = Date()
         
@@ -64,33 +64,40 @@ public final class ZstdCAdapter: ZstdEngineProtocol, Sendable {
             throughputMBs: 0.0
         ))
         
-        let result = CUnsafeBufferAdapter.withCString(srcPath) { cSrc in
-            CUnsafeBufferAdapter.withCString(dstPath) { cDst in
-                CUnsafeBufferAdapter.withCString(dictPath) { cDict in
-                    guard let cSrc = cSrc, let cDst = cDst else { return Int32(-1) }
-                    return ttzip_zstd_compress_file_stream(
-                        cSrc,
-                        cDst,
-                        compLevel,
-                        workers,
-                        jobSizeMB,
-                        overlapLog,
-                        windowLog,
-                        enableLDM,
-                        cDict
-                    )
-                }
+        let bound = ttzip_rust_zstd_compress_bound(srcData.count)
+        var outBuf = [UInt8](repeating: 0, count: bound)
+        var outLen: Int = 0
+        
+        let status = srcData.withUnsafeBytes { srcRaw in
+            guard let srcPtr = srcRaw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+            return outBuf.withUnsafeMutableBufferPointer { dstRaw in
+                guard let dstPtr = dstRaw.baseAddress else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                return ttzip_rust_zstd_compress_advanced(
+                    srcPtr,
+                    srcData.count,
+                    dstPtr,
+                    bound,
+                    compLevel,
+                    workers,
+                    0,
+                    overlapLog,
+                    windowLog,
+                    enableLDM,
+                    &outLen
+                )
             }
         }
         
-        if result == 0 {
+        if status == TTZIP_STATUS_OK {
+            let compData = Data(bytes: outBuf, count: outLen)
+            try compData.write(to: URL(fileURLWithPath: dstPath))
+            
             let duration = max(0.001, Date().timeIntervalSince(startTime))
-            let outBytes = (try? fileManager.attributesOfItem(atPath: dstPath)[.size] as? Int64) ?? 0
             let throughput = (Double(srcBytes) / (1024.0 * 1024.0)) / duration
             
             progressHandler?(ArchiveProgress(
                 state: .completed,
-                bytesProcessed: outBytes,
+                bytesProcessed: Int64(outLen),
                 totalBytes: srcBytes,
                 currentFileName: (dstPath as NSString).lastPathComponent,
                 throughputMBs: throughput
@@ -114,14 +121,37 @@ public final class ZstdCAdapter: ZstdEngineProtocol, Sendable {
         dictPath: String? = nil,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws -> Bool {
-        let result = CUnsafeBufferAdapter.withCString(srcPath) { cSrc in
-            CUnsafeBufferAdapter.withCString(dstPath) { cDst in
-                CUnsafeBufferAdapter.withCString(dictPath) { cDict in
-                    guard let cSrc = cSrc, let cDst = cDst else { return Int32(-1) }
-                    return ttzip_zstd_decompress_file_stream(cSrc, cDst, cDict)
-                }
+        guard let srcData = try? Data(contentsOf: URL(fileURLWithPath: srcPath)) else { return false }
+        var decompSize = Int(ttzip_rust_zstd_get_decompressed_size(
+            (srcData as NSData).bytes.assumingMemoryBound(to: UInt8.self),
+            srcData.count
+        ))
+        if decompSize <= 0 || decompSize > 1024 * 1024 * 1024 {
+            decompSize = max(srcData.count * 4, 64 * 1024)
+        }
+        
+        var outBuf = [UInt8](repeating: 0, count: decompSize)
+        var outLen: Int = 0
+        
+        let status = srcData.withUnsafeBytes { srcRaw in
+            guard let srcPtr = srcRaw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+            return outBuf.withUnsafeMutableBufferPointer { dstRaw in
+                guard let dstPtr = dstRaw.baseAddress else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                return ttzip_rust_zstd_decompress(
+                    srcPtr,
+                    srcData.count,
+                    dstPtr,
+                    decompSize,
+                    &outLen
+                )
             }
         }
-        return result == 0
+        
+        if status == TTZIP_STATUS_OK {
+            let decompData = Data(bytes: outBuf, count: outLen)
+            try? decompData.write(to: URL(fileURLWithPath: dstPath))
+            return true
+        }
+        return false
     }
 }

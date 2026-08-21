@@ -44,10 +44,12 @@ public final class MIPSHardwareBenchmarkEngine: @unchecked Sendable {
         
         // 2. Measure Compression Pass
         let compStart = mach_absolute_time()
-        var compressedBytes: size_t = 0
+        var compressedBytes: Int = 0
         
         for _ in 0..<iterations {
-            compressedBytes = ttzip_libdeflate_compress(rawSource, bufferSize, rawCompressed, bufferSize + (64 * 1024), 1)
+            var outLen: Int = 0
+            let st = ttzip_rust_deflate_compress(rawSource, bufferSize, rawCompressed, bufferSize + (64 * 1024), 1, &outLen)
+            if st == TTZIP_STATUS_OK { compressedBytes = outLen }
         }
         let compElapsed = max(0.0001, Self.elapsedSeconds(from: compStart))
         let compSpeedMBs = (Double(bufferSize * iterations) / (1024.0 * 1024.0)) / compElapsed
@@ -56,7 +58,8 @@ public final class MIPSHardwareBenchmarkEngine: @unchecked Sendable {
         let decompStart = mach_absolute_time()
         
         for _ in 0..<iterations {
-            _ = ttzip_libdeflate_decompress(rawCompressed, compressedBytes, rawDecompressed, bufferSize)
+            var outLen: Int = 0
+            _ = ttzip_rust_deflate_decompress(rawCompressed, compressedBytes, rawDecompressed, bufferSize, &outLen)
         }
         let decompElapsed = max(0.0001, Self.elapsedSeconds(from: decompStart))
         let decompSpeedMBs = (Double(bufferSize * iterations) / (1024.0 * 1024.0)) / decompElapsed

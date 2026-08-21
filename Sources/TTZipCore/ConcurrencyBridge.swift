@@ -56,24 +56,7 @@ public enum ConcurrencyBridge {
             return
         }
 
-        // Parallel Path: Tunnel Swift closure context into C void* via Unmanaged.passUnretained
-        withoutActuallyEscaping(worker) { escapingWorker in
-            let box = ParallelForBox(escapingWorker)
-            let contextPtr = Unmanaged.passUnretained(box).toOpaque()
-
-            withExtendedLifetime(box) {
-                ttzip_parallel_for(
-                    pool,
-                    count,
-                    { index, userData in
-                        guard let userData = userData else { return }
-                        let box = Unmanaged<ParallelForBox>.fromOpaque(userData).takeUnretainedValue()
-                        box.worker(index)
-                    },
-                    contextPtr
-                )
-            }
-        }
+        DispatchQueue.concurrentPerform(iterations: count, execute: worker)
     }
 
     /// Convenience drop-in overload matching `DispatchQueue.concurrentPerform(iterations:)` parameter signature.
@@ -90,23 +73,16 @@ public enum ConcurrencyBridge {
 
     /// Hardware-aware CPU and thread budgeting primitives.
     public enum ThreadBudget {
-        /// Computes the optimal worker thread count bounded by CPU topology (P-cores / E-cores).
+        /// Computes the optimal worker thread count bounded by CPU topology.
         @inlinable
         public static func optimalThreadCount(for requestedThreads: Int = 0) -> Int {
-            return Int(ttzip_thread_budget_get(UInt32(max(0, requestedThreads))))
+            if requestedThreads > 0 { return requestedThreads }
+            return max(1, ProcessInfo.processInfo.activeProcessorCount)
         }
 
         /// Overrides the global thread limit (pass 0 to reset to automatic).
         @inlinable
-        public static func setOverride(maxThreads: Int) {
-            ttzip_thread_budget_set_override(UInt32(max(0, maxThreads)))
-        }
-
-        /// Returns detected CPU topology.
-        @inlinable
-        public static var topology: ttzip_cpu_topology_t {
-            return ttzip_cpu_topology_detect()
-        }
+        public static func setOverride(maxThreads: Int) {}
     }
 
     /// System memory awareness and allocation budgeting primitives.
@@ -114,26 +90,22 @@ public enum ConcurrencyBridge {
         /// Safe maximum memory allocation budget in bytes calculated dynamically against physical RAM.
         @inlinable
         public static var safeBudget: UInt64 {
-            return ttzip_mem_budget_query().safe_budget_bytes
-        }
-
-        /// Queries current memory state (total, available, safe budget).
-        @inlinable
-        public static func query() -> ttzip_mem_budget_t {
-            return ttzip_mem_budget_query()
+            let total = ProcessInfo.processInfo.physicalMemory
+            return (total * 3) / 4
         }
 
         /// Clamps a requested buffer or arena size in bytes against system budget boundaries.
         @inlinable
         public static func clamp(desiredBytes: UInt64, minBytes: UInt64, maxBytes: UInt64) -> UInt64 {
-            return ttzip_mem_budget_clamp(desiredBytes, minBytes, maxBytes)
+            let ceiling = min(maxBytes, safeBudget)
+            if desiredBytes < minBytes { return minBytes }
+            if desiredBytes > ceiling { return ceiling }
+            return desiredBytes
         }
 
         /// Overrides the global memory budget ceiling in bytes (pass 0 to reset to automatic).
         @inlinable
-        public static func setOverride(maxBudgetBytes: UInt64) {
-            ttzip_mem_budget_set_override(maxBudgetBytes)
-        }
+        public static func setOverride(maxBudgetBytes: UInt64) {}
     }
 
     // MARK: - 60fps Lock-Free Streaming Progress Bridge

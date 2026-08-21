@@ -9,6 +9,7 @@ import Foundation
 import CryptoKit
 import Security
 import LocalAuthentication
+import CommonCrypto
 import CTTZipBridge
 
 // MARK: - PasswordVaultManager Persistence, AES-GCM Encryption & Keychain Extension
@@ -34,13 +35,18 @@ extension PasswordVaultManager {
                 memset_s(base, ptr.count, 0, ptr.count)
             }
         }
-        let status = password.withCString { cPwd -> Int32 in
-            salt.withUnsafeBytes { saltBuffer in
-                guard let saltAddress = saltBuffer.bindMemory(to: UInt8.self).baseAddress else { return -1 }
-                return ttzip_pbkdf2_sha256_fast(cPwd, password.utf8.count, saltAddress, salt.count, iterations, &derivedKey, 32)
-            }
+        let passBytes = Array(password.utf8)
+        let status = salt.withUnsafeBytes { sBuf in
+            CCKeyDerivationPBKDF(
+                CCPBKDFAlgorithm(kCCPBKDF2),
+                password, passBytes.count,
+                sBuf.baseAddress?.assumingMemoryBound(to: UInt8.self), salt.count,
+                CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256),
+                iterations,
+                &derivedKey, 32
+            )
         }
-        if status == 0 {
+        if status == kCCSuccess {
             return SymmetricKey(data: derivedKey)
         }
         let hash = SHA256.hash(data: Data(password.utf8))
@@ -98,10 +104,16 @@ extension PasswordVaultManager {
     func deriveSymmetricKey(_ password: String) -> SymmetricKey {
         let salt = Array("TTZipVaultSalt2026".utf8)
         var derivedKey = [UInt8](repeating: 0, count: 32)
-        let status = password.withCString { cPwd -> Int32 in
-            return ttzip_pbkdf2_sha1_fast(cPwd, password.utf8.count, salt, salt.count, 10000, &derivedKey, 32)
-        }
-        if status == 0 {
+        let passBytes = Array(password.utf8)
+        let status = CCKeyDerivationPBKDF(
+            CCPBKDFAlgorithm(kCCPBKDF2),
+            password, passBytes.count,
+            salt, salt.count,
+            CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1),
+            10000,
+            &derivedKey, 32
+        )
+        if status == kCCSuccess {
             return SymmetricKey(data: Data(derivedKey))
         }
         let hash = SHA256.hash(data: Data(password.utf8))

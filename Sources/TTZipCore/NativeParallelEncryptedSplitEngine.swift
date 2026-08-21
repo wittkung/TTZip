@@ -53,17 +53,27 @@ public final class NativeParallelEncryptedSplitEngine: @unchecked Sendable {
                 progressHandler: nil
             )) ?? false
         } else {
+            let enc: TTZipEncryptionMethod = !password.isEmpty ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
+            let pwd = !password.isEmpty ? password : nil
             let res = CUnsafeBufferAdapter.withCString(primaryOutputPath) { cOutputPath in
                 CUnsafeBufferAdapter.withCStringsArray(sourcePaths) { cInputPaths in
-                    CUnsafeBufferAdapter.withCString(password) { cPassword in
-                        guard let cOutputPath = cOutputPath else { return Int32(-1) }
-                        let status = ttzip_create_zip_parallel_c(cOutputPath, cInputPaths, sourcePaths.count, 0, false, cPassword)
-                        if status == 0 { return Int32(0) }
-                        return ttzip_create_archive_tuned(cOutputPath, "zip", cInputPaths, sourcePaths.count, false, 0, 0, 16, cPassword)
+                    CUnsafeBufferAdapter.withCString(pwd) { cPassword in
+                        guard let cOutputPath = cOutputPath else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                        var opt = TTZipCreateOptions(
+                            format: TTZIP_ARCHIVE_FORMAT_ZIP,
+                            level: TTZIP_COMPRESSION_LEVEL_STORE,
+                            encryption: enc,
+                            password: cPassword,
+                            thread_budget: 0,
+                            solid_block_size_mb: 0,
+                            progress_callback: nil,
+                            user_data: nil
+                        )
+                        return ttzip_rust_create_archive(cInputPaths, sourcePaths.count, cOutputPath, &opt)
                     }
                 }
             }
-            success = (res == 0)
+            success = (res == TTZIP_STATUS_OK)
         }
         
         guard success, FileManager.default.fileExists(atPath: primaryOutputPath) else {

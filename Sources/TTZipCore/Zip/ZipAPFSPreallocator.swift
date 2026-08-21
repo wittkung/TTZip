@@ -17,6 +17,6 @@ public final class ZipAPFSPreallocator: @unchecked Sendable {
     /// Preallocates contiguous physical extent for file descriptor before streaming write.
     @discardableResult
     public func preallocateFileExtent(fd: Int32, targetSize: Int64) -> Bool {
-        return ttzip_apfs_preallocate(fd, targetSize) == 0
+        return ttzip_rust_apfs_preallocate(fd, targetSize) == 0
     }
 }

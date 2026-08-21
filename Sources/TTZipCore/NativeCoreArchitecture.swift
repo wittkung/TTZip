@@ -16,12 +16,23 @@ public final class NativeCoreArchitecture: @unchecked Sendable {
     /// Triggers APFS file extent physical pre-allocation to prevent fragmentation.
     @discardableResult
     public func preallocateFileExtent(fileDescriptor: Int32, targetSizeBytes: Int64) -> Bool {
-        return ttzip_core_apfs_preallocate_file(fileDescriptor, targetSizeBytes) == 0
+        guard fileDescriptor >= 0, targetSizeBytes > 0 else { return false }
+        var fstore = fstore_t(
+            fst_flags: UInt32(F_ALLOCATECONTIG | F_ALLOCATEALL),
+            fst_posmode: F_PEOFPOSMODE,
+            fst_offset: 0,
+            fst_length: targetSizeBytes,
+            fst_bytesalloc: 0
+        )
+        if fcntl(fileDescriptor, F_PREALLOCATE, &fstore) != -1 { return true }
+        fstore.fst_flags = UInt32(F_ALLOCATEALL)
+        return fcntl(fileDescriptor, F_PREALLOCATE, &fstore) != -1
     }
     
     /// Computes CRC32 checksum with ARM64 NEON SIMD vectorization.
     public func computeFastCRC32(buffer: UnsafeRawPointer, length: Int) -> UInt32 {
-        return ttzip_core_crc32_neon_single(0, buffer.assumingMemoryBound(to: UInt8.self), length)
+        guard length > 0 else { return 0 }
+        return ttzip_rust_crc32(0, buffer.assumingMemoryBound(to: UInt8.self), length)
     }
     
     /// Allocates memory aligned to Apple Silicon 16KB physical page boundaries.

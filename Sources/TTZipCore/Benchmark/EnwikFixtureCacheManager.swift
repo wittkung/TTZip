@@ -161,12 +161,9 @@ public enum EnwikFixtureCacheManager {
     private static func downloadFileSynchronously(url: URL) -> Data? {
         final class ResultBox: @unchecked Sendable {
             var data: Data?
-            var sema: OpaquePointer?
+            let sema = DispatchSemaphore(value: 0)
         }
         let box = ResultBox()
-        let sema = ttzip_semaphore_create(0)
-        box.sema = sema
-        defer { ttzip_semaphore_destroy(sema) }
         
         var request = URLRequest(url: url)
         request.timeoutInterval = 10.0
@@ -175,12 +172,10 @@ public enum EnwikFixtureCacheManager {
             if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200, let data = data {
                 box?.data = data
             }
-            if let s = box?.sema {
-                ttzip_semaphore_signal(s)
-            }
+            box?.sema.signal()
         }
         task.resume()
-        ttzip_semaphore_wait(sema)
+        _ = box.sema.wait(timeout: .now() + 15.0)
         return box.data
     }
     

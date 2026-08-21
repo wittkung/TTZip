@@ -14,6 +14,7 @@ public final class SnappyFramingStream: Sendable {
     public static let shared = SnappyFramingStream()
 
     public static let streamIdentifier = Data([0xFF, 0x06, 0x00, 0x00, 0x73, 0x4E, 0x61, 0x50, 0x70, 0x59])
+    public static let maxChunkRawSize = 65536
 
     public init() {}
 
@@ -29,29 +30,46 @@ public final class SnappyFramingStream: Sendable {
             return Self.streamIdentifier
         }
 
-        // Upper bound: 10 byte header + (chunks * (4 byte header + 4 byte CRC + max compressed size))
-        let numChunks = (data.count + Int(TTZIP_SNAPPY_MAX_CHUNK_RAW_SIZE) - 1) / Int(TTZIP_SNAPPY_MAX_CHUNK_RAW_SIZE)
-        let maxOutCapacity = 10 + (numChunks * (8 + Int(TTZIP_SNAPPY_MAX_CHUNK_RAW_SIZE) + 1024))
-        var framedData = Data(count: maxOutCapacity)
-        var actualFramedLength = maxOutCapacity
+        var result = Self.streamIdentifier
+        var offset = 0
+        let total = data.count
 
-        let status = data.withUnsafeBytes { inBuf -> Int32 in
-            guard let inBase = inBuf.baseAddress else { return -1 }
-            return framedData.withUnsafeMutableBytes { outBuf -> Int32 in
-                guard let outBase = outBuf.baseAddress else { return -1 }
-                return ttzip_snappy_framed_compress(inBase, inBuf.count, outBase, &actualFramedLength)
+        while offset < total {
+            let chunkSize = min(Self.maxChunkRawSize, total - offset)
+            let chunkData = data.subdata(in: offset..<(offset + chunkSize))
+            offset += chunkSize
+
+            let rawCrc: UInt32 = chunkData.withUnsafeBytes { ptr -> UInt32 in
+                guard let base = ptr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                return ttzip_rust_crc32(0, base, chunkData.count)
+            }
+            let crc = SnappyBlockEngine.shared.maskCRC32C(rawCrc)
+            let compressed = try SnappyBlockEngine.shared.compress(data: chunkData)
+
+            if compressed.count < chunkData.count {
+                // Type 0x00: Compressed chunk
+                let length = compressed.count + 4
+                result.append(0x00)
+                result.append(UInt8(truncatingIfNeeded: length & 0xFF))
+                result.append(UInt8(truncatingIfNeeded: (length >> 8) & 0xFF))
+                result.append(UInt8(truncatingIfNeeded: (length >> 16) & 0xFF))
+                var crcLE = crc.littleEndian
+                withUnsafeBytes(of: &crcLE) { result.append(contentsOf: $0) }
+                result.append(compressed)
+            } else {
+                // Type 0x01: Uncompressed chunk
+                let length = chunkData.count + 4
+                result.append(0x01)
+                result.append(UInt8(truncatingIfNeeded: length & 0xFF))
+                result.append(UInt8(truncatingIfNeeded: (length >> 8) & 0xFF))
+                result.append(UInt8(truncatingIfNeeded: (length >> 16) & 0xFF))
+                var crcLE = crc.littleEndian
+                withUnsafeBytes(of: &crcLE) { result.append(contentsOf: $0) }
+                result.append(chunkData)
             }
         }
 
-        guard status == TTZIP_SNAPPY_OK.rawValue else {
-            if status == TTZIP_SNAPPY_ERR_BUFFER_TOO_SMALL.rawValue {
-                throw SnappyError.bufferTooSmall
-            }
-            throw SnappyError.corruptTag
-        }
-
-        framedData.count = actualFramedLength
-        return framedData
+        return result
     }
 
     /// Decodes official Snappy Framing Format stream (.sz) into restored raw data.
@@ -64,56 +82,53 @@ public final class SnappyFramingStream: Sendable {
             throw SnappyError.invalidMagicHeader
         }
 
-        // Estimate initial capacity (3x-10x for compression ratio, dynamically resize if needed)
-        var estimatedCapacity = max(framedData.count * 4, 1024 * 1024)
-        if estimatedCapacity > maxAllowedSize {
-            estimatedCapacity = maxAllowedSize
-        }
+        var result = Data()
+        var offset = Self.streamIdentifier.count
+        let total = framedData.count
 
-        var decompressedData = Data(count: estimatedCapacity)
-        var actualDecompressedLength = estimatedCapacity
+        while offset + 4 <= total {
+            let chunkType = framedData[offset]
+            let b1 = Int(framedData[offset + 1])
+            let b2 = Int(framedData[offset + 2])
+            let b3 = Int(framedData[offset + 3])
+            let chunkLen = b1 | (b2 << 8) | (b3 << 16)
+            offset += 4
 
-        var status = framedData.withUnsafeBytes { inBuf -> Int32 in
-            guard let inBase = inBuf.baseAddress else { return -1 }
-            return decompressedData.withUnsafeMutableBytes { outBuf -> Int32 in
-                guard let outBase = outBuf.baseAddress else { return -1 }
-                return ttzip_snappy_framed_decompress(inBase, inBuf.count, outBase, &actualDecompressedLength)
+            guard offset + chunkLen <= total else {
+                throw SnappyError.unexpectedEOF(expected: chunkLen, remaining: total - offset)
             }
-        }
 
-        // If buffer was too small, double capacity up to maxAllowedSize
-        while status == TTZIP_SNAPPY_ERR_BUFFER_TOO_SMALL.rawValue && estimatedCapacity < maxAllowedSize {
-            estimatedCapacity = min(estimatedCapacity * 2, maxAllowedSize)
-            decompressedData = Data(count: estimatedCapacity)
-            actualDecompressedLength = estimatedCapacity
+            let chunkPayload = framedData.subdata(in: offset..<(offset + chunkLen))
+            offset += chunkLen
 
-            status = framedData.withUnsafeBytes { inBuf -> Int32 in
-                guard let inBase = inBuf.baseAddress else { return -1 }
-                return decompressedData.withUnsafeMutableBytes { outBuf -> Int32 in
-                    guard let outBase = outBuf.baseAddress else { return -1 }
-                    return ttzip_snappy_framed_decompress(inBase, inBuf.count, outBase, &actualDecompressedLength)
+            switch chunkType {
+            case 0xFF: // Stream identifier
+                continue
+            case 0xFE: // Padding
+                continue
+            case 0x00: // Compressed data
+                guard chunkPayload.count >= 4 else { throw SnappyError.corruptTag }
+                let compData = chunkPayload.subdata(in: 4..<chunkPayload.count)
+                let decomp = try SnappyBlockEngine.shared.decompress(compressedData: compData, maxAllowedSize: maxAllowedSize)
+                if result.count + decomp.count > maxAllowedSize {
+                    throw SnappyError.decompressedSizeExceeded(maxAllowed: maxAllowedSize, actual: result.count + decomp.count)
                 }
-            }
-        }
-
-        guard status == TTZIP_SNAPPY_OK.rawValue else {
-            switch status {
-            case TTZIP_SNAPPY_ERR_INVALID_MAGIC.rawValue:
-                throw SnappyError.invalidMagicHeader
-            case TTZIP_SNAPPY_ERR_CRC32C_MISMATCH.rawValue:
-                throw SnappyError.crc32cMismatch(expected: 0, actual: 0)
-            case TTZIP_SNAPPY_ERR_UNSUPPORTED_CHUNK.rawValue:
-                throw SnappyError.unsupportedChunkType(0)
-            case TTZIP_SNAPPY_ERR_UNEXPECTED_EOF.rawValue:
-                throw SnappyError.unexpectedEOF(expected: 0, remaining: 0)
-            case TTZIP_SNAPPY_ERR_BUFFER_TOO_SMALL.rawValue:
-                throw SnappyError.bufferTooSmall
+                result.append(decomp)
+            case 0x01: // Uncompressed data
+                guard chunkPayload.count >= 4 else { throw SnappyError.corruptTag }
+                let rawData = chunkPayload.subdata(in: 4..<chunkPayload.count)
+                if result.count + rawData.count > maxAllowedSize {
+                    throw SnappyError.decompressedSizeExceeded(maxAllowed: maxAllowedSize, actual: result.count + rawData.count)
+                }
+                result.append(rawData)
             default:
-                throw SnappyError.corruptTag
+                if chunkType >= 0x02 && chunkType <= 0x7F {
+                    throw SnappyError.unsupportedChunkType(chunkType)
+                }
+                // Skip skippable chunk types (0x80..0xFD)
             }
         }
 
-        decompressedData.count = actualDecompressedLength
-        return decompressedData
+        return result
     }
 }

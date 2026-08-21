@@ -52,20 +52,25 @@ public final class HashCalculator: HashCalculating, @unchecked Sendable {
                             let offset = idx * crcChunkSize
                             let len = min(crcChunkSize, totalFileSize - offset)
                             let chunkPtr = basePtr.advanced(by: offset)
-                            outBufPtr[idx] = ttzip_compute_buffer_crc32_neon(0, chunkPtr, len)
+                            outBufPtr[idx] = ttzip_rust_crc32(0, chunkPtr, len)
                         }
                     }
 
                     var finalCRC: UInt32 = 0
                     for idx in 0..<numChunks {
                         let len = min(crcChunkSize, totalFileSize - (idx * crcChunkSize))
-                        finalCRC = UInt32(crc32_combine(uLong(finalCRC), uLong(chunkCRCs[idx]), len))
+                        finalCRC = HardwareChecksumAdapter.combineCRC32(crc1: finalCRC, crc2: chunkCRCs[idx], len2: len)
                     }
                     return String(format: "%08X", finalCRC)
                 }
             }
-            let crc = ttzip_compute_file_crc32(filePath)
-            return String(format: "%08X", crc)
+            if let data = try? Data(contentsOf: URL(fileURLWithPath: filePath)) {
+                let crc = data.withUnsafeBytes { raw in
+                    ttzip_rust_crc32(0, raw.bindMemory(to: UInt8.self).baseAddress, raw.count)
+                }
+                return String(format: "%08X", crc)
+            }
+            return "00000000"
             
         case .sha256:
             return try computeCryptoHashSync(filePath: filePath, createHasher: SHA256.init)

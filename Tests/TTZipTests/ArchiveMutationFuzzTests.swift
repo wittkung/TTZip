@@ -95,7 +95,6 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         let extractDest = baseSandbox.appendingPathComponent("ext_magic_\(fmt.rawValue)_\(iter)").path
                         let status = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
                         _ = status
-                        _ = ttzip_stat_file_info(reproducerPath, nil, nil, nil)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)
@@ -138,7 +137,6 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_crc_\(fmt.rawValue)_\(iter)").path
                         _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
-                        _ = ttzip_stat_file_info(reproducerPath, nil, nil, nil)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)
@@ -181,7 +179,6 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_trunc_\(fmt.rawValue)_\(iter)").path
                         _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
-                        _ = ttzip_stat_file_info(reproducerPath, nil, nil, nil)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)
@@ -292,7 +289,6 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_oversize_\(fmt.rawValue)_\(iter)").path
                         _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
-                        _ = ttzip_stat_file_info(reproducerPath, nil, nil, nil)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)
@@ -335,7 +331,6 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_dict_\(fmt.rawValue)_\(iter)").path
                         _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
-                        _ = ttzip_stat_file_info(reproducerPath, nil, nil, nil)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)
@@ -386,7 +381,6 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_matrix_\(fmt.rawValue)_\(iter)").path
                         _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
-                        _ = ttzip_stat_file_info(reproducerPath, nil, nil, nil)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)

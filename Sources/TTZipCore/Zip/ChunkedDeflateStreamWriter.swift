@@ -14,18 +14,17 @@ import CTTZipBridge
 public final class ChunkedDeflateStreamWriter: @unchecked Sendable {
     public static let adaptiveThresholdBytes: Int64 = 256 * 1024 * 1024 // 256MB
     
-    private var streamHandle: OpaquePointer?
     private let outFd: Int32
-    private let level: Int32
+    private let compressor: DeflateStreamCompressor?
     private var isClosed = false
+    private var totalOut: UInt64 = 0
+    private var currentCrc: UInt32 = 0
     
     public init?(outFd: Int32, level: Int = 6) {
         self.outFd = outFd
-        self.level = Int32(level > 0 ? (level > 12 ? 12 : level) : 6)
-        guard let handle = ttzip_zip_chunked_stream_create(outFd, self.level) else {
-            return nil
-        }
-        self.streamHandle = handle
+        let config = DeflateStreamConfig(compressionLevel: level, windowBits: -15)
+        self.compressor = try? DeflateStreamCompressor(config: config)
+        if self.compressor == nil { return nil }
     }
     
     deinit {
@@ -34,46 +33,71 @@ public final class ChunkedDeflateStreamWriter: @unchecked Sendable {
     
     /// Writes a data buffer into the streaming pipeline.
     public func write(data: Data) -> Bool {
-        guard let handle = streamHandle, !isClosed, !data.isEmpty else {
-            return !isClosed
-        }
+        guard let compressor = compressor, !isClosed else { return false }
+        if data.isEmpty { return true }
         
         return data.withUnsafeBytes { rawBuffer in
             guard let baseAddress = rawBuffer.baseAddress else { return false }
-            let written = ttzip_zip_chunked_stream_write(handle, baseAddress, rawBuffer.count)
-            return written == Int64(rawBuffer.count)
+            return write(buffer: baseAddress, count: rawBuffer.count)
         }
     }
     
     /// Writes raw pointer buffer into the streaming pipeline.
     public func write(buffer: UnsafeRawPointer, count: Int) -> Bool {
-        guard let handle = streamHandle, !isClosed, count > 0 else {
-            return !isClosed
+        guard let compressor = compressor, !isClosed else { return false }
+        if count == 0 { return true }
+        
+        let inBytes = buffer.assumingMemoryBound(to: UInt8.self)
+        currentCrc = ttzip_rust_crc32(currentCrc, inBytes, count)
+        
+        var writeSuccess = true
+        do {
+            try compressor.compress(buffer: buffer, count: count, flush: .noFlush) { outChunk in
+                if let base = outChunk.baseAddress, outChunk.count > 0 {
+                    let w = Darwin.write(outFd, base, outChunk.count)
+                    if w != outChunk.count {
+                        writeSuccess = false
+                    } else {
+                        totalOut += UInt64(w)
+                    }
+                }
+            }
+        } catch {
+            return false
         }
-        let written = ttzip_zip_chunked_stream_write(handle, buffer, count)
-        return written == Int64(count)
+        return writeSuccess
     }
     
     /// Finalizes the stream and returns total compressed bytes and CRC-32 checksum.
     public func finish() -> (totalCompressed: UInt64, finalCrc32: UInt32)? {
-        guard let handle = streamHandle, !isClosed else { return nil }
-        var totalComp: UInt64 = 0
-        var finalCrc: UInt32 = 0
+        guard let compressor = compressor, !isClosed else { return nil }
         
-        let res = ttzip_zip_chunked_stream_finish(handle, &totalComp, &finalCrc)
-        guard res == 0 else { return nil }
+        var writeSuccess = true
+        do {
+            try compressor.finish { outChunk in
+                if let base = outChunk.baseAddress, outChunk.count > 0 {
+                    let w = Darwin.write(outFd, base, outChunk.count)
+                    if w != outChunk.count {
+                        writeSuccess = false
+                    } else {
+                        totalOut += UInt64(w)
+                    }
+                }
+            }
+        } catch {
+            return nil
+        }
         
+        guard writeSuccess else { return nil }
         close()
-        return (totalCompressed: totalComp, finalCrc32: finalCrc)
+        return (totalCompressed: totalOut, finalCrc32: currentCrc)
     }
     
     /// Closes and releases the chunked stream handle.
     public func close() {
         guard !isClosed else { return }
         isClosed = true
-        if let handle = streamHandle {
-            ttzip_zip_chunked_stream_destroy(handle)
-            streamHandle = nil
-        }
+        compressor?.close()
     }
 }
+

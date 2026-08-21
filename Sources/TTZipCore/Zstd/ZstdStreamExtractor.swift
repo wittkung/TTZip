@@ -36,7 +36,7 @@ public final class ZstdStreamExtractor: @unchecked Sendable {
             throughputMBs: 0.0
         ))
         
-        let result = ttzip_zstd_decompress_file_stream(srcPath, dstPath, dictPath)
+        let result = ((try? ZstdCAdapter.shared.decompressFile(srcPath: srcPath, dstPath: dstPath)) == true) ? 0 : -1
         
         if result == 0 {
             let duration = max(0.001, Date().timeIntervalSince(startTime))

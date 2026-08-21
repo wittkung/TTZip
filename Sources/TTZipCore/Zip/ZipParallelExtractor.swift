@@ -184,11 +184,13 @@ public final class ZipParallelExtractor: @unchecked Sendable {
                                 posix_memalign(&alignedOutPtr, 64, targetSize)
                                 if let dstRawPtr = alignedOutPtr {
                                     let dstBytePtr = dstRawPtr.assumingMemoryBound(to: UInt8.self)
-                                    let decompSize = payloadData.withUnsafeBytes { rawIn -> size_t in
-                                        guard let src = rawIn.baseAddress else { return 0 }
-                                        return ttzip_libdeflate_decompress(src, payloadData.count, dstBytePtr, targetSize)
+                                    let decompSize = payloadData.withUnsafeBytes { rawIn -> Int in
+                                        guard let src = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                                        var outLen: Int = 0
+                                        let st = ttzip_rust_deflate_decompress(src, payloadData.count, dstBytePtr, targetSize, &outLen)
+                                        return st == TTZIP_STATUS_OK ? outLen : 0
                                     }
-                                    if decompSize == desc.uncompressedSize {
+                                    if decompSize == Int(desc.uncompressedSize) {
                                         ZipDirectIOWriter.shared.writeBuffer(fd: outFd, buffer: dstBytePtr, count: targetSize)
                                     }
                                     free(dstRawPtr)
@@ -214,7 +216,8 @@ public final class ZipParallelExtractor: @unchecked Sendable {
                             if let mapPtr = mmap(nil, targetSize, PROT_READ | PROT_WRITE, MAP_SHARED, outFd, 0), mapPtr != MAP_FAILED {
                                 let dstPtr = mapPtr.assumingMemoryBound(to: UInt8.self)
                                 posix_madvise(mapPtr, targetSize, POSIX_MADV_WILLNEED)
-                                _ = ttzip_libdeflate_decompress(payloadPtr, Int(desc.compressedSize), dstPtr, targetSize)
+                                var outL: Int = 0
+                                _ = ttzip_rust_deflate_decompress(payloadPtr, Int(desc.compressedSize), dstPtr, targetSize, &outL)
                                 msync(mapPtr, targetSize, MS_ASYNC)
                                 madvise(mapPtr, targetSize, MADV_DONTNEED)
                                 munmap(mapPtr, targetSize)
@@ -223,8 +226,9 @@ public final class ZipParallelExtractor: @unchecked Sendable {
                                 posix_memalign(&alignedOutPtr, 64, targetSize)
                                 if let dstRawPtr = alignedOutPtr {
                                     let dstBytePtr = dstRawPtr.assumingMemoryBound(to: UInt8.self)
-                                    let decompSize = ttzip_libdeflate_decompress(payloadPtr, Int(desc.compressedSize), dstBytePtr, targetSize)
-                                    if decompSize == desc.uncompressedSize {
+                                    var outL: Int = 0
+                                    let status = ttzip_rust_deflate_decompress(payloadPtr, Int(desc.compressedSize), dstBytePtr, targetSize, &outL)
+                                    if status == TTZIP_STATUS_OK && Int64(outL) == desc.uncompressedSize {
                                         ZipDirectIOWriter.shared.writeBuffer(fd: outFd, buffer: dstBytePtr, count: targetSize)
                                     }
                                     free(dstRawPtr)
@@ -234,8 +238,9 @@ public final class ZipParallelExtractor: @unchecked Sendable {
                             // Small files (<=64KB): Stack-allocated fast decompression, zero heap allocation
                             withUnsafeTemporaryAllocation(of: UInt8.self, capacity: targetSize) { stackBuf in
                                 guard let dstBytePtr = stackBuf.baseAddress else { return }
-                                let decompSize = ttzip_libdeflate_decompress(payloadPtr, Int(desc.compressedSize), dstBytePtr, targetSize)
-                                if decompSize == desc.uncompressedSize {
+                                var outL: Int = 0
+                                let status = ttzip_rust_deflate_decompress(payloadPtr, Int(desc.compressedSize), dstBytePtr, targetSize, &outL)
+                                if status == TTZIP_STATUS_OK && Int64(outL) == desc.uncompressedSize {
                                     ZipDirectIOWriter.shared.writeBuffer(fd: outFd, buffer: dstBytePtr, count: targetSize)
                                 }
                             }
@@ -245,8 +250,9 @@ public final class ZipParallelExtractor: @unchecked Sendable {
                             posix_memalign(&alignedOutPtr, 64, targetSize)
                             if let dstRawPtr = alignedOutPtr {
                                 let dstBytePtr = dstRawPtr.assumingMemoryBound(to: UInt8.self)
-                                let decompSize = ttzip_libdeflate_decompress(payloadPtr, Int(desc.compressedSize), dstBytePtr, targetSize)
-                                if decompSize == desc.uncompressedSize {
+                                var outL: Int = 0
+                                let status = ttzip_rust_deflate_decompress(payloadPtr, Int(desc.compressedSize), dstBytePtr, targetSize, &outL)
+                                if status == TTZIP_STATUS_OK && Int64(outL) == desc.uncompressedSize {
                                     ZipDirectIOWriter.shared.writeBuffer(fd: outFd, buffer: dstBytePtr, count: targetSize)
                                 }
                                 free(dstRawPtr)

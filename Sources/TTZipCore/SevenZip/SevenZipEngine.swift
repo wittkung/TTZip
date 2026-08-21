@@ -52,7 +52,10 @@ public final class SevenZipEngine: @unchecked Sendable {
             let joinedTemp = FileManager.default.temporaryDirectory.appendingPathComponent("joined_\(UUID().uuidString).7z").path
             defer { try? FileManager.default.removeItem(atPath: joinedTemp) }
             if ArchiveExtractor().joinSplitVolumes(firstVolumePath: archivePath, outputPath: joinedTemp) {
-                return try SevenZipCAdapter.shared.extractArchive(archivePath: joinedTemp, destinationDir: destinationDir, skipMacJunk: true, password: pwd)
+                if let ok = try? SevenZipCAdapter.shared.extractArchive(archivePath: joinedTemp, destinationDir: destinationDir, skipMacJunk: true, password: pwd), ok {
+                    let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
+                    if !items.isEmpty { return true }
+                }
             }
             let ok = try SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, skipMacJunk: true, password: pwd)
             if !ok {

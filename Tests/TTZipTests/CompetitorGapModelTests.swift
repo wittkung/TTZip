@@ -10,67 +10,6 @@ import XCTest
 
 final class CompetitorGapModelTests: XCTestCase {
     
-    // MARK: - ArchiveSearchQuery & ArchiveSearchResult Tests
-    
-    func testArchiveSearchQueryFullSerialization() throws {
-        let query = ArchiveSearchQuery(
-            queryText: ".*\\.swift",
-            isRegex: true,
-            caseSensitive: true,
-            minSizeBytes: 1024,
-            maxSizeBytes: 1048576,
-            fileExtensions: ["swift", "c", "h"]
-        )
-        
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
-        let data = try encoder.encode(query)
-        
-        let decoder = JSONDecoder()
-        let decoded = try decoder.decode(ArchiveSearchQuery.self, from: data)
-        
-        XCTAssertEqual(query, decoded)
-        XCTAssertEqual(decoded.queryText, ".*\\.swift")
-        XCTAssertTrue(decoded.isRegex)
-        XCTAssertTrue(decoded.caseSensitive)
-        XCTAssertEqual(decoded.minSizeBytes, 1024)
-        XCTAssertEqual(decoded.maxSizeBytes, 1048576)
-        XCTAssertEqual(decoded.fileExtensions, ["swift", "c", "h"])
-    }
-    
-    func testArchiveSearchQueryMinimalDefaults() throws {
-        let query = ArchiveSearchQuery(queryText: "README.md")
-        
-        XCTAssertEqual(query.queryText, "README.md")
-        XCTAssertFalse(query.isRegex)
-        XCTAssertFalse(query.caseSensitive)
-        XCTAssertNil(query.minSizeBytes)
-        XCTAssertNil(query.maxSizeBytes)
-        XCTAssertNil(query.fileExtensions)
-        
-        let data = try JSONEncoder().encode(query)
-        let decoded = try JSONDecoder().decode(ArchiveSearchQuery.self, from: data)
-        XCTAssertEqual(query, decoded)
-    }
-    
-    func testArchiveSearchResultSerialization() throws {
-        let result = ArchiveSearchResult(
-            matchedIndices: [0, 4, 12, 99],
-            matchedEntriesCount: 4,
-            totalScannedEntries: 150000,
-            searchDurationMs: 11.85
-        )
-        
-        let data = try JSONEncoder().encode(result)
-        let decoded = try JSONDecoder().decode(ArchiveSearchResult.self, from: data)
-        
-        XCTAssertEqual(result, decoded)
-        XCTAssertEqual(decoded.matchedIndices, [0, 4, 12, 99])
-        XCTAssertEqual(decoded.matchedEntriesCount, 4)
-        XCTAssertEqual(decoded.totalScannedEntries, 150000)
-        XCTAssertEqual(decoded.searchDurationMs, 11.85, accuracy: 0.0001)
-    }
-    
     // MARK: - HardwareBenchmarkMetric Tests
     
     func testHardwareBenchmarkMetricSerialization() throws {

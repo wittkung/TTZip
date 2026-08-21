@@ -16,7 +16,7 @@ public final class ZipMemoryEngine: @unchecked Sendable {
     
     /// In-memory zero-copy parallel ZIP decompression without filesystem I/O overhead.
     public func extractInMemory(archiveData: Data) -> [(path: String, data: Data)]? {
-        return archiveData.withUnsafeBytes { rawIn in
+        return archiveData.withUnsafeBytes { (rawIn: UnsafeRawBufferPointer) -> [(path: String, data: Data)]? in
             guard let bytePtr = rawIn.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
             let fileSize = archiveData.count
             
@@ -34,6 +34,7 @@ public final class ZipMemoryEngine: @unchecked Sendable {
                 let currentBytePtr = pointerBox.pointer
                 
                 if lfhPos + 30 > pointerBox.size { return }
+                
                 var fnLenVal: UInt16 = 0
                 var extraLenVal: UInt16 = 0
                 memcpy(&fnLenVal, currentBytePtr.advanced(by: lfhPos + 26), 2)
@@ -52,8 +53,9 @@ public final class ZipMemoryEngine: @unchecked Sendable {
                 } else if desc.compressionMethod == 8 { // Deflate
                     let uncompSize = Int(desc.uncompressedSize)
                     let rawDst = UnsafeMutablePointer<UInt8>.allocate(capacity: uncompSize)
-                    let decompSize = ttzip_libdeflate_decompress(payloadPtr, Int(desc.compressedSize), rawDst, uncompSize)
-                    if decompSize == desc.uncompressedSize {
+                    var decompSize: Int = 0
+                    let st = ttzip_rust_deflate_decompress(payloadPtr, Int(desc.compressedSize), rawDst, uncompSize, &decompSize)
+                    if st == TTZIP_STATUS_OK && decompSize == uncompSize {
                         let outData = Data(bytesNoCopy: rawDst, count: uncompSize, deallocator: .custom { ptr, _ in ptr.deallocate() })
                         resultsBox.set(idx: idx, res: (path: desc.path, data: outData))
                     } else {
@@ -105,8 +107,9 @@ public final class ZipMemoryEngine: @unchecked Sendable {
             } else if desc.compressionMethod == 8 { // Deflate
                 let uncompSize = Int(desc.uncompressedSize)
                 let rawDst = UnsafeMutablePointer<UInt8>.allocate(capacity: uncompSize)
-                let decompSize = ttzip_libdeflate_decompress(payloadPtr, Int(desc.compressedSize), rawDst, uncompSize)
-                if decompSize == desc.uncompressedSize {
+                var decompSize: Int = 0
+                let st = ttzip_rust_deflate_decompress(payloadPtr, Int(desc.compressedSize), rawDst, uncompSize, &decompSize)
+                if st == TTZIP_STATUS_OK && decompSize == uncompSize {
                     let outData = Data(bytesNoCopy: rawDst, count: uncompSize, deallocator: .custom { ptr, _ in ptr.deallocate() })
                     resultsBox.set(idx: idx, res: (path: desc.path, data: outData))
                 } else {

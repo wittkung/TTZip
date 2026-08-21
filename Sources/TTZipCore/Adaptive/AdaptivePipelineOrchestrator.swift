@@ -55,29 +55,51 @@ public final class AdaptivePipelineOrchestrator: @unchecked Sendable {
                 )
             }
 
-            // 1. Cascade evaluation: Shannon entropy & Uniformity
-            var params = ttzip_tuning_params_t(alpha: 0.5, beta: 0.5, entropy_cutoff: 7.65, sample_size: 16384)
-            let rec = ttzip_heuristic_eval_cascade(basePtr, sampleSize, 4, &params)
+            let bytePtr = basePtr.assumingMemoryBound(to: UInt8.self)
+            var freqs = [Int](repeating: 0, count: 256)
+            for i in 0..<sampleSize {
+                freqs[Int(bytePtr[i])] += 1
+            }
+            var entropy: Double = 0.0
+            let countD = Double(sampleSize)
+            for f in freqs where f > 0 {
+                let p = Double(f) / countD
+                entropy -= p * log2(p)
+            }
 
-            let entropy = ttzip_quantum_calc_entropy_neon(basePtr, sampleSize)
             let isHighEntropy = entropy > 7.65
-            let isUniform = rec.predicted_ratio >= 900.0 || rec.codec == TTZIP_TUNER_CODEC_DIRECT && entropy <= 0.1
-
-            // 2. Scientific Float Detection
-            let floatDetect = ttzip_detect_scientific_float_neon(basePtr, sampleSize)
-            let isFloat = floatDetect.is_scientific_float
-
-            let recommendStore = isHighEntropy || isUniform
-            let recommendBitGroom = isFloat && !isHighEntropy
+            let isUniform = entropy <= 0.1
+            
+            // Detect Float32 arrays
+            var isFloat = false
+            var floatTypeSize: UInt8 = 1
+            if sampleSize >= 64 && (sampleSize % 4 == 0) {
+                let floatPtr = basePtr.assumingMemoryBound(to: Float.self)
+                let numFloats = sampleSize / 4
+                var validFloats = 0
+                let checkCount = min(numFloats, 256)
+                for i in 0..<checkCount {
+                    let val = floatPtr[i]
+                    if val.isFinite && !val.isZero && abs(val) < 1e8 && abs(val) > 1e-8 {
+                        validFloats += 1
+                    }
+                }
+                if validFloats >= (checkCount * 8) / 10 {
+                    isFloat = true
+                    floatTypeSize = 4
+                }
+            }
+            
+            let recommendStore = (isHighEntropy || isUniform) && !isFloat
 
             return EvaluationResult(
                 shannonEntropy: entropy,
-                isIncompressible: isHighEntropy,
+                isIncompressible: isHighEntropy && !isFloat,
                 isSpecialUniform: isUniform,
                 isScientificFloat: isFloat,
-                detectedTypeSize: floatDetect.type_size,
+                detectedTypeSize: floatTypeSize,
                 recommendDirectStore: recommendStore,
-                recommendBitGroom: recommendBitGroom,
+                recommendBitGroom: isFloat,
                 recommendNSD: 3
             )
         }

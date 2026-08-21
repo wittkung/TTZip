@@ -506,46 +506,45 @@ public enum CLICommandRouter {
             }
         }
         
-        var errBuf = [CChar](repeating: 0, count: 512)
-        var patterns: [UnsafePointer<CChar>?] = []
-        if let entry = entryPath {
-            patterns.append((entry as NSString).utf8String)
-        }
+        let tempDir = (NSTemporaryDirectory() as NSString).appendingPathComponent("TTZip_Cat_\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
         
-        let patternCount = patterns.count
-        let rc = patterns.withUnsafeBufferPointer { ptr -> Int32 in
-            return ttzip_stream_archive_entries_to_fd(
-                effectivePath,
-                ptr.baseAddress,
-                patternCount,
-                STDOUT_FILENO,
-                pwd,
-                options.force,
-                &errBuf,
-                512
-            )
-        }
-        
-        if rc == 0 {
-            return .ok
-        } else if rc == -141 || rc == 141 {
-            return .sigpipe
-        } else if rc == -2 {
-            let msg = errBuf.withUnsafeBufferPointer { ptr in
-                ptr.baseAddress.map { String(cString: $0) } ?? ""
-            }
-            TerminalRenderEngine.shared.logError("ttzip-cli: error: \(msg.isEmpty ? "stdout is a terminal and entry contains binary data. Use --force (-f) to override." : msg)")
+        let extractor = ArchiveExtractor()
+        do {
+            try extractor.extractSync(archivePath: effectivePath, destinationDir: tempDir, password: pwd)
+        } catch {
+            TerminalRenderEngine.shared.logError("ttzip-cli: error: stream extraction failed: \(error.localizedDescription)")
             return .dataError
-        } else if rc == -1 {
+        }
+        
+        let targetFile: String
+        if let entry = entryPath {
+            targetFile = (tempDir as NSString).appendingPathComponent(entry)
+        } else {
+            let items = (try? FileManager.default.subpathsOfDirectory(atPath: tempDir)) ?? []
+            guard let first = items.first(where: { item in
+                var isDir: ObjCBool = false
+                let path = (tempDir as NSString).appendingPathComponent(item)
+                return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && !isDir.boolValue
+            }) else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: error: no file entries found in archive")
+                return .noInput
+            }
+            targetFile = (tempDir as NSString).appendingPathComponent(first)
+        }
+        
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: targetFile)) else {
             TerminalRenderEngine.shared.logError("ttzip-cli: error: entry '\(entryPath ?? "*")' not found in '\(archivePath)'")
             return .noInput
-        } else {
-            let msg = errBuf.withUnsafeBufferPointer { ptr in
-                ptr.baseAddress.map { String(cString: $0) } ?? ""
-            }
-            TerminalRenderEngine.shared.logError("ttzip-cli: error: stream extraction failed (code \(rc)): \(msg)")
-            return .dataError
         }
+        
+        data.withUnsafeBytes { ptr in
+            if let base = ptr.baseAddress {
+                _ = Darwin.write(STDOUT_FILENO, base, data.count)
+            }
+        }
+        return .ok
     }
     
     private static func handleTreeArchive(path: String, options: CLIOptions) async -> CLIExitCode {

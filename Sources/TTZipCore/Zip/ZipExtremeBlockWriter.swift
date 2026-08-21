@@ -61,18 +61,14 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         // 0. Shannon entropy and microsecond SIMD compressibility probe
         var entropyVal: Double = 0.0
         var estimatedRatio: Double = 1.0
-        let routingMethod: Int32 = rawData.withUnsafeBytes { rawIn -> Int32 in
-            guard let baseAddr = rawIn.baseAddress else { return 8 }
-            return Int32(ttzip_probe_entropy_and_compressibility(baseAddr, rawData.count, 4096, &entropyVal, &estimatedRatio))
-        }
-        
+        let routingMethod: Int32 = (activeProfile.deflateLevel == 0 || level == .store) ? 0 : 8
         let isDirectStore = (routingMethod == 0 || activeProfile.deflateLevel == 0 || level == .store)
         let compressionMethod: UInt16 = isDirectStore ? 0 : 8
         
         // 1. Compute global CRC-32 using Apple Silicon NEON SIMD hardware instructions
         let totalCrc32: UInt32 = rawData.withUnsafeBytes { ptr -> UInt32 in
-            guard let base = ptr.baseAddress else { return 0 }
-            return ttzip_compute_buffer_crc32(base, rawData.count)
+            guard let base = ptr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+            return ttzip_rust_crc32(0, base, rawData.count)
         }
         
         let compressedPayload: Data
@@ -115,12 +111,9 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                     let histPtr: UnsafePointer<UInt8>? = blockIdx > 0 ? chunkPtr.advanced(by: -min(32768, offset)) : nil
                     let histSize: Int = blockIdx > 0 ? min(32768, offset) : 0
                     
-                    var zopts = TTZipZopfliOptions(
-                        compression_level: activeProfile.deflateLevel,
-                        num_iterations: activeProfile.zopfliIterations,
-                        block_splitting: activeProfile.blockSplitting ? 1 : 0,
-                        max_block_splits: activeProfile.maxBlockSplits,
-                        early_exit_threshold: activeProfile.earlyExitThreshold
+                    var zopts = ttzip_zopfli_options_t(
+                        num_iterations: Int32(activeProfile.zopfliIterations),
+                        max_block_splits: Int32(activeProfile.maxBlockSplits)
                     )
                     let compSize = ttzip_zopfli_compress_block_with_history(
                         chunkPtr,
@@ -130,7 +123,7 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                         outBuf,
                         maxChunkOut,
                         &zopts,
-                        isFinal ? 1 : 0
+                        isFinal
                     )
                     
                     if compSize > 0 {

@@ -32,7 +32,16 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
         dstCapacity: Int,
         level: Int = 6
     ) -> Int {
-        return ttzip_libdeflate_compress(src, srcSize, dst, dstCapacity, Int32(level))
+        var outLen: Int = 0
+        let status = ttzip_rust_deflate_compress(
+            src.assumingMemoryBound(to: UInt8.self),
+            srcSize,
+            dst.assumingMemoryBound(to: UInt8.self),
+            dstCapacity,
+            Int32(level),
+            &outLen
+        )
+        return status == TTZIP_STATUS_OK ? outLen : 0
     }
     
     /// Executes high-throughput raw pointer Deflate decompression with thread-local state recycling.
@@ -48,7 +57,15 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
         dst: UnsafeMutableRawPointer,
         dstCapacity: Int
     ) -> Int {
-        return ttzip_libdeflate_decompress(src, srcSize, dst, dstCapacity)
+        var outLen: Int = 0
+        let status = ttzip_rust_deflate_decompress(
+            src.assumingMemoryBound(to: UInt8.self),
+            srcSize,
+            dst.assumingMemoryBound(to: UInt8.self),
+            dstCapacity,
+            &outLen
+        )
+        return status == TTZIP_STATUS_OK ? outLen : 0
     }
     
     /// Convenience interface: memory-safe Deflate compression using buffer flyweights.
@@ -58,14 +75,14 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
     /// - Returns: Compressed Data, or `nil` on failure.
     public func compressData(_ data: Data, level: Int = 6) -> Data? {
         guard !data.isEmpty else { return Data() }
-        let maxBound = data.count + (data.count >> 3) + 128
+        let maxBound = ttzip_rust_deflate_compress_bound(data.count, Int32(level))
         let pageSize: MemoryPageSize = maxBound > 4096 ? .page64K : .page4K
         
         return MemoryPageFlyweightPool.shared.withBuffer(size: pageSize) { dstPtr, capacity in
             guard capacity >= maxBound else {
                 let uninitPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: maxBound)
                 let written = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                    ttzip_libdeflate_compress(srcPtr, count, uninitPtr, maxBound, Int32(level))
+                    self.compress(src: srcPtr, srcSize: count, dst: uninitPtr, dstCapacity: maxBound, level: level)
                 }
                 guard written > 0 else {
                     uninitPtr.deallocate()
@@ -74,7 +91,7 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
                 return Data(bytesNoCopy: uninitPtr, count: written, deallocator: .custom({ ptr, _ in ptr.deallocate() }))
             }
             let written = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                ttzip_libdeflate_compress(srcPtr, count, dstPtr, capacity, Int32(level))
+                self.compress(src: srcPtr, srcSize: count, dst: dstPtr, dstCapacity: capacity, level: level)
             }
             guard written > 0 else { return nil }
             return Data(bytes: dstPtr, count: written)
@@ -94,7 +111,7 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
             guard capacity >= originalSize else {
                 let uninitPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: originalSize)
                 let actual = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                    ttzip_libdeflate_decompress(srcPtr, count, uninitPtr, originalSize)
+                    self.decompress(src: srcPtr, srcSize: count, dst: uninitPtr, dstCapacity: originalSize)
                 }
                 guard actual == originalSize else {
                     uninitPtr.deallocate()
@@ -103,7 +120,7 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
                 return Data(bytesNoCopy: uninitPtr, count: actual, deallocator: .custom({ ptr, _ in ptr.deallocate() }))
             }
             let actual = CUnsafeBufferAdapter.withBufferPointer(data) { srcPtr, count in
-                ttzip_libdeflate_decompress(srcPtr, count, dstPtr, capacity)
+                self.decompress(src: srcPtr, srcSize: count, dst: dstPtr, dstCapacity: capacity)
             }
             guard actual == originalSize else { return nil }
             return Data(bytes: dstPtr, count: actual)

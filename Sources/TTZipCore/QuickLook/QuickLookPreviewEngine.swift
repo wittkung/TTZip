@@ -20,8 +20,7 @@ public enum QuickLookPreviewEngine: Sendable {
         let rootArchiveNodes = ArchiveTreeBuilder.buildTree(from: entries)
         let previewNodes = rootArchiveNodes.map { PreviewTreeNode.from(archiveTreeNode: $0) }
         
-        var fileSize: Int64 = 0
-        _ = ttzip_stat_file_info(archivePath, &fileSize, nil, nil)
+        let fileSize = (try? FileManager.default.attributesOfItem(atPath: archivePath)[.size] as? Int64) ?? 0
         
         let uncompressedSize = entries.reduce(0) { $0 + $1.uncompressedSize }
         let compressedSize = fileSize

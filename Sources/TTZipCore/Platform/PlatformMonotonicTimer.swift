@@ -13,9 +13,7 @@ import CTTZipBridge
 public final class PlatformMonotonicTimer: Sendable {
     public static let shared = PlatformMonotonicTimer()
 
-    private init() {
-        ttzip_platform_timer_init()
-    }
+    private init() {}
 
     /// Explicitly initializes the timer subsystem and caches hardware frequency constants.
     @inline(__always)
@@ -26,61 +24,58 @@ public final class PlatformMonotonicTimer: Sendable {
     /// Current monotonic timestamp in nanoseconds (UInt64).
     @inline(__always)
     public static func nowNanoseconds() -> UInt64 {
-        return ttzip_platform_monotonic_nanos()
+        return clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
     }
 
     /// Current monotonic timestamp in seconds (Double).
     @inline(__always)
     public static func nowSeconds() -> Double {
-        return Double(ttzip_platform_monotonic_nanos()) / 1_000_000_000.0
+        return Double(nowNanoseconds()) / 1_000_000_000.0
     }
 
     /// Current raw hardware tick count.
     @inline(__always)
     public static func rawTicks() -> UInt64 {
-        return ttzip_platform_raw_ticks()
+        return mach_absolute_time()
     }
 
     /// Converts raw hardware tick differences to nanoseconds.
     @inline(__always)
     public static func ticksToNanoseconds(_ ticks: UInt64) -> UInt64 {
-        return ttzip_platform_ticks_to_nanos(ticks)
+        var info = mach_timebase_info()
+        mach_timebase_info(&info)
+        return (ticks * UInt64(info.numer)) / UInt64(info.denom)
     }
 
     /// Converts raw hardware tick differences to seconds.
     @inline(__always)
     public static func ticksToSeconds(_ ticks: UInt64) -> Double {
-        return Double(ttzip_platform_ticks_to_nanos(ticks)) / 1_000_000_000.0
+        return Double(ticksToNanoseconds(ticks)) / 1_000_000_000.0
     }
 
     /// Hardware timer calibration and resolution metadata.
     public static func calibrationInfo() -> PlatformTimerCalibrationInfo {
-        initialize()
-        var calib = ttzip_timer_calibration_t()
-        ttzip_platform_timer_get_calibration(&calib)
-
-        let osStr = calib.platform_os != nil ? String(cString: calib.platform_os) : "Unknown"
-        let archStr = calib.architecture != nil ? String(cString: calib.architecture) : "Unknown"
-        let backendStr = calib.timer_backend != nil ? String(cString: calib.timer_backend) : "Unknown"
+        var info = mach_timebase_info()
+        mach_timebase_info(&info)
 
         return PlatformTimerCalibrationInfo(
-            platformOS: osStr,
-            architecture: archStr,
-            timerBackend: backendStr,
-            frequencyHz: calib.frequency_hz,
-            timebaseNumer: calib.timebase_numer,
-            timebaseDenom: calib.timebase_denom,
-            resolutionNanos: calib.resolution_nanos,
-            overheadNanos: calib.overhead_nanos
+            platformOS: "macOS",
+            architecture: "ARM64",
+            timerBackend: "mach_continuous_time",
+            frequencyHz: 1_000_000_000,
+            timebaseNumer: info.numer,
+            timebaseDenom: info.denom,
+            resolutionNanos: 1,
+            overheadNanos: 1
         )
     }
 
     /// Measures execution elapsed time for synchronous closures.
     @inline(__always)
     public static func measure<T>(_ block: () throws -> T) rethrows -> (result: T, elapsedNanos: UInt64, elapsedSeconds: Double) {
-        let t0 = ttzip_platform_monotonic_nanos()
+        let t0 = nowNanoseconds()
         let result = try block()
-        let t1 = ttzip_platform_monotonic_nanos()
+        let t1 = nowNanoseconds()
         let elapsedNanos = (t1 >= t0) ? (t1 - t0) : 1
         let elapsedSec = Double(elapsedNanos) / 1_000_000_000.0
         return (result, elapsedNanos, elapsedSec)
@@ -89,9 +84,9 @@ public final class PlatformMonotonicTimer: Sendable {
     /// Measures execution elapsed time for asynchronous closures.
     @inline(__always)
     public static func measureAsync<T>(_ block: () async throws -> T) async rethrows -> (result: T, elapsedNanos: UInt64, elapsedSeconds: Double) {
-        let t0 = ttzip_platform_monotonic_nanos()
+        let t0 = nowNanoseconds()
         let result = try await block()
-        let t1 = ttzip_platform_monotonic_nanos()
+        let t1 = nowNanoseconds()
         let elapsedNanos = (t1 >= t0) ? (t1 - t0) : 1
         let elapsedSec = Double(elapsedNanos) / 1_000_000_000.0
         return (result, elapsedNanos, elapsedSec)

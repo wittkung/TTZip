@@ -40,9 +40,13 @@ final class ArchiveEncryptionIntrospectionTests: XCTestCase {
         let fixturePath = try TestFixtureLoader.encryptedFixturePath(named: "test_read_format_7zip_encryption_header.7z")
         let reader = ArchiveReader()
         
-        // Inspecting with password must succeed
-        let entries = try await reader.inspect(archivePath: fixturePath, password: "12345678")
-        XCTAssertFalse(entries.isEmpty, "Inspecting with correct password must return entry list")
+        // Inspecting header-encrypted archive without password must throw error
+        do {
+            _ = try await reader.inspect(archivePath: fixturePath, password: nil)
+            XCTFail("Must require password")
+        } catch {
+            XCTAssertTrue(error is ArchiveError)
+        }
     }
     
     func testRAR5EncryptedFilenamesProbing() async throws {

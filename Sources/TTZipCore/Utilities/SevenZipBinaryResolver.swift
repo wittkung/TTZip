@@ -30,7 +30,6 @@ public final class SevenZipBinaryResolver: @unchecked Sendable {
         
         if let bundlePath = Bundle.main.path(forResource: "7zz", ofType: nil),
            FileManager.default.isExecutableFile(atPath: bundlePath) {
-            ttzip_register_7zz_binary(bundlePath)
             cachedPath = bundlePath
             return bundlePath
         }
@@ -45,7 +44,6 @@ public final class SevenZipBinaryResolver: @unchecked Sendable {
         ]
         for candidate in candidates {
             if FileManager.default.isExecutableFile(atPath: candidate) || FileManager.default.fileExists(atPath: candidate) {
-                ttzip_register_7zz_binary(candidate)
                 cachedPath = candidate
                 return candidate
             }
@@ -61,7 +59,6 @@ public final class SevenZipBinaryResolver: @unchecked Sendable {
             if proc.terminationStatus == 0 {
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 if let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !str.isEmpty {
-                    ttzip_register_7zz_binary(str)
                     cachedPath = str
                     return str
                 }

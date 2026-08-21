@@ -138,7 +138,7 @@ public final class ZipStoreStreamWriter: @unchecked Sendable {
                         let inBytePtr = mappedIn.assumingMemoryBound(to: UInt8.self)
                         posix_madvise(mappedIn, totalFileSize, POSIX_MADV_WILLNEED | POSIX_MADV_SEQUENTIAL)
 
-                        let cloneRet = enableZeroCopy ? ttzip_apfs_clone_range(inFd, 0, outFd, Int64(item.dataOffset), UInt64(item.fileSize)) : -1
+                        let cloneRet = -1
                         if cloneRet == 0 {
                             let crcChunkSize = 64 * 1024 * 1024
                             let numChunks = (totalFileSize + crcChunkSize - 1) / crcChunkSize
@@ -153,14 +153,14 @@ public final class ZipStoreStreamWriter: @unchecked Sendable {
                                     let offset = idx * crcChunkSize
                                     let len = min(crcChunkSize, totalFileSize - offset)
                                     let chunkPtr = basePtr.advanced(by: offset)
-                                    outBufPtr[idx] = ttzip_compute_buffer_crc32_neon(0, chunkPtr, len)
+                                    outBufPtr[idx] = ttzip_rust_crc32(0, chunkPtr, len)
                                 }
                             }
                             
                             var finalCRC: UInt32 = 0
                             for idx in 0..<numChunks {
                                 let len = min(crcChunkSize, totalFileSize - (idx * crcChunkSize))
-                                finalCRC = UInt32(crc32_combine(uLong(finalCRC), uLong(chunkCRCs[idx]), len))
+                                finalCRC = HardwareChecksumAdapter.combineCRC32(crc1: finalCRC, crc2: chunkCRCs[idx], len2: len)
                             }
                             fileCRC = finalCRC
                             
@@ -186,7 +186,7 @@ public final class ZipStoreStreamWriter: @unchecked Sendable {
                                     let offset = idx * crcChunkSize
                                     let len = min(crcChunkSize, totalFileSize - offset)
                                     let chunkPtr = basePtr.advanced(by: offset)
-                                    outBufPtr[idx] = ttzip_compute_buffer_crc32_neon(0, chunkPtr, len)
+                                    outBufPtr[idx] = ttzip_rust_crc32(0, chunkPtr, len)
                                     _ = pwrite(outFd, chunkPtr, len, off_t(item.dataOffset + UInt64(offset)))
                                 }
                             }
@@ -194,7 +194,7 @@ public final class ZipStoreStreamWriter: @unchecked Sendable {
                             var finalCRC: UInt32 = 0
                             for idx in 0..<numChunks {
                                 let len = min(crcChunkSize, totalFileSize - (idx * crcChunkSize))
-                                finalCRC = UInt32(crc32_combine(uLong(finalCRC), uLong(chunkCRCs[idx]), len))
+                                finalCRC = HardwareChecksumAdapter.combineCRC32(crc1: finalCRC, crc2: chunkCRCs[idx], len2: len)
                             }
                             fileCRC = finalCRC
                             
@@ -218,7 +218,7 @@ public final class ZipStoreStreamWriter: @unchecked Sendable {
                                 let n = pread(inFd, chunkPtr, bytesToRead, off_t(bytesReadTotal))
                                 if n <= 0 { break }
 
-                                fileCRC = ttzip_compute_buffer_crc32_neon(fileCRC, chunkPtr, n)
+                                fileCRC = ttzip_rust_crc32(fileCRC, chunkPtr, n)
                                 pwrite(outFd, chunkPtr, n, off_t(item.dataOffset + UInt64(bytesReadTotal)))
 
                                 bytesReadTotal += Int64(n)

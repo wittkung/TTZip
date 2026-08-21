@@ -17,10 +17,10 @@ public final class LzfseCAdapter: Sendable {
     /// Checks if LZFSE static C engine is available.
     @inline(__always)
     public var isAvailable: Bool {
-        return ttzip_lzfse_is_available()
+        return true
     }
     
-    /// Decompresses a raw memory buffer using native C LZFSE with thread-local scratch arena.
+    /// Decompresses a raw memory buffer using native LZFSE.
     @inline(__always)
     public func decompress(
         src: UnsafePointer<UInt8>,
@@ -29,10 +29,12 @@ public final class LzfseCAdapter: Sendable {
         dstCapacity: Int
     ) -> Int {
         guard srcLength > 0 && dstCapacity > 0 else { return 0 }
-        return ttzip_lzfse_decompress(src, srcLength, dst, dstCapacity)
+        var outLen: Int = 0
+        let status = ttzip_rust_lzfse_decompress(src, srcLength, dst, dstCapacity, &outLen)
+        return status == TTZIP_STATUS_OK ? outLen : 0
     }
     
-    /// Compresses a raw memory buffer using native C LZFSE with thread-local scratch arena.
+    /// Compresses a raw memory buffer using native LZFSE.
     @inline(__always)
     public func compress(
         src: UnsafePointer<UInt8>,
@@ -41,7 +43,9 @@ public final class LzfseCAdapter: Sendable {
         dstCapacity: Int
     ) -> Int {
         guard srcLength > 0 && dstCapacity > 0 else { return 0 }
-        return ttzip_lzfse_compress(src, srcLength, dst, dstCapacity)
+        var outLen: Int = 0
+        let status = ttzip_rust_lzfse_compress(src, srcLength, dst, dstCapacity, &outLen)
+        return status == TTZIP_STATUS_OK ? outLen : 0
     }
     
     /// Decompresses a single DMG / AAR block buffer.
@@ -52,27 +56,46 @@ public final class LzfseCAdapter: Sendable {
         dst: UnsafeMutablePointer<UInt8>,
         dstCapacity: Int
     ) -> Int {
-        guard srcLength > 0 && dstCapacity > 0 else { return 0 }
-        return ttzip_lzfse_decompress_block(src, srcLength, dst, dstCapacity)
+        return decompress(src: src, srcLength: srcLength, dst: dst, dstCapacity: dstCapacity)
     }
     
-    /// Decompresses a `.lzfse` file to a target destination path using streaming micro-buffering.
+    /// Decompresses a `.lzfse` file to a target destination path.
     public func decompressFileStream(srcPath: String, dstPath: String) -> Int32 {
-        return CUnsafeBufferAdapter.withCString(srcPath) { cSrc in
-            CUnsafeBufferAdapter.withCString(dstPath) { cDst in
-                guard let cSrc = cSrc, let cDst = cDst else { return Int32(TTZIP_ERR_INVALID_PARAM.rawValue) }
-                return Int32(ttzip_lzfse_decompress_file_stream(cSrc, cDst))
+        guard let srcData = try? Data(contentsOf: URL(fileURLWithPath: srcPath)) else { return -1 }
+        let cap = srcData.count * 4 + 64 * 1024
+        var outBuf = [UInt8](repeating: 0, count: cap)
+        let decSize = srcData.withUnsafeBytes { srcRaw in
+            guard let srcPtr = srcRaw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+            return outBuf.withUnsafeMutableBufferPointer { dstRaw in
+                guard let dstPtr = dstRaw.baseAddress else { return 0 }
+                return decompress(src: srcPtr, srcLength: srcData.count, dst: dstPtr, dstCapacity: cap)
             }
         }
+        if decSize > 0 {
+            let outData = Data(bytes: outBuf, count: decSize)
+            try? outData.write(to: URL(fileURLWithPath: dstPath))
+            return 0
+        }
+        return -1
     }
     
-    /// Compresses a source file to a `.lzfse` target path using streaming micro-buffering.
+    /// Compresses a source file to a `.lzfse` target path.
     public func compressFileStream(srcPath: String, dstPath: String) -> Int32 {
-        return CUnsafeBufferAdapter.withCString(srcPath) { cSrc in
-            CUnsafeBufferAdapter.withCString(dstPath) { cDst in
-                guard let cSrc = cSrc, let cDst = cDst else { return Int32(TTZIP_ERR_INVALID_PARAM.rawValue) }
-                return Int32(ttzip_lzfse_compress_file_stream(cSrc, cDst))
+        guard let srcData = try? Data(contentsOf: URL(fileURLWithPath: srcPath)) else { return -1 }
+        let cap = srcData.count + 4096
+        var outBuf = [UInt8](repeating: 0, count: cap)
+        let compSize = srcData.withUnsafeBytes { srcRaw in
+            guard let srcPtr = srcRaw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+            return outBuf.withUnsafeMutableBufferPointer { dstRaw in
+                guard let dstPtr = dstRaw.baseAddress else { return 0 }
+                return compress(src: srcPtr, srcLength: srcData.count, dst: dstPtr, dstCapacity: cap)
             }
         }
+        if compSize > 0 {
+            let outData = Data(bytes: outBuf, count: compSize)
+            try? outData.write(to: URL(fileURLWithPath: dstPath))
+            return 0
+        }
+        return -1
     }
 }

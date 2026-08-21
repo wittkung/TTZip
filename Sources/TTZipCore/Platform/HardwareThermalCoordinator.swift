@@ -25,10 +25,6 @@ public actor HardwareThermalCoordinator {
         guard !isMonitoring else { return }
         isMonitoring = true
 
-        // 初始化更新一次底层 C 运行时状态
-        let initialRaw = Int32(ProcessInfo.processInfo.thermalState.rawValue)
-        ttzip_bridge_set_thermal_state(initialRaw)
-
         monitorTask = Task.detached(priority: .utility) { [weak self] in
             let notifications = NotificationCenter.default.notifications(
                 named: ProcessInfo.thermalStateDidChangeNotification,
@@ -36,8 +32,6 @@ public actor HardwareThermalCoordinator {
             )
             for await _ in notifications {
                 let state = ProcessInfo.processInfo.thermalState
-                let rawVal = Int32(state.rawValue)
-                ttzip_bridge_set_thermal_state(rawVal)
                 await self?.handleThermalStateChange(state)
             }
         }

@@ -96,47 +96,44 @@ public final class ZipCryptoEngine: ZipCryptoEngineProtocol, @unchecked Sendable
             guard let basePtr = outBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
             return aesKey.withUnsafeBytes { kBuf -> Int32 in
                 guard let kPtr = kBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
-                return ttzip_aes256_ctr_crypt_parallel(kPtr, basePtr, payloadCount, basePtr, 16)
+                return ttzip_rust_aes256_ctr(kPtr, 1, basePtr, payloadCount, basePtr)
             }
         }
         guard status == 0 else { return nil }
         
-        var hmacTag = Data(count: 10)
+        var fullHmac = [UInt8](repeating: 0, count: 20)
         cipherPayload.withUnsafeBytes { pIn in
             hmacKey.withUnsafeBytes { hIn in
-                hmacTag.withUnsafeMutableBytes { tOut in
-                    if let hPtr = hIn.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                       let pPtr = pIn.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                       let tPtr = tOut.baseAddress?.assumingMemoryBound(to: UInt8.self) {
-                        _ = ttzip_compute_hmac_sha1_fast(hPtr, hmacKey.count, pPtr, cipherPayload.count, tPtr)
-                    }
+                if let hPtr = hIn.baseAddress, let pPtr = pIn.baseAddress {
+                    CCHmac(CCHmacAlgorithm(kCCHmacAlgSHA1), hPtr, hmacKey.count, pPtr, cipherPayload.count, &fullHmac)
                 }
             }
         }
+        let hmacTag = Data(fullHmac.prefix(10))
         
         var cipherStream = Data()
         cipherStream.append(salt)
         cipherStream.append(pvv)
         cipherStream.append(cipherPayload)
-        cipherStream.append(hmacTag.prefix(10))
+        cipherStream.append(hmacTag)
         
         // WinZip AES Extra Field (Header ID: 0x9901, Size: 7)
         var extra = Data()
         var headerId: UInt16 = 0x9901
         var extraSize: UInt16 = 7
-        var vendorVer: UInt16 = 0x0001
-        var vendorId: UInt16 = 0x4541 // "AE"
-        var strength: UInt8 = 0x03    // AES-256
-        var methodVal: UInt16 = actualCompressionMethod
+        var aesVersion: UInt16 = 0x0002 // AE-2
+        var vendorId: UInt16 = 0x4541   // "AE"
+        var aesStrength: UInt8 = 0x03   // 256-bit
+        var actualMethod: UInt16 = UInt16(actualCompressionMethod)
         
-        extra.append(Data(bytes: &headerId, count: 2))
-        extra.append(Data(bytes: &extraSize, count: 2))
-        extra.append(Data(bytes: &vendorVer, count: 2))
-        extra.append(Data(bytes: &vendorId, count: 2))
-        extra.append(Data(bytes: &strength, count: 1))
-        extra.append(Data(bytes: &methodVal, count: 2))
+        withUnsafeBytes(of: &headerId) { extra.append(contentsOf: $0) }
+        withUnsafeBytes(of: &extraSize) { extra.append(contentsOf: $0) }
+        withUnsafeBytes(of: &aesVersion) { extra.append(contentsOf: $0) }
+        withUnsafeBytes(of: &vendorId) { extra.append(contentsOf: $0) }
+        withUnsafeBytes(of: &aesStrength) { extra.append(contentsOf: $0) }
+        withUnsafeBytes(of: &actualMethod) { extra.append(contentsOf: $0) }
         
-        return (cipherStream, 99, extra)
+        return (payload: cipherStream, compressionMethod: 99, extraField: extra)
     }
     
     public func decryptAES256(payloadPtr: UnsafePointer<UInt8>, count: Int, password: String) -> Data? {
@@ -164,7 +161,7 @@ public final class ZipCryptoEngine: ZipCryptoEngineProtocol, @unchecked Sendable
         
         let status = aesKey.withUnsafeBytes { kBuf -> Int32 in
             guard let kPtr = kBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
-            return ttzip_aes256_ctr_crypt_parallel(kPtr, srcCipherPtr, cipherLen, dstBytePtr, 16)
+            return ttzip_rust_aes256_ctr(kPtr, 1, srcCipherPtr, cipherLen, dstBytePtr)
         }
         
         if status == 0 {
@@ -185,11 +182,15 @@ public final class ZipCryptoEngine: ZipCryptoEngineProtocol, @unchecked Sendable
             
             let saltPtr = payloadPtr
             let passBytes = Array(password.utf8)
-            let status = passBytes.withUnsafeBufferPointer { pBuf -> Int32 in
-                guard let pPtr = pBuf.baseAddress else { return -1 }
-                return ttzip_pbkdf2_sha1_fast(pPtr, passBytes.count, saltPtr, 16, 1000, keyPtr, 66)
-            }
-            guard status == 0 else { return false }
+            let status = CCKeyDerivationPBKDF(
+                CCPBKDFAlgorithm(kCCPBKDF2),
+                password, passBytes.count,
+                saltPtr, 16,
+                CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1),
+                1000,
+                keyPtr, 66
+            )
+            guard status == kCCSuccess else { return false }
             
             let derivedPvv1 = keyPtr[64]
             let derivedPvv2 = keyPtr[65]
@@ -197,7 +198,7 @@ public final class ZipCryptoEngine: ZipCryptoEngineProtocol, @unchecked Sendable
             
             let cipherLen = count - 18 - 10
             let srcCipherPtr = payloadPtr.advanced(by: 18)
-            return ttzip_aes256_ctr_crypt_parallel(keyPtr, srcCipherPtr, cipherLen, destinationPtr, 16) == 0
+            return ttzip_rust_aes256_ctr(keyPtr, 1, srcCipherPtr, cipherLen, destinationPtr) == 0
         }
     }
     
@@ -215,18 +216,22 @@ public final class ZipCryptoEngine: ZipCryptoEngineProtocol, @unchecked Sendable
         
         var derived = Data(count: keyLength)
         let passBytes = Array(password.utf8)
-        let status = passBytes.withUnsafeBufferPointer { pBuf -> Int32 in
-            guard let pPtr = pBuf.baseAddress else { return -1 }
-            return salt.withUnsafeBytes { sBuf -> Int32 in
-                guard let sPtr = sBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
-                return derived.withUnsafeMutableBytes { dBuf -> Int32 in
-                    guard let dPtr = dBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
-                    return ttzip_pbkdf2_sha1_fast(pPtr, passBytes.count, sPtr, salt.count, 1000, dPtr, keyLength)
-                }
+        let status = salt.withUnsafeBytes { sBuf -> Int32 in
+            guard let sPtr = sBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
+            return derived.withUnsafeMutableBytes { dBuf -> Int32 in
+                guard let dPtr = dBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
+                return CCKeyDerivationPBKDF(
+                    CCPBKDFAlgorithm(kCCPBKDF2),
+                    password, passBytes.count,
+                    sPtr, salt.count,
+                    CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1),
+                    1000,
+                    dPtr, keyLength
+                )
             }
         }
         
-        if status == 0 {
+        if status == kCCSuccess {
             ArchiveKeyCacheManager.shared.setKey(password: password, salt: salt, keyLength: keyLength, derivedKey: derived)
             return derived
         }

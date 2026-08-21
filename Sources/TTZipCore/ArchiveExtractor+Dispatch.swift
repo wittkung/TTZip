@@ -35,15 +35,11 @@ extension ArchiveExtractor {
             }
         }
 
-        // 2. TAR.ZST / ZSTD in-process C Direct decompression
+        // 2. TAR.ZST / ZSTD in-process decompression
         if targetFormat == .tarZst || targetFormat == .zst || pathLower.hasSuffix(".tar.zst") || pathLower.hasSuffix(".tzst") || pathLower.hasSuffix(".zst") {
-            let status = ttzip_extract_tar_zstd_direct_c(archivePath, destinationDir, options.skipMacJunk)
-            if status == 0 {
-                let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
-                if !items.isEmpty {
-                    Self.cleanupQuarantineAttributes(at: destinationDir)
-                    return true
-                }
+            if extractWithRust(archivePath: archivePath, destinationDir: destinationDir, password: password) {
+                Self.cleanupQuarantineAttributes(at: destinationDir)
+                return true
             }
             if extractZstdNative(archivePath: archivePath, destinationDir: destinationDir, options: options, password: password, advancedOptions: advancedOptions) {
                 return true
@@ -52,8 +48,7 @@ extension ArchiveExtractor {
 
         // 3. TAR derivatives and uncompressed TAR extraction
         if targetFormat == .tar || targetFormat == .tarGz || targetFormat == .tarBz2 || targetFormat == .tarXz || ArchiveCompressionFormat.tarFamilyExtensions.contains(where: { pathLower.hasSuffix($0) }) {
-            let status = ttzip_extract_archive_advanced(archivePath, destinationDir, options.skipMacJunk, password)
-            if status == 0 {
+            if extractWithRust(archivePath: archivePath, destinationDir: destinationDir, password: password) {
                 if unpackNestedTarFiles(destinationDir: destinationDir, options: options, password: password) {
                     Self.cleanupQuarantineAttributes(at: destinationDir)
                     return true
@@ -79,26 +74,17 @@ extension ArchiveExtractor {
         
         // 5. WIM archive extraction
         if targetFormat == .wim || pathLower.hasSuffix(".wim") {
-            let status = ttzip_extract_archive_advanced(archivePath, destinationDir, options.skipMacJunk, password)
-            if status == 0 {
+            if extractWithRust(archivePath: archivePath, destinationDir: destinationDir, password: password) {
                 Self.cleanupQuarantineAttributes(at: destinationDir)
                 return true
             }
         }
 
         // 6. ZIP in-process multi-threaded extraction
-        // 🔒 API CONTRACT: ZIP Parallel Decompression Engine Route (mmap + libdeflate + NEON SIMD)
-        // SEE: .agents/rules/zip-engine-freeze.md
         if targetFormat == .zip || pathLower.hasSuffix(".zip") {
-            if ttzip_extract_zip_c_parallel(archivePath, destinationDir, options.skipMacJunk, password) == 0 {
-                if let items = try? FileManager.default.contentsOfDirectory(atPath: destinationDir), !items.isEmpty {
-                    Self.cleanupQuarantineAttributes(at: destinationDir)
-                    return true
-                }
-            }
-            let status = ttzip_extract_archive_advanced(archivePath, destinationDir, options.skipMacJunk, password)
-            if status == 0 {
-                if let items = try? FileManager.default.contentsOfDirectory(atPath: destinationDir), !items.isEmpty {
+            if extractWithRust(archivePath: archivePath, destinationDir: destinationDir, password: password) {
+                let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
+                if !items.isEmpty {
                     Self.cleanupQuarantineAttributes(at: destinationDir)
                     return true
                 }
@@ -108,6 +94,28 @@ extension ArchiveExtractor {
         return false
     }
 
+    private func extractWithRust(archivePath: String, destinationDir: String, password: String?) -> Bool {
+        let pwd = (password != nil && !password!.isEmpty) ? password : nil
+        return CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
+            CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
+                CUnsafeBufferAdapter.withCString(pwd) { pPtr in
+                    guard let aPtr = aPtr, let dPtr = dPtr else { return false }
+                    var opt = TTZipExtractOptions(
+                        destination_path: dPtr,
+                        password: pPtr,
+                        thread_budget: 0,
+                        overwrite_existing: true,
+                        preserve_permissions: true,
+                        dry_run: false,
+                        progress_callback: nil,
+                        user_data: nil
+                    )
+                    return ttzip_rust_extract_archive(aPtr, dPtr, &opt) == TTZIP_STATUS_OK
+                }
+            }
+        }
+    }
+
     private func extractZstdNative(
         archivePath: String,
         destinationDir: String,
@@ -115,8 +123,9 @@ extension ArchiveExtractor {
         password: String?,
         advancedOptions: ArchiveAdvancedOptions?
     ) -> Bool {
-        if ttzip_extract_archive_advanced(archivePath, destinationDir, options.skipMacJunk, password) == 0 {
-            if let items = try? FileManager.default.contentsOfDirectory(atPath: destinationDir), !items.isEmpty {
+        if extractWithRust(archivePath: archivePath, destinationDir: destinationDir, password: password) {
+            let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
+            if !items.isEmpty {
                 Self.cleanupQuarantineAttributes(at: destinationDir)
                 return true
             }
@@ -129,7 +138,7 @@ extension ArchiveExtractor {
         }
         let outPath = (destinationDir as NSString).appendingPathComponent(targetName)
         if let ok = try? NativeZstdEngine.shared.decompressFile(srcPath: archivePath, dstPath: outPath, dictPath: advancedOptions?.zstdOptions.zstdDictPath, progressHandler: nil), ok {
-            if targetName.lowercased().hasSuffix(".tar") || ttzip_extract_archive_advanced(outPath, destinationDir, options.skipMacJunk, password) == 0 {
+            if targetName.lowercased().hasSuffix(".tar") || extractWithRust(archivePath: outPath, destinationDir: destinationDir, password: password) {
                 try? FileManager.default.removeItem(atPath: outPath)
             }
             Self.cleanupQuarantineAttributes(at: destinationDir)
@@ -145,7 +154,7 @@ extension ArchiveExtractor {
         let tarItems = items.filter { $0.lowercased().hasSuffix(".tar") }
         for tarItem in tarItems {
             let tarPath = (destinationDir as NSString).appendingPathComponent(tarItem)
-            _ = ttzip_extract_archive_advanced(tarPath, destinationDir, options.skipMacJunk, password)
+            _ = extractWithRust(archivePath: tarPath, destinationDir: destinationDir, password: password)
             try? FileManager.default.removeItem(atPath: tarPath)
         }
         return true

@@ -114,7 +114,7 @@ public final class InMemoryBenchmarkEngine: Sendable {
         config: InMemoryBenchmarkConfig,
         progressCallback: (@Sendable (String) -> Void)?
     ) -> AlgorithmBenchmarkResult? {
-        let maxCompCap = max(srcSize + max(131072, srcSize / 4), ttzip_snappy_max_compressed_length(srcSize) + 65536)
+        let maxCompCap = max(srcSize + max(131072, srcSize / 4), ttzip_rust_snappy_max_compressed_length(srcSize) + 65536)
         guard let compRaw = NativeCoreArchitecture.allocateAlignedPageBuffer(capacity: maxCompCap),
               let decompRaw = NativeCoreArchitecture.allocateAlignedPageBuffer(capacity: srcSize) else {
             return nil
@@ -135,69 +135,79 @@ public final class InMemoryBenchmarkEngine: Sendable {
         case "zip", "deflate", "zip-deflate", "gz", "tar.gz":
             algoName = "ZIP-Deflate"
             compFunc = { s, sLen, d, dCap, lvl in
-                return ttzip_libdeflate_compress(s, sLen, d, dCap, Int32(lvl))
+                var outLen: Int = 0
+                let st = ttzip_rust_deflate_compress(s, sLen, d, dCap, Int32(lvl), &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
             decompFunc = { s, sLen, d, dCap in
-                return ttzip_libdeflate_decompress(s, sLen, d, dCap)
+                var outLen: Int = 0
+                let st = ttzip_rust_deflate_decompress(s, sLen, d, dCap, &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
 
         case "zstd", "tar.zst", "zst":
             algoName = "Zstandard"
             compFunc = { s, sLen, d, dCap, lvl in
-                return Int(ttzip_zstd_compress(s, sLen, d, dCap, Int32(lvl)))
+                var outLen: Int = 0
+                let st = ttzip_rust_zstd_compress_advanced(s, sLen, d, dCap, Int32(lvl), 0, 0, 0, 0, false, &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
             decompFunc = { s, sLen, d, dCap in
-                return Int(ttzip_zstd_decompress(s, sLen, d, dCap))
+                var outLen: Int = 0
+                let st = ttzip_rust_zstd_decompress(s, sLen, d, dCap, &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
 
         case "7z", "lzma2", "7z-lzma2":
             algoName = "7Z-LZMA2"
             compFunc = { s, sLen, d, dCap, lvl in
-                var outLen: size_t = 0
-                let rc = ttzip_lzma2_compress_mt_c(s, sLen, d, dCap, &outLen, Int32(lvl))
-                return (rc == 0) ? Int(outLen) : 0
+                var outLen: Int = 0
+                let st = ttzip_rust_fl2_compress(s, sLen, d, dCap, Int32(lvl), 0, &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
             decompFunc = { s, sLen, d, dCap in
-                var outLen: size_t = 0
-                let rc = ttzip_lzma2_decompress_mt_c(s, sLen, d, dCap, &outLen)
-                return (rc == 0) ? Int(outLen) : 0
+                var outLen: Int = 0
+                let st = ttzip_rust_fl2_decompress(s, sLen, d, dCap, 0, &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
 
         case "lz4":
             algoName = "LZ4"
             compFunc = { s, sLen, d, dCap, _ in
-                return Int(LZ4_compress_default(UnsafeRawPointer(s).assumingMemoryBound(to: CChar.self),
-                                                UnsafeMutableRawPointer(d).assumingMemoryBound(to: CChar.self),
-                                                Int32(sLen),
-                                                Int32(dCap)))
+                var outLen: Int = 0
+                let st = ttzip_rust_lz4_compress(s, sLen, d, dCap, &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
             decompFunc = { s, sLen, d, dCap in
-                return Int(LZ4_decompress_safe(UnsafeRawPointer(s).assumingMemoryBound(to: CChar.self),
-                                               UnsafeMutableRawPointer(d).assumingMemoryBound(to: CChar.self),
-                                               Int32(sLen),
-                                               Int32(dCap)))
+                var outLen: Int = 0
+                let st = ttzip_rust_lz4_decompress(s, sLen, d, dCap, &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
 
         case "snappy", "sz":
             algoName = "Google-Snappy"
             compFunc = { s, sLen, d, dCap, _ in
-                var outLen = dCap
-                let rc = ttzip_snappy_compress(s, sLen, d, &outLen)
-                return (rc == TTZIP_SNAPPY_OK.rawValue) ? outLen : 0
+                var outLen: Int = 0
+                let st = ttzip_rust_snappy_compress(s, sLen, d, dCap, &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
             decompFunc = { s, sLen, d, dCap in
-                var outLen = dCap
-                let rc = ttzip_snappy_decompress(s, sLen, d, &outLen)
-                return (rc == TTZIP_SNAPPY_OK.rawValue) ? outLen : 0
+                var outLen: Int = 0
+                let st = ttzip_rust_snappy_decompress(s, sLen, d, dCap, &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
 
         default:
             algoName = format.uppercased()
             compFunc = { s, sLen, d, dCap, lvl in
-                return ttzip_libdeflate_compress(s, sLen, d, dCap, Int32(lvl))
+                var outLen: Int = 0
+                let st = ttzip_rust_deflate_compress(s, sLen, d, dCap, Int32(lvl), &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
             decompFunc = { s, sLen, d, dCap in
-                return ttzip_libdeflate_decompress(s, sLen, d, dCap)
+                var outLen: Int = 0
+                let st = ttzip_rust_deflate_decompress(s, sLen, d, dCap, &outLen)
+                return st == TTZIP_STATUS_OK ? outLen : 0
             }
         }
 
