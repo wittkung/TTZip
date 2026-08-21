@@ -77,6 +77,18 @@ pub fn compress_items_parallel(
                         let mut enc_payload = Vec::new();
                         winzip_aes256_encrypt_and_tag(pass, &salt, &raw_payload, &mut enc_payload)?;
                         (99u16, 3u8, true, enc_payload)
+                    } else if encryption == TTZipEncryptionMethod::ZipCrypto {
+                        let pass = pwd_cloned.as_deref().ok_or(TTZipStatus::ErrInvalidPassword)?;
+                        let mut enc_payload = Vec::with_capacity(12 + raw_payload.len());
+                        let mut header = [0x42u8; 12];
+                        header[11] = (crc32 >> 24) as u8;
+                        let mut keys = crate::crypto::zipcrypto::ZipCryptoKeys::from_password(pass.as_bytes());
+                        keys.encrypt_slice(&mut header);
+                        enc_payload.extend_from_slice(&header);
+                        let mut body = raw_payload.clone();
+                        keys.encrypt_slice(&mut body);
+                        enc_payload.extend_from_slice(&body);
+                        (actual_method, 0u8, true, enc_payload)
                     } else {
                         (actual_method, 0u8, false, raw_payload)
                     };

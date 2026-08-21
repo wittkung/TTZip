@@ -37,13 +37,14 @@ impl AppState {
                 return;
             }
 
-            let raw_data = self.archive_raw_data.clone();
+            let password = self.recovered_password.as_deref();
+            let raw_data = &self.archive_raw_data;
 
             // Extract stream bytes for preview
             let preview_bytes = if self.archive_format == "ZIP" {
-                if let Ok(archive) = ZipArchive::open_slice(&raw_data) {
+                if let Ok(archive) = ZipArchive::open_slice(raw_data) {
                     if let Some(idx) = archive.entries().iter().position(|e| e.rel_path == rel_path) {
-                        archive.extract_entry_bytes(idx, None).unwrap_or_default()
+                        archive.extract_entry_bytes(idx, password).unwrap_or_default()
                     } else {
                         Vec::new()
                     }
@@ -51,9 +52,9 @@ impl AppState {
                     Vec::new()
                 }
             } else if self.archive_format == "7-Zip" {
-                if let Ok(archive) = SevenZArchive::open_slice(&raw_data) {
+                if let Ok(archive) = SevenZArchive::open_slice(raw_data) {
                     if let Some(idx) = archive.files().iter().position(|f| f.rel_path == rel_path) {
-                        archive.extract_entry_bytes(idx, None).unwrap_or_default()
+                        archive.extract_entry_bytes(idx, password).unwrap_or_default()
                     } else {
                         Vec::new()
                     }

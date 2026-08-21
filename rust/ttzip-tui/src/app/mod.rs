@@ -9,10 +9,17 @@
 
 pub mod extract;
 pub mod input;
+pub mod modal_state;
 pub mod preview;
+pub mod recovery_runner;
+pub mod repair_runner;
+pub mod split;
 pub mod state;
 pub mod types;
 
+pub use modal_state::*;
+pub use recovery_runner::*;
+pub use repair_runner::*;
 pub use state::*;
 pub use types::*;
 

@@ -46,6 +46,7 @@ impl AppState {
         let raw_data = self.archive_raw_data.clone();
         let is_zip = self.archive_format == "ZIP";
         let dest_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let password = self.recovered_password.clone();
 
         thread::spawn(move || {
             let start = Instant::now();
@@ -103,7 +104,7 @@ impl AppState {
                     if let Ok(archive) = ZipArchive::open_slice(&raw_data) {
                         if let Some(idx) = archive.entries().iter().position(|e| e.rel_path == *rel_path) {
                             uncomp_size = archive.entries()[idx].uncompressed_size;
-                            archive.extract_entry_bytes(idx, None).unwrap_or_default()
+                            archive.extract_entry_bytes(idx, password.as_deref()).unwrap_or_default()
                         } else {
                             Vec::new()
                         }
@@ -112,7 +113,7 @@ impl AppState {
                     }
                 } else if let Ok(archive) = SevenZArchive::open_slice(&raw_data) {
                     if let Some(idx) = archive.files().iter().position(|f| f.rel_path == *rel_path) {
-                        let bytes = archive.extract_entry_bytes(idx, None).unwrap_or_default();
+                        let bytes = archive.extract_entry_bytes(idx, password.as_deref()).unwrap_or_default();
                         uncomp_size = bytes.len() as u64;
                         bytes
                     } else {

@@ -26,6 +26,18 @@ pub enum AppEvent {
     TaskCompleted(Result<String, String>),
     CancellationRequested,
     Tick,
+    // Multi-modal notification events
+    RecoveryProgress {
+        tested: usize,
+        total: usize,
+        speed: f64,
+        elapsed_secs: f64,
+        eta_secs: f64,
+    },
+    RecoveryCompleted(Result<Option<String>, String>),
+    RepairCompleted(Result<usize, String>),
+    ParetoBenchmarkCompleted(Result<String, String>),
+    SplitCompleted(Result<Vec<String>, String>),
 }
 
 /// JSON payload schema conforming to `contracts/tui_event_contract.json`.

@@ -15,6 +15,10 @@ pub enum AppMode {
     Preview,
     Progress,
     Help,
+    PasswordRecovery,
+    RepairWizard,
+    ParetoBenchmark,
+    SplitManager,
     Exiting,
 }
 
@@ -35,3 +39,5 @@ impl ArchiveFormat {
         }
     }
 }
+
+

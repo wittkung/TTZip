@@ -8,6 +8,7 @@
 //! UI Root Layout and Component Composition.
 
 pub mod explorer;
+pub mod modals;
 pub mod progress;
 pub mod search;
 pub mod theme;
@@ -70,6 +71,18 @@ pub fn render(frame: &mut Frame, state: &mut AppState) {
         AppMode::Help => {
             render_help_modal(frame, size);
         }
+        AppMode::PasswordRecovery => {
+            modals::render_recovery_modal(frame, size, state);
+        }
+        AppMode::RepairWizard => {
+            modals::render_repair_modal(frame, size, state);
+        }
+        AppMode::ParetoBenchmark => {
+            modals::render_pareto_modal(frame, size, state);
+        }
+        AppMode::SplitManager => {
+            modals::render_split_modal(frame, size, state);
+        }
         _ => {}
     }
 }
@@ -108,18 +121,24 @@ fn render_header(frame: &mut Frame, area: Rect, state: &AppState) {
 /// Renders bottom shortcut guide and status messages.
 fn render_footer(frame: &mut Frame, area: Rect, state: &AppState) {
     let shortcuts = Line::from(vec![
-        Span::styled(" [j/k/↑/↓] ", Theme::style_key_shortcut()),
+        Span::styled(" [j/k] ", Theme::style_key_shortcut()),
         Span::styled("Move  ", Theme::style_muted_text()),
         Span::styled("[Space] ", Theme::style_key_shortcut()),
         Span::styled("Mark  ", Theme::style_muted_text()),
-        Span::styled("[a] ", Theme::style_key_shortcut()),
-        Span::styled("All  ", Theme::style_muted_text()),
         Span::styled("[Enter] ", Theme::style_key_shortcut()),
         Span::styled("Extract  ", Theme::style_muted_text()),
         Span::styled("[/] ", Theme::style_key_shortcut()),
         Span::styled("Search  ", Theme::style_muted_text()),
         Span::styled("[p] ", Theme::style_key_shortcut()),
         Span::styled("Preview  ", Theme::style_muted_text()),
+        Span::styled("[r] ", Theme::style_key_shortcut()),
+        Span::styled("Recover  ", Theme::style_muted_text()),
+        Span::styled("[R] ", Theme::style_key_shortcut()),
+        Span::styled("Repair  ", Theme::style_muted_text()),
+        Span::styled("[B] ", Theme::style_key_shortcut()),
+        Span::styled("Bench  ", Theme::style_muted_text()),
+        Span::styled("[S] ", Theme::style_key_shortcut()),
+        Span::styled("Split  ", Theme::style_muted_text()),
         Span::styled("[?] ", Theme::style_key_shortcut()),
         Span::styled("Help  ", Theme::style_muted_text()),
         Span::styled("[q] ", Theme::style_key_shortcut()),
@@ -263,6 +282,26 @@ fn render_help_modal(frame: &mut Frame, area: Rect) {
         ]),
         Line::from(""),
         Line::from(vec![
+            Span::styled(" Modals & Recovery Tools:", Theme::style_title()),
+        ]),
+        Line::from(vec![
+            Span::styled("   r                 ", Theme::style_key_shortcut()),
+            Span::styled("Password recovery dictionary wizard", Theme::style_primary_text()),
+        ]),
+        Line::from(vec![
+            Span::styled("   R                 ", Theme::style_key_shortcut()),
+            Span::styled("Self-healing corrupt archive repair wizard", Theme::style_primary_text()),
+        ]),
+        Line::from(vec![
+            Span::styled("   B                 ", Theme::style_key_shortcut()),
+            Span::styled("Pareto frontier & hardware benchmark engine", Theme::style_primary_text()),
+        ]),
+        Line::from(vec![
+            Span::styled("   S                 ", Theme::style_key_shortcut()),
+            Span::styled("Multi-volume archive split & join manager", Theme::style_primary_text()),
+        ]),
+        Line::from(""),
+        Line::from(vec![
             Span::styled(" Control & Cancellation:", Theme::style_title()),
         ]),
         Line::from(vec![
@@ -278,3 +317,7 @@ fn render_help_modal(frame: &mut Frame, area: Rect) {
     let p = Paragraph::new(help_text).block(block);
     frame.render_widget(p, popup_area);
 }
+
+#[cfg(test)]
+mod tests;
+
