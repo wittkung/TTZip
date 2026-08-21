@@ -179,9 +179,9 @@ public struct MediaPreviewView: View {
             return s
         }
         
-        let gbkEncoding = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue))
-        if let s = String(data: data, encoding: String.Encoding(rawValue: gbkEncoding)) {
-            return s
+        let detectedStr = CharsetDetector.sanitizeFilename(bytes: data)
+        if !detectedStr.isEmpty {
+            return detectedStr
         }
         
         if let s = String(data: data, encoding: .utf16) {

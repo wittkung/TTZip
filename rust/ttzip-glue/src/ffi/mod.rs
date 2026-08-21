@@ -15,6 +15,7 @@ pub mod crypto_ffi;
 pub mod filter_ffi;
 pub mod fs_ffi;
 pub mod runtime_ffi;
+pub mod security_ffi;
 pub mod stream_ffi;
 pub mod vfs_ffi;
 
@@ -26,6 +27,7 @@ pub use crypto_ffi::*;
 pub use filter_ffi::*;
 pub use fs_ffi::*;
 pub use runtime_ffi::*;
+pub use security_ffi::*;
 pub use stream_ffi::*;
 pub use vfs_ffi::*;
 

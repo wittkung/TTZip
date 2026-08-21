@@ -13,8 +13,10 @@ use tempfile::tempdir;
 use ttzip_glue::crypto::rs_fec::gf8::gf8_mul_add_slice;
 use ttzip_glue::crypto::zipcrypto::ZipCryptoKeys;
 use ttzip_glue::ffi::{
-    ttzip_rust_rs_create_recovery_record, ttzip_rust_rs_decode, ttzip_rust_rs_encode,
-    ttzip_rust_rs_free_buffer, ttzip_rust_rs_repair_archive, ttzip_rust_zipcrypto_decrypt_stream,
+    ttzip_rust_rs_append_recovery_record_file, ttzip_rust_rs_create_recovery_record,
+    ttzip_rust_rs_decode, ttzip_rust_rs_encode, ttzip_rust_rs_free_buffer,
+    ttzip_rust_rs_inspect_recovery_record_file, ttzip_rust_rs_repair_archive,
+    ttzip_rust_rs_repair_archive_streaming, ttzip_rust_zipcrypto_decrypt_stream,
     ttzip_rust_zipcrypto_encrypt_stream, ttzip_rust_zipcrypto_init_keys,
 };
 use ttzip_glue::types::TTZipStatus;
@@ -195,6 +197,83 @@ fn test_rs_recovery_record_ffi_create_and_repair() {
     let repair_res = unsafe { ttzip_rust_rs_repair_archive(c_path.as_ptr(), &mut repaired) };
     assert_eq!(repair_res, TTZipStatus::Ok.to_i32());
     assert!(repaired, "Archive should be repaired successfully");
+
+    let restored = std::fs::read(&file_path).unwrap();
+    assert_eq!(&restored[..original_payload.len()], &original_payload[..]);
+}
+
+#[test]
+fn test_rs_recovery_record_streaming_file_ffi_roundtrip() {
+    let dir = tempdir().unwrap();
+    let file_path = dir.path().join("archive_streaming.tar");
+    let original_payload: Vec<u8> = (0..128 * 1024)
+        .map(|i| ((i * 17 + 13) & 0xFF) as u8)
+        .collect();
+
+    std::fs::write(&file_path, &original_payload).unwrap();
+
+    let c_path = CString::new(file_path.to_str().unwrap()).unwrap();
+    let mut data_slices = 0usize;
+    let mut parity_slices = 0usize;
+    let mut protected_len = 0u64;
+    let mut root_hash = [0u8; 32];
+
+    let append_status = unsafe {
+        ttzip_rust_rs_append_recovery_record_file(
+            c_path.as_ptr(),
+            25.0,
+            16384,
+            &mut data_slices,
+            &mut parity_slices,
+            &mut protected_len,
+            root_hash.as_mut_ptr(),
+        )
+    };
+    assert_eq!(append_status, TTZipStatus::Ok.to_i32());
+    assert_eq!(data_slices, 8);
+    assert_eq!(parity_slices, 2);
+    assert_eq!(protected_len, original_payload.len() as u64);
+
+    // Inspect via FFI
+    let mut ins_slice_size = 0usize;
+    let mut ins_k = 0usize;
+    let mut ins_m = 0usize;
+    let mut ins_len = 0u64;
+    let mut ins_hash = [0u8; 32];
+    let mut ins_has_record = false;
+
+    let ins_status = unsafe {
+        ttzip_rust_rs_inspect_recovery_record_file(
+            c_path.as_ptr(),
+            &mut ins_slice_size,
+            &mut ins_k,
+            &mut ins_m,
+            &mut ins_len,
+            ins_hash.as_mut_ptr(),
+            &mut ins_has_record,
+        )
+    };
+    assert_eq!(ins_status, TTZipStatus::Ok.to_i32());
+    assert!(ins_has_record);
+    assert_eq!(ins_slice_size, 16384);
+    assert_eq!(ins_k, 8);
+    assert_eq!(ins_m, 2);
+    assert_eq!(ins_hash, root_hash);
+
+    // Corrupt shard 3 and shard 7
+    let mut damaged = std::fs::read(&file_path).unwrap();
+    for i in 0..300 {
+        damaged[3 * 16384 + i] ^= 0xCC;
+        damaged[7 * 16384 + i] ^= 0x33;
+    }
+    std::fs::write(&file_path, &damaged).unwrap();
+
+    // Repair via streaming FFI
+    let mut repaired = false;
+    let repair_status =
+        unsafe { ttzip_rust_rs_repair_archive_streaming(c_path.as_ptr(), &mut repaired) };
+    assert_eq!(repair_status, TTZipStatus::Ok.to_i32());
+    assert!(repaired, "Streaming in-place repair must succeed");
 
     let restored = std::fs::read(&file_path).unwrap();
     assert_eq!(&restored[..original_payload.len()], &original_payload[..]);

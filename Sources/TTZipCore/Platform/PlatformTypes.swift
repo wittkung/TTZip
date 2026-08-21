@@ -17,6 +17,7 @@ public struct PlatformPathNormalizationResult: Sendable, Equatable {
     public let containsWindowsReservedDeviceName: Bool
     public let strippedAlternateDataStream: String?
     public let win32FormattedPath: String
+    public let hasTraversalAttack: Bool
     
     public init(
         originalPath: String,
@@ -26,7 +27,8 @@ public struct PlatformPathNormalizationResult: Sendable, Equatable {
         isLongPath: Bool,
         containsWindowsReservedDeviceName: Bool,
         strippedAlternateDataStream: String? = nil,
-        win32FormattedPath: String
+        win32FormattedPath: String,
+        hasTraversalAttack: Bool = false
     ) {
         self.originalPath = originalPath
         self.normalizedPath = normalizedPath
@@ -36,6 +38,7 @@ public struct PlatformPathNormalizationResult: Sendable, Equatable {
         self.containsWindowsReservedDeviceName = containsWindowsReservedDeviceName
         self.strippedAlternateDataStream = strippedAlternateDataStream
         self.win32FormattedPath = win32FormattedPath
+        self.hasTraversalAttack = hasTraversalAttack
     }
 }
 

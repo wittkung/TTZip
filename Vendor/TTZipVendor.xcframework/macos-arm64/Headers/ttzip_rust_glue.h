@@ -147,6 +147,9 @@ int32_t ttzip_rust_zipcrypto_encrypt_stream(uint32_t *key0, uint32_t *key1, uint
 int32_t ttzip_rust_rs_encode(const uint8_t *const *data_ptrs, size_t k_data, uint8_t *const *parity_ptrs, size_t m_parity, size_t block_size);
 int32_t ttzip_rust_rs_decode(const uint8_t *const *available_ptrs, const int32_t *available_indices, size_t num_available, size_t k_data, size_t m_parity, const int32_t *missing_indices, size_t num_missing, uint8_t *const *reconstructed_ptrs, size_t block_size);
 int32_t ttzip_rust_rs_create_recovery_record(const uint8_t *payload, size_t payload_len, double redundancy_percent, size_t slice_size, uint8_t **out_record, size_t *out_record_len);
+int32_t ttzip_rust_rs_append_recovery_record_file(const char *archive_path, double redundancy_percent, size_t slice_size, size_t *out_data_slices, size_t *out_parity_slices, uint64_t *out_protected_len, uint8_t *out_root_hash);
+int32_t ttzip_rust_rs_inspect_recovery_record_file(const char *archive_path, size_t *out_slice_size, size_t *out_data_slices, size_t *out_parity_slices, uint64_t *out_protected_len, uint8_t *out_root_hash, bool *out_has_record);
+int32_t ttzip_rust_rs_repair_archive_streaming(const char *archive_path, bool *out_repaired);
 int32_t ttzip_rust_rs_repair_archive(const char *archive_path, bool *out_repaired);
 void ttzip_rust_rs_free_buffer(uint8_t *ptr, size_t len);
 TTZipStatus ttzip_rust_detect_format_buffer(const uint8_t *buf, size_t len, const char *filename_hint, int32_t *out_format, bool *out_is_sfx, size_t *out_sfx_offset);
@@ -200,6 +203,7 @@ TTZipStatus ttzip_rust_brotli_decompress_file_stream(const char *src_path, const
 TTZipStatus ttzip_rust_lzfse_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 TTZipStatus ttzip_rust_lzfse_decompress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 TTZipStatus ttzip_rust_detect_charset(const uint8_t *data, size_t data_len, char *out_buf, size_t out_buf_capacity);
+TTZipStatus ttzip_rust_sanitize_filename(const uint8_t *data, size_t data_len, char *out_buf, size_t out_buf_capacity, size_t *out_len);
 
 // Stream Adapters
 typedef struct TTZipStreamReaderHandle TTZipStreamReaderHandle;
@@ -245,6 +249,19 @@ TTZipStatus ttzip_rust_join_split_volumes(const char *first_volume_path, const c
 
 
 // Filesystem Security & Filter DSL
+typedef struct TTZipPathSanitizationResult {
+    char normalized_path[4096];
+    char win32_formatted_path[4096];
+    char stripped_ads[1024];
+    bool has_traversal_attack;
+    bool is_absolute;
+    bool is_unc;
+    bool is_long_path;
+    bool is_windows_reserved;
+    bool has_stripped_ads;
+} TTZipPathSanitizationResult;
+
+TTZipStatus ttzip_rust_sanitize_path(const char *raw_path, TTZipPathSanitizationResult *out_result);
 TTZipStatus ttzip_rust_validate_path(const char *dest_dir, const char *entry_path, char *out_sanitized, size_t out_capacity);
 int32_t ttzip_rust_apfs_preallocate(int32_t fd, int64_t target_size);
 int32_t ttzip_rust_apfs_clone_file(const char *src, const char *dst, bool overwrite);
@@ -400,6 +417,55 @@ bool ttzip_rust_crypto_recover_7z_aes(const char *const *passwords, size_t count
 TTZipStatus ttzip_rust_archive_repair_zip(const char *damaged_path, const char *repaired_path, size_t *out_salvaged_count);
 TTZipStatus ttzip_rust_archive_repair_tar(const char *damaged_path, const char *repaired_path, size_t *out_salvaged_count);
 TTZipStatus ttzip_rust_archive_repair_auto(const char *damaged_path, const char *repaired_path, size_t *out_salvaged_count);
+
+// Parallel FS Scanner
+typedef struct TTZipScannedItemRaw {
+    const char *src_path;
+    const char *rel_path;
+    uint64_t file_size;
+    int64_t mtime_epoch_secs;
+    uint32_t mode;
+    bool is_directory;
+} TTZipScannedItemRaw;
+
+typedef bool (*TTZipScanCallback)(const TTZipScannedItemRaw *item, void *user_data);
+
+typedef struct TTZipScanConfigRaw {
+    bool include_hidden;
+    bool skip_mac_junk;
+    uint32_t max_depth;
+    uint32_t thread_budget;
+} TTZipScanConfigRaw;
+
+TTZipStatus ttzip_rust_scan_directory_parallel(const char *root_path, const TTZipScanConfigRaw *config, TTZipScanCallback callback, void *user_data);
+
+// SIMD Binary Hex Diff & Fuzzing
+int32_t ttzip_rust_hex_diff(const uint8_t *expected_ptr, size_t expected_len, const uint8_t *actual_ptr, size_t actual_len, size_t max_window, bool use_ansi, char **out_diff);
+void ttzip_rust_free_hex_diff(char *diff_ptr);
+TTZipStatus ttzip_rust_fuzz_mutate(const uint8_t *data, size_t len, uint32_t op_index, uint64_t seed, uint8_t *out_buf, size_t out_cap, size_t *out_len, uint64_t *next_seed);
+
+// Platform Memory & Zeroize
+void ttzip_rust_secure_zeroize(uint8_t *ptr, size_t len);
+uint8_t *ttzip_rust_alloc_aligned(size_t alignment, size_t size);
+void ttzip_rust_free_aligned(uint8_t *ptr, size_t alignment, size_t size);
+TTZipStatus ttzip_rust_memory_usage(uint64_t *out_current_rss, uint64_t *out_peak_rss, uint64_t *out_virtual_size);
+
+// Platform CPU & Hardware Topology
+typedef struct TTZipCpuCapsRaw {
+    uint32_t logical_cores;
+    size_t physical_page_size;
+    uint32_t p_cores;
+    uint32_t e_cores;
+    bool has_arm_neon;
+    bool has_arm_crypto;
+    bool has_aes_ni;
+    bool has_avx2;
+    bool has_avx512;
+    bool has_hardware_crc32;
+} TTZipCpuCapsRaw;
+
+TTZipStatus ttzip_rust_cpu_get_capabilities(TTZipCpuCapsRaw *out_caps);
+TTZipStatus ttzip_rust_cpu_get_topology(uint32_t *out_p_cores, uint32_t *out_e_cores, uint32_t *out_total_cores);
 
 #ifdef __cplusplus
 }

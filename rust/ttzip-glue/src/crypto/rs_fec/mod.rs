@@ -9,7 +9,10 @@
 
 pub mod cauchy;
 pub mod gf8;
+pub mod inspect;
+pub mod record_format;
 pub mod recovery_record;
+pub mod repair;
 #[cfg(test)]
 pub mod tests;
 
@@ -19,7 +22,8 @@ pub use gf8::{
     scalar_gf8_mul_add_raw, EXP_TABLE, LOG_TABLE,
 };
 pub use recovery_record::{
-    append_recovery_record_to_file, create_recovery_record, inspect_recovery_record,
-    repair_archive_data, repair_archive_file, RecoveryRecordInfo, DEFAULT_SLICE_SIZE, MAGIC_FOOTER,
-    MAGIC_HEADER,
+    append_recovery_record_to_file, create_recovery_record, create_recovery_record_streaming,
+    inspect_recovery_record, inspect_recovery_record_reader, repair_archive_data,
+    repair_archive_file, repair_archive_file_streaming, RecoveryRecordInfo,
+    StreamingCauchyAccumulator, DEFAULT_SLICE_SIZE, MAGIC_FOOTER, MAGIC_HEADER,
 };

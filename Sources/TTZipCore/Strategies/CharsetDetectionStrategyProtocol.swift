@@ -52,7 +52,7 @@ public final class UTF8CharsetStrategy: CharsetDetectionStrategyProtocol {
 
 /// 3. CJK legacy encoding conversion strategy (`CJKLegacyCharsetStrategy`).
 public final class CJKLegacyCharsetStrategy: CharsetDetectionStrategyProtocol {
-    public let charsetStrategyName: String = "CJK (GB18030/BIG5/Shift-JIS) Legacy Conversion Strategy"
+    public let charsetStrategyName: String = "CJK (GB18030/BIG5/Shift-JIS/EUC-KR) Native Rust Transcoding Strategy"
     
     public init() {}
     
@@ -61,18 +61,19 @@ public final class CJKLegacyCharsetStrategy: CharsetDetectionStrategyProtocol {
     }
     
     public func sanitize(bytes: Data) -> String? {
-        let encodings: [CFStringEncodings] = [
-            .GB_18030_2000,
-            .big5,
-            .shiftJIS,
-            .EUC_KR
-        ]
-        for enc in encodings {
-            let nsEnc = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(enc.rawValue))
-            let encoding = String.Encoding(rawValue: nsEnc)
-            if let converted = String(data: bytes, encoding: encoding), !converted.isEmpty {
-                return converted
+        if bytes.isEmpty { return "" }
+        let capacity = max(bytes.count * 4 + 1, 256)
+        var buffer = [CChar](repeating: 0, count: capacity)
+        var written: Int = 0
+        let status: CTTZipBridge.TTZipStatus = bytes.withUnsafeBytes { rawPtr -> CTTZipBridge.TTZipStatus in
+            guard let baseAddress = rawPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return TTZIP_STATUS_ERR_INVALID_PARAM
             }
+            return ttzip_rust_sanitize_filename(baseAddress, bytes.count, &buffer, buffer.count, &written)
+        }
+        if status == TTZIP_STATUS_OK {
+            let nonNullBytes = buffer.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }
+            return String(decoding: nonNullBytes, as: UTF8.self)
         }
         return String(decoding: bytes, as: UTF8.self)
     }
@@ -99,28 +100,22 @@ public final class CharsetDetectionStrategyContext: @unchecked Sendable {
             return cached
         }
         
-        let detected: String
-        if !data.contains(where: { $0 >= 0x80 }) {
-            detected = "ASCII"
-        } else if let _ = String(data: data, encoding: .utf8) {
-            detected = "UTF-8"
-        } else {
-            let encodings: [(String, CFStringEncodings)] = [
-                ("GB18030", .GB_18030_2000),
-                ("BIG5", .big5),
-                ("Shift-JIS", .shiftJIS),
-                ("EUC-KR", .EUC_KR)
-            ]
-            var found = "WINDOWS-1252"
-            for (name, enc) in encodings {
-                let nsEnc = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(enc.rawValue))
-                let encoding = String.Encoding(rawValue: nsEnc)
-                if let str = String(data: data, encoding: encoding), !str.isEmpty {
-                    found = name
-                    break
-                }
+        var buffer = [CChar](repeating: 0, count: 64)
+        let status: CTTZipBridge.TTZipStatus = data.withUnsafeBytes { rawPtr -> CTTZipBridge.TTZipStatus in
+            guard let baseAddress = rawPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return TTZIP_STATUS_ERR_INVALID_PARAM
             }
-            detected = found
+            return ttzip_rust_detect_charset(baseAddress, data.count, &buffer, buffer.count)
+        }
+        
+        let detected: String
+        if status == TTZIP_STATUS_OK, buffer[0] != 0 {
+            let nonNullBytes = buffer.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }
+            detected = String(decoding: nonNullBytes, as: UTF8.self)
+        } else if !data.contains(where: { $0 >= 0x80 }) {
+            detected = "ASCII"
+        } else {
+            detected = "UTF-8"
         }
         
         charsetCache.setValue(detected, forKey: data)
@@ -128,6 +123,7 @@ public final class CharsetDetectionStrategyContext: @unchecked Sendable {
     }
     
     public func sanitizeFilename(bytes: Data) -> String {
+        if bytes.isEmpty { return "" }
         if let cached = sanitizeCache.value(forKey: bytes) {
             return cached
         }

@@ -11,9 +11,10 @@ use crate::fs::apfs::{
     apfs_clone_file, apfs_fcopyfile_clone, apfs_preallocate, is_mac_junk_file, ttzip_remove_path_fast,
 };
 use crate::fs::safe_extract::sanitize_and_validate_path;
+use crate::fs::scanner::{scan_directory_parallel, ScanOptions};
 use crate::types::TTZipStatus;
-use libc::c_char;
-use std::ffi::CStr;
+use libc::{c_char, c_void};
+use std::ffi::{CStr, CString};
 use std::panic::catch_unwind;
 use std::path::Path;
 
@@ -147,3 +148,93 @@ pub unsafe extern "C" fn ttzip_rust_remove_path_fast(path: *const c_char) -> i32
     });
     result.unwrap_or(-1)
 }
+
+/// Raw C-ABI structure for a scanned filesystem item.
+#[repr(C)]
+pub struct TTZipScannedItemRaw {
+    pub src_path: *const c_char,
+    pub rel_path: *const c_char,
+    pub file_size: u64,
+    pub mtime_epoch_secs: i64,
+    pub mode: u32,
+    pub is_directory: bool,
+}
+
+/// Callback function invoked for each scanned filesystem entry.
+pub type TTZipScanCallback =
+    Option<unsafe extern "C" fn(item: *const TTZipScannedItemRaw, user_data: *mut c_void) -> bool>;
+
+/// Scan configuration passed over C-ABI.
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct TTZipScanConfigRaw {
+    pub include_hidden: bool,
+    pub skip_mac_junk: bool,
+    pub max_depth: u32,
+    pub thread_budget: u32,
+}
+
+/// Recursively scans a filesystem directory in parallel with Rayon and invokes callback for each item.
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_scan_directory_parallel(
+    root_path: *const c_char,
+    config: *const TTZipScanConfigRaw,
+    callback: TTZipScanCallback,
+    user_data: *mut c_void,
+) -> TTZipStatus {
+    let result = catch_unwind(|| {
+        if root_path.is_null() {
+            return TTZipStatus::ErrInvalidParam;
+        }
+
+        let path_str = match CStr::from_ptr(root_path).to_str() {
+            Ok(s) => s,
+            Err(_) => return TTZipStatus::ErrInvalidParam,
+        };
+
+        let options = if !config.is_null() {
+            let cfg = &*config;
+            ScanOptions {
+                include_hidden: cfg.include_hidden,
+                skip_mac_junk: cfg.skip_mac_junk,
+                max_depth: cfg.max_depth,
+                thread_budget: cfg.thread_budget,
+            }
+        } else {
+            ScanOptions::default()
+        };
+
+        let items = scan_directory_parallel(Path::new(path_str), &options);
+
+        if let Some(cb) = callback {
+            for item in &items {
+                let c_src = match CString::new(item.src_path.as_bytes()) {
+                    Ok(c) => c,
+                    Err(_) => continue,
+                };
+                let c_rel = match CString::new(item.rel_path.as_bytes()) {
+                    Ok(c) => c,
+                    Err(_) => continue,
+                };
+
+                let raw_item = TTZipScannedItemRaw {
+                    src_path: c_src.as_ptr(),
+                    rel_path: c_rel.as_ptr(),
+                    file_size: item.file_size,
+                    mtime_epoch_secs: item.mtime_epoch_secs,
+                    mode: item.mode,
+                    is_directory: item.is_directory,
+                };
+
+                let should_continue = cb(&raw_item, user_data);
+                if !should_continue {
+                    return TTZipStatus::Cancelled;
+                }
+            }
+        }
+
+        TTZipStatus::Ok
+    });
+    result.unwrap_or(TTZipStatus::ErrPanicCaught)
+}
+

@@ -11,8 +11,10 @@ pub mod checksum;
 pub mod ciphers;
 pub mod fec;
 mod recovery;
+pub mod recovery_record_ffi;
 
 pub use checksum::*;
 pub use ciphers::*;
 pub use fec::*;
 pub use recovery::*;
+pub use recovery_record_ffi::*;

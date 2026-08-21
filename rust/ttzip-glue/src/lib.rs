@@ -17,13 +17,17 @@
 pub mod analytics;
 pub mod archive;
 pub mod bench;
+pub mod charset;
 pub mod codecs;
 pub mod crypto;
 pub mod ffi;
 pub mod fs;
+pub mod platform;
 pub mod runtime;
+pub mod security;
 pub mod sevenz;
 pub mod standards;
+pub mod testing;
 pub mod types;
 pub mod vfs;
 pub mod zip;
@@ -35,13 +39,17 @@ pub use archive::{
     VolumeSegment,
 };
 pub use bench::*;
+pub use charset::*;
 pub use codecs::*;
 pub use crypto::*;
 pub use ffi::*;
 pub use fs::*;
+pub use platform::*;
 pub use runtime::*;
+pub use security::*;
 pub use sevenz::{create_7z_archive, decode_7z_solid_payload, parse_7z_metadata, SevenZArchive, SevenZFileMeta, SevenZHeaderInfo};
 pub use standards::*;
+pub use testing::*;
 pub use types::*;
 pub use vfs::*;
 pub use zip::{create_zip_archive, ZipArchive, ZipEntry, ZipInputItem};

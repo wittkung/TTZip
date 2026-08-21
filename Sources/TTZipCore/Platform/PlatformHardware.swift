@@ -19,48 +19,84 @@ public enum PlatformHardware {
     public static let capabilities: CPUFeatureSet = detectCapabilities()
     
     private static func detectCapabilities() -> CPUFeatureSet {
+        var rawCaps = TTZipCpuCapsRaw()
+        let status = ttzip_rust_cpu_get_capabilities(&rawCaps)
+        
+        #if arch(arm64)
+        let archStr = "arm64"
+        #elseif arch(x86_64)
+        let archStr = "x86_64"
+        #else
+        let archStr = "unknown"
+        #endif
+        
+        if status == TTZIP_STATUS_OK {
+            return CPUFeatureSet(
+                architecture: archStr,
+                logicalCores: Int(rawCaps.logical_cores),
+                physicalPageSize: Int(rawCaps.physical_page_size),
+                hasARMNeon: rawCaps.has_arm_neon,
+                hasARMCrypto: rawCaps.has_arm_crypto,
+                hasAESNI: rawCaps.has_aes_ni,
+                hasAVX2: rawCaps.has_avx2,
+                hasAVX512: rawCaps.has_avx512,
+                hasHardwareCRC32: rawCaps.has_hardware_crc32
+            )
+        }
+        
         let cores = ProcessInfo.processInfo.activeProcessorCount
         let pageSize = PlatformOperatingSystem.current.defaultPageAlignment
         
         #if arch(arm64)
-        let archStr = "arm64"
-        let hasNeon = true
-        let hasCrypto = true
-        let hasAES = true
-        let hasAVX2 = false
-        let hasAVX512 = false
-        let hasCRC32 = true
-        
-        #elseif arch(x86_64)
-        let archStr = "x86_64"
-        let hasNeon = false
-        let hasCrypto = false
-        let hasAES = true
-        let hasAVX2 = true
-        let hasAVX512 = false
-        let hasCRC32 = true
-        
-        #else
-        let archStr = "unknown"
-        let hasNeon = false
-        let hasCrypto = false
-        let hasAES = false
-        let hasAVX2 = false
-        let hasAVX512 = false
-        let hasCRC32 = false
-        #endif
-        
         return CPUFeatureSet(
             architecture: archStr,
             logicalCores: cores,
             physicalPageSize: pageSize,
-            hasARMNeon: hasNeon,
-            hasARMCrypto: hasCrypto,
-            hasAESNI: hasAES,
-            hasAVX2: hasAVX2,
-            hasAVX512: hasAVX512,
-            hasHardwareCRC32: hasCRC32
+            hasARMNeon: true,
+            hasARMCrypto: true,
+            hasAESNI: true,
+            hasAVX2: false,
+            hasAVX512: false,
+            hasHardwareCRC32: true
         )
+        #elseif arch(x86_64)
+        return CPUFeatureSet(
+            architecture: archStr,
+            logicalCores: cores,
+            physicalPageSize: pageSize,
+            hasARMNeon: false,
+            hasARMCrypto: false,
+            hasAESNI: true,
+            hasAVX2: true,
+            hasAVX512: false,
+            hasHardwareCRC32: true
+        )
+        #else
+        return CPUFeatureSet(
+            architecture: archStr,
+            logicalCores: cores,
+            physicalPageSize: pageSize,
+            hasARMNeon: false,
+            hasARMCrypto: false,
+            hasAESNI: false,
+            hasAVX2: false,
+            hasAVX512: false,
+            hasHardwareCRC32: false
+        )
+        #endif
+    }
+    
+    /// Queries dynamic P-core, E-core, and total logical core topology.
+    public static func cpuTopology() -> (pCores: Int, eCores: Int, totalCores: Int) {
+        var p: UInt32 = 0
+        var e: UInt32 = 0
+        var tot: UInt32 = 0
+        let status = ttzip_rust_cpu_get_topology(&p, &e, &tot)
+        if status == TTZIP_STATUS_OK {
+            return (pCores: Int(p), eCores: Int(e), totalCores: Int(tot))
+        }
+        let active = ProcessInfo.processInfo.activeProcessorCount
+        return (pCores: active, eCores: 0, totalCores: active)
     }
     
     /// Boosts current thread scheduling QoS priority to user interactive on Darwin.

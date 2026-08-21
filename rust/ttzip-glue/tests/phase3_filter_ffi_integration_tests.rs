@@ -7,7 +7,6 @@
 
 use std::ffi::CString;
 use ttzip_glue::ffi::filter_ffi::*;
-use ttzip_glue::ffi::fs_ffi::*;
 
 #[test]
 fn test_dsl_filter_ffi_lifecycle_and_evaluation() {

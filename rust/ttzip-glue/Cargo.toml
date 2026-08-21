@@ -21,6 +21,9 @@ crossbeam-utils = "0.8"
 parking_lot = "0.12"
 snap = "1.1"
 brotli = "7.0"
+encoding_rs = "0.8"
+chardetng = "0.1"
+unicode-normalization = "0.1"
 
 [dev-dependencies]
 hex = "0.4"

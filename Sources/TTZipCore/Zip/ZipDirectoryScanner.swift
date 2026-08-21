@@ -6,6 +6,7 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
 
 /// Value type representing a filesystem entry scheduled for ZIP compression.
 public struct ZipFileItemToCompress: Sendable {
@@ -27,50 +28,36 @@ public enum ZipDirectoryScanner {
     public static func scan(inputPaths: [String], skipMacJunk: Bool = true) -> [ZipFileItemToCompress] {
         var items: [ZipFileItemToCompress] = []
         items.reserveCapacity(256)
-        let fm = FileManager.default
         
         for path in inputPaths {
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: path, isDirectory: &isDir) else { continue }
+            guard FileManager.default.fileExists(atPath: path) else { continue }
             
-            let url = URL(fileURLWithPath: path).resolvingSymlinksInPath()
-            let canonicalPath = url.path
-            let baseName = url.lastPathComponent
+            var config = TTZipScanConfigRaw(
+                include_hidden: false,
+                skip_mac_junk: skipMacJunk,
+                max_depth: 0,
+                thread_budget: 0
+            )
             
-            if skipMacJunk && isMacJunk(baseName) { continue }
-            
-            if isDir.boolValue {
-                items.append(ZipFileItemToCompress(srcPath: canonicalPath, relPath: baseName, isDirectory: true, fileSize: 0))
-                if let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey], options: [.skipsHiddenFiles]) {
-                    for case let fileURL as URL in enumerator {
-                        let resolvedURL = fileURL.resolvingSymlinksInPath()
-                        let subPath = resolvedURL.path
-                        if skipMacJunk && isMacJunk(subPath) { continue }
-                        let resValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey])
-                        let subIsDir = resValues?.isDirectory ?? false
-                        
-                        let rel: String
-                        if subPath.hasPrefix(canonicalPath) {
-                            var suffix = String(subPath.dropFirst(canonicalPath.count))
-                            if suffix.hasPrefix("/") { suffix = String(suffix.dropFirst()) }
-                            rel = baseName + "/" + suffix
-                        } else if fileURL.path.hasPrefix(path) {
-                            var suffix = String(fileURL.path.dropFirst(path.count))
-                            if suffix.hasPrefix("/") { suffix = String(suffix.dropFirst()) }
-                            rel = baseName + "/" + suffix
-                        } else {
-                            rel = baseName + "/" + fileURL.lastPathComponent
-                        }
-                        
-                        let sz = Int64(resValues?.fileSize ?? 0)
-                        items.append(ZipFileItemToCompress(srcPath: subPath, relPath: rel, isDirectory: subIsDir, fileSize: sz))
-                    }
-                }
-            } else {
-                var st = stat()
-                let sz = (stat(canonicalPath, &st) == 0) ? Int64(st.st_size) : 0
-                items.append(ZipFileItemToCompress(srcPath: canonicalPath, relPath: baseName, isDirectory: false, fileSize: sz))
+            var pathItems: [ZipFileItemToCompress] = []
+            let callback: @convention(c) (UnsafePointer<TTZipScannedItemRaw>?, UnsafeMutableRawPointer?) -> Bool = { rawItemPtr, userData in
+                guard let raw = rawItemPtr?.pointee, let userData = userData else { return true }
+                let collector = userData.assumingMemoryBound(to: [ZipFileItemToCompress].self)
+                let src = raw.src_path != nil ? String(cString: raw.src_path) : ""
+                let rel = raw.rel_path != nil ? String(cString: raw.rel_path) : ""
+                collector.pointee.append(ZipFileItemToCompress(
+                    srcPath: src,
+                    relPath: rel,
+                    isDirectory: raw.is_directory,
+                    fileSize: Int64(raw.file_size)
+                ))
+                return true
             }
+            
+            withUnsafeMutablePointer(to: &pathItems) { ptr in
+                _ = ttzip_rust_scan_directory_parallel(path, &config, callback, ptr)
+            }
+            items.append(contentsOf: pathItems)
         }
         return items
     }
@@ -78,14 +65,11 @@ public enum ZipDirectoryScanner {
     public static func scan(inputPaths: [String], filterOptions: ArchiveFilterOptions) -> [ZipFileItemToCompress] {
         var items: [ZipFileItemToCompress] = []
         items.reserveCapacity(256)
-        let fm = FileManager.default
         
         for path in inputPaths {
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: path, isDirectory: &isDir) else { continue }
+            guard FileManager.default.fileExists(atPath: path) else { continue }
             
             let url = URL(fileURLWithPath: path).resolvingSymlinksInPath()
-            let canonicalPath = url.path
             let baseName = url.lastPathComponent
             
             if PathPatternFilterEngine.shouldExclude(
@@ -98,46 +82,43 @@ public enum ZipDirectoryScanner {
                 continue
             }
             
-            if isDir.boolValue {
-                items.append(ZipFileItemToCompress(srcPath: canonicalPath, relPath: baseName, isDirectory: true, fileSize: 0))
-                if let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey], options: [.skipsHiddenFiles]) {
-                    for case let fileURL as URL in enumerator {
-                        let resolvedURL = fileURL.resolvingSymlinksInPath()
-                        let subPath = resolvedURL.path
-                        
-                        let rel: String
-                        if subPath.hasPrefix(canonicalPath) {
-                            var suffix = String(subPath.dropFirst(canonicalPath.count))
-                            if suffix.hasPrefix("/") { suffix = String(suffix.dropFirst()) }
-                            rel = baseName + "/" + suffix
-                        } else if fileURL.path.hasPrefix(path) {
-                            var suffix = String(fileURL.path.dropFirst(path.count))
-                            if suffix.hasPrefix("/") { suffix = String(suffix.dropFirst()) }
-                            rel = baseName + "/" + suffix
-                        } else {
-                            rel = baseName + "/" + fileURL.lastPathComponent
-                        }
-                        
-                        if PathPatternFilterEngine.shouldExclude(
-                            path: rel,
-                            excludePatterns: filterOptions.excludePatterns,
-                            includePatterns: filterOptions.includePatterns,
-                            excludeVCS: filterOptions.excludeVCS,
-                            noMacMetadata: filterOptions.noMacMetadata
-                        ) {
-                            continue
-                        }
-                        
-                        let resValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey])
-                        let subIsDir = resValues?.isDirectory ?? false
-                        let sz = Int64(resValues?.fileSize ?? 0)
-                        items.append(ZipFileItemToCompress(srcPath: subPath, relPath: rel, isDirectory: subIsDir, fileSize: sz))
-                    }
+            var config = TTZipScanConfigRaw(
+                include_hidden: !filterOptions.noMacMetadata,
+                skip_mac_junk: filterOptions.noMacMetadata,
+                max_depth: 0,
+                thread_budget: 0
+            )
+            
+            var pathItems: [ZipFileItemToCompress] = []
+            let callback: @convention(c) (UnsafePointer<TTZipScannedItemRaw>?, UnsafeMutableRawPointer?) -> Bool = { rawItemPtr, userData in
+                guard let raw = rawItemPtr?.pointee, let userData = userData else { return true }
+                let collector = userData.assumingMemoryBound(to: [ZipFileItemToCompress].self)
+                let src = raw.src_path != nil ? String(cString: raw.src_path) : ""
+                let rel = raw.rel_path != nil ? String(cString: raw.rel_path) : ""
+                collector.pointee.append(ZipFileItemToCompress(
+                    srcPath: src,
+                    relPath: rel,
+                    isDirectory: raw.is_directory,
+                    fileSize: Int64(raw.file_size)
+                ))
+                return true
+            }
+            
+            withUnsafeMutablePointer(to: &pathItems) { ptr in
+                _ = ttzip_rust_scan_directory_parallel(path, &config, callback, ptr)
+            }
+            
+            for item in pathItems {
+                if PathPatternFilterEngine.shouldExclude(
+                    path: item.relPath,
+                    excludePatterns: filterOptions.excludePatterns,
+                    includePatterns: filterOptions.includePatterns,
+                    excludeVCS: filterOptions.excludeVCS,
+                    noMacMetadata: filterOptions.noMacMetadata
+                ) {
+                    continue
                 }
-            } else {
-                var st = stat()
-                let sz = (stat(canonicalPath, &st) == 0) ? Int64(st.st_size) : 0
-                items.append(ZipFileItemToCompress(srcPath: canonicalPath, relPath: baseName, isDirectory: false, fileSize: sz))
+                items.append(item)
             }
         }
         return items

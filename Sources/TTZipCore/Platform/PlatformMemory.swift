@@ -40,6 +40,18 @@ public enum PlatformMemory {
     /// Queries current process physical resident memory (RSS), peak RSS high-water mark, and virtual memory snapshot.
     @inlinable
     public static func currentMemoryUsage() -> MemoryCeilingSnapshot {
+        var curRss: UInt64 = 0
+        var peakRss: UInt64 = 0
+        var vSize: UInt64 = 0
+        let status = ttzip_rust_memory_usage(&curRss, &peakRss, &vSize)
+        if status == TTZIP_STATUS_OK && (curRss > 0 || peakRss > 0) {
+            return MemoryCeilingSnapshot(
+                currentRSSBytes: curRss,
+                peakRSSBytes: peakRss,
+                virtualSizeBytes: vSize
+            )
+        }
+        
         #if os(macOS)
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
@@ -97,14 +109,7 @@ public enum PlatformMemory {
     @inlinable
     public static func secureZero(pointer: UnsafeMutableRawPointer, byteCount: Int) {
         guard byteCount > 0 else { return }
-        #if os(macOS)
-        _ = memset_s(pointer, byteCount, 0, byteCount)
-        #else
-        let volatilePtr = pointer.bindMemory(to: UInt8.self, capacity: byteCount)
-        for i in 0..<byteCount {
-            volatilePtr.advanced(by: i).pointee = 0
-        }
-        #endif
+        ttzip_rust_secure_zeroize(pointer.assumingMemoryBound(to: UInt8.self), byteCount)
     }
     
     /// Maps physical file into virtual address space in read-only mode and returns mapping descriptor.

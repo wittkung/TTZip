@@ -29,11 +29,7 @@ public final class SecurityScanner: @unchecked Sendable {
         guard !path.isEmpty else { return false }
         if path.contains("\0") { return false }
         let res = PlatformPathSanitizer.sanitize(path: path)
-        if res.isAbsolute || res.isUNCPath || res.containsWindowsReservedDeviceName || res.strippedAlternateDataStream != nil {
-            return false
-        }
-        let forward = path.replacingOccurrences(of: "\\", with: "/")
-        if forward.hasPrefix("/") || forward.contains("..") {
+        if res.hasTraversalAttack || res.isAbsolute || res.isUNCPath || res.containsWindowsReservedDeviceName || res.strippedAlternateDataStream != nil {
             return false
         }
         return !res.normalizedPath.isEmpty

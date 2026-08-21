@@ -23,13 +23,47 @@ final class CharsetDetectorTests: XCTestCase {
     }
     
     func testGBKChineseCharsetDetection() {
-        // " .txt" GBK (16 bytes)
-        let gbkString = "你好测试文件.txt"
-        let gbkEncoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
-        let data = gbkString.data(using: gbkEncoding)!
+        // "你好测试文件.txt" in GBK / GB18030 (16 bytes)
+        let gbkBytes: [UInt8] = [
+            0xC4, 0xE3, // 你
+            0xBA, 0xC3, // 好
+            0xB2, 0xE2, // 测
+            0xCA, 0xD4, // 试
+            0xCE, 0xC4, // 文
+            0xBC, 0xFE, // 件
+            0x2E, 0x74, 0x78, 0x74 // .txt
+        ]
+        let data = Data(gbkBytes)
         
         let sanitized = CharsetDetector.sanitizeFilename(bytes: data)
         XCTAssertEqual(sanitized, "你好测试文件.txt", "GBK encoded bytes should be sanitized to proper Chinese string")
+    }
+    
+    func testShiftJISJapaneseCharsetDetection() {
+        // "日本語.zip" in Shift-JIS
+        let sjisBytes: [UInt8] = [
+            0x93, 0xFA, // 日
+            0x96, 0x7B, // 本
+            0x8C, 0xEA, // 語
+            0x2E, 0x7A, 0x69, 0x70 // .zip
+        ]
+        let data = Data(sjisBytes)
+        let sanitized = CharsetDetector.sanitizeFilename(bytes: data)
+        XCTAssertEqual(sanitized, "日本語.zip")
+    }
+
+    func testBig5TraditionalChineseCharsetDetection() {
+        // "測試檔件.txt" in Big5
+        let big5Bytes: [UInt8] = [
+            0xB4, 0xFA, // 測
+            0xB8, 0xD5, // 試
+            0xC0, 0xC9, // 檔
+            0xA5, 0xF3, // 件
+            0x2E, 0x74, 0x78, 0x74 // .txt
+        ]
+        let data = Data(big5Bytes)
+        let sanitized = CharsetDetector.sanitizeFilename(bytes: data)
+        XCTAssertEqual(sanitized, "測試檔件.txt")
     }
     
     func testEmptyDataDetection() {

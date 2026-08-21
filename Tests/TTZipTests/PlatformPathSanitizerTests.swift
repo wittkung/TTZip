@@ -70,4 +70,26 @@ final class PlatformPathSanitizerTests: XCTestCase {
         XCTAssertTrue(res.isLongPath)
         XCTAssertTrue(res.win32FormattedPath.hasPrefix("\\\\?\\C:\\"))
     }
+    
+    func testZipSlipDetectionFlag() {
+        let resUnsafe = PlatformPathSanitizer.sanitize(path: "safe/../../outside/secret.txt")
+        XCTAssertTrue(resUnsafe.hasTraversalAttack)
+        
+        let resSafe = PlatformPathSanitizer.sanitize(path: "a/b/../../c")
+        XCTAssertFalse(resSafe.hasTraversalAttack)
+    }
+    
+    func testUnicodeNFCNormalization() {
+        // Hangul NFD decomposed -> NFC precomposed
+        let hangulNFD = "\u{1100}\u{1161}\u{11A8}.dat"
+        let res = PlatformPathSanitizer.sanitize(path: hangulNFD)
+        XCTAssertEqual(res.normalizedPath, "각.dat")
+    }
+    
+    func testSecurityScannerLegitimateMultiDotPath() {
+        XCTAssertTrue(SecurityScanner.isPathSafe("release..notes.txt"))
+        XCTAssertTrue(SecurityScanner.isPathSafe("subfolder/file.v1..2.dat"))
+        XCTAssertFalse(SecurityScanner.isPathSafe("../escape.txt"))
+        XCTAssertFalse(SecurityScanner.isPathSafe("/etc/passwd"))
+    }
 }

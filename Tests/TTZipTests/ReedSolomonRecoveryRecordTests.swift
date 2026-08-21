@@ -10,34 +10,34 @@ import XCTest
 
 final class ReedSolomonRecoveryRecordTests: XCTestCase {
     private var tempDirectoryURL: URL!
-    
+
     override func setUpWithError() throws {
         try super.setUpWithError()
         tempDirectoryURL = FileManager.default.temporaryDirectory.appendingPathComponent("TTZip_FECTests_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDirectoryURL, withIntermediateDirectories: true)
     }
-    
+
     override func tearDownWithError() throws {
         if let url = tempDirectoryURL {
             try? FileManager.default.removeItem(at: url)
         }
         try super.tearDownWithError()
     }
-    
+
     func testReedSolomonEncodeAndDecodeExactReconstruction() {
         let sliceSize = 1024
         let K = 8
         let M = 2
-        
+
         var dataSlices = [Data]()
         for i in 0..<K {
             let slice = Data((0..<sliceSize).map { UInt8(($0 + i * 37) & 0xFF) })
             dataSlices.append(slice)
         }
-        
+
         let parities = ReedSolomonFEC.encode(dataSlices: dataSlices, parityCount: M)
         XCTAssertEqual(parities.count, M)
-        
+
         // Simulate corruption: drop slices 2 and 5
         var intactSlices = [Int: Data]()
         for i in 0..<K {
@@ -48,35 +48,37 @@ final class ReedSolomonRecoveryRecordTests: XCTestCase {
         // Add both parities
         intactSlices[K + 0] = parities[0]
         intactSlices[K + 1] = parities[1]
-        
+
         let reconstructed = ReedSolomonFEC.decode(
             intactSlices: intactSlices,
             totalK: K,
             totalM: M,
             sliceSize: sliceSize
         )
-        
+
         XCTAssertNotNil(reconstructed)
         XCTAssertEqual(reconstructed?[2], dataSlices[2])
         XCTAssertEqual(reconstructed?[5], dataSlices[5])
     }
-    
+
     func testRecoveryRecordInjectionAndSelfHealing() throws {
         let testFile = tempDirectoryURL.appendingPathComponent("archive_fec.tar").path
         let sampleContent = Data((0..<(64 * 1024)).map { UInt8($0 & 0xFF) })
         try sampleContent.write(to: URL(fileURLWithPath: testFile))
-        
+
         let engine = ArchiveRecoveryRecordEngine.shared
-        let payload = try engine.appendRecoveryRecord(to: testFile, redundancyPercent: 10.0, sliceSize: 8192)
-        
+        let payload = try engine.appendRecoveryRecord(to: testFile, redundancyPercent: 15.0, sliceSize: 8192)
+
         XCTAssertEqual(payload.dataSlicesCount, 8)
-        XCTAssertEqual(payload.paritySlicesCount, 1)
-        
+        XCTAssertEqual(payload.paritySlicesCount, 2)
+        XCTAssertEqual(payload.rootChecksum.count, 64, "Root checksum must be full 64-character SHA-256 hex string")
+
         // Verify inspection
         let inspected = engine.inspectRecoveryRecord(archivePath: testFile)
         XCTAssertNotNil(inspected)
         XCTAssertEqual(inspected?.protectedPayloadLength, Int64(sampleContent.count))
-        
+        XCTAssertEqual(inspected?.rootChecksum, payload.rootChecksum)
+
         // Corrupt 512 bytes in slice 3
         var fileData = try Data(contentsOf: URL(fileURLWithPath: testFile))
         let corruptOffset = 3 * 8192 + 100
@@ -84,13 +86,92 @@ final class ReedSolomonRecoveryRecordTests: XCTestCase {
             fileData[corruptOffset + i] ^= 0xFF
         }
         try fileData.write(to: URL(fileURLWithPath: testFile))
-        
+
         // Perform self-healing
         let success = try engine.repairArchive(archivePath: testFile)
         XCTAssertTrue(success)
-        
+
         let restoredData = try Data(contentsOf: URL(fileURLWithPath: testFile))
         let restoredPayload = Data(restoredData.prefix(sampleContent.count))
         XCTAssertEqual(restoredPayload, sampleContent)
+    }
+
+    func testFull32ByteSHA256ChecksumFormat() throws {
+        let testFile = tempDirectoryURL.appendingPathComponent("sha256_format.zip").path
+        let testData = Data("TTZip 2026 Forward Error Correction Full 32-Byte Binary SHA-256 Test Payload".utf8)
+        try testData.write(to: URL(fileURLWithPath: testFile))
+
+        let engine = ArchiveRecoveryRecordEngine.shared
+        let record = try engine.appendRecoveryRecord(to: testFile, redundancyPercent: 20.0, sliceSize: 1024)
+
+        XCTAssertEqual(record.rootChecksum.count, 64)
+        let inspected = engine.inspectRecoveryRecord(archivePath: testFile)
+        XCTAssertNotNil(inspected)
+        XCTAssertEqual(inspected?.rootChecksum, record.rootChecksum)
+    }
+
+    func testMultipleCorruptionsSelfHealing() throws {
+        let testFile = tempDirectoryURL.appendingPathComponent("multi_corrupt.tar").path
+        var sampleArray = [UInt8](repeating: 0, count: 128 * 1024)
+        for i in 0..<sampleArray.count {
+            sampleArray[i] = UInt8((i * 13 + 7) & 0xFF)
+        }
+        let sampleContent = Data(sampleArray)
+        try sampleContent.write(to: URL(fileURLWithPath: testFile))
+
+        let engine = ArchiveRecoveryRecordEngine.shared
+        let payload = try engine.appendRecoveryRecord(to: testFile, redundancyPercent: 25.0, sliceSize: 16384)
+        XCTAssertEqual(payload.dataSlicesCount, 8)
+        XCTAssertEqual(payload.paritySlicesCount, 2)
+
+        // Corrupt 2 shards (shard 1 and shard 6)
+        var fileData = try Data(contentsOf: URL(fileURLWithPath: testFile))
+        for i in 0..<400 {
+            fileData[1 * 16384 + i] ^= 0xAA
+            fileData[6 * 16384 + i] ^= 0x55
+        }
+        try fileData.write(to: URL(fileURLWithPath: testFile))
+
+        let success = try engine.repairArchive(archivePath: testFile)
+        XCTAssertTrue(success, "Multiple corruptions within parity capacity must be repaired")
+
+        let restoredData = try Data(contentsOf: URL(fileURLWithPath: testFile))
+        let restoredPayload = Data(restoredData.prefix(sampleContent.count))
+        XCTAssertEqual(restoredPayload, sampleContent)
+    }
+
+    func testMemorySafetyNoUAFConcurrentEncodeDecode() {
+        let sliceSize = 2048
+        let K = 6
+        let M = 2
+
+        DispatchQueue.concurrentPerform(iterations: 50) { iteration in
+            var dataSlices = [Data]()
+            for i in 0..<K {
+                let slice = Data((0..<sliceSize).map { UInt8(($0 + i * 17 + iteration) & 0xFF) })
+                dataSlices.append(slice)
+            }
+
+            let parities = ReedSolomonFEC.encode(dataSlices: dataSlices, parityCount: M)
+            XCTAssertEqual(parities.count, M)
+
+            var intactSlices = [Int: Data]()
+            for i in 0..<K {
+                if i != 1 {
+                    intactSlices[i] = dataSlices[i]
+                }
+            }
+            intactSlices[K + 0] = parities[0]
+
+            let decoded = ReedSolomonFEC.decode(
+                intactSlices: intactSlices,
+                totalK: K,
+                totalM: M,
+                sliceSize: sliceSize
+            )
+
+            XCTAssertNotNil(decoded)
+            XCTAssertEqual(decoded?[1], dataSlices[1])
+        }
     }
 }
