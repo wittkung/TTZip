@@ -19,6 +19,24 @@ public final class SevenZipSeekTable: @unchecked Sendable {
         public let crc32: UInt32
         public let isDirectory: Bool
         public let isEmptyStream: Bool
+        
+        public init(
+            path: String,
+            uncompressedSize: Int64,
+            uncompressedOffset: Int64,
+            folderIndex: Int,
+            crc32: UInt32,
+            isDirectory: Bool,
+            isEmptyStream: Bool
+        ) {
+            self.path = path
+            self.uncompressedSize = uncompressedSize
+            self.uncompressedOffset = uncompressedOffset
+            self.folderIndex = folderIndex
+            self.crc32 = crc32
+            self.isDirectory = isDirectory
+            self.isEmptyStream = isEmptyStream
+        }
     }
     
     private let entriesByPath: [String: SeekEntry]
@@ -41,7 +59,7 @@ public final class SevenZipSeekTable: @unchecked Sendable {
         return entriesByPath[path]
     }
     
-    /// Extracts a single entry directly to a destination directory.
+    /// Extracts a single entry directly to a destination directory without temporary directory full extraction.
     public func extractSingleFile(path: String, destinationDir: String, password: String? = nil) throws -> Bool {
         guard let entry = entry(forPath: path) else { return false }
         if entry.isDirectory {
@@ -62,38 +80,49 @@ public final class SevenZipSeekTable: @unchecked Sendable {
         return true
     }
     
-    /// Extracts single entry data directly into a Swift `Data` buffer.
+    /// Extracts single entry data directly into a Swift `Data` buffer with zero disk writes.
     public func extractData(forPath path: String, password: String? = nil) -> Data? {
         guard let entry = entry(forPath: path), !entry.isDirectory else { return nil }
         if entry.isEmptyStream || entry.uncompressedSize == 0 {
             return Data()
         }
         
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_7z_seek_\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let targetSize = Int(entry.uncompressedSize)
+        var buffer = [UInt8](repeating: 0, count: targetSize)
+        var extractedLen: Int = 0
         
-        guard let ok = try? SevenZipEngine.shared.extract(archivePath: archivePath, destinationDir: tempDir.path, password: password), ok else {
-            return nil
-        }
-        
-        let directFile = tempDir.appendingPathComponent(path)
-        if FileManager.default.fileExists(atPath: directFile.path) {
-            return try? Data(contentsOf: directFile)
-        }
-        
-        let lastComponentFile = tempDir.appendingPathComponent((path as NSString).lastPathComponent)
-        if FileManager.default.fileExists(atPath: lastComponentFile.path) {
-            return try? Data(contentsOf: lastComponentFile)
-        }
-        
-        if let enumerator = FileManager.default.enumerator(at: tempDir, includingPropertiesForKeys: nil) {
-            for case let fileURL as URL in enumerator {
-                if fileURL.lastPathComponent == (path as NSString).lastPathComponent {
-                    return try? Data(contentsOf: fileURL)
+        let status = archivePath.withCString { cArch in
+            path.withCString { cPath in
+                if let pass = password {
+                    return pass.withCString { cPass in
+                        ttzip_rust_7z_extract_entry_memory(
+                            cArch,
+                            cPath,
+                            -1,
+                            cPass,
+                            &buffer,
+                            targetSize,
+                            &extractedLen
+                        )
+                    }
+                } else {
+                    return ttzip_rust_7z_extract_entry_memory(
+                        cArch,
+                        cPath,
+                        -1,
+                        nil,
+                        &buffer,
+                        targetSize,
+                        &extractedLen
+                    )
                 }
             }
         }
-        return nil
+        
+        guard status == TTZIP_STATUS_OK else {
+            return nil
+        }
+        
+        return Data(buffer.prefix(extractedLen))
     }
 }

@@ -245,3 +245,85 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
 
     result.unwrap_or(TTZipStatus::ErrPanicCaught)
 }
+
+/// C-ABI exported 7z single entry extraction into an in-memory buffer with Early Termination.
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_7z_extract_entry_memory(
+    archive_path: *const c_char,
+    entry_path: *const c_char,
+    entry_index: i64,
+    password: *const c_char,
+    out_buffer: *mut u8,
+    buffer_capacity: usize,
+    out_extracted_len: *mut usize,
+) -> TTZipStatus {
+    let result = catch_unwind(|| {
+        if archive_path.is_null() {
+            return TTZipStatus::ErrInvalidParam;
+        }
+
+        let arch_str = match CStr::from_ptr(archive_path).to_str() {
+            Ok(s) => s,
+            Err(_) => return TTZipStatus::ErrInvalidParam,
+        };
+
+        let p = Path::new(arch_str);
+        if !p.exists() {
+            return TTZipStatus::ErrFileNotFound;
+        }
+
+        let data = match fs::read(p) {
+            Ok(d) => d,
+            Err(_) => return TTZipStatus::ErrOpenFailed,
+        };
+
+        let archive = match crate::sevenz::SevenZArchive::open_slice(&data) {
+            Ok(a) => a,
+            Err(e) => return e,
+        };
+
+        let target_idx = if entry_index >= 0 {
+            entry_index as usize
+        } else if !entry_path.is_null() {
+            let ep_str = match CStr::from_ptr(entry_path).to_str() {
+                Ok(s) => s,
+                Err(_) => return TTZipStatus::ErrInvalidParam,
+            };
+            match archive.seek_index().get_by_path(ep_str) {
+                Some(loc) => loc.file_index,
+                None => return TTZipStatus::ErrFileNotFound,
+            }
+        } else {
+            return TTZipStatus::ErrInvalidParam;
+        };
+
+        let pass_str = if !password.is_null() {
+            CStr::from_ptr(password).to_str().ok()
+        } else {
+            None
+        };
+
+        let payload = match archive.extract_entry_bytes_stream(target_idx, pass_str) {
+            Ok(bytes) => bytes,
+            Err(e) => return e,
+        };
+
+        if !out_extracted_len.is_null() {
+            *out_extracted_len = payload.len();
+        }
+
+        if !out_buffer.is_null() {
+            if buffer_capacity < payload.len() {
+                return TTZipStatus::ErrOutOfMemory;
+            }
+            if !payload.is_empty() {
+                std::ptr::copy_nonoverlapping(payload.as_ptr(), out_buffer, payload.len());
+            }
+        }
+
+        TTZipStatus::Ok
+    });
+
+    result.unwrap_or(TTZipStatus::ErrPanicCaught)
+}
+

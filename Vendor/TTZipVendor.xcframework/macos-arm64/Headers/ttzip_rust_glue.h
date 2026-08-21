@@ -127,23 +127,15 @@ typedef struct TTZipAes256Context {
     uint8_t round_keys_dec[240];
 } TTZipAes256Context;
 
-/**
- * Version and Lifecycle
- */
+// Lifecycle & SIMD / Checksums
 const char *ttzip_rust_version(void);
 TTZipStatus ttzip_rust_init(void);
 const char *ttzip_rust_status_string(TTZipStatus status);
 bool ttzip_rust_is_hardware_accelerated(void);
-
-/**
- * Checksum & SIMD operations
- */
 uint32_t ttzip_rust_crc32(uint32_t crc, const uint8_t *data, size_t len);
 uint32_t ttzip_rust_adler32(uint32_t adler, const uint8_t *data, size_t len);
 
-/**
- * AES-256 & ZipCrypto Crypto operations
- */
+// AES-256 & ZipCrypto Operations
 int32_t ttzip_rust_aes256_ctr(const uint8_t *key, uint64_t initial_counter, const uint8_t *src, size_t len, uint8_t *dst);
 int32_t ttzip_rust_aes256_cbc_decrypt(const uint8_t *key, const uint8_t *iv, const uint8_t *src, size_t len, uint8_t *dst);
 int32_t ttzip_rust_7z_kdf_sha256(const char *password, const uint8_t *salt, size_t salt_len, uint32_t num_cycles_power, uint8_t *out_key);
@@ -151,27 +143,19 @@ int32_t ttzip_rust_zipcrypto_init_keys(const char *password, uint32_t *key0, uin
 int32_t ttzip_rust_zipcrypto_decrypt_stream(uint32_t *key0, uint32_t *key1, uint32_t *key2, const uint8_t *src, size_t len, uint8_t *dst);
 int32_t ttzip_rust_zipcrypto_encrypt_stream(uint32_t *key0, uint32_t *key1, uint32_t *key2, const uint8_t *src, size_t len, uint8_t *dst);
 
-/**
- * Reed-Solomon FEC & Self-Healing operations
- */
+// Reed-Solomon FEC & Compliance
 int32_t ttzip_rust_rs_encode(const uint8_t *const *data_ptrs, size_t k_data, uint8_t *const *parity_ptrs, size_t m_parity, size_t block_size);
 int32_t ttzip_rust_rs_decode(const uint8_t *const *available_ptrs, const int32_t *available_indices, size_t num_available, size_t k_data, size_t m_parity, const int32_t *missing_indices, size_t num_missing, uint8_t *const *reconstructed_ptrs, size_t block_size);
 int32_t ttzip_rust_rs_create_recovery_record(const uint8_t *payload, size_t payload_len, double redundancy_percent, size_t slice_size, uint8_t **out_record, size_t *out_record_len);
 int32_t ttzip_rust_rs_repair_archive(const char *archive_path, bool *out_repaired);
 void ttzip_rust_rs_free_buffer(uint8_t *ptr, size_t len);
-
-/**
- * Archive Standards & Magic Signatures Format Sniffing & Compliance
- */
 TTZipStatus ttzip_rust_detect_format_buffer(const uint8_t *buf, size_t len, const char *filename_hint, int32_t *out_format, bool *out_is_sfx, size_t *out_sfx_offset);
 TTZipStatus ttzip_rust_detect_format_file(const char *file_path, int32_t *out_format, bool *out_is_sfx, size_t *out_sfx_offset);
 TTZipStatus ttzip_rust_check_compliance_buffer(const uint8_t *buf, size_t len, int32_t format_hint, char **out_report_json, bool *out_is_compliant);
 TTZipStatus ttzip_rust_check_compliance_file(const char *file_path, char **out_report_json, bool *out_is_compliant);
 void ttzip_rust_free_compliance_report(char *report_ptr);
 
-/**
- * DEFLATE / zlib / gzip Codecs (libdeflate)
- */
+// DEFLATE / zlib / gzip Codecs
 TTZipStatus ttzip_rust_deflate_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, int32_t level, size_t *out_len);
 TTZipStatus ttzip_rust_deflate_decompress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 TTZipStatus ttzip_rust_zlib_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, int32_t level, size_t *out_len);
@@ -180,146 +164,159 @@ TTZipStatus ttzip_rust_gzip_compress(const uint8_t *src, size_t src_len, uint8_t
 TTZipStatus ttzip_rust_gzip_decompress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 size_t ttzip_rust_deflate_compress_bound(size_t src_len, int32_t level);
 
-/**
- * Zstandard Codec (zstd)
- */
+// Zstandard Codec (zstd)
 TTZipStatus ttzip_rust_zstd_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, int32_t level, size_t *out_len);
-TTZipStatus ttzip_rust_zstd_compress_advanced(
-    const uint8_t *src,
-    size_t src_len,
-    uint8_t *dst,
-    size_t dst_capacity,
-    int32_t level,
-    uint32_t nb_workers,
-    uint32_t job_size_mb,
-    uint32_t overlap_log,
-    uint32_t window_log,
-    bool enable_ldm,
-    size_t *out_len
-);
+TTZipStatus ttzip_rust_zstd_compress_advanced(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, int32_t level, uint32_t nb_workers, uint32_t job_size_mb, uint32_t overlap_log, uint32_t window_log, bool enable_ldm, size_t *out_len);
 TTZipStatus ttzip_rust_zstd_decompress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
+TTZipStatus ttzip_rust_zstd_compress_file_stream(const char *src_path, const char *dst_path, int32_t level, uint32_t nb_workers, uint32_t job_size_mb, uint32_t overlap_log, uint32_t window_log, bool enable_ldm, TTZipProgressCallback progress_callback, void *user_data);
+TTZipStatus ttzip_rust_zstd_decompress_file_stream(const char *src_path, const char *dst_path, TTZipProgressCallback progress_callback, void *user_data);
 size_t ttzip_rust_zstd_compress_bound(size_t src_len);
 uint64_t ttzip_rust_zstd_get_decompressed_size(const uint8_t *src, size_t src_len);
 
-/**
- * Fast-LZMA2 Codec (fast-lzma2)
- */
+// Fast-LZMA2 & Fast Block Codecs
 TTZipStatus ttzip_rust_fl2_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, int32_t level, uint32_t nb_threads, size_t *out_len);
 TTZipStatus ttzip_rust_fl2_decompress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, uint32_t nb_threads, size_t *out_len);
 size_t ttzip_rust_fl2_compress_bound(size_t src_len);
 uint64_t ttzip_rust_fl2_find_decompressed_size(const uint8_t *src, size_t src_len);
-
-/**
- * Fast Block Codecs (LZ4, Snappy, Apple LZFSE)
- */
 TTZipStatus ttzip_rust_lz4_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 TTZipStatus ttzip_rust_lz4_decompress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 size_t ttzip_rust_lz4_compress_bound(size_t src_len);
-
 TTZipStatus ttzip_rust_snappy_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 TTZipStatus ttzip_rust_snappy_decompress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 size_t ttzip_rust_snappy_max_compressed_length(size_t src_len);
 TTZipStatus ttzip_rust_snappy_uncompressed_length(const uint8_t *src, size_t src_len, size_t *out_len);
 bool ttzip_rust_snappy_validate(const uint8_t *src, size_t src_len);
-
 TTZipStatus ttzip_rust_lzfse_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 TTZipStatus ttzip_rust_lzfse_decompress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
-
-/**
- * Charset Detector (Mozilla uchardet)
- */
 TTZipStatus ttzip_rust_detect_charset(const uint8_t *data, size_t data_len, char *out_buf, size_t out_buf_capacity);
 
-/**
- * Stream Adapters & Micro-buffering
- */
+// Stream Adapters
 typedef struct TTZipStreamReaderHandle TTZipStreamReaderHandle;
 typedef struct TTZipStreamWriterHandle TTZipStreamWriterHandle;
-
 TTZipStreamReaderHandle *ttzip_rust_stream_reader_new_file(const char *path, size_t buffer_size);
 int32_t ttzip_rust_stream_reader_read(TTZipStreamReaderHandle *handle, const uint8_t **out_ptr, size_t *out_len);
 void ttzip_rust_stream_reader_free(TTZipStreamReaderHandle *handle);
-
 TTZipStreamWriterHandle *ttzip_rust_stream_writer_new_file(const char *path, size_t buffer_size);
 int32_t ttzip_rust_stream_writer_write(TTZipStreamWriterHandle *handle, const uint8_t *data, size_t len);
 int32_t ttzip_rust_stream_writer_flush(TTZipStreamWriterHandle *handle);
 void ttzip_rust_stream_writer_free(TTZipStreamWriterHandle *handle);
 
-/**
- * Filesystem Security & APFS Optimizations
- */
+// Filesystem Security & Filter DSL
 TTZipStatus ttzip_rust_validate_path(const char *dest_dir, const char *entry_path, char *out_sanitized, size_t out_capacity);
 int32_t ttzip_rust_apfs_preallocate(int32_t fd, int64_t target_size);
 int32_t ttzip_rust_apfs_clone_file(const char *src, const char *dst, bool overwrite);
 int32_t ttzip_rust_apfs_clone_range(int32_t in_fd, int32_t out_fd);
 bool ttzip_rust_is_mac_junk(const char *path);
 int32_t ttzip_rust_remove_path_fast(const char *path);
+int32_t ttzip_rust_strip_leading_components(const char *path, size_t count, char *out_buf, size_t out_capacity);
+bool ttzip_rust_is_vcs_metadata(const char *path);
+bool ttzip_rust_is_mac_junk_metadata(const char *path);
+bool ttzip_rust_glob_matches(const char *pattern, const char *path, bool case_sensitive);
 
-/**
- * Runtime Cancellation & Structured Logging
- */
+typedef struct TTZipDslFilterHandle TTZipDslFilterHandle;
+typedef struct TTZipPathFilterHandle TTZipPathFilterHandle;
+TTZipDslFilterHandle *ttzip_rust_dsl_filter_new(const char *query);
+bool ttzip_rust_dsl_filter_evaluate(const TTZipDslFilterHandle *handle, const char *path, uint64_t uncompressed_size, int64_t mtime_epoch_secs);
+void ttzip_rust_dsl_filter_free(TTZipDslFilterHandle *handle);
+bool ttzip_rust_dsl_evaluate_oneshot(const char *query, const char *path, uint64_t uncompressed_size, int64_t mtime_epoch_secs);
+TTZipPathFilterHandle *ttzip_rust_path_filter_new(const char *const *include_patterns, size_t include_count, const char *const *exclude_patterns, size_t exclude_count, bool exclude_vcs, bool no_mac_metadata);
+bool ttzip_rust_path_filter_should_include(const TTZipPathFilterHandle *handle, const char *path);
+bool ttzip_rust_path_filter_should_exclude(const TTZipPathFilterHandle *handle, const char *path);
+void ttzip_rust_path_filter_free(TTZipPathFilterHandle *handle);
+
+// Runtime & Logging
 typedef struct TTZipCancellationToken TTZipCancellationToken;
-
 TTZipCancellationToken *ttzip_rust_cancellation_token_new(void);
 void ttzip_rust_cancellation_token_cancel(TTZipCancellationToken *token, uint8_t reason);
 bool ttzip_rust_cancellation_token_is_cancelled(const TTZipCancellationToken *token);
 void ttzip_rust_cancellation_token_free(TTZipCancellationToken *token);
-
 typedef void (*TTZipLogCallback)(TTZipLogLevel level, const char *target_module, const char *message, const char *file, int32_t line, void *user_data);
-
 TTZipStatus ttzip_rust_set_logger(TTZipLogCallback callback, TTZipLogLevel min_level, void *user_data);
 void ttzip_rust_log(TTZipLogLevel level, const char *target, const char *message, const char *file, int32_t line);
 
-/**
- * Unified High-Level Archive Operations
- */
-TTZipStatus ttzip_rust_inspect_archive(
-    const char *archive_path,
-    const char *password,
-    bool detect_encoding,
-    TTZipInspectCallback callback,
-    void *user_data
-);
+// Lock-Free Ring Buffers & Worker Pool
+typedef struct TTZipSpscRingBufferHandle TTZipSpscRingBufferHandle;
+typedef struct TTZipMpmcRingBufferHandle TTZipMpmcRingBufferHandle;
+TTZipSpscRingBufferHandle *ttzip_rust_spsc_ring_buffer_new(size_t capacity);
+bool ttzip_rust_spsc_ring_buffer_push(TTZipSpscRingBufferHandle *handle, void *item);
+void *ttzip_rust_spsc_ring_buffer_pop(TTZipSpscRingBufferHandle *handle);
+size_t ttzip_rust_spsc_ring_buffer_count(const TTZipSpscRingBufferHandle *handle);
+size_t ttzip_rust_spsc_ring_buffer_capacity(const TTZipSpscRingBufferHandle *handle);
+bool ttzip_rust_spsc_ring_buffer_is_empty(const TTZipSpscRingBufferHandle *handle);
+bool ttzip_rust_spsc_ring_buffer_is_full(const TTZipSpscRingBufferHandle *handle);
+void ttzip_rust_spsc_ring_buffer_free(TTZipSpscRingBufferHandle *handle);
+TTZipMpmcRingBufferHandle *ttzip_rust_mpmc_ring_buffer_new(size_t capacity);
+bool ttzip_rust_mpmc_ring_buffer_push(TTZipMpmcRingBufferHandle *handle, void *item);
+void *ttzip_rust_mpmc_ring_buffer_pop(TTZipMpmcRingBufferHandle *handle);
+size_t ttzip_rust_mpmc_ring_buffer_count(const TTZipMpmcRingBufferHandle *handle);
+size_t ttzip_rust_mpmc_ring_buffer_capacity(const TTZipMpmcRingBufferHandle *handle);
+bool ttzip_rust_mpmc_ring_buffer_is_empty(const TTZipMpmcRingBufferHandle *handle);
+bool ttzip_rust_mpmc_ring_buffer_is_full(const TTZipMpmcRingBufferHandle *handle);
+void ttzip_rust_mpmc_ring_buffer_free(TTZipMpmcRingBufferHandle *handle);
 
-TTZipStatus ttzip_rust_extract_archive(
-    const char *archive_path,
-    const char *destination_path,
-    const TTZipExtractOptions *options
-);
+typedef enum TTZipWorkerPoolState {
+    TTZIP_WORKER_POOL_IDLE = 0,
+    TTZIP_WORKER_POOL_RUNNING = 1,
+    TTZIP_WORKER_POOL_PAUSED = 2,
+    TTZIP_WORKER_POOL_DRAINING = 3,
+    TTZIP_WORKER_POOL_SHUTDOWN = 4
+} TTZipWorkerPoolState;
+typedef struct TTZipWorkerPoolHandle TTZipWorkerPoolHandle;
+typedef void (*TTZipWorkerTaskFn)(void *context);
+TTZipWorkerPoolHandle *ttzip_rust_worker_pool_new(uint32_t worker_count);
+bool ttzip_rust_worker_pool_submit(TTZipWorkerPoolHandle *handle, TTZipWorkerTaskFn task_fn, void *context);
+void ttzip_rust_worker_pool_set_workers(TTZipWorkerPoolHandle *handle, uint32_t count);
+void ttzip_rust_worker_pool_pause(TTZipWorkerPoolHandle *handle);
+void ttzip_rust_worker_pool_resume(TTZipWorkerPoolHandle *handle);
+void ttzip_rust_worker_pool_drain(TTZipWorkerPoolHandle *handle);
+void ttzip_rust_worker_pool_shutdown(TTZipWorkerPoolHandle *handle);
+uint32_t ttzip_rust_worker_pool_get_active_workers(const TTZipWorkerPoolHandle *handle);
+uint32_t ttzip_rust_worker_pool_get_pending_tasks(const TTZipWorkerPoolHandle *handle);
+uint64_t ttzip_rust_worker_pool_get_completed_tasks(const TTZipWorkerPoolHandle *handle);
+uint64_t ttzip_rust_worker_pool_get_failed_tasks(const TTZipWorkerPoolHandle *handle);
+TTZipWorkerPoolState ttzip_rust_worker_pool_get_state(const TTZipWorkerPoolHandle *handle);
+void ttzip_rust_worker_pool_free(TTZipWorkerPoolHandle *handle);
 
-TTZipStatus ttzip_rust_create_archive(
-    const char *const *source_paths,
-    size_t source_count,
-    const char *destination_path,
-    const TTZipCreateOptions *options
-);
+// Unified Archive Operations
+TTZipStatus ttzip_rust_inspect_archive(const char *archive_path, const char *password, bool detect_encoding, TTZipInspectCallback callback, void *user_data);
+TTZipStatus ttzip_rust_extract_archive(const char *archive_path, const char *destination_path, const TTZipExtractOptions *options);
+TTZipStatus ttzip_rust_7z_extract_entry_memory(const char *archive_path, const char *entry_path, int64_t entry_index, const char *password, uint8_t *out_buffer, size_t buffer_capacity, size_t *out_extracted_len);
+TTZipStatus ttzip_rust_create_archive(const char *const *source_paths, size_t source_count, const char *destination_path, const TTZipCreateOptions *options);
 
-/**
- * Pure Rust TAR & ZIP Direct C-ABI Operations
- */
-TTZipStatus ttzip_rust_tar_scan_entries(
-    const char *archive_path,
-    TTZipInspectCallback callback,
-    void *user_data
-);
+// Pure Rust TAR & ZIP C-ABI
+TTZipStatus ttzip_rust_tar_scan_entries(const char *archive_path, TTZipInspectCallback callback, void *user_data);
+TTZipStatus ttzip_rust_tar_extract_entry(const char *archive_path, size_t entry_index, uint8_t *out_buffer, size_t buffer_capacity, size_t *out_extracted_len);
+TTZipStatus ttzip_rust_zip_scan_entries(const char *archive_path, TTZipInspectCallback callback, void *user_data);
 
-TTZipStatus ttzip_rust_tar_extract_entry(
-    const char *archive_path,
-    size_t entry_index,
-    uint8_t *out_buffer,
-    size_t buffer_capacity,
-    size_t *out_extracted_len
-);
+// Hardware Monotonic Benchmark & Pareto Frontier Optimization
+typedef struct TTZipMIPSBenchmarkResult {
+    uint32_t dictionary_size_mb;
+    uint32_t thread_count;
+    double compress_mips;
+    double decompress_mips;
+    double total_mips;
+    double compress_speed_mbs;
+    double decompress_speed_mbs;
+    double cpu_usage_percent;
+    double rating_per_usage_mips;
+} TTZipMIPSBenchmarkResult;
 
-TTZipStatus ttzip_rust_zip_scan_entries(
-    const char *archive_path,
-    TTZipInspectCallback callback,
-    void *user_data
-);
+typedef struct TTZipParetoPointRaw {
+    uint64_t tag;
+    double throughput_mbs;
+    double space_savings_pct;
+    uint32_t pareto_rank;
+    bool is_pareto_optimal;
+    bool is_on_convex_envelope;
+} TTZipParetoPointRaw;
+
+TTZipStatus ttzip_rust_bench_run_mips(uint32_t dictionary_size_mb, uint32_t thread_count, uint32_t iterations, TTZipMIPSBenchmarkResult *out_result);
+TTZipStatus ttzip_rust_bench_compute_pareto_frontier(TTZipParetoPointRaw *points, size_t count);
+uint64_t ttzip_rust_bench_monotonic_nanos(void);
+double ttzip_rust_bench_calc_throughput_mbs(size_t bytes, double elapsed_secs);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* TTZIP_RUST_GLUE_H */
-

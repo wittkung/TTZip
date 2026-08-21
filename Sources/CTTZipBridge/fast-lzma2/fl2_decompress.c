@@ -1204,7 +1204,7 @@ static size_t FL2_decompressStream_blocking(FL2_DStream* fds, FL2_outBuffer* out
         if (fds->stage == FL2DEC_STAGE_INIT) {
             BYTE prop = ((const BYTE*)input->src)[input->pos];
             ++input->pos;
-            FL2_initDStream_prop(fds, prop);
+            CHECK_F(FL2_initDStream_prop(fds, prop));
             fds->stage = FL2DEC_STAGE_DECOMP;
         }
 #ifndef FL2_SINGLETHREAD

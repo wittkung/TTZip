@@ -8,16 +8,17 @@
 import Foundation
 import CTTZipBridge
 
-/// Adapter Pattern: Native C Zstandard streaming compression and decompression adapter.
+/// Adapter Pattern: Native Rust Zstandard streaming compression and decompression adapter.
 ///
-/// Bridges native C routines (`ttzip_zstd_compress_file_stream` and `ttzip_zstd_decompress_file_stream`)
-/// with Swift `ZstdEngineProtocol`, leveraging Apple Silicon multi-core threading and Long Distance Matching (LDM).
+/// Bridges native Rust routines (`ttzip_rust_zstd_compress_file_stream` and `ttzip_rust_zstd_decompress_file_stream`)
+/// with Swift `ZstdEngineProtocol`, leveraging Apple Silicon multi-core threading, bounded 4MB/4MB double buffer
+/// state machine pipelines, and Long Distance Matching (LDM) with strict <16MB RSS memory guarantees.
 public final class ZstdCAdapter: ZstdEngineProtocol, Sendable {
     public static let shared = ZstdCAdapter()
     
     private init() {}
     
-    /// Compresses a file or stream into a Zstandard frame.
+    /// Compresses a file into a Zstandard frame using bounded 4MB/4MB streaming pipeline.
     /// - Parameters:
     ///   - srcPath: Path to source input file.
     ///   - dstPath: Path to destination compressed output file.
@@ -39,8 +40,8 @@ public final class ZstdCAdapter: ZstdEngineProtocol, Sendable {
         
         let workers = UInt32(tuner.optimalCompressionThreads)
         let fileManager = FileManager.default
-        guard let srcData = try? Data(contentsOf: URL(fileURLWithPath: srcPath)) else { return false }
-        let srcBytes = Int64(srcData.count)
+        let srcAttrs = try? fileManager.attributesOfItem(atPath: srcPath)
+        let srcBytes = (srcAttrs?[.size] as? NSNumber)?.int64Value ?? 0
         
         var windowLog: UInt32 = 0
         if enableLDM {
@@ -64,40 +65,73 @@ public final class ZstdCAdapter: ZstdEngineProtocol, Sendable {
             throughputMBs: 0.0
         ))
         
-        let bound = ttzip_rust_zstd_compress_bound(srcData.count)
-        var outBuf = [UInt8](repeating: 0, count: bound)
-        var outLen: Int = 0
+        final class ProgressBox: @unchecked Sendable {
+            let handler: (@Sendable (ArchiveProgress) -> Void)?
+            let totalBytes: Int64
+            let fileName: String
+            let startTime: Date
+            
+            init(handler: (@Sendable (ArchiveProgress) -> Void)?, totalBytes: Int64, fileName: String, startTime: Date) {
+                self.handler = handler
+                self.totalBytes = totalBytes
+                self.fileName = fileName
+                self.startTime = startTime
+            }
+        }
         
-        let status = srcData.withUnsafeBytes { srcRaw in
-            guard let srcPtr = srcRaw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return TTZIP_STATUS_ERR_INVALID_PARAM }
-            return outBuf.withUnsafeMutableBufferPointer { dstRaw in
-                guard let dstPtr = dstRaw.baseAddress else { return TTZIP_STATUS_ERR_INVALID_PARAM }
-                return ttzip_rust_zstd_compress_advanced(
-                    srcPtr,
-                    srcData.count,
-                    dstPtr,
-                    bound,
+        let box = ProgressBox(
+            handler: progressHandler,
+            totalBytes: srcBytes,
+            fileName: (srcPath as NSString).lastPathComponent,
+            startTime: startTime
+        )
+        let boxPtr = Unmanaged.passRetained(box).toOpaque()
+        defer { Unmanaged<ProgressBox>.fromOpaque(boxPtr).release() }
+        
+        let callback: TTZipProgressCallback = { processed, total, cName, userData in
+            guard let ptr = userData else { return true }
+            let innerBox = Unmanaged<ProgressBox>.fromOpaque(ptr).takeUnretainedValue()
+            if let handler = innerBox.handler {
+                let duration = max(0.001, Date().timeIntervalSince(innerBox.startTime))
+                let throughput = (Double(processed) / (1024.0 * 1024.0)) / duration
+                let name = cName.map { String(cString: $0) } ?? innerBox.fileName
+                handler(ArchiveProgress(
+                    state: .processing,
+                    bytesProcessed: Int64(processed),
+                    totalBytes: innerBox.totalBytes > 0 ? innerBox.totalBytes : Int64(total),
+                    currentFileName: name,
+                    throughputMBs: throughput
+                ))
+            }
+            return true
+        }
+        
+        let status = srcPath.withCString { cSrc in
+            dstPath.withCString { cDst in
+                ttzip_rust_zstd_compress_file_stream(
+                    cSrc,
+                    cDst,
                     compLevel,
                     workers,
                     0,
                     overlapLog,
                     windowLog,
                     enableLDM,
-                    &outLen
+                    progressHandler != nil ? callback : nil,
+                    boxPtr
                 )
             }
         }
         
         if status == TTZIP_STATUS_OK {
-            let compData = Data(bytes: outBuf, count: outLen)
-            try compData.write(to: URL(fileURLWithPath: dstPath))
-            
             let duration = max(0.001, Date().timeIntervalSince(startTime))
             let throughput = (Double(srcBytes) / (1024.0 * 1024.0)) / duration
+            let dstAttrs = try? fileManager.attributesOfItem(atPath: dstPath)
+            let dstBytes = (dstAttrs?[.size] as? NSNumber)?.int64Value ?? 0
             
             progressHandler?(ArchiveProgress(
                 state: .completed,
-                bytesProcessed: Int64(outLen),
+                bytesProcessed: dstBytes,
                 totalBytes: srcBytes,
                 currentFileName: (dstPath as NSString).lastPathComponent,
                 throughputMBs: throughput
@@ -108,7 +142,7 @@ public final class ZstdCAdapter: ZstdEngineProtocol, Sendable {
         return false
     }
     
-    /// Decompresses a Zstandard frame file.
+    /// Decompresses a Zstandard frame file using bounded 4MB/4MB streaming pipeline.
     /// - Parameters:
     ///   - srcPath: Path to source `.zst` file.
     ///   - dstPath: Path to destination decompressed output file.
@@ -121,37 +155,79 @@ public final class ZstdCAdapter: ZstdEngineProtocol, Sendable {
         dictPath: String? = nil,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws -> Bool {
-        guard let srcData = try? Data(contentsOf: URL(fileURLWithPath: srcPath)) else { return false }
-        var decompSize = Int(ttzip_rust_zstd_get_decompressed_size(
-            (srcData as NSData).bytes.assumingMemoryBound(to: UInt8.self),
-            srcData.count
-        ))
-        if decompSize <= 0 || decompSize > 1024 * 1024 * 1024 {
-            decompSize = max(srcData.count * 4, 64 * 1024)
+        let fileManager = FileManager.default
+        let srcAttrs = try? fileManager.attributesOfItem(atPath: srcPath)
+        let srcBytes = (srcAttrs?[.size] as? NSNumber)?.int64Value ?? 0
+        let startTime = Date()
+        
+        final class ProgressBox: @unchecked Sendable {
+            let handler: (@Sendable (ArchiveProgress) -> Void)?
+            let totalBytes: Int64
+            let fileName: String
+            let startTime: Date
+            
+            init(handler: (@Sendable (ArchiveProgress) -> Void)?, totalBytes: Int64, fileName: String, startTime: Date) {
+                self.handler = handler
+                self.totalBytes = totalBytes
+                self.fileName = fileName
+                self.startTime = startTime
+            }
         }
         
-        var outBuf = [UInt8](repeating: 0, count: decompSize)
-        var outLen: Int = 0
+        let box = ProgressBox(
+            handler: progressHandler,
+            totalBytes: srcBytes,
+            fileName: (srcPath as NSString).lastPathComponent,
+            startTime: startTime
+        )
+        let boxPtr = Unmanaged.passRetained(box).toOpaque()
+        defer { Unmanaged<ProgressBox>.fromOpaque(boxPtr).release() }
         
-        let status = srcData.withUnsafeBytes { srcRaw in
-            guard let srcPtr = srcRaw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return TTZIP_STATUS_ERR_INVALID_PARAM }
-            return outBuf.withUnsafeMutableBufferPointer { dstRaw in
-                guard let dstPtr = dstRaw.baseAddress else { return TTZIP_STATUS_ERR_INVALID_PARAM }
-                return ttzip_rust_zstd_decompress(
-                    srcPtr,
-                    srcData.count,
-                    dstPtr,
-                    decompSize,
-                    &outLen
+        let callback: TTZipProgressCallback = { processed, total, cName, userData in
+            guard let ptr = userData else { return true }
+            let innerBox = Unmanaged<ProgressBox>.fromOpaque(ptr).takeUnretainedValue()
+            if let handler = innerBox.handler {
+                let duration = max(0.001, Date().timeIntervalSince(innerBox.startTime))
+                let throughput = (Double(processed) / (1024.0 * 1024.0)) / duration
+                let name = cName.map { String(cString: $0) } ?? innerBox.fileName
+                handler(ArchiveProgress(
+                    state: .processing,
+                    bytesProcessed: Int64(processed),
+                    totalBytes: innerBox.totalBytes > 0 ? innerBox.totalBytes : Int64(total),
+                    currentFileName: name,
+                    throughputMBs: throughput
+                ))
+            }
+            return true
+        }
+        
+        let status = srcPath.withCString { cSrc in
+            dstPath.withCString { cDst in
+                ttzip_rust_zstd_decompress_file_stream(
+                    cSrc,
+                    cDst,
+                    progressHandler != nil ? callback : nil,
+                    boxPtr
                 )
             }
         }
         
         if status == TTZIP_STATUS_OK {
-            let decompData = Data(bytes: outBuf, count: outLen)
-            try? decompData.write(to: URL(fileURLWithPath: dstPath))
+            let duration = max(0.001, Date().timeIntervalSince(startTime))
+            let dstAttrs = try? fileManager.attributesOfItem(atPath: dstPath)
+            let dstBytes = (dstAttrs?[.size] as? NSNumber)?.int64Value ?? 0
+            let throughput = (Double(dstBytes) / (1024.0 * 1024.0)) / duration
+            
+            progressHandler?(ArchiveProgress(
+                state: .completed,
+                bytesProcessed: dstBytes,
+                totalBytes: dstBytes,
+                currentFileName: (dstPath as NSString).lastPathComponent,
+                throughputMBs: throughput
+            ))
             return true
         }
+        
         return false
     }
 }

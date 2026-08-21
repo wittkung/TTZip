@@ -12,8 +12,8 @@
 
 pub mod compressor;
 pub mod decompressor;
-pub mod ffi;
-pub mod pool;
+mod ffi;
+mod pool;
 
 #[cfg(test)]
 mod tests;

@@ -5,19 +5,13 @@
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
-//! 7-Zip Solid Stream Decoder and Selective Extraction Engine.
-//!
-//! Integrates ARM64 8-way NEON AES-256-CBC hardware decryption, zero-heap SHA-256 KDF,
-//! multi-threaded fast-lzma2 / Deflate decoding, and sub-stream selective slicing.
+//! Zero-copy 7z Archive reader and extraction engine.
 
-use crate::codecs::deflate::deflate_decompress;
-use crate::codecs::lzma2::fl2_decompress;
-use crate::crypto::aes256::aes256_cbc_decrypt;
+use super::payload::decode_7z_solid_payload;
+use super::stream::extract_entry_bytes_stream;
 use crate::crypto::crc32::crc32_fast;
-use crate::crypto::sha256::sha256_7z_kdf;
 use crate::fs::safe_extract::{sanitize_and_validate_path, SafeExtractEngine};
-use crate::sevenz::format::*;
-use crate::sevenz::header::{parse_7z_metadata, SevenZFileMeta, SevenZHeaderInfo};
+use crate::sevenz::header::{parse_7z_metadata, SevenZFileMeta, SevenZHeaderInfo, SevenZSeekIndex};
 use crate::types::{TTZipExtractOptions, TTZipStatus};
 use crate::zip::reader::ZipExtractReport;
 use std::ffi::CString;
@@ -27,106 +21,35 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-/// Decompresses and decrypts the entire 7z solid payload block.
-pub fn decode_7z_solid_payload(
-    mapped: &[u8],
-    info: &SevenZHeaderInfo,
-    password: Option<&str>,
-    threads: u32,
-) -> Result<Vec<u8>, TTZipStatus> {
-    if info.payload_len == 0 {
-        return Ok(Vec::new());
-    }
-
-    let payload_end = info.payload_offset + info.payload_len;
-    if payload_end > mapped.len() {
-        return Err(TTZipStatus::ErrCorruptHeader);
-    }
-
-    let mut raw_payload = &mapped[info.payload_offset..payload_end];
-    let mut decrypted_storage = Vec::new();
-
-    // 1. Hardware AES-256-CBC decryption via ARM64 NEON if encrypted
-    if info.is_encrypted {
-        let pass = password.ok_or(TTZipStatus::ErrInvalidPassword)?;
-        if pass.is_empty() {
-            return Err(TTZipStatus::ErrInvalidPassword);
-        }
-
-        let key = sha256_7z_kdf(pass, &info.aes_salt[..info.aes_salt_len], info.aes_num_cycles_power);
-
-        if raw_payload.len() % 16 != 0 {
-            return Err(TTZipStatus::ErrCorruptHeader);
-        }
-
-        decrypted_storage.resize(raw_payload.len(), 0);
-        aes256_cbc_decrypt(&key, &info.aes_iv, raw_payload, &mut decrypted_storage)
-            .map_err(|_| TTZipStatus::ErrInvalidPassword)?;
-
-        raw_payload = &decrypted_storage;
-    }
-
-    // 2. Compute total expected uncompressed size
-    let expected_unpack_size: u64 = if !info.stream_sizes.is_empty() {
-        info.stream_sizes.iter().sum()
-    } else if !info.folders.is_empty() && !info.folders[0].unpack_sizes.is_empty() {
-        info.folders[0].unpack_sizes[0]
-    } else {
-        raw_payload.len() as u64
-    };
-
-    let mut unpack_buf = vec![0u8; expected_unpack_size as usize];
-
-    // 3. Decompress via selected coder
-    match info.primary_method_id {
-        METHOD_COPY => {
-            let u_len = unpack_buf.len();
-            if raw_payload.len() < u_len {
-                return Err(TTZipStatus::ErrCorruptHeader);
-            }
-            unpack_buf.copy_from_slice(&raw_payload[..u_len]);
-        }
-        METHOD_DEFLATE => {
-            let decomp_len = deflate_decompress(raw_payload, &mut unpack_buf)?;
-            if decomp_len != unpack_buf.len() {
-                return Err(TTZipStatus::ErrExtractionFailed);
-            }
-        }
-        METHOD_LZMA2 => {
-            let decomp_len = fl2_decompress(raw_payload, &mut unpack_buf, threads)?;
-            if decomp_len != unpack_buf.len() {
-                return Err(TTZipStatus::ErrExtractionFailed);
-            }
-        }
-        _ => {
-            // For other formats (LZMA, BCJ), attempt fast-lzma2 fallback or report format error
-            let decomp_len = fl2_decompress(raw_payload, &mut unpack_buf, threads)?;
-            if decomp_len != unpack_buf.len() {
-                return Err(TTZipStatus::ErrArchiveInitFailed);
-            }
-        }
-    }
-
-    Ok(unpack_buf)
-}
-
 /// Zero-copy 7z Archive reader and extractor.
 pub struct SevenZArchive<'a> {
     data: &'a [u8],
     info: SevenZHeaderInfo,
+    seek_index: SevenZSeekIndex,
 }
 
 impl<'a> SevenZArchive<'a> {
     /// Opens and parses a 7z archive from in-memory slice.
     pub fn open_slice(data: &'a [u8]) -> Result<Self, TTZipStatus> {
         let info = parse_7z_metadata(data)?;
-        Ok(Self { data, info })
+        let seek_index = SevenZSeekIndex::build(&info);
+        Ok(Self {
+            data,
+            info,
+            seek_index,
+        })
     }
 
     /// Returns reference to parsed 7z metadata header.
     #[inline]
     pub fn info(&self) -> &SevenZHeaderInfo {
         &self.info
+    }
+
+    /// Returns reference to pre-built random-access seek index.
+    #[inline]
+    pub fn seek_index(&self) -> &SevenZSeekIndex {
+        &self.seek_index
     }
 
     /// Returns list of files in the 7z archive.
@@ -147,63 +70,24 @@ impl<'a> SevenZArchive<'a> {
         self.info.files.is_empty()
     }
 
+    /// Decompresses and extracts a single file from the 7z solid stream using Early Termination.
+    #[inline]
+    pub fn extract_entry_bytes_stream(
+        &self,
+        entry_idx: usize,
+        password: Option<&str>,
+    ) -> Result<Vec<u8>, TTZipStatus> {
+        extract_entry_bytes_stream(self.data, &self.info, &self.seek_index, entry_idx, password)
+    }
+
     /// Decompresses and extracts a single file from the 7z solid stream.
+    #[inline]
     pub fn extract_entry_bytes(
         &self,
         entry_idx: usize,
         password: Option<&str>,
     ) -> Result<Vec<u8>, TTZipStatus> {
-        let file_meta = self.info.files.get(entry_idx).ok_or(TTZipStatus::ErrInvalidOffset)?;
-
-        if file_meta.is_directory || file_meta.is_empty_stream {
-            return Ok(Vec::new());
-        }
-
-        // Calculate offset and length for this stream in the solid block
-        let mut stream_idx = 0;
-        let mut target_stream_idx = None;
-
-        for (i, f) in self.info.files.iter().enumerate() {
-            if !f.is_directory && !f.is_empty_stream {
-                if i == entry_idx {
-                    target_stream_idx = Some(stream_idx);
-                    break;
-                }
-                stream_idx += 1;
-            }
-        }
-
-        let s_idx = target_stream_idx.ok_or(TTZipStatus::ErrInvalidOffset)?;
-        if s_idx >= self.info.stream_sizes.len() {
-            return Err(TTZipStatus::ErrCorruptHeader);
-        }
-
-        let mut offset = 0usize;
-        for i in 0..s_idx {
-            offset += self.info.stream_sizes[i] as usize;
-        }
-        let size = self.info.stream_sizes[s_idx] as usize;
-
-        // Decode solid stream (single-threaded for targeted fast extract)
-        let solid_buf = decode_7z_solid_payload(self.data, &self.info, password, 2)?;
-
-        if offset + size > solid_buf.len() {
-            return Err(TTZipStatus::ErrCorruptHeader);
-        }
-
-        let file_slice = &solid_buf[offset..offset + size];
-
-        // Verify CRC32 if stream CRC is available
-        if let Some(&expected_crc) = self.info.stream_crcs.get(s_idx) {
-            if expected_crc != 0 {
-                let computed = crc32_fast(0, file_slice);
-                if computed != expected_crc {
-                    return Err(TTZipStatus::ErrInvalidPassword);
-                }
-            }
-        }
-
-        Ok(file_slice.to_vec())
+        self.extract_entry_bytes_stream(entry_idx, password)
     }
 
     /// Extracts all files in the 7z archive to the destination directory.
@@ -254,7 +138,6 @@ impl<'a> SevenZArchive<'a> {
             });
         }
 
-        // 1. Decode solid block
         let solid_buf = decode_7z_solid_payload(
             self.data,
             &self.info,
@@ -262,7 +145,6 @@ impl<'a> SevenZArchive<'a> {
             options.thread_budget.max(1),
         )?;
 
-        // 2. Slice and land files
         let mut offset = 0usize;
         let mut stream_idx = 0usize;
         let processed_bytes = Arc::new(AtomicU64::new(0));
@@ -294,7 +176,6 @@ impl<'a> SevenZArchive<'a> {
 
             let file_data = &solid_buf[offset..offset + fsize];
 
-            // Check CRC
             if let Some(&expected_crc) = self.info.stream_crcs.get(stream_idx) {
                 if expected_crc != 0 {
                     let computed = crc32_fast(0, file_data);

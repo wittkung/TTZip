@@ -9,26 +9,30 @@ import Foundation
 
 /// Reusable asynchronous worker pool coordinating bounded concurrency to prevent thread explosion.
 ///
-/// Supports dynamic worker scaling, prioritization tiers, and structured lifecycle state transitions.
+/// Supports dynamic worker scaling, prioritization tiers, and zero-polling event-driven dispatching.
 public final class ArchiveWorkerPool: @unchecked Sendable {
     public static let shared = ArchiveWorkerPool()
 
-    private var targetWorkerCount: Int
-    private let dispatcher: ArchiveTaskDispatcher
-    private var currentState: WorkerPoolState = .idle
+    internal var targetWorkerCount: Int
+    internal let dispatcher: ArchiveTaskDispatcher
+    internal var currentState: WorkerPoolState = .idle
 
-    private var workerTasks: [UUID: Task<Void, Never>] = [:]
-    private var activeWorkers: Int = 0
+    internal var workerTasks: [UUID: Task<Void, Never>] = [:]
+    internal var activeWorkers: Int = 0
 
-    private var completedTasksCount: Int64 = 0
-    private var failedTasksCount: Int64 = 0
+    internal var completedTasksCount: Int64 = 0
+    internal var failedTasksCount: Int64 = 0
 
-    private var continuations: [String: CheckedContinuation<Result<any Sendable, Error>, Never>] = [:]
-    private var cancelledPoolItemIDs: Set<String> = []
-    private let lock = NSLock()
+    internal var continuations: [String: CheckedContinuation<Result<any Sendable, Error>, Never>] = [:]
+    internal var cancelledPoolItemIDs: Set<String> = []
+    internal let lock = NSLock()
+    internal let signaler = ArchiveWorkerPoolSignaler()
 
     private convenience init() {
-        self.init(maxWorkers: ProcessInfo.processInfo.activeProcessorCount, dispatcher: ArchiveTaskDispatcher())
+        self.init(
+            maxWorkers: ProcessInfo.processInfo.activeProcessorCount,
+            dispatcher: ArchiveTaskDispatcher()
+        )
     }
 
     internal init(
@@ -87,6 +91,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
 
         if running {
             adjustWorkers()
+            signaler.notifyWorkAvailable()
         }
     }
 
@@ -103,6 +108,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         lock.unlock()
 
         adjustWorkers()
+        signaler.notifyWorkAvailable()
     }
 
     /// Suspends task dequeue while keeping existing workers alive.
@@ -112,6 +118,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         if currentState == .running {
             currentState = .paused
         }
+        signaler.notifyWorkAvailable()
     }
 
     /// Resumes task dequeue on paused worker pool.
@@ -125,6 +132,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         lock.unlock()
 
         adjustWorkers()
+        signaler.notifyWorkAvailable()
     }
 
     /// Drains all pending tasks gracefully before transitioning back to idle.
@@ -132,18 +140,19 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         guard startDrain() else { return }
 
         adjustWorkers()
+        signaler.notifyWorkAvailable()
 
         while true {
             if isDrainCompleted() {
                 break
             }
-            try? await Task.sleep(nanoseconds: 10_000_000)
+            await signaler.waitForDrain()
         }
 
         finishDrain()
     }
 
-    private func startDrain() -> Bool {
+    internal func startDrain() -> Bool {
         lock.lock()
         defer { lock.unlock() }
         if currentState == .shutdown {
@@ -153,7 +162,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         return true
     }
 
-    private func finishDrain() {
+    internal func finishDrain() {
         lock.lock()
         defer { lock.unlock() }
         if currentState == .draining {
@@ -162,7 +171,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         }
     }
 
-    private func isDrainCompleted() -> Bool {
+    internal func isDrainCompleted() -> Bool {
         lock.lock()
         defer { lock.unlock() }
         let isDone = dispatcher.isEmpty && activeWorkers == 0
@@ -182,6 +191,8 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         stopAllWorkerTasks()
         lock.unlock()
 
+        signaler.wakeAll()
+
         for cont in pendingContinuations {
             cont.resume(returning: .failure(CancellationError()))
         }
@@ -200,6 +211,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         } else {
             adjustWorkers()
         }
+        signaler.notifyWorkAvailable()
     }
 
     public func submitBatch(_ items: [any ArchiveWorkItemProtocol]) {
@@ -213,6 +225,7 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
         } else {
             adjustWorkers()
         }
+        signaler.notifyWorkAvailable()
     }
 
     @discardableResult
@@ -276,144 +289,6 @@ public final class ArchiveWorkerPool: @unchecked Sendable {
 
         for cont in allConts {
             cont.resume(returning: .failure(CancellationError()))
-        }
-    }
-
-    // MARK: - Internal Worker Management
-
-    private func stopAllWorkerTasks() {
-        for task in workerTasks.values {
-            task.cancel()
-        }
-        workerTasks.removeAll()
-    }
-
-    private func removeWorkerTask(id: UUID) {
-        lock.lock()
-        defer { lock.unlock() }
-        workerTasks.removeValue(forKey: id)
-    }
-
-    private func adjustWorkers() {
-        lock.lock()
-        defer { lock.unlock() }
-
-        guard currentState == .running || currentState == .draining else { return }
-
-        workerTasks = workerTasks.filter { !$0.value.isCancelled }
-
-        let currentCount = workerTasks.count
-        let target = targetWorkerCount
-
-        if currentCount > target {
-            let surplusCount = currentCount - target
-            let keysToCancel = Array(workerTasks.keys.prefix(surplusCount))
-            for key in keysToCancel {
-                if let task = workerTasks.removeValue(forKey: key) {
-                    task.cancel()
-                }
-            }
-        } else if currentCount < target {
-            let toCreate = target - currentCount
-            for _ in 0..<toCreate {
-                let taskID = UUID()
-                let task = Task { [weak self] in
-                    defer {
-                        self?.removeWorkerTask(id: taskID)
-                    }
-                    guard let self = self else { return }
-                    await self.runWorkerLoop()
-                }
-                workerTasks[taskID] = task
-            }
-        }
-    }
-
-    private func checkWorkerLoopStatus() -> (shouldExit: Bool, isPaused: Bool) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        if currentState == .shutdown || currentState == .idle {
-            return (shouldExit: true, isPaused: false)
-        }
-        if currentState == .paused {
-            return (shouldExit: false, isPaused: true)
-        }
-        if Task.isCancelled {
-            return (shouldExit: true, isPaused: false)
-        }
-        return (shouldExit: false, isPaused: false)
-    }
-
-    private func popTaskForWorker() -> (item: (any ArchiveWorkItemProtocol)?, shouldExitDraining: Bool) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        let st = currentState
-        if let item = dispatcher.popHighestPriorityItem() {
-            activeWorkers += 1
-            return (item: item, shouldExitDraining: false)
-        }
-
-        if st == .draining {
-            return (item: nil, shouldExitDraining: true)
-        }
-
-        return (item: nil, shouldExitDraining: false)
-    }
-
-    private func markWorkerTaskFinished(itemID: String, success: Bool) -> CheckedContinuation<Result<any Sendable, Error>, Never>? {
-        lock.lock()
-        defer { lock.unlock() }
-
-        activeWorkers -= 1
-        if success {
-            completedTasksCount += 1
-        } else {
-            failedTasksCount += 1
-        }
-        return continuations.removeValue(forKey: itemID)
-    }
-
-    private func runWorkerLoop() async {
-        while true {
-            let status = checkWorkerLoopStatus()
-            if status.shouldExit {
-                break
-            }
-            if status.isPaused {
-                try? await Task.sleep(nanoseconds: 20_000_000)
-                continue
-            }
-
-            let popResult = popTaskForWorker()
-            if popResult.shouldExitDraining {
-                break
-            }
-
-            guard let item = popResult.item else {
-                try? await Task.sleep(nanoseconds: 10_000_000)
-                continue
-            }
-
-            let itemID = item.itemID
-            let result: Result<any Sendable, Error>
-            var isSuccess = false
-
-            if dispatcher.isCancelled(itemID: itemID) {
-                result = .failure(CancellationError())
-            } else {
-                do {
-                    let output = try await item.execute()
-                    result = .success(output)
-                    isSuccess = true
-                } catch {
-                    result = .failure(error)
-                }
-            }
-
-            let cont = markWorkerTaskFinished(itemID: itemID, success: isSuccess)
-            cont?.resume(returning: result)
         }
     }
 }

@@ -9,6 +9,10 @@
 
 pub mod cancellation;
 pub mod logging;
+pub mod ring_buffer;
+pub mod worker_pool;
 
 pub use cancellation::*;
 pub use logging::*;
+pub use ring_buffer::*;
+pub use worker_pool::*;

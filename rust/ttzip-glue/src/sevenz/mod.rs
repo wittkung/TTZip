@@ -16,14 +16,17 @@ pub mod format;
 pub mod header;
 pub mod writer;
 
-pub use decoder::{decode_7z_solid_payload, SevenZArchive};
+pub use decoder::{decode_7z_solid_payload, extract_entry_bytes_stream, SevenZArchive};
 pub use format::{
     read_varint, write_varint, SevenZSignatureHeader, K_CODERS_UNPACK_SIZE, K_CRC, K_EMPTY_STREAM,
     K_END, K_ENCODED_HEADER, K_FILES_INFO, K_FOLDER, K_HEADER, K_MAIN_STREAMS_INFO, K_NAME,
     K_NUM_UNPACK_STREAM, K_PACK_INFO, K_SIZE, K_SUB_STREAMS_INFO, K_UNPACK_INFO, K_WIN_ATTRIBUTES,
     METHOD_AES, METHOD_COPY, METHOD_DEFLATE, METHOD_LZMA, METHOD_LZMA2, SEVENZ_SIGNATURE,
 };
-pub use header::{parse_7z_metadata, SevenZCoder, SevenZFileMeta, SevenZFolder, SevenZHeaderInfo};
+pub use header::{
+    parse_7z_metadata, SevenZCoder, SevenZEntryLocation, SevenZFileMeta, SevenZFolder,
+    SevenZHeaderInfo, SevenZSeekIndex,
+};
 pub use writer::{
     build_7z_metadata_header, create_7z_archive, create_7z_solid_archive_bytes,
 };
@@ -66,13 +69,18 @@ mod tests {
         let archive = SevenZArchive::open_slice(&archive_bytes).expect("7z open failed");
         assert_eq!(archive.len(), 3);
 
-        let f0 = archive.extract_entry_bytes(0, None).expect("extract f0 failed");
+        let f0 = archive.extract_entry_bytes_stream(0, None).expect("extract f0 failed");
         assert_eq!(f0, b"Document content for 7z native Rust test.");
 
-        let f1 = archive.extract_entry_bytes(1, None).expect("extract f1 failed");
+        let f1 = archive.extract_entry_bytes_stream(1, None).expect("extract f1 failed");
         assert!(f1.is_empty());
 
-        let f2 = archive.extract_entry_bytes(2, None).expect("extract f2 failed");
+        let f2 = archive.extract_entry_bytes_stream(2, None).expect("extract f2 failed");
         assert_eq!(f2, vec![0x33u8; 8192]);
+
+        // Test seek index lookup
+        let loc = archive.seek_index().get_by_path("assets/data.bin").expect("find f2");
+        assert_eq!(loc.file_index, 2);
+        assert_eq!(loc.uncompressed_size, 8192);
     }
 }

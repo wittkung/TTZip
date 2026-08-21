@@ -6,13 +6,14 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
 
 /// 2D 帕累托非支配前沿与凸包包络线计算中枢 (2D Skyline & Monotone Chain Algorithm)
+///
+/// Backed by high-performance Rust core `compute_pareto_frontier_raw` ($O(N \log K)$ Dilworth's Theorem & $O(M \log M)$ Monotone Chain).
 public final class ParetoFrontierCalculator: @unchecked Sendable {
     public static let shared = ParetoFrontierCalculator()
     private init() {}
-
-    private let epsilon: Double = 1e-7
 
     /// 从原始基准测试结果列表中提取帕累托前沿与上凸包包络线
     public func calculateFrontier(from benchmarkResults: [AlgorithmBenchmarkResult]) -> ParetoFrontierResult {
@@ -25,7 +26,7 @@ public final class ParetoFrontierCalculator: @unchecked Sendable {
             )
         }
 
-        var points: [ParetoPoint] = benchmarkResults.enumerated().map { (idx, r) in
+        var points: [ParetoPoint] = benchmarkResults.map { r in
             let id = "\(r.algorithm.lowercased())_l\(r.level)"
             return ParetoPoint(
                 id: id,
@@ -53,62 +54,52 @@ public final class ParetoFrontierCalculator: @unchecked Sendable {
     /// 执行 2D 扫描线与 Patience Binary Search 确定多级帕累托层级与上凸包
     public func computeParetoFrontier(points: inout [ParetoPoint]) -> ParetoFrontierResult {
         guard !points.isEmpty else {
-            return ParetoFrontierResult(totalPointsEvaluated: 0, frontierPoints: [], convexEnvelopePoints: [], allPoints: [])
+            return ParetoFrontierResult(
+                totalPointsEvaluated: 0,
+                frontierPoints: [],
+                convexEnvelopePoints: [],
+                allPoints: []
+            )
         }
 
-        // 1. 按照 (吞吐降序 x 降序, 空间节省率降序 y 降序) 排序
-        points.sort { (a, b) -> Bool in
-            if abs(a.throughputMBs - b.throughputMBs) > epsilon {
-                return a.throughputMBs > b.throughputMBs
-            }
-            return a.spaceSavingsPct > b.spaceSavingsPct
-        }
-
-        // 2. 基于 Dilworth 定理与 Patience Sorting 计算多层 Pareto Rank (O(N log K))
-        // targetTiers[j] 记录第 j 层的当前最大 y 坐标
-        var targetTiers: [Double] = []
-
+        // Bridge to high-performance Rust core algorithm
+        var rawPoints = [TTZipParetoPointRaw](repeating: TTZipParetoPointRaw(), count: points.count)
         for i in 0..<points.count {
-            let curY = points[i].spaceSavingsPct
-            
-            // 在 targetTiers 中二分查找最小的满足 curY > targetTiers[j] 的层级 j
-            var left = 0
-            var right = targetTiers.count
-            while left < right {
-                let mid = (left + right) / 2
-                if curY > targetTiers[mid] + epsilon {
-                    right = mid
-                } else {
-                    left = mid + 1
-                }
-            }
-
-            if left < targetTiers.count {
-                // 加入已有层级
-                points[i].paretoRank = left + 1
-                targetTiers[left] = curY
-            } else {
-                // 开启新层级
-                targetTiers.append(curY)
-                points[i].paretoRank = targetTiers.count
-            }
-
-            points[i].isParetoOptimal = (points[i].paretoRank == 1)
+            rawPoints[i] = TTZipParetoPointRaw(
+                tag: UInt64(i),
+                throughput_mbs: points[i].throughputMBs,
+                space_savings_pct: points[i].spaceSavingsPct,
+                pareto_rank: 1,
+                is_pareto_optimal: false,
+                is_on_convex_envelope: false
+            )
         }
 
-        // 3. 提取 Rank 1 帕累托前沿集合 (按吞吐升序排列)
+        let st = rawPoints.withUnsafeMutableBufferPointer { bufPtr in
+            ttzip_rust_bench_compute_pareto_frontier(bufPtr.baseAddress, bufPtr.count)
+        }
+
+        if st == TTZIP_STATUS_OK {
+            // Rust sorts the raw points in-place by (throughput desc, space savings desc)
+            var reorderedPoints = [ParetoPoint]()
+            reorderedPoints.reserveCapacity(rawPoints.count)
+
+            for rp in rawPoints {
+                let origIdx = Int(rp.tag)
+                var pt = points[origIdx]
+                pt.paretoRank = Int(rp.pareto_rank)
+                pt.isParetoOptimal = rp.is_pareto_optimal
+                pt.isOnConvexEnvelope = rp.is_on_convex_envelope
+                reorderedPoints.append(pt)
+            }
+            points = reorderedPoints
+        }
+
         var frontier = points.filter { $0.isParetoOptimal }
         frontier.sort { $0.throughputMBs < $1.throughputMBs }
 
-        // 4. 使用 Andrew's Monotone Chain 算法计算上凸包 (Upper Convex Hull)
-        let convexHull = computeUpperConvexHull(frontierPoints: frontier)
-        let convexHullIds = Set(convexHull.map { $0.id })
-
-        for i in 0..<points.count {
-            if convexHullIds.contains(points[i].id) {
-                points[i].isOnConvexEnvelope = true
-            }
-        }
+        var convexHull = points.filter { $0.isOnConvexEnvelope }
+        convexHull.sort { $0.throughputMBs < $1.throughputMBs }
 
         return ParetoFrontierResult(
             totalPointsEvaluated: points.count,
@@ -116,32 +107,5 @@ public final class ParetoFrontierCalculator: @unchecked Sendable {
             convexEnvelopePoints: convexHull,
             allPoints: points
         )
-    }
-
-    /// Andrew's Monotone Chain 计算 2D 上凸包 (Upper Convex Envelope)
-    private func computeUpperConvexHull(frontierPoints: [ParetoPoint]) -> [ParetoPoint] {
-        guard frontierPoints.count > 2 else {
-            return frontierPoints
-        }
-
-        // frontierPoints 已经按 throughputMBs 升序排列
-        var upperHull: [ParetoPoint] = []
-
-        for p in frontierPoints {
-            while upperHull.count >= 2 {
-                let a = upperHull[upperHull.count - 2]
-                let b = upperHull[upperHull.count - 1]
-                let crossProduct = (b.throughputMBs - a.throughputMBs) * (p.spaceSavingsPct - a.spaceSavingsPct) -
-                                   (b.spaceSavingsPct - a.spaceSavingsPct) * (p.throughputMBs - a.throughputMBs)
-                if crossProduct >= -epsilon { // 凹折或共线，弹出次优顶点
-                    upperHull.removeLast()
-                } else {
-                    break
-                }
-            }
-            upperHull.append(p)
-        }
-
-        return upperHull
     }
 }

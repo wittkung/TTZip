@@ -6,11 +6,7 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
+import CTTZipBridge
 
 /// High-performance POSIX glob wildcard matching, pattern filtering, and path component stripping engine.
 public enum PathPatternFilterEngine: Sendable {
@@ -38,90 +34,28 @@ public enum PathPatternFilterEngine: Sendable {
     
     // MARK: - POSIX Fnmatch Wildcard Matching
     
-    /// Evaluates whether path matches POSIX.2 glob pattern.
+    /// Evaluates whether path matches POSIX.2 glob pattern with DFA speed.
     public static func matches(pattern: String, path: String, caseSensitive: Bool = true) -> Bool {
-        let flags = (caseSensitive ? 0 : FNM_CASEFOLD) | FNM_PATHNAME
-        let cleanPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
-        let cleanPat = pattern.hasPrefix("/") ? String(pattern.dropFirst()) : pattern
-        
-        // 1. Direct path / fnmatch
-        if fnmatch(cleanPat, cleanPath, flags) == 0 {
-            return true
-        }
-        if fnmatch(pattern, path, flags) == 0 {
-            return true
-        }
-        
-        // 2. Double-star glob support
-        if pattern.contains("**") {
-            var regexPat = "^"
-            var idx = pattern.startIndex
-            while idx < pattern.endIndex {
-                if pattern[idx...].hasPrefix("**/") {
-                    regexPat += "(?:.+/)?"
-                    idx = pattern.index(idx, offsetBy: 3)
-                } else if pattern[idx...].hasPrefix("/**") {
-                    regexPat += "(?:/.*)?"
-                    idx = pattern.index(idx, offsetBy: 3)
-                } else if pattern[idx...].hasPrefix("**") {
-                    regexPat += ".*"
-                    idx = pattern.index(idx, offsetBy: 2)
-                } else if pattern[idx] == "*" {
-                    regexPat += "[^/]*"
-                    idx = pattern.index(after: idx)
-                } else if pattern[idx] == "?" {
-                    regexPat += "[^/]"
-                    idx = pattern.index(after: idx)
-                } else if pattern[idx] == "." {
-                    regexPat += "\\."
-                    idx = pattern.index(after: idx)
-                } else {
-                    regexPat.append(pattern[idx])
-                    idx = pattern.index(after: idx)
-                }
-            }
-            regexPat += "$"
-            if let regex = try? NSRegularExpression(pattern: regexPat, options: caseSensitive ? [] : [.caseInsensitive]) {
-                let range = NSRange(location: 0, length: cleanPath.utf16.count)
-                if regex.firstMatch(in: cleanPath, options: [], range: range) != nil {
-                    return true
-                }
-                let rawRange = NSRange(location: 0, length: path.utf16.count)
-                if regex.firstMatch(in: path, options: [], range: rawRange) != nil {
-                    return true
-                }
+        pattern.withCString { cPat in
+            path.withCString { cPath in
+                ttzip_rust_glob_matches(cPat, cPath, caseSensitive)
             }
         }
-        
-        // 3. Basename or component match for pattern without slashes
-        if !cleanPat.contains("/") {
-            let components = cleanPath.components(separatedBy: "/")
-            for comp in components {
-                if fnmatch(cleanPat, comp, caseSensitive ? 0 : FNM_CASEFOLD) == 0 {
-                    return true
-                }
-            }
-        }
-        return false
     }
     
     // MARK: - Metadata Evaluation Decisions
     
     /// Checks if path matches VCS metadata.
     public static func isVCSMetadata(_ path: String) -> Bool {
-        let parts = path.components(separatedBy: "/")
-        return parts.contains { vcsDirectoryNames.contains($0) || vcsFileNames.contains($0) }
+        path.withCString { cPath in
+            ttzip_rust_is_vcs_metadata(cPath)
+        }
     }
     
     /// Checks if path matches OS temporary junk or metadata files.
     public static func isMacMetadata(_ path: String) -> Bool {
-        let parts = path.components(separatedBy: "/")
-        for part in parts {
-            if macMetadataNames.contains(part) { return true }
-            if part.hasPrefix("._") { return true }
-        }
-        return path.withCString { cPath in
-            ttzip_rust_is_mac_junk(cPath)
+        path.withCString { cPath in
+            ttzip_rust_is_mac_junk_metadata(cPath)
         }
     }
     
@@ -208,42 +142,11 @@ public enum PathPatternFilterEngine: Sendable {
         guard count > 0 else { return path }
         guard !path.isEmpty else { return nil }
         
-        let utf8 = path.utf8
-        var i = utf8.startIndex
-        let end = utf8.endIndex
-        
-        // 1. Skip leading slashes
-        while i < end && utf8[i] == UInt8(ascii: "/") {
-            i = utf8.index(after: i)
+        return path.withCString { cPath in
+            var buffer = [CChar](repeating: 0, count: path.utf8.count + 32)
+            let res = ttzip_rust_strip_leading_components(cPath, count, &buffer, buffer.count)
+            guard res == 0 else { return nil }
+            return String(cString: buffer)
         }
-        
-        // 2. Skip leading "./"
-        if i < end && utf8[i] == UInt8(ascii: ".") {
-            let next = utf8.index(after: i)
-            if next < end && utf8[next] == UInt8(ascii: "/") {
-                i = utf8.index(after: next)
-                while i < end && utf8[i] == UInt8(ascii: "/") {
-                    i = utf8.index(after: i)
-                }
-            }
-        }
-        
-        var strippedCount = 0
-        while strippedCount < count && i < end {
-            while i < end && utf8[i] != UInt8(ascii: "/") {
-                i = utf8.index(after: i)
-            }
-            strippedCount += 1
-            while i < end && utf8[i] == UInt8(ascii: "/") {
-                i = utf8.index(after: i)
-            }
-        }
-        
-        guard strippedCount == count, i < end else {
-            return nil
-        }
-        
-        let remaining = String(path[i..<end])
-        return remaining.isEmpty ? nil : remaining
     }
 }

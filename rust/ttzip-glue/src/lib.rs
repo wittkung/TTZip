@@ -14,6 +14,7 @@
 #![allow(clippy::missing_safety_doc)]
 
 pub mod archive;
+pub mod bench;
 pub mod codecs;
 pub mod crypto;
 pub mod ffi;
@@ -25,6 +26,7 @@ pub mod types;
 pub mod zip;
 
 pub use archive::*;
+pub use bench::*;
 pub use codecs::*;
 pub use crypto::*;
 pub use ffi::*;
