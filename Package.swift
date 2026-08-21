@@ -36,6 +36,12 @@ let package = Package(
         .target(
             name: "CTTZipBridge",
             dependencies: ["TTZipVendor"],
+            exclude: [
+                "fast-lzma2",
+                "lzfse",
+                "snappy",
+                "ttzip_threadpool.c"
+            ],
             cSettings: [
                 .headerSearchPath("include"),
                 .headerSearchPath("fast-lzma2"),
@@ -48,7 +54,12 @@ let package = Package(
                     "-fvisibility=hidden",
                     "-Wall",
                     "-Wextra",
-                    "-Wvla",
+                    "-Wno-unused-function",
+                    "-Wno-unused-parameter",
+                    "-Wno-unused-variable",
+                    "-Wno-sign-compare",
+                    "-Wno-implicit-fallthrough",
+                    "-Wno-missing-field-initializers",
                     "-Wformat=2"
                 ])
             ],

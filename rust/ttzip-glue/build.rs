@@ -26,7 +26,7 @@ fn compile_native_codecs(repo_root: &Path, out_dir: &Path, target: &str) {
     if threadpool_src.exists() {
         let obj_path = out_dir.join("ttzip_threadpool.o");
         let status = Command::new("clang")
-            .args(["-O3", "-c", "-target", target, "-I", bridge_dir.to_str().unwrap(), "-I", bridge_dir.join("include").to_str().unwrap()])
+            .args(["-O3", "-c", "-target", target, "-mmacosx-version-min=14.0", "-I", bridge_dir.to_str().unwrap(), "-I", bridge_dir.join("include").to_str().unwrap()])
             .arg(&threadpool_src)
             .arg("-o")
             .arg(&obj_path)
@@ -60,7 +60,7 @@ fn compile_native_codecs(repo_root: &Path, out_dir: &Path, target: &str) {
         }
         let obj_path = out_dir.join(format!("fl2_{}.o", src));
         let status = Command::new("clang")
-            .args(["-O3", "-c", "-target", target, "-I", fast_lzma2_dir.to_str().unwrap()])
+            .args(["-O3", "-c", "-target", target, "-mmacosx-version-min=14.0", "-I", fast_lzma2_dir.to_str().unwrap()])
             .arg(&src_path)
             .arg("-o")
             .arg(&obj_path)
@@ -87,7 +87,7 @@ fn compile_native_codecs(repo_root: &Path, out_dir: &Path, target: &str) {
         }
         let obj_path = out_dir.join(format!("lzfse_{}.o", src));
         let status = Command::new("clang")
-            .args(["-O3", "-c", "-target", target, "-I", lzfse_dir.to_str().unwrap()])
+            .args(["-O3", "-c", "-target", target, "-mmacosx-version-min=14.0", "-I", lzfse_dir.to_str().unwrap()])
             .arg(&src_path)
             .arg("-o")
             .arg(&obj_path)
@@ -111,7 +111,7 @@ fn compile_native_codecs(repo_root: &Path, out_dir: &Path, target: &str) {
         }
         let obj_path = out_dir.join(format!("snappy_{}.o", src));
         let status = Command::new("clang++")
-            .args(["-O3", "-std=c++17", "-c", "-target", target, "-I", snappy_dir.to_str().unwrap()])
+            .args(["-O3", "-std=c++17", "-c", "-target", target, "-mmacosx-version-min=14.0", "-I", snappy_dir.to_str().unwrap()])
             .arg(&src_path)
             .arg("-o")
             .arg(&obj_path)
@@ -124,7 +124,7 @@ fn compile_native_codecs(repo_root: &Path, out_dir: &Path, target: &str) {
     if !obj_files.is_empty() {
         let lib_path = out_dir.join("libttzip_native_codecs.a");
         let mut libtool = Command::new("libtool");
-        libtool.arg("-static").arg("-o").arg(&lib_path);
+        libtool.arg("-static").arg("-no_warning_for_no_symbols").arg("-o").arg(&lib_path);
         for obj in &obj_files {
             libtool.arg(obj);
         }
@@ -149,22 +149,18 @@ fn main() {
 
     let vendor_dir = repo_root.join("Vendor");
     let vendor_lib_dir = vendor_dir.join("lib");
-    let xcframework_arm64_dir = vendor_dir.join("TTZipVendor.xcframework/macos-arm64");
 
     // Configure search paths for native static libraries
-    if vendor_dir.exists() {
-        println!("cargo:rustc-link-search=native={}", vendor_dir.display());
-    }
     if vendor_lib_dir.exists() {
         println!("cargo:rustc-link-search=native={}", vendor_lib_dir.display());
-    }
-    if xcframework_arm64_dir.exists() {
-        println!("cargo:rustc-link-search=native={}", xcframework_arm64_dir.display());
-    }
-
-    // Link Vendor archive if available
-    if vendor_dir.join("libTTZipVendor.a").exists() || xcframework_arm64_dir.join("libTTZipVendor.a").exists() {
-        println!("cargo:rustc-link-lib=static=TTZipVendor");
+        println!("cargo:rustc-link-lib=static=archive");
+        println!("cargo:rustc-link-lib=static=deflate");
+        println!("cargo:rustc-link-lib=static=zstd");
+        println!("cargo:rustc-link-lib=static=lzma");
+        println!("cargo:rustc-link-lib=static=lz4");
+        println!("cargo:rustc-link-lib=static=uchardet");
+        println!("cargo:rustc-link-lib=static=z");
+        println!("cargo:rustc-link-lib=static=b2");
     }
 
     // Compile and link in-tree native codecs (fast-lzma2, lzfse, snappy)

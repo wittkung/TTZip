@@ -151,25 +151,30 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
 
         case .extract:
             let activePwd = context.password
-            let res = ttzip_extract_zip_c_parallel(context.archivePath, context.destinationDir, context.options.skipMacJunk, activePwd)
-            if res != 0 {
-                if let pwd = activePwd, !pwd.isEmpty {
-                    if (try? SevenZipEngine.shared.extract(archivePath: context.archivePath, destinationDir: context.destinationDir, password: pwd)) == true {
-                        let items = (try? FileManager.default.contentsOfDirectory(atPath: context.destinationDir)) ?? []
-                        return WorkflowResult(
-                            isSuccess: true,
-                            outputPath: context.archivePath,
-                            destinationDir: context.destinationDir,
-                            unlockedPassword: context.password,
-                            entriesCount: items.count,
-                            metrics: ["format": "zip", "engine": "SevenZipEngineAESFallback"]
+            let status = CUnsafeBufferAdapter.withCString(context.archivePath) { aPtr in
+                CUnsafeBufferAdapter.withCString(context.destinationDir) { dPtr in
+                    CUnsafeBufferAdapter.withCString(activePwd) { pPtr in
+                        guard let aPtr = aPtr, let dPtr = dPtr else { return Int32(-1) }
+                        var opt = TTZipExtractOptions(
+                            destination_path: dPtr,
+                            password: pPtr,
+                            thread_budget: 4,
+                            overwrite_existing: true,
+                            preserve_permissions: true,
+                            dry_run: false,
+                            progress_callback: nil,
+                            user_data: nil
                         )
+                        let rStatus = ttzip_rust_extract_archive(aPtr, dPtr, &opt)
+                        if rStatus == TTZIP_STATUS_OK {
+                            return Int32(0)
+                        }
+                        return ttzip_extract_archive_advanced(aPtr, dPtr, context.options.skipMacJunk, pPtr)
                     }
                 }
-                let status = ttzip_extract_archive_advanced(context.archivePath, context.destinationDir, context.options.skipMacJunk, activePwd)
-                if status != 0 {
-                    throw ArchiveError.readFailed(code: status)
-                }
+            }
+            if status != 0 {
+                throw ArchiveError.readFailed(code: status)
             }
             let items = (try? FileManager.default.contentsOfDirectory(atPath: context.destinationDir)) ?? []
             return WorkflowResult(
@@ -179,7 +184,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                 processedBytes: 0,
                 unlockedPassword: context.password,
                 entriesCount: items.count,
-                metrics: ["format": "zip", "engine": "NativeZipExtractC"]
+                metrics: ["format": "zip", "engine": "RustUnifiedZipExtract"]
             )
 
         case .inspect:

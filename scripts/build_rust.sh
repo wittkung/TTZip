@@ -101,10 +101,16 @@ BUILT_LIBS=()
 
 for target in "${TARGETS[@]}"; do
     echo "--> [INFO] Building ttzip-glue for ${target} (${BUILD_MODE})..."
-    cargo build --manifest-path "${RUST_DIR}/Cargo.toml" --target "${target}" ${CARGO_FLAGS}
+    cargo build --manifest-path "${RUST_DIR}/Cargo.toml" --package ttzip-glue --target "${target}" ${CARGO_FLAGS}
     
     TARGET_LIB="${RUST_DIR}/target/${target}/${BUILD_MODE}/libttzip_glue.a"
     if [ -f "${TARGET_LIB}" ]; then
+        # Strip DWARF debug sections from individual member objects to optimize staticlib size
+        STRIP_DIR="${RUST_DIR}/target/${target}/${BUILD_MODE}/stripped_objs"
+        rm -rf "${STRIP_DIR}" && mkdir -p "${STRIP_DIR}"
+        (cd "${STRIP_DIR}" && ar -x "${TARGET_LIB}" && strip -S *.o 2>/dev/null || true)
+        libtool -static -no_warning_for_no_symbols -o "${TARGET_LIB}" "${STRIP_DIR}"/*.o
+        rm -rf "${STRIP_DIR}"
         BUILT_LIBS+=("${TARGET_LIB}")
     else
         echo "❌ Error: Expected static library not found at ${TARGET_LIB}"
@@ -131,7 +137,7 @@ echo "    libttzip_glue.a architecture: $(lipo -info "${VENDOR_LIB_DIR}/libttzip
 
 # 3. 重新打包 libTTZipVendor.a (包含 libttzip_glue.a 与已有 vendor 库)
 echo "--> [INFO] Creating Universal static library via libtool / lipo: Vendor/libTTZipVendor.a..."
-libtool -static -o "${VENDOR_DIR}/libTTZipVendor.a" "${VENDOR_LIB_DIR}"/*.a
+libtool -static -no_warning_for_no_symbols -o "${VENDOR_DIR}/libTTZipVendor.a" "${VENDOR_LIB_DIR}"/*.a
 
 if [ -d "${XCFRAMEWORK_MAC_DIR}" ]; then
     echo "--> Syncing libTTZipVendor.a to ${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a..."
