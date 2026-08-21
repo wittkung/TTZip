@@ -18,22 +18,22 @@ public struct ArchiveExplorerView: View {
     public let onExtractClicked: () -> Void
     public let onCloseClicked: () -> Void
     
-    @ObservedObject private var l10n = AppLocalizationState.shared
-    @StateObject private var treeStore = ArchiveTreeStore()
-    @State private var selectedEntryID: String?
-    @State private var previewFileURL: URL?
-    @State private var showPreviewPanel = true
-    @State private var isExtractingTemp = false
-    @State private var searchText = ""
-    @State private var previewTask: Task<Void, Never>? = nil
-    @State private var currentTempDir: URL? = nil
-    @State private var eventMonitor: Any? = nil
+    @ObservedObject var l10n = AppLocalizationState.shared
+    @StateObject var treeStore = ArchiveTreeStore()
+    @State var selectedEntryID: String?
+    @State var previewFileURL: URL?
+    @State var showPreviewPanel = true
+    @State var isExtractingTemp = false
+    @State var searchText = ""
+    @State var previewTask: Task<Void, Never>? = nil
+    @State var currentTempDir: URL? = nil
+    @State var eventMonitor: Any? = nil
     
     // In-Place Live Edit & Mutation States
-    @State private var activeEditSessions: [String: InPlaceEditSession] = [:]
-    @State private var syncStatusMessage: String? = nil
-    @State private var isMutatingArchive: Bool = false
-    @State private var showDeleteConfirmation: Bool = false
+    @State var activeEditSessions: [String: InPlaceEditSession] = [:]
+    @State var syncStatusMessage: String? = nil
+    @State var isMutatingArchive: Bool = false
+    @State var showDeleteConfirmation: Bool = false
     
     public init(
         archivePath: String,
@@ -56,75 +56,17 @@ public struct ArchiveExplorerView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header Bar
-            HStack(spacing: TTZipTheme.Spacing.xs) {
-                Image(systemName: "archivebox")
-                    .font(.system(size: 18, weight: .light))
-                    .foregroundStyle(TTZipTheme.bambooGreen)
-                Text((archivePath as NSString).lastPathComponent)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.primary)
-                
-                if let status = syncStatusMessage {
-                    HStack(spacing: 4) {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                        Text(status)
-                            .font(TTZipTheme.Typography.caption)
-                            .foregroundStyle(TTZipTheme.bambooGreen)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(TTZipTheme.bambooGreen.opacity(0.12))
-                    .clipShape(Capsule())
-                    .transition(.opacity)
+            ArchiveExplorerHeaderBar(
+                archivePath: archivePath,
+                syncStatusMessage: syncStatusMessage,
+                selectedEntry: selectedEntry,
+                showPreviewPanel: $showPreviewPanel,
+                onExtractClicked: onExtractClicked,
+                onCloseClicked: onCloseClicked,
+                onOpenInExternalEditor: { selected in
+                    openSelectedInExternalEditor(selected)
                 }
-                
-                Spacer()
-                
-                if let selected = selectedEntry, !selected.isDirectory {
-                    Button(action: { openSelectedInExternalEditor(selected) }) {
-                        Label("Open in Editor", systemImage: "arrow.up.forward.app")
-                            .font(TTZipTheme.Typography.callout)
-                            .padding(.horizontal, TTZipTheme.Spacing.sm)
-                            .padding(.vertical, TTZipTheme.Spacing.xs)
-                    }
-                    .buttonStyle(.plain)
-                    .background(Color.secondary.opacity(0.15))
-                    .clipShape(Capsule())
-                    .help("Open in default macOS application and watch for live changes")
-                }
-                
-                Toggle(isOn: $showPreviewPanel.animation(.easeOut(duration: 0.2))) {
-                    Label("Preview Panel", systemImage: "sidebar.right")
-                        .font(TTZipTheme.Typography.callout)
-                }
-                .toggleStyle(.button)
-                .controlSize(.regular)
-                
-                Button(action: onExtractClicked) {
-                    Label(l10n.t(L10n.Explorer.extractToPrompt), systemImage: "square.and.arrow.up")
-                        .font(TTZipTheme.Typography.callout)
-                        .foregroundStyle(Color.white)
-                        .padding(.horizontal, TTZipTheme.Spacing.sm)
-                        .padding(.vertical, TTZipTheme.Spacing.xs)
-                }
-                .buttonStyle(.plain)
-                .background(TTZipTheme.primaryGradient)
-                .clipShape(Capsule())
-                .keyboardShortcut("e", modifiers: [.command])
-                
-                Button(action: onCloseClicked) {
-                    Image(systemName: "xmark.circle")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, 6)
-            }
-            .padding(.top, 38)
-            .padding(.horizontal, TTZipTheme.Spacing.xl)
-            .padding(.bottom, TTZipTheme.Spacing.md)
+            )
             
             Rectangle()
                 .fill(TTZipTheme.hairlineBorder)
@@ -152,43 +94,13 @@ public struct ArchiveExplorerView: View {
                             )
                         }
                     } else {
-                        Table(treeStore.filteredEntries, selection: $selectedEntryID) {
-                            TableColumn(l10n.t(L10n.Explorer.nameHeader)) { entry in
-                                HStack(spacing: 8) {
-                                    Image(systemName: fileIconName(isDirectory: entry.isDirectory, name: entry.name))
-                                        .foregroundStyle(entry.isDirectory ? TTZipTheme.bambooGreen : Color.primary)
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(entry.name)
-                                            .font(TTZipTheme.Typography.body)
-                                        Text(entry.path)
-                                            .font(TTZipTheme.Typography.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
+                        ArchiveExplorerTableView(
+                            filteredEntries: treeStore.filteredEntries,
+                            selectedEntryID: $selectedEntryID,
+                            onSelectEntry: { newID in
+                                extractSelectedForPreview(entryID: newID)
                             }
-                            .width(min: 240, ideal: 360)
-                            
-                            TableColumn(l10n.t(L10n.Explorer.sizeHeader)) { entry in
-                                Text(entry.isDirectory ? "--" : formatBytes(entry.uncompressedSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .width(100)
-                            
-                            TableColumn(l10n.t(L10n.Explorer.kindHeader)) { entry in
-                                Text(entry.detectedEncoding)
-                                    .font(TTZipTheme.Typography.codeCaption)
-                                    .padding(.horizontal, TTZipTheme.Spacing.xs)
-                                    .padding(.vertical, 2)
-                                    .background(TTZipTheme.bambooGreen.opacity(0.12))
-                                    .foregroundStyle(TTZipTheme.bambooGreen)
-                                    .clipShape(RoundedRectangle(cornerRadius: TTZipTheme.Radius.sm, style: .continuous))
-                            }
-                            .width(min: 80, ideal: 100, max: 140)
-                        }
-                        .tableStyle(.inset(alternatesRowBackgrounds: false))
-                        .onChange(of: selectedEntryID) { _, newID in
-                            extractSelectedForPreview(entryID: newID)
-                        }
+                        )
                     }
                 }
                 .background(Color.clear)
@@ -315,247 +227,5 @@ public struct ArchiveExplorerView: View {
             }
             activeEditSessions.removeAll()
         }
-    }
-    
-    // MARK: - In-Place Live Editing & Mutation Operations
-    
-    private func openSelectedInExternalEditor(_ entry: ArchiveEntry) {
-        Task {
-            do {
-                let session = try await InPlaceArchiveMutationEngine.shared.beginEditingSession(
-                    archivePath: archivePath,
-                    entryPath: entry.path,
-                    password: password
-                )
-                
-                await MainActor.run {
-                    self.activeEditSessions[session.sessionId] = session
-                    self.syncStatusMessage = "Watching '\(entry.name)' for external changes..."
-                }
-                
-                // Open in default macOS application
-                NSWorkspace.shared.open(URL(fileURLWithPath: session.stagedFilePath))
-                
-                // Start auto sync
-                InPlaceArchiveMutationEngine.shared.startWatchingAndAutoSync(
-                    session: session,
-                    password: password
-                ) { updatedSession, result in
-                    Task { @MainActor in
-                        switch result {
-                        case .success:
-                            self.syncStatusMessage = "⚡️ Saved & updated '\(entry.name)' in archive"
-                            self.reloadArchiveEntries()
-                            try? await Task.sleep(nanoseconds: 3_000_000_000)
-                            if self.syncStatusMessage?.contains(entry.name) == true {
-                                self.syncStatusMessage = nil
-                            }
-                        case .failure(let err):
-                            self.syncStatusMessage = "❌ Sync failed: \(err.localizedDescription)"
-                        }
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    self.syncStatusMessage = "Error opening: \(error.localizedDescription)"
-                }
-            }
-        }
-    }
-    
-    private final class PathAccumulator: @unchecked Sendable {
-
-        private var paths: [String] = []
-        private let lock = NSLock()
-        
-        func append(_ path: String) {
-            lock.lock()
-            paths.append(path)
-            lock.unlock()
-        }
-        
-        var allPaths: [String] {
-            lock.lock()
-            defer { lock.unlock() }
-            return paths
-        }
-    }
-    
-    private func handleDropFiles(providers: [NSItemProvider]) {
-        let accumulator = PathAccumulator()
-        let group = DispatchGroup()
-        
-        for provider in providers {
-            group.enter()
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                if let url = url, url.isFileURL {
-                    accumulator.append(url.path)
-                }
-                group.leave()
-            }
-        }
-        
-        group.notify(queue: .main) {
-            let paths = accumulator.allPaths
-            guard !paths.isEmpty else { return }
-            self.isMutatingArchive = true
-            self.syncStatusMessage = "Adding \(paths.count) items into archive..."
-
-            
-            Task {
-                do {
-                    try await InPlaceArchiveMutationEngine.shared.addFilesToArchive(
-                        archivePath: self.archivePath,
-                        sourceFilePaths: paths,
-                        destinationVirtualFolder: nil,
-                        password: self.password
-                    )
-                    await MainActor.run {
-                        self.isMutatingArchive = false
-                        self.syncStatusMessage = "Archive updated successfully"
-                        self.reloadArchiveEntries()
-                    }
-                } catch {
-
-                    await MainActor.run {
-                        self.isMutatingArchive = false
-                        self.syncStatusMessage = "Failed to add items: \(error.localizedDescription)"
-                    }
-                }
-            }
-        }
-    }
-    
-    private func deleteSelectedEntry(_ entry: ArchiveEntry) {
-        isMutatingArchive = true
-        syncStatusMessage = "Deleting '\(entry.name)' from archive..."
-        
-        Task {
-            do {
-                try await InPlaceArchiveMutationEngine.shared.deleteEntriesFromArchive(
-                    archivePath: archivePath,
-                    entryPathsToDelete: [entry.path],
-                    password: password
-                )
-                await MainActor.run {
-                    self.isMutatingArchive = false
-                    self.syncStatusMessage = "Deleted '\(entry.name)'"
-                    self.selectedEntryID = nil
-                    self.reloadArchiveEntries()
-                }
-            } catch {
-                await MainActor.run {
-                    self.isMutatingArchive = false
-                    self.syncStatusMessage = "Failed to delete: \(error.localizedDescription)"
-                }
-            }
-        }
-    }
-    
-    private func reloadArchiveEntries() {
-        Task {
-            let reader = ArchiveReader()
-            if let newEntries = try? await reader.inspect(archivePath: archivePath, password: password) {
-                await MainActor.run {
-                    self.entries = newEntries
-                    self.treeStore.updateEntries(newEntries, force: true)
-                }
-            }
-        }
-    }
-    
-    private func moveSelectionUp() {
-        if !searchText.isEmpty {
-            let currentList = treeStore.filteredEntries
-            guard let currentID = selectedEntryID, let idx = currentList.firstIndex(where: { $0.id == currentID || $0.path == currentID }) else {
-                if let first = currentList.first {
-                    selectedEntryID = first.id
-                }
-                return
-            }
-            if idx > 0 {
-                selectedEntryID = currentList[idx - 1].id
-            }
-        } else {
-            NotificationCenter.default.post(name: .archiveExplorerMoveUp, object: nil)
-        }
-    }
-    
-    private func moveSelectionDown() {
-        if !searchText.isEmpty {
-            let currentList = treeStore.filteredEntries
-            guard let currentID = selectedEntryID, let idx = currentList.firstIndex(where: { $0.id == currentID || $0.path == currentID }) else {
-                if let first = currentList.first {
-                    selectedEntryID = first.id
-                }
-                return
-            }
-            if idx < currentList.count - 1 {
-                selectedEntryID = currentList[idx + 1].id
-            }
-        } else {
-            NotificationCenter.default.post(name: .archiveExplorerMoveDown, object: nil)
-        }
-    }
-    
-    private func fileIconName(isDirectory: Bool, name: String) -> String {
-        if isDirectory { return "folder.fill" }
-        let ext = (name as NSString).pathExtension.lowercased()
-        switch ext {
-        case "png", "jpg", "jpeg", "gif", "webp", "heic", "svg", "bmp": return "photo.fill"
-        case "mp4", "mov", "m4v", "avi", "mkv": return "film.fill"
-        case "mp3", "wav", "m4a", "aac", "flac": return "music.note"
-        case "pdf": return "doc.richtext.fill"
-        case "swift", "json", "c", "cpp", "h", "md", "py", "sh", "xml", "html", "css": return "doc.text.fill"
-        default: return "doc.fill"
-        }
-    }
-    
-    private func extractSelectedForPreview(entryID: String?) {
-        previewTask?.cancel()
-        if let oldTempDir = currentTempDir {
-            try? FileManager.default.removeItem(at: oldTempDir)
-            currentTempDir = nil
-        }
-        
-        guard let entryID = entryID,
-              let entry = entries.first(where: { $0.id == entryID || $0.path == entryID }),
-              !entry.isDirectory else {
-            previewFileURL = nil
-            return
-        }
-        
-        let filename = (entry.path as NSString).lastPathComponent
-        isExtractingTemp = true
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("TTZipPreview_\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        currentTempDir = tempDir
-        
-        previewTask = Task {
-            do {
-                try await TTZipEngineFacade.shared.extractSingleEntry(
-                    archivePath: archivePath,
-                    entryPath: entry.path,
-                    destinationDir: tempDir.path,
-                    password: password
-                )
-                guard !Task.isCancelled else { return }
-                let expectedFileURL = tempDir.appendingPathComponent(filename)
-                await MainActor.run {
-                    self.previewFileURL = expectedFileURL
-                    self.isExtractingTemp = false
-                }
-            } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    self.previewFileURL = nil
-                    self.isExtractingTemp = false
-                }
-            }
-        }
-    }
-    
-    private func formatBytes(_ bytes: Int64) -> String {
-        return ByteCountFormatterCache.string(fromByteCount: bytes)
     }
 }
