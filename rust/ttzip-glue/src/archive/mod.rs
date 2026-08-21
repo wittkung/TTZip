@@ -12,6 +12,7 @@ pub mod repair;
 pub mod split;
 pub mod stream_adapter;
 pub mod tar;
+pub mod unified;
 
 pub use in_place_edit::*;
 pub use repair::*;
@@ -21,5 +22,6 @@ pub use split::{
 };
 pub use stream_adapter::*;
 pub use tar::*;
+pub use unified::*;
 
 

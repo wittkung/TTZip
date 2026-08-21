@@ -42,15 +42,36 @@ extension ArchiveWriter {
     ) throws {
         hardwareTuner.boostCurrentThreadPriority()
             
-        // 1. 7z fast path
+        // 1. 7z path
         if format == .sevenZip {
-            let success = try SevenZipParallelWriter.shared.createArchive(
-                outputPath: outputPath,
-                inputPaths: inputPaths,
-                level: level,
-                password: password,
-                progressHandler: progressHandler
-            )
+            let success: Bool
+            if password == nil || password!.isEmpty {
+                if let fastOk = try? SevenZipParallelWriter.shared.createArchive(
+                    outputPath: outputPath,
+                    inputPaths: inputPaths,
+                    level: level,
+                    password: password,
+                    progressHandler: progressHandler
+                ), fastOk {
+                    success = true
+                } else {
+                    success = try SevenZipEngine.shared.createArchive(
+                        outputPath: outputPath,
+                        inputPaths: inputPaths,
+                        level: level,
+                        password: password,
+                        progressHandler: progressHandler
+                    )
+                }
+            } else {
+                success = try SevenZipEngine.shared.createArchive(
+                    outputPath: outputPath,
+                    inputPaths: inputPaths,
+                    level: level,
+                    password: password,
+                    progressHandler: progressHandler
+                )
+            }
             if success {
                 if let splitBytes = splitVolumeSizeBytes, splitBytes > 0 {
                     try ArchiveWriter.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
@@ -125,8 +146,8 @@ extension ArchiveWriter {
             }
         }
         
-        // 3. Split multi-volume creation mode for 7z
-        if format == .sevenZip && (splitVolumeSizeBytes != nil && splitVolumeSizeBytes! > 0) {
+        // 3. Split multi-volume creation mode for 7z (unencrypted)
+        if format == .sevenZip && (splitVolumeSizeBytes != nil && splitVolumeSizeBytes! > 0) && (password == nil || password!.isEmpty) {
             let splitBytes = splitVolumeSizeBytes!
             let success = (try? SevenZipParallelWriter.shared.createArchive(
                 outputPath: outputPath,
@@ -224,23 +245,8 @@ extension ArchiveWriter {
         password: String?,
         skipMacJunk: Bool
     ) -> Bool {
-        let rustFormat: TTZipArchiveFormat
-        switch format {
-        case .zip: rustFormat = TTZIP_ARCHIVE_FORMAT_ZIP
-        case .sevenZip: rustFormat = TTZIP_ARCHIVE_FORMAT_SEVEN_ZIP
-        case .tar, .tarGz, .gz, .tarZst, .zst, .tarBz2, .bz2, .tarXz, .xz: rustFormat = TTZIP_ARCHIVE_FORMAT_TAR
-        default: rustFormat = TTZIP_ARCHIVE_FORMAT_TAR
-        }
-
-        let lvlMap: TTZipCompressionLevel
-        switch level {
-        case .store: lvlMap = TTZIP_COMPRESSION_LEVEL_STORE
-        case .fastest, .fast: lvlMap = TTZIP_COMPRESSION_LEVEL_FASTEST
-        case .normal: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
-        case .maximum: lvlMap = TTZIP_COMPRESSION_LEVEL_MAXIMUM
-        case .ultra: lvlMap = TTZIP_COMPRESSION_LEVEL_ULTRA
-        default: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
-        }
+        let rustFormat = ArchiveWriter.mapFormat(format)
+        let lvlMap = ArchiveWriter.mapLevel(level)
 
         let enc: TTZipEncryptionMethod = (password != nil && !password!.isEmpty) ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
         let pwd = (password != nil && !password!.isEmpty) ? password : nil

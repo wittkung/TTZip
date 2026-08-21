@@ -81,6 +81,25 @@ extension ArchiveWriter {
             }
         }
         
+        // 1.8. WinZip AES-256 Encrypted Route
+        if let pwd = password, !pwd.isEmpty {
+            let success = (try? ZipParallelWriter.shared.createArchive(
+                outputPath: outputPath,
+                inputPaths: inputPaths,
+                level: level,
+                skipMacJunk: options.skipMacJunk,
+                password: pwd,
+                progressHandler: progressHandler
+            )) ?? false
+            if success {
+                if let splitBytes = splitVolumeSizeBytes, splitBytes > 0 {
+                    try? Self.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
+                }
+                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "ZIP AES-256 archive created", progressHandler: progressHandler)
+                return true
+            }
+        }
+
         // 2. Native ZIP multi-threaded parallel compression engine (libdeflate + mmap + NEON CRC32)
         // 🔒 API CONTRACT: ZIP Parallel Compression Engine Route
         // SEE: .agents/rules/zip-engine-freeze.md

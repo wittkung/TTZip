@@ -177,7 +177,7 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
                 var isDir: ObjCBool = false
                 if fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue {
                     let filename = (fullPath as NSString).lastPathComponent
-                    if filename == ".metadata_never_index" || filename == ".DS_Store" || filename.hasPrefix("._") || filename.contains(":com.apple.") || filename.contains("com.apple.provenance") {
+                    if filename == ".metadata_never_index" || filename == ".noindex" || filename == ".DS_Store" || filename.hasPrefix("._") || filename.contains(":com.apple.") || filename.contains("com.apple.provenance") {
                         continue
                     }
                     let sz = (try? fm.attributesOfItem(atPath: fullPath)[.size] as? Int64) ?? 0

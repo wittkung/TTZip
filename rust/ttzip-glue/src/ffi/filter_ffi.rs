@@ -115,6 +115,28 @@ pub unsafe extern "C" fn ttzip_rust_dsl_evaluate_oneshot(
     result.unwrap_or(false)
 }
 
+pub type TTZipFilterDslEngine = TTZipDslFilterHandle;
+
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_create_filter_dsl_engine(query: *const c_char) -> *mut TTZipFilterDslEngine {
+    ttzip_rust_dsl_filter_new(query)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_eval_filter_dsl(
+    engine: *const TTZipFilterDslEngine,
+    path: *const c_char,
+    uncompressed_size: u64,
+    mtime_epoch_secs: i64,
+) -> bool {
+    ttzip_rust_dsl_filter_evaluate(engine, path, uncompressed_size, mtime_epoch_secs)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_free_filter_dsl_engine(engine: *mut TTZipFilterDslEngine) {
+    ttzip_rust_dsl_filter_free(engine);
+}
+
 // MARK: - Path Pattern Filter Engine FFI
 
 pub struct TTZipPathFilterHandle(pub PathPatternFilter);

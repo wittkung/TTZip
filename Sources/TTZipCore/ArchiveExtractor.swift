@@ -8,17 +8,20 @@
 import Foundation
 import CTTZipBridge
 
-/// High-performance stream-based archive extraction engine.
+/// High-performance unified stream-based archive extraction engine.
 public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
     internal let hardwareTuner: HardwareTunerProtocol
     public let targetFormat: ArchiveCompressionFormat?
 
-    public init(hardwareTuner: HardwareTunerProtocol = ArchiveEngineFamilyProvider.shared.currentFactory.tuner, targetFormat: ArchiveCompressionFormat? = nil) {
+    public init(
+        hardwareTuner: HardwareTunerProtocol = ArchiveEngineFamilyProvider.shared.currentFactory.tuner,
+        targetFormat: ArchiveCompressionFormat? = nil
+    ) {
         self.hardwareTuner = hardwareTuner
         self.targetFormat = targetFormat
     }
 
-    /// Synchronously extracts an archive to the destination directory (zero Task queue overhead).
+    /// Synchronously extracts an archive to the destination directory.
     @inline(__always)
     public func extractSync(
         archivePath: String,
@@ -27,16 +30,65 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         password: String? = nil,
         advancedOptions: ArchiveAdvancedOptions? = nil
     ) throws {
-        let template = ArchiveEngineTemplateRegistry.shared.template(forPath: archivePath, operation: .extract)
-        let context = ArchiveTemplateContext(
-            operation: .extract,
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: archivePath) else {
+            throw ArchiveError.fileNotFound
+        }
+
+        if !fileManager.fileExists(atPath: destinationDir) {
+            try fileManager.createDirectory(atPath: destinationDir, withIntermediateDirectories: true)
+        }
+
+        Self.preventSpotlightIndexing(at: destinationDir)
+        defer { Self.cleanupQuarantineAttributes(at: destinationDir) }
+
+        hardwareTuner.boostCurrentThreadPriority()
+
+        if dispatchFastExtraction(
             archivePath: archivePath,
             destinationDir: destinationDir,
-            password: password,
             options: options,
+            password: password,
             advancedOptions: advancedOptions
-        )
-        _ = try template.performWorkflow(context: context)
+        ) {
+            return
+        }
+
+        let pwd = (password != nil && !password!.isEmpty) ? password : nil
+        let status = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
+            CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
+                CUnsafeBufferAdapter.withCString(pwd) { pPtr in
+                    guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                    var opt = TTZipExtractOptions(
+                        destination_path: dPtr,
+                        password: pPtr,
+                        thread_budget: 0,
+                        overwrite_existing: true,
+                        preserve_permissions: true,
+                        dry_run: false,
+                        progress_callback: nil,
+                        user_data: nil
+                    )
+                    return ttzip_rust_archive_extract_unified(aPtr, dPtr, &opt)
+                }
+            }
+        }
+
+        if status == TTZIP_STATUS_OK {
+            return
+        }
+
+        if let items = try? fileManager.contentsOfDirectory(atPath: destinationDir) {
+            for item in items {
+                try? fileManager.removeItem(atPath: (destinationDir as NSString).appendingPathComponent(item))
+            }
+        }
+
+        if status == TTZIP_STATUS_CANCELLED {
+            throw CancellationError()
+        }
+
+        throw ArchiveError.readFailed(code: status.rawValue)
     }
 
     /// Asynchronously extracts an archive with password candidate traversal and fast-path dispatch.
@@ -53,197 +105,42 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
             password: password
         )
         try ArchiveValidationPipeline.buildDefaultExtractPipeline().validateOrThrow(context: valCtx)
-        
-        let pathLower = archivePath.lowercased()
-        let passCandidates = password != nil ? [password!] : PasswordVaultManager.shared.candidatePasswordsForAutoUnlock()
-        
-        // Handle split multi-volume 7z archives (.001 / .7z.001)
-        if pathLower.hasSuffix(".001") || pathLower.contains(".7z.") {
-            let activePwd = password ?? passCandidates.first
-            let pwd = (activePwd != nil && !activePwd!.isEmpty) ? activePwd : nil
-            
-            if pathLower.hasSuffix(".001") {
-                let joinedTemp = FileManager.default.temporaryDirectory.appendingPathComponent("joined_\(UUID().uuidString).7z").path
-                defer { try? FileManager.default.removeItem(atPath: joinedTemp) }
-                if self.joinSplitVolumes(firstVolumePath: archivePath, outputPath: joinedTemp) {
-                    if let ok = try? SevenZipEngine.shared.extract(archivePath: joinedTemp, destinationDir: destinationDir, password: pwd), ok {
-                        let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
-                        if !items.isEmpty { return }
-                    }
-                }
-            }
-            
-            if let ok = try? SevenZipEngine.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: pwd), ok {
-                let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
-                if !items.isEmpty { return }
-            }
-            let status = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
-                CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
-                    CUnsafeBufferAdapter.withCString(pwd) { pPtr in
-                        guard let aPtr = aPtr, let dPtr = dPtr else { return Int32(-1) }
-                        var opt = TTZipExtractOptions(
-                            destination_path: dPtr,
-                            password: pPtr,
-                            thread_budget: 4,
-                            overwrite_existing: true,
-                            preserve_permissions: true,
-                            dry_run: false,
-                            progress_callback: nil,
-                            user_data: nil
-                        )
-                        let rStatus = ttzip_rust_extract_archive(aPtr, dPtr, &opt)
-                        if rStatus == TTZIP_STATUS_OK {
-                            return Int32(0)
-                        }
-                        return ttzip_extract_archive_advanced(aPtr, dPtr, options.skipMacJunk, pPtr)
-                    }
-                }
-            }
-            if status == 0 {
-                return
-            }
-            try await extractSingleFile(archivePath: archivePath, entryPath: "*", destinationDir: destinationDir, password: pwd)
-            return
-        }
-        
-        // Fast-path for Apple DMG containers (UDIF with LZFSE / ZLIB / RAW / LZMA chunks)
-        if pathLower.hasSuffix(".dmg") {
-            let candidates: [String?] = passCandidates.isEmpty ? [password] : passCandidates.map { Optional($0) }
-            for cand in candidates {
-                if let ok = try? DMGVirtualStreamAdapter.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: cand, skipMacJunk: options.skipMacJunk), ok {
-                    if let items = try? FileManager.default.contentsOfDirectory(atPath: destinationDir), !items.isEmpty {
-                        return
-                    }
-                }
-            }
-        }
-        
-        // Fast-path for single-file .lzfse archives
-        if pathLower.hasSuffix(".lzfse") {
-            let outName = URL(fileURLWithPath: archivePath).deletingPathExtension().lastPathComponent
-            let targetOut = (destinationDir as NSString).appendingPathComponent(outName.isEmpty ? "decompressed" : outName)
-            if LzfseCAdapter.shared.decompressFileStream(srcPath: archivePath, dstPath: targetOut) == 0 {
-                return
-            }
-        }
-        
-        // Fast-path for 7z / DMG / ISO containers
-        if pathLower.contains(".7z") || pathLower.contains("sevenzip") || pathLower.hasSuffix(".cb7") || pathLower.hasSuffix(".dmg") || pathLower.hasSuffix(".iso") {
-            let activePwd = password ?? passCandidates.first
-            let pwd = (activePwd != nil && !activePwd!.isEmpty) ? activePwd : nil
-            let rStatus = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
-                CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
-                    CUnsafeBufferAdapter.withCString(pwd) { pPtr in
-                        guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
-                        var opt = TTZipExtractOptions(
-                            destination_path: dPtr,
-                            password: pPtr,
-                            thread_budget: 0,
-                            overwrite_existing: true,
-                            preserve_permissions: true,
-                            dry_run: false,
-                            progress_callback: nil,
-                            user_data: nil
-                        )
-                        return ttzip_rust_extract_archive(aPtr, dPtr, &opt)
-                    }
-                }
-            }
-            if rStatus == TTZIP_STATUS_OK {
-                let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
-                if !items.isEmpty {
-                    return
-                }
-            }
-            
-            let candidates: [String?] = passCandidates.isEmpty ? [password] : passCandidates.map { Optional($0) }
-            for cand in candidates {
-                if let ok = try? SevenZipEngine.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: cand), ok {
-                    if let items = try? FileManager.default.contentsOfDirectory(atPath: destinationDir), !items.isEmpty {
-                        return
-                    }
-                }
-            }
-        }
-        
-        // Native parallel engine fast-path for ZIP archives
-        if pathLower.hasSuffix(".zip") || pathLower.contains(".zip") {
-            let activePwd = password ?? passCandidates.first
-            let pwd = (activePwd != nil && !activePwd!.isEmpty) ? activePwd : nil
-            let rStatus = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
-                CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
-                    CUnsafeBufferAdapter.withCString(pwd) { pPtr in
-                        guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
-                        var opt = TTZipExtractOptions(
-                            destination_path: dPtr,
-                            password: pPtr,
-                            thread_budget: 0,
-                            overwrite_existing: true,
-                            preserve_permissions: true,
-                            dry_run: false,
-                            progress_callback: nil,
-                            user_data: nil
-                        )
-                        return ttzip_rust_extract_archive(aPtr, dPtr, &opt)
-                    }
-                }
-            }
-            if rStatus == TTZIP_STATUS_OK {
-                return
-            }
-        }
-        
+
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: archivePath) else {
             throw ArchiveError.fileNotFound
         }
-        
+
         if !fileManager.fileExists(atPath: destinationDir) {
             try fileManager.createDirectory(atPath: destinationDir, withIntermediateDirectories: true)
         }
-        
+
         Self.preventSpotlightIndexing(at: destinationDir)
         try Task.checkCancellation()
-        
-        let performExtraction = { [weak self] () throws in
-            self?.hardwareTuner.boostCurrentThreadPriority()
-            let candidates: [String?] = (password != nil) ? [password] : (passCandidates.isEmpty ? [nil] : passCandidates.map { Optional($0) })
-            var lastStatus: Int32 = -1
-            for cand in candidates {
-                let status = ttzip_extract_archive_advanced(archivePath, destinationDir, options.skipMacJunk, cand)
-                if status == 0 {
+
+        let passCandidates: [String?] = password != nil ? [password] : {
+            let vaultCandidates = PasswordVaultManager.shared.candidatePasswordsForAutoUnlock()
+            return vaultCandidates.isEmpty ? [nil] : vaultCandidates.map { Optional($0) }
+        }()
+
+        try await Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            self.hardwareTuner.boostCurrentThreadPriority()
+
+            for cand in passCandidates {
+                if self.dispatchFastExtraction(
+                    archivePath: archivePath,
+                    destinationDir: destinationDir,
+                    options: options,
+                    password: cand,
+                    advancedOptions: advancedOptions
+                ) {
                     return
                 }
-                lastStatus = status
-            }
-            throw ArchiveError.readFailed(code: lastStatus)
-        }
-        
-        try await Task.detached(priority: .userInitiated) {
-            try performExtraction()
-        }.value
-        
-        Self.cleanupQuarantineAttributes(at: destinationDir)
-    }
-    
-    /// Synchronously extracts a single file from the archive without processing other entries.
-    public func extractSingleFile(archivePath: String, entryPath: String, destinationDir: String, password: String? = nil) async throws {
-        try await Task.detached(priority: .userInitiated) {
-            let fileManager = FileManager.default
-            if !fileManager.fileExists(atPath: destinationDir) {
-                try fileManager.createDirectory(atPath: destinationDir, withIntermediateDirectories: true)
-            }
-            
-            let pathLower = archivePath.lowercased()
-            if pathLower.contains(".7z") || pathLower.contains("sevenzip") || pathLower.hasSuffix(".cb7") {
-                if let ok = try? SevenZipEngine.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: password), ok {
-                    return
-                }
-            } else if pathLower.hasSuffix(".zip") {
-                let pwd = (password != nil && !password!.isEmpty) ? password : nil
-                let rStatus = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
+
+                let status = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
                     CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
-                        CUnsafeBufferAdapter.withCString(pwd) { pPtr in
+                        CUnsafeBufferAdapter.withCString(cand) { pPtr in
                             guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
                             var opt = TTZipExtractOptions(
                                 destination_path: dPtr,
@@ -255,45 +152,70 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
                                 progress_callback: nil,
                                 user_data: nil
                             )
-                            return ttzip_rust_extract_archive(aPtr, dPtr, &opt)
+                            return ttzip_rust_archive_extract_unified(aPtr, dPtr, &opt)
                         }
                     }
                 }
-                if rStatus == TTZIP_STATUS_OK {
-                    return
-                }
-            } else if pathLower.hasSuffix(".aar") {
-                if let ok = try? NativeAppleArchiveEngine.shared.extract(archivePath: archivePath, destinationDir: destinationDir), ok {
+
+                if status == TTZIP_STATUS_OK {
                     return
                 }
             }
-            
-            let status = ttzip_extract_archive_advanced(archivePath, destinationDir, false, password)
-            if status != 0 {
-                throw ArchiveError.readFailed(code: status)
+
+            if let items = try? FileManager.default.contentsOfDirectory(atPath: destinationDir) {
+                for item in items {
+                    try? FileManager.default.removeItem(atPath: (destinationDir as NSString).appendingPathComponent(item))
+                }
             }
+
+            throw ArchiveError.readFailed(code: -11)
         }.value
+
         Self.cleanupQuarantineAttributes(at: destinationDir)
     }
 
-    // MARK: - Helpers
-    
-    internal static func cleanupQuarantineAttributes(at dirPath: String) {
-        dirPath.withCString { pathPtr in
-            let sz = getxattr(pathPtr, "com.apple.quarantine", nil, 0, 0, XATTR_NOFOLLOW)
-            if sz > 0 {
-                removexattr(pathPtr, "com.apple.quarantine", XATTR_NOFOLLOW)
+    /// Synchronously extracts a single file from the archive without processing other entries.
+    public func extractSingleFile(
+        archivePath: String,
+        entryPath: String,
+        destinationDir: String,
+        password: String? = nil
+    ) async throws {
+        try await Task.detached(priority: .userInitiated) {
+            let fileManager = FileManager.default
+            if !fileManager.fileExists(atPath: destinationDir) {
+                try fileManager.createDirectory(atPath: destinationDir, withIntermediateDirectories: true)
             }
-        }
+
+            let pwd = (password != nil && !password!.isEmpty) ? password : nil
+            let status = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
+                CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
+                    CUnsafeBufferAdapter.withCString(pwd) { pPtr in
+                        guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                        var opt = TTZipExtractOptions(
+                            destination_path: dPtr,
+                            password: pPtr,
+                            thread_budget: 0,
+                            overwrite_existing: true,
+                            preserve_permissions: true,
+                            dry_run: false,
+                            progress_callback: nil,
+                            user_data: nil
+                        )
+                        return ttzip_rust_archive_extract_unified(aPtr, dPtr, &opt)
+                    }
+                }
+            }
+
+            if status != TTZIP_STATUS_OK {
+                throw ArchiveError.readFailed(code: status.rawValue)
+            }
+        }.value
+
+        Self.cleanupQuarantineAttributes(at: destinationDir)
     }
-    
-    private static func preventSpotlightIndexing(at dirPath: String) {
-        let noIndexFilePath = (dirPath as NSString).appendingPathComponent(".noindex")
-        if !FileManager.default.fileExists(atPath: noIndexFilePath) {
-            FileManager.default.createFile(atPath: noIndexFilePath, contents: nil)
-        }
-    }
-    
+
+    /// Joins multi-volume split archive files into a continuous output file.
     public func joinSplitVolumes(firstVolumePath: String, outputPath: String) -> Bool {
         let status = firstVolumePath.withCString { cFirst in
             outputPath.withCString { cOut in
@@ -321,5 +243,23 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         )
         let template = ArchiveEngineTemplateRegistry.shared.template(forPath: archivePath, operation: .extract)
         return try template.performWorkflow(context: context)
+    }
+
+    // MARK: - Helpers
+
+    internal static func cleanupQuarantineAttributes(at dirPath: String) {
+        dirPath.withCString { pathPtr in
+            let sz = getxattr(pathPtr, "com.apple.quarantine", nil, 0, 0, XATTR_NOFOLLOW)
+            if sz > 0 {
+                removexattr(pathPtr, "com.apple.quarantine", XATTR_NOFOLLOW)
+            }
+        }
+    }
+
+    private static func preventSpotlightIndexing(at dirPath: String) {
+        let noIndexFilePath = (dirPath as NSString).appendingPathComponent(".noindex")
+        if !FileManager.default.fileExists(atPath: noIndexFilePath) {
+            FileManager.default.createFile(atPath: noIndexFilePath, contents: nil)
+        }
     }
 }

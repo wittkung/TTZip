@@ -17,6 +17,7 @@ impl<R: Read + Seek> StreamReaderState<R> {
         if request == 0 {
             return Ok(0);
         }
+        self.is_eof = false;
         let old_pos = self.reader.stream_position()?;
         let new_pos = self.reader.seek(SeekFrom::Current(request))?;
         let delta = new_pos as i64 - old_pos as i64;
@@ -28,6 +29,7 @@ impl<R: Read + Seek> StreamReaderState<R> {
 
     /// Seeks to a specific offset based on `whence`.
     pub fn seek(&mut self, whence: SeekFrom) -> std::io::Result<u64> {
+        self.is_eof = false;
         self.reader.seek(whence)
     }
 }

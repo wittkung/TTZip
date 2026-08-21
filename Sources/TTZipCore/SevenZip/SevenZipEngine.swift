@@ -53,13 +53,39 @@ public final class SevenZipEngine: @unchecked Sendable {
             defer { try? FileManager.default.removeItem(atPath: joinedTemp) }
             if ArchiveExtractor().joinSplitVolumes(firstVolumePath: archivePath, outputPath: joinedTemp) {
                 if let ok = try? SevenZipCAdapter.shared.extractArchive(archivePath: joinedTemp, destinationDir: destinationDir, skipMacJunk: true, password: pwd), ok {
+                    let items = ((try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []).filter { $0 != ".noindex" && $0 != ".DS_Store" && !$0.hasPrefix("._") }
+                    if !items.isEmpty { return true }
+                }
+                if let ok = try? SevenZipParallelWriter.shared.extractArchive(archivePath: joinedTemp, destinationDir: destinationDir, password: pwd), ok {
+                    let items = ((try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []).filter { $0 != ".noindex" && $0 != ".DS_Store" && !$0.hasPrefix("._") }
+                    if !items.isEmpty { return true }
+                }
+                let status = CUnsafeBufferAdapter.withCString(joinedTemp) { aPtr in
+                    CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
+                        CUnsafeBufferAdapter.withCString(pwd) { pPtr in
+                            guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                            var opt = TTZipExtractOptions(
+                                destination_path: dPtr,
+                                password: pPtr,
+                                thread_budget: 0,
+                                overwrite_existing: true,
+                                preserve_permissions: true,
+                                dry_run: false,
+                                progress_callback: nil,
+                                user_data: nil
+                            )
+                            return ttzip_rust_archive_extract_unified(aPtr, dPtr, &opt)
+                        }
+                    }
+                }
+                if status == TTZIP_STATUS_OK {
                     let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
                     if !items.isEmpty { return true }
                 }
             }
-            let ok = try SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, skipMacJunk: true, password: pwd)
+            var ok = (try? SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, skipMacJunk: true, password: pwd)) ?? false
             if !ok {
-                TTLogger.debug("[SevenZipEngine] Split archive extraction failed: \(archivePath)")
+                ok = (try? SevenZipParallelWriter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, password: pwd)) ?? false
             }
             return ok
         }
@@ -67,6 +93,29 @@ public final class SevenZipEngine: @unchecked Sendable {
         var ok = (try? SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, skipMacJunk: true, password: pwd)) ?? false
         if !ok {
             ok = (try? SevenZipParallelWriter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, password: pwd)) ?? false
+        }
+        if !ok {
+            let status = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
+                CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
+                    CUnsafeBufferAdapter.withCString(pwd) { pPtr in
+                        guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                        var opt = TTZipExtractOptions(
+                            destination_path: dPtr,
+                            password: pPtr,
+                            thread_budget: 0,
+                            overwrite_existing: true,
+                            preserve_permissions: true,
+                            dry_run: false,
+                            progress_callback: nil,
+                            user_data: nil
+                        )
+                        return ttzip_rust_archive_extract_unified(aPtr, dPtr, &opt)
+                    }
+                }
+            }
+            if status == TTZIP_STATUS_OK {
+                ok = true
+            }
         }
         if !ok {
             TTLogger.debug("[SevenZipEngine] Extraction failed: \(archivePath)")

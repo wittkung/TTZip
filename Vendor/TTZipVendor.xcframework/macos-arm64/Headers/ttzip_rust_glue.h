@@ -349,6 +349,10 @@ TTZipWorkerPoolState ttzip_rust_worker_pool_get_state(const TTZipWorkerPoolHandl
 void ttzip_rust_worker_pool_free(TTZipWorkerPoolHandle *handle);
 
 // Unified Archive Operations
+TTZipStatus ttzip_rust_archive_create_unified(const char *const *source_paths, size_t source_count, const char *destination_path, const TTZipCreateOptions *options, uint64_t split_volume_size_bytes);
+TTZipStatus ttzip_rust_archive_extract_unified(const char *archive_path, const char *destination_path, const TTZipExtractOptions *options);
+TTZipStatus ttzip_rust_archive_inspect_unified(const char *archive_path, const char *password, bool detect_encoding, TTZipInspectCallback callback, void *user_data);
+TTZipStatus ttzip_rust_archive_repair_unified(const char *damaged_path, const char *repaired_path, size_t *out_salvaged_count);
 TTZipStatus ttzip_rust_inspect_archive(const char *archive_path, const char *password, bool detect_encoding, TTZipInspectCallback callback, void *user_data);
 TTZipStatus ttzip_rust_extract_archive(const char *archive_path, const char *destination_path, const TTZipExtractOptions *options);
 TTZipStatus ttzip_rust_7z_extract_entry_memory(const char *archive_path, const char *entry_path, int64_t entry_index, const char *password, uint8_t *out_buffer, size_t buffer_capacity, size_t *out_extracted_len);
@@ -504,6 +508,29 @@ void ttzip_rust_inplace_session_free(TTZipInPlaceSession *session);
 TTZipStatus ttzip_rust_differential_scan_directory(const char *path, char **out_manifest_json);
 TTZipStatus ttzip_rust_differential_compare_manifests(const char *ttzip_json, const char *oracle_json, bool is_tar_format, const char *oracle_name, const char *format_name, char **out_report_json, bool *out_is_passed);
 void ttzip_rust_free_differential_string(char *ptr);
+
+// Unified VFS Tree & Fuzzy Search Engine
+typedef struct TTZipVfsTreeHandle TTZipVfsTreeHandle;
+
+typedef struct TTZipVfsSearchResultRaw {
+    const char *name;
+    const char *path;
+    uint64_t uncompressed_size;
+    uint64_t compressed_size;
+    uint32_t crc32;
+    bool is_directory;
+    bool is_encrypted;
+    int64_t score;
+} TTZipVfsSearchResultRaw;
+
+typedef bool (*TTZipVfsSearchCallback)(const TTZipVfsSearchResultRaw *result, void *user_data);
+
+TTZipVfsTreeHandle *ttzip_rust_vfs_tree_build(const TTZipEntryMetadata *entries, size_t count, const char *root_name);
+TTZipStatus ttzip_rust_vfs_tree_render(const TTZipVfsTreeHandle *handle, char **out_rendered);
+TTZipStatus ttzip_rust_vfs_fuzzy_search(const TTZipVfsTreeHandle *handle, const char *query, TTZipVfsSearchCallback callback, void *user_data);
+void ttzip_rust_vfs_tree_free(TTZipVfsTreeHandle *handle);
+void ttzip_rust_vfs_free_string(char *ptr);
+void ttzip_rust_vfs_tree_get_stats(const TTZipVfsTreeHandle *handle, uint64_t *out_total_files, uint64_t *out_total_dirs, uint64_t *out_total_size);
 
 #ifdef __cplusplus
 }

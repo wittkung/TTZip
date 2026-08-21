@@ -71,20 +71,20 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         
         try Task.checkCancellation()
         
-        let template = ArchiveEngineTemplateRegistry.shared.template(for: format)
-        let context = ArchiveTemplateContext(
-            operation: .compress,
-            archivePath: outputPath,
-            inputPaths: inputPaths,
-            format: format,
-            level: level,
-            password: password,
-            options: options,
-            advancedOptions: advancedOptions,
-            splitVolumeSizeBytes: splitVolumeSizeBytes,
-            progressHandler: progressHandler
-        )
-        _ = try await template.performWorkflowAsync(context: context)
+        try await Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            try self.createArchiveSync(
+                outputPath: outputPath,
+                format: format,
+                level: level,
+                inputPaths: inputPaths,
+                options: options,
+                password: password,
+                splitVolumeSizeBytes: splitVolumeSizeBytes,
+                advancedOptions: advancedOptions,
+                progressHandler: progressHandler
+            )
+        }.value
     }
 
     /// Synchronously creates an archive bypassing Task queue context-switches.
@@ -100,20 +100,26 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         advancedOptions: ArchiveAdvancedOptions = .defaultOptions,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws {
-        let template = ArchiveEngineTemplateRegistry.shared.template(for: format)
-        let context = ArchiveTemplateContext(
-            operation: .compress,
-            archivePath: outputPath,
-            inputPaths: inputPaths,
+        guard !inputPaths.isEmpty else {
+            throw ArchiveError.readFailed(code: -10)
+        }
+
+        let startTime = Date()
+        let totalBytes = inputPaths.reduce(Int64(0)) { $0 + Self.recursivePathSize(at: $1) }
+
+        try createArchiveInternal(
+            outputPath: outputPath,
             format: format,
             level: level,
-            password: password,
+            inputPaths: inputPaths,
             options: options,
-            advancedOptions: advancedOptions,
             splitVolumeSizeBytes: splitVolumeSizeBytes,
-            progressHandler: progressHandler
+            password: password,
+            advancedOptions: advancedOptions,
+            progressHandler: progressHandler,
+            startTime: startTime,
+            totalBytes: totalBytes
         )
-        _ = try template.performWorkflow(context: context)
     }
 
     /// Template Method Pattern execution of archive compression workflow.
@@ -142,5 +148,34 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         )
         let template = ArchiveEngineTemplateRegistry.shared.template(for: format)
         return try template.performWorkflow(context: context)
+    }
+
+    // MARK: - Format Mappings
+
+    internal static func mapFormat(_ format: ArchiveCompressionFormat) -> TTZipArchiveFormat {
+        switch format {
+        case .sevenZip: return TTZIP_ARCHIVE_FORMAT_SEVEN_ZIP
+        case .zip: return TTZIP_ARCHIVE_FORMAT_ZIP
+        case .tar: return TTZIP_ARCHIVE_FORMAT_TAR
+        case .tarGz, .gz: return TTZIP_ARCHIVE_FORMAT_TAR_GZ
+        case .tarBz2, .bz2: return TTZIP_ARCHIVE_FORMAT_TAR_BZ2
+        case .tarXz, .xz: return TTZIP_ARCHIVE_FORMAT_TAR_XZ
+        case .tarZst, .zst: return TTZIP_ARCHIVE_FORMAT_TAR_ZSTD
+        case .dmg: return TTZIP_ARCHIVE_FORMAT_DMG
+        case .snappy: return TTZIP_ARCHIVE_FORMAT_SNAPPY
+        default: return TTZIP_ARCHIVE_FORMAT_ZIP
+        }
+    }
+
+    internal static func mapLevel(_ level: ArchiveCompressionLevel) -> TTZipCompressionLevel {
+        switch level {
+        case .store: return TTZIP_COMPRESSION_LEVEL_STORE
+        case .fastest: return TTZIP_COMPRESSION_LEVEL_FASTEST
+        case .fast: return TTZIP_COMPRESSION_LEVEL_FAST
+        case .normal: return TTZIP_COMPRESSION_LEVEL_NORMAL
+        case .maximum: return TTZIP_COMPRESSION_LEVEL_MAXIMUM
+        case .ultra: return TTZIP_COMPRESSION_LEVEL_ULTRA
+        default: return TTZIP_COMPRESSION_LEVEL_NORMAL
+        }
     }
 }

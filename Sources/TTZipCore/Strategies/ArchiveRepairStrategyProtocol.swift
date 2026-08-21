@@ -53,7 +53,7 @@ public final class ZipCentralDirectoryReconstructionStrategy: ArchiveRepairStrat
                     return ttzip_rust_archive_repair_zip(cSrc, cDst, &salvaged)
                 }
             }
-            if nativeStatus == TTZIP_STATUS_OK && salvaged > 0 {
+            if nativeStatus == TTZIP_STATUS_OK {
                 return salvaged
             }
             
@@ -64,11 +64,11 @@ public final class ZipCentralDirectoryReconstructionStrategy: ArchiveRepairStrat
             let extractor = ArchiveEngineFactory.makeExtractor()
             _ = try? extractor.extractSync(archivePath: damagedArchivePath, destinationDir: tempDir, options: .defaultClean, password: nil)
             
-            var recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir)) ?? []
+            var recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir).filter { $0 != ".noindex" && !$0.hasPrefix(".") }) ?? []
             
             if recoveredItems.isEmpty, let fileData = try? Data(contentsOf: URL(fileURLWithPath: damagedArchivePath)) {
                 Self.salvageZipLocalHeaders(fileData: fileData, outputDir: tempDir)
-                recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir)) ?? []
+                recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir).filter { $0 != ".noindex" && !$0.hasPrefix(".") }) ?? []
             }
             
             let fullPaths = recoveredItems.map { (tempDir as NSString).appendingPathComponent($0) }
@@ -173,11 +173,11 @@ public final class TarTruncatedSalvageStrategy: ArchiveRepairStrategyProtocol {
             let extractor = ArchiveEngineFactory.makeExtractor()
             _ = try? extractor.extractSync(archivePath: damagedArchivePath, destinationDir: tempDir, options: .defaultClean, password: nil)
             
-            var recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir)) ?? []
+            var recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir).filter { $0 != ".noindex" && !$0.hasPrefix(".") }) ?? []
             
             if recoveredItems.isEmpty, let fileData = try? Data(contentsOf: URL(fileURLWithPath: damagedArchivePath)) {
                 Self.salvageTarBlocks(fileData: fileData, outputDir: tempDir)
-                recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir)) ?? []
+                recoveredItems = (try? fileManager.contentsOfDirectory(atPath: tempDir).filter { $0 != ".noindex" && !$0.hasPrefix(".") }) ?? []
             }
             
             let fullPaths = recoveredItems.map { (tempDir as NSString).appendingPathComponent($0) }

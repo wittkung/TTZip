@@ -211,4 +211,15 @@ public final class ArchiveComponentTreeBuilder: @unchecked Sendable {
             return compositeDir
         }
     }
+    
+    /// Renders an ASCII/Unicode hierarchical tree directly using the Safe Rust VFS engine.
+    public static func renderTree(from entries: [ArchiveEntry], rootName: String = "") -> String {
+        return RustVfsBridge.renderTree(from: entries, rootName: rootName)
+    }
+    
+    /// Performs high-performance fuzzy query matching directly via the Safe Rust VFS engine.
+    public static func fuzzySearch(in entries: [ArchiveEntry], query: String) -> [ArchiveEntry] {
+        return RustVfsBridge.fuzzySearch(in: entries, query: query)
+    }
 }
+

@@ -264,4 +264,17 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
             throw ArchiveError.readFailed(code: -1)
         }.value
     }
+    
+    /// Inspects archive and builds a unified hierarchical VFS tree.
+    public func inspectTree(archivePath: String, password: String? = nil) async throws -> ArchiveCompositeDirectory {
+        let entries = try await inspect(archivePath: archivePath, password: password)
+        return ArchiveComponentTreeBuilder.buildTree(from: entries)
+    }
+    
+    /// Performs fuzzy search on the archive contents using Safe Rust VFS engine.
+    public func fuzzySearch(archivePath: String, query: String, password: String? = nil) async throws -> [ArchiveEntry] {
+        let entries = try await inspect(archivePath: archivePath, password: password)
+        return RustVfsBridge.fuzzySearch(in: entries, query: query)
+    }
 }
+

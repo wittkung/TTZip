@@ -15,13 +15,14 @@
 
 mod create;
 mod extract;
-mod guards;
+pub(crate) mod guards;
 mod in_place;
 mod inspect;
 mod repair;
 pub mod split;
-mod sys;
+pub(crate) mod sys;
 mod tar;
+pub mod unified;
 mod zip;
 
 pub use create::ttzip_rust_create_archive;
@@ -31,6 +32,7 @@ pub use inspect::ttzip_rust_inspect_archive;
 pub use repair::*;
 pub use split::*;
 pub use tar::{ttzip_rust_tar_extract_entry, ttzip_rust_tar_scan_entries};
+pub use unified::*;
 pub use zip::ttzip_rust_zip_scan_entries;
 
 

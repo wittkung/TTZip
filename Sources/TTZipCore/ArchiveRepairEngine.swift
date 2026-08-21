@@ -70,6 +70,30 @@ public final class ArchiveRepairEngine: @unchecked Sendable {
     /// Fast hardware NEON-accelerated direct archive repair via Rust FFI.
     public func repairArchiveNative(damagedArchivePath: String, repairedOutputPath: String) -> Int? {
         guard FileManager.default.fileExists(atPath: damagedArchivePath) else { return nil }
+        
+        // 1. Check for Reed-Solomon self-healing recovery record
+        var hasRecord = false
+        _ = CUnsafeBufferAdapter.withCString(damagedArchivePath) { cSrc in
+            guard let cSrc = cSrc else { return Int32(-1) }
+            return ttzip_rust_rs_inspect_recovery_record_file(cSrc, nil, nil, nil, nil, nil, &hasRecord)
+        }
+        
+        if hasRecord {
+            var repaired = false
+            let status = CUnsafeBufferAdapter.withCString(damagedArchivePath) { cSrc in
+                guard let cSrc = cSrc else { return Int32(-1) }
+                return ttzip_rust_rs_repair_archive_streaming(cSrc, &repaired)
+            }
+            if status == 0 && repaired {
+                if damagedArchivePath != repairedOutputPath {
+                    try? FileManager.default.removeItem(atPath: repairedOutputPath)
+                    try? FileManager.default.copyItem(atPath: damagedArchivePath, toPath: repairedOutputPath)
+                }
+                return 1
+            }
+        }
+        
+        // 2. Direct format repair via Rust microkernel FFI
         return CUnsafeBufferAdapter.withCString(damagedArchivePath) { cSrc in
             CUnsafeBufferAdapter.withCString(repairedOutputPath) { cDst in
                 guard let cSrc = cSrc, let cDst = cDst else { return nil }

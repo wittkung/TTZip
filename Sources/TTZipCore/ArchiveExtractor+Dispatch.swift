@@ -22,14 +22,14 @@ extension ArchiveExtractor {
 
         // 1. Apple DMG (UDIF with LZFSE / ZLIB / RAW / LZMA chunks)
         if targetFormat == .dmg || pathLower.hasSuffix(".dmg") {
-            if let ok = try? DMGVirtualStreamAdapter.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: password, skipMacJunk: options.skipMacJunk), ok {
+            if extractWithRust(archivePath: archivePath, destinationDir: destinationDir, password: password) {
                 Self.cleanupQuarantineAttributes(at: destinationDir)
                 return true
             }
         }
 
         // 1.1 7Z / ISO / Split Volume (.001) / Generic container fallback
-        if targetFormat == .sevenZip || targetFormat == .dmg || targetFormat == .iso || ArchiveCompressionFormat.sevenZipFamilyExtensions.contains(where: { pathLower.hasSuffix($0) }) || pathLower.contains(".7z.") {
+        if targetFormat == .sevenZip || targetFormat == .iso || ArchiveCompressionFormat.sevenZipFamilyExtensions.contains(where: { pathLower.hasSuffix($0) }) || pathLower.contains(".7z.") {
             if let ok = try? SevenZipEngine.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: password), ok {
                 return true
             }
@@ -83,7 +83,14 @@ extension ArchiveExtractor {
         // 6. ZIP in-process multi-threaded extraction
         if targetFormat == .zip || pathLower.hasSuffix(".zip") {
             if extractWithRust(archivePath: archivePath, destinationDir: destinationDir, password: password) {
-                let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
+                let items = ((try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []).filter { $0 != ".noindex" && $0 != ".DS_Store" && !$0.hasPrefix("._") }
+                if !items.isEmpty {
+                    Self.cleanupQuarantineAttributes(at: destinationDir)
+                    return true
+                }
+            }
+            if let ok = try? SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, skipMacJunk: options.skipMacJunk, password: password), ok {
+                let items = ((try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []).filter { $0 != ".noindex" && $0 != ".DS_Store" && !$0.hasPrefix("._") }
                 if !items.isEmpty {
                     Self.cleanupQuarantineAttributes(at: destinationDir)
                     return true

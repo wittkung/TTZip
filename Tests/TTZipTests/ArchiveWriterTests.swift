@@ -130,12 +130,14 @@ final class ArchiveWriterTests: XCTestCase {
                 if subpath.hasSuffix("doc2.txt") { foundB = (extractDir as NSString).appendingPathComponent(subpath) }
             }
         }
+        let allSubpaths = (try? FileManager.default.subpathsOfDirectory(atPath: extractDir)) ?? []
+        XCTAssertNotNil(foundA, "Extracted destination must contain video1.bin. Found: \(allSubpaths)")
+        XCTAssertNotNil(foundB, "Extracted destination must contain doc2.txt. Found: \(allSubpaths)")
         
-        XCTAssertNotNil(foundA, "Extracted destination must contain video1.bin")
-        XCTAssertNotNil(foundB, "Extracted destination must contain doc2.txt")
-        
-        let extractedFileA = foundA!
-        let extractedFileB = foundB!
+        guard let extractedFileA = foundA, let extractedFileB = foundB else {
+            XCTFail("Missing extracted files: \(allSubpaths)")
+            return
+        }
         
         XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFileA), "Extracted video file must exist")
         XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFileB), "Extracted document file must exist")

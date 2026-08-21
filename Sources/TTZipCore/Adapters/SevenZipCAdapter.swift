@@ -85,7 +85,7 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
                         proc.arguments = args
                         let pipe = Pipe()
                         proc.standardOutput = pipe
-                        proc.standardError = pipe
+                        proc.standardError = FileHandle.nullDevice
                         if (try? proc.run()) != nil {
                             _ = pipe.fileHandleForReading.readDataToEndOfFile()
                             proc.waitUntilExit()
@@ -132,7 +132,7 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
                         user_data: nil
                     )
                     let status = ttzip_rust_extract_archive(cArchivePath, cDestDir, &opt)
-                    let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
+                    let items = ((try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []).filter { $0 != ".noindex" && $0 != ".DS_Store" && !$0.hasPrefix("._") }
                     if status == TTZIP_STATUS_OK && !items.isEmpty {
                         return true
                     }
@@ -149,7 +149,7 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
                         proc.arguments = args
                         let pipe = Pipe()
                         proc.standardOutput = pipe
-                        proc.standardError = pipe
+                        proc.standardError = FileHandle.nullDevice
                         if (try? proc.run()) != nil {
                             _ = pipe.fileHandleForReading.readDataToEndOfFile()
                             proc.waitUntilExit()
