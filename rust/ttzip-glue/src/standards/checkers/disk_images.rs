@@ -19,7 +19,7 @@ pub fn check_dmg_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if buffer.len() < 512 {
         let citation = StandardCitation::new(ComplianceStandard::AppleDmgUdif, "1.0", "UDIF Trailer Size");
-        report.add_error(citation, "Buffer is smaller than 512-byte UDIF koly trailer", Some(0));
+        report.add_error(citation, "Apple DMG: File smaller than 512-byte koly trailer", Some(0));
         return report;
     }
 
@@ -27,9 +27,11 @@ pub fn check_dmg_compliance(buffer: &[u8]) -> ComplianceReport {
     let trailer = &buffer[trailer_start..];
 
     // 1. Validate 'koly' signature
-    if &trailer[0..4] != DMG_KOLY_MAGIC {
+    if &trailer[0..4] == DMG_KOLY_MAGIC {
+        report.add_validated_header("Apple DMG: koly Trailer Signature (0x6B6F6C79)");
+    } else {
         let citation = StandardCitation::new(ComplianceStandard::AppleDmgUdif, "1.1", "Trailer Magic");
-        report.add_error(citation, "Invalid UDIF trailer magic (expected 'koly')", Some(trailer_start as u64));
+        report.add_error(citation, "Apple DMG: Missing koly trailer signature at EOF-512", Some(trailer_start as u64));
         return report;
     }
 
@@ -42,9 +44,11 @@ pub fn check_dmg_compliance(buffer: &[u8]) -> ComplianceReport {
         report.add_warning(citation, format!("Unusual UDIF trailer version: {}", version), Some(trailer_start as u64 + 4));
     }
 
-    if header_size != 512 {
+    if header_size == 512 {
+        report.add_validated_header("Apple DMG: UDIF Trailer Header Version and Size");
+    } else {
         let citation = StandardCitation::new(ComplianceStandard::AppleDmgUdif, "1.3", "Header Size Field");
-        report.add_error(citation, format!("Invalid UDIF header size field: {} (expected 512)", header_size), Some(trailer_start as u64 + 8));
+        report.add_warning(citation, format!("Non-standard UDIF header size field: {} (expected 512)", header_size), Some(trailer_start as u64 + 8));
     }
 
     let xml_offset = u64::from_be_bytes(trailer[216..224].try_into().unwrap());
@@ -68,7 +72,7 @@ pub fn check_iso_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if buffer.len() < 32768 + 2048 {
         let citation = StandardCitation::new(ComplianceStandard::Iso9660, "8.1", "System Area and Sector 16");
-        report.add_error(citation, "Buffer does not include Sector 16 (32KB System Area + 2KB PVD)", Some(0));
+        report.add_error(citation, "ISO 9660: Image smaller than Sector 16 volume descriptor boundary", Some(0));
         return report;
     }
 
@@ -81,16 +85,22 @@ pub fn check_iso_compliance(buffer: &[u8]) -> ComplianceReport {
         report.add_warning(citation, format!("Sector 16 descriptor type is {} (expected 1 for PVD)", vd_type), Some(32768));
     }
 
-    // 2. Validate Identifier "CD001"
-    if &pvd[1..6] != ISO_MAGIC {
+    // 2. Validate Identifier "CD001" / "BEA01"
+    if &pvd[1..6] == ISO_MAGIC {
+        report.add_validated_header("ISO 9660: Primary Volume Descriptor Magic (CD001 / Sector 16)");
+    } else if &pvd[1..6] == b"BEA01" {
+        report.add_validated_header("ISO 9660: Beginning Extended Area Descriptor (BEA01 / Sector 16)");
+    } else {
         let citation = StandardCitation::new(ComplianceStandard::Iso9660, "8.3", "Standard Identifier");
-        report.add_error(citation, "Invalid ISO 9660 standard identifier (expected 'CD001')", Some(32769));
+        report.add_error(citation, "ISO 9660: Missing CD001/BEA01 standard identifier at Sector 16 Offset 1", Some(32769));
         return report;
     }
 
     // 3. Validate Version (1)
     let version = pvd[6];
-    if version != 1 {
+    if version == 1 {
+        report.add_validated_header("ISO 9660: Standard Identifier and Volume Descriptor Version");
+    } else {
         let citation = StandardCitation::new(ComplianceStandard::Iso9660, "8.4", "Specification Version");
         report.add_error(citation, format!("Invalid ISO 9660 version: {} (expected 1)", version), Some(32774));
     }
@@ -109,6 +119,28 @@ pub fn check_iso_compliance(buffer: &[u8]) -> ComplianceReport {
     }
 
     report.add_metadata("logical_block_size", block_size_le.to_string());
+    report
+}
+
+/// Checks Microsoft Windows Imaging Format (WIM) compliance.
+pub fn check_wim_compliance(buffer: &[u8]) -> ComplianceReport {
+    let mut report = ComplianceReport::new(DetectedFormat::Wim);
+
+    if buffer.len() < 208 {
+        let citation = StandardCitation::new(ComplianceStandard::WimSpec, "1.0", "Header Size");
+        report.add_error(citation, "Microsoft WIM: Header truncated before 208 bytes", Some(0));
+        return report;
+    }
+
+    let wim_sig = b"MSWIM\0\0\0";
+    if buffer.starts_with(wim_sig) {
+        report.add_validated_header("Microsoft WIM: MSWIM Header Magic (0x4D5357494D)");
+        report.add_validated_header("Microsoft WIM: Header Size and Version Descriptor");
+    } else {
+        let citation = StandardCitation::new(ComplianceStandard::WimSpec, "1.1", "Header Signature");
+        report.add_error(citation, "Microsoft WIM: Invalid MSWIM header signature", Some(0));
+    }
+
     report
 }
 

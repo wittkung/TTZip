@@ -126,6 +126,11 @@ pub unsafe extern "C" fn ttzip_rust_check_compliance_buffer(
             15 => DetectedFormat::Lzfse,
             16 => DetectedFormat::Snappy,
             17 => DetectedFormat::Lz4,
+            18 => DetectedFormat::Lzip,
+            19 => DetectedFormat::Lrzip,
+            20 => DetectedFormat::Brotli,
+            21 => DetectedFormat::Aar,
+            22 => DetectedFormat::Wim,
             _ => DetectedFormat::Unknown,
         };
 

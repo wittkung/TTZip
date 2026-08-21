@@ -6,6 +6,7 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+#if canImport(AppKit) && canImport(FinderSync)
 import FinderSync
 import AppKit
 
@@ -112,3 +113,4 @@ public class TTZipFinderSyncController: FIFinderSync, @unchecked Sendable {
         }
     }
 }
+#endif

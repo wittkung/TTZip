@@ -19,7 +19,7 @@ pub fn check_zstd_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if buffer.len() < 4 {
         let citation = StandardCitation::new(ComplianceStandard::Rfc8878Zstd, "3.1.1", "Magic Number");
-        report.add_error(citation, "Buffer is smaller than 4-byte Zstandard magic number", Some(0));
+        report.add_error(citation, "RFC 8878: Zstandard stream truncated before 4-byte magic number", Some(0));
         return report;
     }
 
@@ -27,10 +27,11 @@ pub fn check_zstd_compliance(buffer: &[u8]) -> ComplianceReport {
 
     // Check for skippable frames
     if (ZSTD_SKIPPABLE_START..=ZSTD_SKIPPABLE_END).contains(&magic) {
+        report.add_validated_header(format!("RFC 8878: Zstandard Skippable Frame Magic (0x{:08X})", magic));
         report.add_metadata("frame_type", "skippable");
         if buffer.len() < 8 {
             let citation = StandardCitation::new(ComplianceStandard::Rfc8878Zstd, "3.1.2", "Skippable Frame");
-            report.add_error(citation, "Truncated skippable frame size header", Some(4));
+            report.add_error(citation, "RFC 8878: Truncated skippable frame size header", Some(4));
             return report;
         }
         let frame_size = u32::from_le_bytes(buffer[4..8].try_into().unwrap());
@@ -40,13 +41,14 @@ pub fn check_zstd_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if magic != ZSTD_MAGIC {
         let citation = StandardCitation::new(ComplianceStandard::Rfc8878Zstd, "3.1.1", "Zstandard Magic Number");
-        report.add_error(citation, format!("Invalid Zstandard magic number: 0x{:08X}", magic), Some(0));
+        report.add_error(citation, format!("RFC 8878: Invalid Zstandard Frame Magic Number (got 0x{:08X})", magic), Some(0));
         return report;
     }
+    report.add_validated_header("RFC 8878: Zstandard Frame Magic Number (0xFD2FB528)");
 
     if buffer.len() < 5 {
         let citation = StandardCitation::new(ComplianceStandard::Rfc8878Zstd, "3.1.1.1", "Frame Header Descriptor");
-        report.add_error(citation, "Buffer truncated before Frame_Header_Descriptor byte", Some(4));
+        report.add_error(citation, "RFC 8878: Buffer truncated before Frame_Header_Descriptor byte", Some(4));
         return report;
     }
 
@@ -60,8 +62,9 @@ pub fn check_zstd_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if reserved_bit {
         let citation = StandardCitation::new(ComplianceStandard::Rfc8878Zstd, "3.1.1.1.1", "FHD Reserved Bit");
-        report.add_error(citation, "FHD reserved bit 3 must be zero", Some(4));
+        report.add_error(citation, "RFC 8878: Frame Header Descriptor reserved bit 3 is set", Some(4));
     }
+    report.add_validated_header("RFC 8878: Frame Header Descriptor (FHD)");
 
     report.add_metadata("has_checksum", checksum_flag.to_string());
     report.add_metadata("single_segment", single_segment_flag.to_string());
@@ -72,10 +75,11 @@ pub fn check_zstd_compliance(buffer: &[u8]) -> ComplianceReport {
     if !single_segment_flag {
         if cursor >= buffer.len() {
             let citation = StandardCitation::new(ComplianceStandard::Rfc8878Zstd, "3.1.1.1.2", "Window Descriptor");
-            report.add_error(citation, "Truncated Window_Descriptor byte", Some(cursor as u64));
+            report.add_error(citation, "RFC 8878: Truncated Window_Descriptor byte", Some(cursor as u64));
             return report;
         }
         let _window_byte = buffer[cursor];
+        report.add_validated_header("RFC 8878: Window Descriptor (Window_Size)");
         cursor += 1;
     }
 
@@ -89,7 +93,7 @@ pub fn check_zstd_compliance(buffer: &[u8]) -> ComplianceReport {
     };
     if cursor + dict_bytes > buffer.len() {
         let citation = StandardCitation::new(ComplianceStandard::Rfc8878Zstd, "3.1.1.1.3", "Dictionary ID");
-        report.add_error(citation, "Truncated Dictionary_ID field", Some(cursor as u64));
+        report.add_error(citation, "RFC 8878: Truncated Dictionary_ID field", Some(cursor as u64));
         return report;
     }
     cursor += dict_bytes;
@@ -104,7 +108,7 @@ pub fn check_zstd_compliance(buffer: &[u8]) -> ComplianceReport {
     };
     if cursor + fcs_bytes > buffer.len() {
         let citation = StandardCitation::new(ComplianceStandard::Rfc8878Zstd, "3.1.1.1.4", "Frame Content Size");
-        report.add_error(citation, "Truncated Frame_Content_Size field", Some(cursor as u64));
+        report.add_error(citation, "RFC 8878: Truncated Frame_Content_Size field", Some(cursor as u64));
         return report;
     }
     cursor += fcs_bytes;
@@ -118,7 +122,9 @@ pub fn check_zstd_compliance(buffer: &[u8]) -> ComplianceReport {
 
         if block_type == 3 {
             let citation = StandardCitation::new(ComplianceStandard::Rfc8878Zstd, "3.1.1.2", "Block Type Reserved");
-            report.add_error(citation, "Block Header specifies reserved block type 3", Some(cursor as u64));
+            report.add_error(citation, "RFC 8878: Block Header contains reserved Block_Type 3", Some(cursor as u64));
+        } else {
+            report.add_validated_header("RFC 8878: Block Header (Last_Block and Block_Type)");
         }
 
         if block_size > 131072 {

@@ -39,10 +39,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                     progressHandler: context.progressHandler
                 )) ?? false
                 if ok {
-                    var totalOrig: Int64 = 0
-                    for path in context.inputPaths {
-                        totalOrig += ArchiveWriter.recursivePathSize(at: path)
-                    }
+                    let totalOrig = totalInputBytes(for: context.inputPaths)
                     let compSize = (try? FileManager.default.attributesOfItem(atPath: context.archivePath)[.size] as? Int64) ?? 0
                     return WorkflowResult(
                         isSuccess: true,
@@ -91,15 +88,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
             }
 
             if context.splitVolumeSizeBytes == nil || context.splitVolumeSizeBytes == 0 {
-                let lvlMap: TTZipCompressionLevel
-                switch context.level {
-                case .store: lvlMap = TTZIP_COMPRESSION_LEVEL_STORE
-                case .fastest, .fast: lvlMap = TTZIP_COMPRESSION_LEVEL_FASTEST
-                case .normal: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
-                case .maximum: lvlMap = TTZIP_COMPRESSION_LEVEL_MAXIMUM
-                case .ultra: lvlMap = TTZIP_COMPRESSION_LEVEL_ULTRA
-                default: lvlMap = TTZIP_COMPRESSION_LEVEL_NORMAL
-                }
+                let lvlMap = mapLevel(context.level)
                 let enc: TTZipEncryptionMethod = (context.password != nil && !context.password!.isEmpty) ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
                 let pwd = (context.password != nil && !context.password!.isEmpty) ? context.password : nil
                 let status = CUnsafeBufferAdapter.withCString(context.archivePath) { cOutputPath in
@@ -121,10 +110,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                     }
                 }
                 if status == TTZIP_STATUS_OK {
-                    var totalOrig: Int64 = 0
-                    for path in context.inputPaths {
-                        totalOrig += ArchiveWriter.recursivePathSize(at: path)
-                    }
+                    let totalOrig = totalInputBytes(for: context.inputPaths)
                     let compSize = (try? FileManager.default.attributesOfItem(atPath: context.archivePath)[.size] as? Int64) ?? 0
                     context.progressHandler?(ArchiveProgress(
                         state: .completed,
@@ -155,10 +141,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
             if !ok {
                 throw ArchiveError.readFailed(code: -1)
             }
-            var totalOrig: Int64 = 0
-            for path in context.inputPaths {
-                totalOrig += ArchiveWriter.recursivePathSize(at: path)
-            }
+            let totalOrig = totalInputBytes(for: context.inputPaths)
             let compSize = (try? FileManager.default.attributesOfItem(atPath: context.archivePath)[.size] as? Int64) ?? 0
             return WorkflowResult(
                 isSuccess: true,
@@ -270,6 +253,31 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
             }
             result.setMetadata("PKZipHeaderValid", forKey: "pkzip_header_verified")
             result.setMetadata("CentralDirectoryReconstructed", forKey: "central_directory_reconstruction")
+        }
+    }
+
+    // MARK: - Private Helpers
+
+    private func totalInputBytes(for paths: [String]) -> Int64 {
+        if paths.count == 1 {
+            return (try? FileManager.default.attributesOfItem(atPath: paths[0])[.size] as? Int64) ?? 0
+        }
+        var total: Int64 = 0
+        for path in paths {
+            total += ArchiveWriter.recursivePathSize(at: path)
+        }
+        return total
+    }
+
+    private func mapLevel(_ level: ArchiveCompressionLevel) -> TTZipCompressionLevel {
+        switch level {
+        case .store: return TTZIP_COMPRESSION_LEVEL_STORE
+        case .fastest, .fast1, .fast2: return TTZIP_COMPRESSION_LEVEL_FASTEST
+        case .fast, .fast3, .fast4, .fast5, .level1, .level2, .level3: return TTZIP_COMPRESSION_LEVEL_FAST
+        case .normal, .level4, .level5, .level6: return TTZIP_COMPRESSION_LEVEL_NORMAL
+        case .maximum, .level7, .level8, .level9: return TTZIP_COMPRESSION_LEVEL_MAXIMUM
+        case .ultra, .level10, .level11: return TTZIP_COMPRESSION_LEVEL_ULTRA
+        default: return TTZIP_COMPRESSION_LEVEL_NORMAL
         }
     }
 }

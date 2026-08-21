@@ -19,16 +19,17 @@ pub fn check_xz_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if buffer.len() < 12 {
         let citation = StandardCitation::new(ComplianceStandard::XzSpec, "2.1.1", "Stream Header Size");
-        report.add_error(citation, "Buffer is smaller than 12-byte XZ Stream Header", Some(0));
+        report.add_error(citation, "XZ: Stream truncated before 12-byte stream header", Some(0));
         return report;
     }
 
     // 1. Validate Stream Header Magic
     if &buffer[0..6] != XZ_HEADER_MAGIC {
         let citation = StandardCitation::new(ComplianceStandard::XzSpec, "2.1.1.1", "Header Magic Bytes");
-        report.add_error(citation, "Invalid XZ Stream Header magic bytes", Some(0));
+        report.add_error(citation, "XZ: Invalid stream header magic bytes", Some(0));
         return report;
     }
+    report.add_validated_header("XZ: Stream Header Magic (\\xFD7zXZ\\x00)");
 
     // 2. Validate Stream Flags & Header CRC32
     let stream_flags = &buffer[6..8];
@@ -42,6 +43,8 @@ pub fn check_xz_compliance(buffer: &[u8]) -> ComplianceReport {
             format!("XZ Header CRC32 mismatch (header: 0x{:08X}, computed: 0x{:08X})", header_crc32, computed_crc32),
             Some(8),
         );
+    } else {
+        report.add_validated_header("XZ: Stream Header Flags and CRC32");
     }
 
     if stream_flags[0] != 0 {
@@ -57,6 +60,7 @@ pub fn check_xz_compliance(buffer: &[u8]) -> ComplianceReport {
         let footer_start = buffer.len() - 12;
         let footer_magic = &buffer[footer_start + 10..footer_start + 12];
         if footer_magic == XZ_FOOTER_MAGIC {
+            report.add_validated_header("XZ: Stream Footer Magic (YZ) and Backward Size CRC32");
             let footer_flags = &buffer[footer_start + 8..footer_start + 10];
             if footer_flags != stream_flags {
                 let citation = StandardCitation::new(ComplianceStandard::XzSpec, "2.1.2.3", "Stream Flags Parity");

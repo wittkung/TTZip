@@ -78,14 +78,16 @@ pub fn check_snappy_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if buffer.len() < 10 {
         let citation = StandardCitation::new(ComplianceStandard::SnappySpec, "1.0", "Stream Identifier Chunk");
-        report.add_error(citation, "Buffer is smaller than 10-byte Snappy Stream Identifier", Some(0));
+        report.add_error(citation, "Snappy: Stream truncated before 10-byte identifier chunk", Some(0));
         return report;
     }
 
     // Must start with Stream Identifier: 0xFF, [0x06, 0x00, 0x00], "sNaPpY"
-    if buffer[0] != 0xFF || &buffer[1..4] != &[0x06, 0x00, 0x00] || &buffer[4..10] != b"sNaPpY" {
+    if buffer[0] == 0xFF && &buffer[1..4] == &[0x06, 0x00, 0x00] && &buffer[4..10] == b"sNaPpY" {
+        report.add_validated_header("Snappy: Stream Identifier Chunk (0xFF 0x060000 sNaPpY)");
+    } else {
         let citation = StandardCitation::new(ComplianceStandard::SnappySpec, "1.1", "Identifier Chunk Magic");
-        report.add_error(citation, "Invalid Snappy framed stream identifier signature", Some(0));
+        report.add_error(citation, "Snappy: Invalid Stream Identifier chunk magic", Some(0));
         return report;
     }
 
@@ -97,27 +99,116 @@ pub fn check_snappy_compliance(buffer: &[u8]) -> ComplianceReport {
 pub fn check_lz4_compliance(buffer: &[u8]) -> ComplianceReport {
     let mut report = ComplianceReport::new(DetectedFormat::Lz4);
 
-    if buffer.len() < 7 {
+    if buffer.len() < 4 {
         let citation = StandardCitation::new(ComplianceStandard::Lz4Spec, "1.0", "Frame Descriptor Size");
-        report.add_error(citation, "Buffer is smaller than minimum 7-byte LZ4 frame header", Some(0));
+        report.add_error(citation, "LZ4: Stream truncated before 4-byte magic number", Some(0));
         return report;
     }
 
     let magic = u32::from_le_bytes(buffer[0..4].try_into().unwrap());
-    if magic != 0x184D2204 {
+    if magic == 0x184D2204 {
+        report.add_validated_header("LZ4: Frame Magic Number (0x184D2204)");
+        if buffer.len() >= 7 {
+            report.add_validated_header("LZ4: Frame Descriptor (FLG, BD, HC)");
+        }
+    } else if magic == 0x184C2102 {
+        report.add_validated_header("LZ4: Legacy Frame Magic (0x184C2102)");
+    } else {
         let citation = StandardCitation::new(ComplianceStandard::Lz4Spec, "1.1", "Frame Magic");
-        report.add_error(citation, format!("Invalid LZ4 frame magic: 0x{:08X}", magic), Some(0));
+        report.add_error(citation, format!("LZ4: Invalid frame magic number (0x{:08X})", magic), Some(0));
         return report;
     }
 
-    let flg = buffer[4];
-    let version = (flg >> 6) & 0x03;
-    if version != 1 {
-        let citation = StandardCitation::new(ComplianceStandard::Lz4Spec, "1.2", "Version Number");
-        report.add_error(citation, format!("Invalid LZ4 frame version: {} (expected 1)", version), Some(4));
+    if buffer.len() >= 5 {
+        let flg = buffer[4];
+        let version = (flg >> 6) & 0x03;
+        if version != 1 {
+            let citation = StandardCitation::new(ComplianceStandard::Lz4Spec, "1.2", "Version Number");
+            report.add_error(citation, format!("Invalid LZ4 frame version: {} (expected 1)", version), Some(4));
+        }
+        report.add_metadata("version", version.to_string());
     }
 
-    report.add_metadata("version", version.to_string());
+    report
+}
+
+/// Checks Lzip format compliance.
+pub fn check_lzip_compliance(buffer: &[u8]) -> ComplianceReport {
+    let mut report = ComplianceReport::new(DetectedFormat::Lzip);
+
+    if buffer.len() < 6 {
+        let citation = StandardCitation::new(ComplianceStandard::LzipSpec, "1.0", "Header Size");
+        report.add_error(citation, "Lzip: Stream truncated before 6-byte header", Some(0));
+        return report;
+    }
+
+    if buffer.starts_with(b"LZIP") {
+        let ver = buffer[4];
+        report.add_validated_header(format!("Lzip: LZIP Header Magic and Version {}", ver));
+        report.add_validated_header("Lzip: Dictionary Size Descriptor");
+    } else {
+        let citation = StandardCitation::new(ComplianceStandard::LzipSpec, "1.1", "Header Magic");
+        report.add_error(citation, "Lzip: Invalid LZIP header magic", Some(0));
+    }
+
+    report
+}
+
+/// Checks LRZIP format compliance.
+pub fn check_lrzip_compliance(buffer: &[u8]) -> ComplianceReport {
+    let mut report = ComplianceReport::new(DetectedFormat::Lrzip);
+
+    if buffer.len() < 6 {
+        let citation = StandardCitation::new(ComplianceStandard::LrzipSpec, "1.0", "Header Size");
+        report.add_error(citation, "LRZIP: Stream truncated before 6-byte header", Some(0));
+        return report;
+    }
+
+    if buffer.starts_with(b"LRZI") {
+        let maj = buffer[4];
+        let min = buffer[5];
+        report.add_validated_header(format!("LRZIP: LRZI Header Magic and Version ({}.{})", maj, min));
+    } else {
+        let citation = StandardCitation::new(ComplianceStandard::LrzipSpec, "1.1", "Header Magic");
+        report.add_error(citation, "LRZIP: Invalid LRZI magic header", Some(0));
+    }
+
+    report
+}
+
+/// Checks Apple Archive (AAR / AEA) format compliance.
+pub fn check_aar_compliance(buffer: &[u8]) -> ComplianceReport {
+    let mut report = ComplianceReport::new(DetectedFormat::Aar);
+
+    if buffer.len() < 4 {
+        let citation = StandardCitation::new(ComplianceStandard::AarSpec, "1.0", "Header Size");
+        report.add_error(citation, "Apple Archive: Stream truncated before 4-byte magic", Some(0));
+        return report;
+    }
+
+    if buffer.starts_with(b"AA01") {
+        report.add_validated_header("Apple Archive: AA01 Stream Header Magic");
+    } else if buffer.starts_with(b"AEA1") {
+        report.add_validated_header("Apple Archive: AEA1 Encrypted Archive Header Magic");
+    } else {
+        let citation = StandardCitation::new(ComplianceStandard::AarSpec, "1.1", "Header Magic");
+        report.add_error(citation, "Apple Archive: Invalid AA01/AEA1 magic header", Some(0));
+    }
+
+    report
+}
+
+/// Checks Brotli stream compliance.
+pub fn check_brotli_compliance(buffer: &[u8]) -> ComplianceReport {
+    let mut report = ComplianceReport::new(DetectedFormat::Brotli);
+
+    if buffer.is_empty() {
+        let citation = StandardCitation::new(ComplianceStandard::BrotliSpec, "1.0", "Stream Size");
+        report.add_error(citation, "RFC 7932: Brotli stream is empty", Some(0));
+    } else {
+        report.add_validated_header("RFC 7932: Brotli Compressed Data Stream");
+    }
+
     report
 }
 

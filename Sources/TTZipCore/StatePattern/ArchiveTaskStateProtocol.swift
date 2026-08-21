@@ -94,3 +94,31 @@ public protocol ArchiveTaskStateProtocol: Sendable {
     /// Triggers completion terminal state.
     func complete(context: ArchiveTaskContext) throws
 }
+
+public extension ArchiveTaskStateProtocol {
+    var canPause: Bool { false }
+    var canResume: Bool { false }
+    var canCancel: Bool { false }
+    
+    func pause(context: ArchiveTaskContext) throws {
+        throw ArchiveError.invalidState
+    }
+    
+    func resume(context: ArchiveTaskContext) throws {
+        throw ArchiveError.invalidState
+    }
+    
+    func cancel(context: ArchiveTaskContext) throws {
+        throw ArchiveError.invalidState
+    }
+    
+    func fail(context: ArchiveTaskContext, error: Error) throws {
+        context.cleanupTempFiles()
+        context.setLastError(error)
+        context.transitionTo(FailedState(error: error))
+    }
+    
+    func complete(context: ArchiveTaskContext) throws {
+        throw ArchiveStateError.invalidTransition(from: stateName, action: "complete")
+    }
+}

@@ -238,6 +238,11 @@ public enum ArchiveMagicSignatureScanner {
         case 11: return .dmg
         case 16: return .snappy
         case 17: return .lz4
+        case 18: return .lzip
+        case 19: return .lrzip
+        case 20: return .brotli
+        case 21: return .aar
+        case 22: return .wim
         default: return nil
         }
     }

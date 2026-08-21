@@ -10,51 +10,15 @@ import Foundation
 // MARK: - 1. IdleState (Initial idle preparation state)
 public struct IdleState: ArchiveTaskStateProtocol {
     public let stateName = "Idle"
-    public let canPause = false
-    public let canResume = false
-    public let canCancel = false
-    
     public init() {}
-    
-    public func pause(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func resume(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func cancel(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func fail(context: ArchiveTaskContext, error: Error) throws {
-        context.cleanupTempFiles()
-        context.setLastError(error)
-        context.transitionTo(FailedState(error: error))
-    }
-    
-    public func complete(context: ArchiveTaskContext) throws {
-        throw ArchiveStateError.invalidTransition(from: stateName, action: "complete")
-    }
 }
 
 // MARK: - 2. PreparingState (Validation and resource allocation state)
 public struct PreparingState: ArchiveTaskStateProtocol {
     public let stateName = "Preparing"
-    public let canPause = false
-    public let canResume = false
     public let canCancel = true
     
     public init() {}
-    
-    public func pause(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func resume(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
     
     public func cancel(context: ArchiveTaskContext) throws {
         guard context.transitionTo(CancellingState()) else {
@@ -66,12 +30,6 @@ public struct PreparingState: ArchiveTaskStateProtocol {
         context.transitionTo(FailedState(error: cancelError))
     }
     
-    public func fail(context: ArchiveTaskContext, error: Error) throws {
-        context.cleanupTempFiles()
-        context.setLastError(error)
-        context.transitionTo(FailedState(error: error))
-    }
-    
     public func complete(context: ArchiveTaskContext) throws {
         context.transitionTo(CompletedState())
     }
@@ -81,7 +39,6 @@ public struct PreparingState: ArchiveTaskStateProtocol {
 public struct RunningState: ArchiveTaskStateProtocol {
     public let stateName = "Running"
     public let canPause = true
-    public let canResume = false
     public let canCancel = true
     
     public init() {}
@@ -91,10 +48,6 @@ public struct RunningState: ArchiveTaskStateProtocol {
         guard context.transitionTo(PausedState()) else {
             throw ArchiveError.invalidState
         }
-    }
-    
-    public func resume(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
     }
     
     public func cancel(context: ArchiveTaskContext) throws {
@@ -107,12 +60,6 @@ public struct RunningState: ArchiveTaskStateProtocol {
         context.transitionTo(FailedState(error: cancelError))
     }
     
-    public func fail(context: ArchiveTaskContext, error: Error) throws {
-        context.cleanupTempFiles()
-        context.setLastError(error)
-        context.transitionTo(FailedState(error: error))
-    }
-    
     public func complete(context: ArchiveTaskContext) throws {
         context.updateProgress(processedBytes: max(context.processedBytes, context.totalBytes))
         context.transitionTo(CompletedState())
@@ -122,15 +69,10 @@ public struct RunningState: ArchiveTaskStateProtocol {
 // MARK: - 4. PausedState (Paused and suspended state)
 public struct PausedState: ArchiveTaskStateProtocol {
     public let stateName = "Paused"
-    public let canPause = false
     public let canResume = true
     public let canCancel = true
     
     public init() {}
-    
-    public func pause(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
     
     public func resume(context: ArchiveTaskContext) throws {
         context.updateProgress(processedBytes: context.checkpointOffset)
@@ -148,70 +90,18 @@ public struct PausedState: ArchiveTaskStateProtocol {
         context.setLastError(cancelError)
         context.transitionTo(FailedState(error: cancelError))
     }
-    
-    public func fail(context: ArchiveTaskContext, error: Error) throws {
-        context.cleanupTempFiles()
-        context.setLastError(error)
-        context.transitionTo(FailedState(error: error))
-    }
-    
-    public func complete(context: ArchiveTaskContext) throws {
-        throw ArchiveStateError.invalidTransition(from: stateName, action: "complete")
-    }
 }
 
 // MARK: - 5. CancellingState (Cancelling and cleanup in progress state)
 public struct CancellingState: ArchiveTaskStateProtocol {
     public let stateName = "Cancelling"
-    public let canPause = false
-    public let canResume = false
-    public let canCancel = false
-    
     public init() {}
-    
-    public func pause(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func resume(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func cancel(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func fail(context: ArchiveTaskContext, error: Error) throws {
-        context.cleanupTempFiles()
-        context.setLastError(error)
-        context.transitionTo(FailedState(error: error))
-    }
-    
-    public func complete(context: ArchiveTaskContext) throws {
-        throw ArchiveStateError.invalidTransition(from: stateName, action: "complete")
-    }
 }
 
 // MARK: - 6. CompletedState (Terminal successful completion state)
 public struct CompletedState: ArchiveTaskStateProtocol {
     public let stateName = "Completed"
-    public let canPause = false
-    public let canResume = false
-    public let canCancel = false
-    
     public init() {}
-    
-    public func pause(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func resume(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func cancel(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
     
     public func fail(context: ArchiveTaskContext, error: Error) throws {
         throw ArchiveStateError.taskAlreadyCompleted
@@ -225,26 +115,10 @@ public struct CompletedState: ArchiveTaskStateProtocol {
 // MARK: - 7. FailedState (Terminal failure state)
 public struct FailedState: ArchiveTaskStateProtocol {
     public let stateName = "Failed"
-    public let canPause = false
-    public let canResume = false
-    public let canCancel = false
-    
     public let error: Error
     
     public init(error: Error) {
         self.error = error
-    }
-    
-    public func pause(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func resume(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
-    }
-    
-    public func cancel(context: ArchiveTaskContext) throws {
-        throw ArchiveError.invalidState
     }
     
     public func fail(context: ArchiveTaskContext, error: Error) throws {

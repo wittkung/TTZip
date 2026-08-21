@@ -6,13 +6,15 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
 
-/// Delegate facade dispatching parallel 7z archive creation operations.
+/// Fast parallel 7z archive creation facade directly interfacing with native C/Rust engine.
 public final class SevenZipParallelWriter: @unchecked Sendable {
     public static let shared = SevenZipParallelWriter()
     
     private init() {}
     
+    /// Creates a 7z archive directly via `SevenZipCAdapter`.
     @inline(__always)
     public func createArchive(
         outputPath: String,
@@ -23,10 +25,28 @@ public final class SevenZipParallelWriter: @unchecked Sendable {
         solidBlockSizeMb: Int = 128,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws -> Bool {
-        return try SevenZipEngine.shared.createArchive(
+        return try SevenZipCAdapter.shared.createArchive(
             outputPath: outputPath,
             inputPaths: inputPaths,
             level: level,
+            password: password,
+            useZstd: useZstd,
+            solidBlockSizeMb: solidBlockSizeMb,
+            progressHandler: progressHandler
+        )
+    }
+    
+    /// Extracts a 7z archive directly via `SevenZipCAdapter`.
+    @inline(__always)
+    public func extractArchive(
+        archivePath: String,
+        destinationDir: String,
+        password: String? = nil
+    ) throws -> Bool {
+        return try SevenZipCAdapter.shared.extractArchive(
+            archivePath: archivePath,
+            destinationDir: destinationDir,
+            skipMacJunk: true,
             password: password
         )
     }

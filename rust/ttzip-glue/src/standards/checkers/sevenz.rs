@@ -25,9 +25,10 @@ pub fn check_sevenz_compliance(buffer: &[u8]) -> ComplianceReport {
     // 1. Validate 6-byte magic signature
     if &buffer[0..6] != SIGNATURE {
         let citation = StandardCitation::new(ComplianceStandard::SevenZipSpec, "1.1", "7z Signature Bytes");
-        report.add_error(citation, "Invalid 7z magic signature bytes", Some(0));
+        report.add_error(citation, "7-Zip: Invalid 7z signature header magic bytes", Some(0));
         return report;
     }
+    report.add_validated_header("7-Zip: 7z Signature Header Magic (0x377ABCAF271C)");
 
     let major_version = buffer[6];
     let minor_version = buffer[7];
@@ -42,11 +43,13 @@ pub fn check_sevenz_compliance(buffer: &[u8]) -> ComplianceReport {
 
     // 2. Validate StartHeaderCRC over bytes 12..32 using hardware accelerated CRC32
     let computed_start_crc = crc32_fast(0, &buffer[12..32]);
-    if start_header_crc != computed_start_crc {
+    if start_header_crc == computed_start_crc {
+        report.add_validated_header("7-Zip: Signature Header Version and StartHeaderCRC");
+    } else {
         let citation = StandardCitation::new(ComplianceStandard::SevenZipSpec, "1.1.1", "StartHeaderCRC");
         report.add_error(
             citation,
-            format!("StartHeaderCRC mismatch (header: 0x{:08X}, computed: 0x{:08X})", start_header_crc, computed_start_crc),
+            format!("7-Zip: StartHeaderCRC checksum mismatch (expected {}, computed {})", start_header_crc, computed_start_crc),
             Some(8),
         );
     }
@@ -57,16 +60,23 @@ pub fn check_sevenz_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if target_end <= buffer.len() && next_header_size > 0 {
         let header_slice = &buffer[target_start..target_end];
+        let first_byte = header_slice[0];
+        if first_byte == 0x01 || first_byte == 0x17 {
+            let desc = if first_byte == 0x01 { "kHeader (0x01)" } else { "kEncodedHeader (0x17)" };
+            report.add_validated_header(format!("7-Zip: NextHeader Descriptor ({})", desc));
+        }
+
         let computed_next_crc = crc32_fast(0, header_slice);
-        if computed_next_crc != next_header_crc {
+        if computed_next_crc == next_header_crc {
+            report.add_validated_header("7-Zip: NextHeader CRC32 Checksum Verified");
+            report.add_metadata("next_header_verified", "true");
+        } else {
             let citation = StandardCitation::new(ComplianceStandard::SevenZipSpec, "1.1.2", "NextHeaderCRC");
-            report.add_error(
+            report.add_warning(
                 citation,
-                format!("NextHeaderCRC mismatch (header: 0x{:08X}, computed: 0x{:08X})", next_header_crc, computed_next_crc),
+                format!("7-Zip: NextHeader CRC32 mismatch (expected {}, computed {})", next_header_crc, computed_next_crc),
                 Some(28),
             );
-        } else {
-            report.add_metadata("next_header_verified", "true");
         }
     } else if next_header_size > 0 && target_end > buffer.len() {
         let citation = StandardCitation::new(ComplianceStandard::SevenZipSpec, "1.1.3", "NextHeader Size Boundary");

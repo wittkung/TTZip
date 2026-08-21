@@ -34,8 +34,10 @@ public struct StandardsComplianceReport: Sendable, Equatable, Codable {
     }
 }
 
-/// Standards Compliance Checker validating archives against official specifications.
+/// Standards Compliance Checker delegating directly to high-performance Rust validation kernels.
 public enum StandardsComplianceChecker {
+
+    // MARK: - Public Validation APIs
 
     /// Validates compliance of a file on disk at `fileURL` against official standards.
     public static func checkCompliance(
@@ -103,14 +105,14 @@ public enum StandardsComplianceChecker {
         }
     }
 
-    /// Validates compliance of an `UnsafeRawBufferPointer`.
+    /// Validates compliance of an `UnsafeRawBufferPointer` by delegating directly to Rust C-ABI.
     public static func checkCompliance(
         buffer: UnsafeRawBufferPointer,
         fileSize: Int64,
         expectedFormat: ArchiveCompressionFormat? = nil,
         fileURL: URL? = nil
     ) throws -> StandardsComplianceReport {
-        // Detect format if not provided
+        // Detect target format if not explicitly provided
         let targetFormat: ArchiveCompressionFormat
         if let expected = expectedFormat {
             targetFormat = expected
@@ -130,120 +132,75 @@ public enum StandardsComplianceChecker {
         }
 
         let citation = ArchiveFormatStandardRegistry.shared.spec(for: targetFormat)?.standardCitations.first
-
-        switch targetFormat {
-        case .zip:
-            return Self.validateZip(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .tar:
-            return Self.validateTar(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .gz:
-            return Self.validateGz(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .zst:
-            return Self.validateZstd(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .sevenZip:
-            return Self.validate7z(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .bz2:
-            return Self.validateBz2(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .xz:
-            return Self.validateXz(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .lz4:
-            return Self.validateLz4(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .lzip:
-            return Self.validateLzip(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .brotli:
-            return Self.validateBrotli(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .lrzip:
-            return Self.validateLrzip(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .aar:
-            return Self.validateAar(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .snappy:
-            return Self.validateSnappy(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .wim:
-            return Self.validateWim(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .dmg:
-            return Self.validateDmg(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .iso:
-            return Self.validateIso(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .tarGz:
-            return Self.validateTarGz(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .tarBz2:
-            return Self.validateTarBz2(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .tarXz:
-            return Self.validateTarXz(buffer: buffer, fileSize: fileSize, citation: citation)
-        case .tarZst:
-            return Self.validateTarZst(buffer: buffer, fileSize: fileSize, citation: citation)
+        guard let base = buffer.baseAddress, !buffer.isEmpty else {
+            return StandardsComplianceReport(
+                format: targetFormat,
+                isCompliant: false,
+                standardCitation: citation,
+                validatedHeaders: [],
+                warnings: [],
+                violations: ["Buffer is empty (0 bytes)"]
+            )
         }
-    }
 
-    // MARK: - Compound Format Validation Proxies
+        var reportPtr: UnsafeMutablePointer<CChar>? = nil
+        var isCompliant: Bool = false
+        let formatCode = mapFormatToRustCode(targetFormat)
 
-    static func validateTarGz(
-        buffer: UnsafeRawBufferPointer,
-        fileSize: Int64,
-        citation: StandardCitation?
-    ) -> StandardsComplianceReport {
-        let report = Self.validateGz(buffer: buffer, fileSize: fileSize, citation: citation)
+        let status = ttzip_rust_check_compliance_buffer(
+            base.assumingMemoryBound(to: UInt8.self),
+            buffer.count,
+            formatCode,
+            &reportPtr,
+            &isCompliant
+        )
+
+        guard status == TTZIP_STATUS_OK, let ptr = reportPtr else {
+            return StandardsComplianceReport(
+                format: targetFormat,
+                isCompliant: false,
+                standardCitation: citation,
+                validatedHeaders: [],
+                warnings: [],
+                violations: ["Rust compliance evaluation failed with status \(status)"]
+            )
+        }
+        defer { ttzip_rust_free_compliance_report(ptr) }
+
+        let jsonString = String(cString: ptr)
+        guard let jsonData = jsonString.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode(RustComplianceJsonPayload.self, from: jsonData) else {
+            return StandardsComplianceReport(
+                format: targetFormat,
+                isCompliant: isCompliant,
+                standardCitation: citation,
+                validatedHeaders: [],
+                warnings: [],
+                violations: ["Failed to decode compliance JSON report from Rust"]
+            )
+        }
+
+        let warnings = decoded.issues?
+            .filter { $0.severity == "WARNING" }
+            .map { $0.message } ?? []
+
+        let violations = decoded.issues?
+            .filter { $0.severity == "ERROR" }
+            .map { $0.message } ?? []
+
         return StandardsComplianceReport(
-            format: .tarGz,
-            isCompliant: report.isCompliant,
+            format: targetFormat,
+            isCompliant: decoded.is_compliant,
             standardCitation: citation,
-            validatedHeaders: report.validatedHeaders,
-            warnings: report.warnings,
-            violations: report.violations
+            validatedHeaders: decoded.validated_headers ?? [],
+            warnings: warnings,
+            violations: violations
         )
     }
 
-    static func validateTarBz2(
-        buffer: UnsafeRawBufferPointer,
-        fileSize: Int64,
-        citation: StandardCitation?
-    ) -> StandardsComplianceReport {
-        let report = Self.validateBz2(buffer: buffer, fileSize: fileSize, citation: citation)
-        return StandardsComplianceReport(
-            format: .tarBz2,
-            isCompliant: report.isCompliant,
-            standardCitation: citation,
-            validatedHeaders: report.validatedHeaders,
-            warnings: report.warnings,
-            violations: report.violations
-        )
-    }
+    // MARK: - Native Direct String APIs
 
-    static func validateTarXz(
-        buffer: UnsafeRawBufferPointer,
-        fileSize: Int64,
-        citation: StandardCitation?
-    ) -> StandardsComplianceReport {
-        let report = Self.validateXz(buffer: buffer, fileSize: fileSize, citation: citation)
-        return StandardsComplianceReport(
-            format: .tarXz,
-            isCompliant: report.isCompliant,
-            standardCitation: citation,
-            validatedHeaders: report.validatedHeaders,
-            warnings: report.warnings,
-            violations: report.violations
-        )
-    }
-
-    static func validateTarZst(
-        buffer: UnsafeRawBufferPointer,
-        fileSize: Int64,
-        citation: StandardCitation?
-    ) -> StandardsComplianceReport {
-        let report = Self.validateZstd(buffer: buffer, fileSize: fileSize, citation: citation)
-        return StandardsComplianceReport(
-            format: .tarZst,
-            isCompliant: report.isCompliant,
-            standardCitation: citation,
-            validatedHeaders: report.validatedHeaders,
-            warnings: report.warnings,
-            violations: report.violations
-        )
-    }
-
-    // MARK: - Native Rust C-ABI Compliance Verification
-
-    /// Performs fast direct standards compliance verification via Rust C-ABI.
+    /// Performs direct standards compliance verification via Rust C-ABI returning raw JSON.
     public static func checkComplianceNative(
         buffer: UnsafeRawBufferPointer,
         expectedFormat: ArchiveCompressionFormat? = nil
@@ -268,7 +225,7 @@ public enum StandardsComplianceChecker {
         return (isCompliant, String(cString: ptr))
     }
 
-    /// Performs fast direct standards compliance verification on disk via Rust C-ABI.
+    /// Performs direct standards compliance verification on disk via Rust C-ABI returning raw JSON.
     public static func checkComplianceNative(
         fileURL: URL
     ) -> (isCompliant: Bool, reportJson: String?) {
@@ -289,6 +246,8 @@ public enum StandardsComplianceChecker {
         return (isCompliant, String(cString: ptr))
     }
 
+    // MARK: - Format Mapping Helper
+
     private static func mapFormatToRustCode(_ format: ArchiveCompressionFormat?) -> Int32 {
         guard let format = format else { return 0 }
         switch format {
@@ -303,7 +262,29 @@ public enum StandardsComplianceChecker {
         case .dmg: return 11
         case .snappy: return 16
         case .lz4: return 17
-        default: return 0
+        case .lzip: return 18
+        case .lrzip: return 19
+        case .brotli: return 20
+        case .aar: return 21
+        case .wim: return 22
         }
     }
+}
+
+// MARK: - Internal JSON Decoder Model
+
+private struct RustComplianceJsonPayload: Decodable {
+    let format: String?
+    let is_compliant: Bool
+    let validated_headers: [String]?
+    let metadata: [String: String]?
+    let issues: [RustComplianceIssuePayload]?
+}
+
+private struct RustComplianceIssuePayload: Decodable {
+    let severity: String
+    let standard: String?
+    let section: String?
+    let message: String
+    let offset: Int64?
 }

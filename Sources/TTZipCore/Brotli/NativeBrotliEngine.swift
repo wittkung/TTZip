@@ -11,7 +11,7 @@ import CTTZipBridge
 /// Native in-process Brotli (.br / .tar.br) streaming codec engine.
 ///
 /// Backed directly by Pure Rust Google Brotli streaming engine (`ttzip_rust_brotli_...`)
-/// and unified POSIX TAR archive pipeline. Completely eliminates Apple `Compression.framework` dependencies.
+/// and unified POSIX TAR in-memory pipeline. Eliminates 2x intermediate disk I/O amplification.
 public final class NativeBrotliEngine: @unchecked Sendable {
     public static let shared = NativeBrotliEngine()
     
@@ -107,12 +107,12 @@ public final class NativeBrotliEngine: @unchecked Sendable {
     ) throws -> Bool {
         let quality: UInt32
         switch level {
-        case .fastest: quality = 1
-        case .fast:    quality = 3
-        case .normal:  quality = 6
-        case .maximum: quality = 9
-        case .ultra:   quality = 11
-        @unknown default: quality = 6
+        case .store, .fastest, .fast1, .fast2, .fast3, .fast4, .fast5, .level1: quality = 1
+        case .fast, .level2, .level3: quality = 3
+        case .normal, .level4, .level5, .level6: quality = 6
+        case .maximum, .level7, .level8, .level9: quality = 9
+        case .ultra, .level10, .level11: quality = 11
+        default: quality = 6
         }
 
         let status = ttzip_rust_brotli_compress_file_stream(srcPath, dstPath, quality, 22, nil, nil)
@@ -129,7 +129,7 @@ public final class NativeBrotliEngine: @unchecked Sendable {
         return status == TTZIP_STATUS_OK
     }
     
-    /// Packs and compresses input paths into Brotli (.br / .tar.br) archive container.
+    /// Packs and compresses input paths into Brotli (.br / .tar.br) archive container using in-memory TAR pipe.
     public func createArchive(
         outputPath: String,
         inputPaths: [String],
@@ -137,35 +137,69 @@ public final class NativeBrotliEngine: @unchecked Sendable {
         skipMacJunk: Bool = false,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws -> Bool {
-        let tempTar = FileManager.default.temporaryDirectory.appendingPathComponent("tt_br_tar_\(UUID().uuidString).tar").path
-        defer { try? FileManager.default.removeItem(atPath: tempTar) }
+        // 1. Generate uncompressed TAR byte stream entirely in memory (0 disk I/O)
+        let tarData = try BrotliTarStreamPipe.buildTarData(inputPaths: inputPaths, skipMacJunk: skipMacJunk)
         
-        // 1. Generate uncompressed TAR stream
-        let status = CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
-            ttzip_create_tar_native_c(tempTar, "tar", cInputPaths, inputPaths.count, skipMacJunk, 1)
+        let quality: UInt32
+        switch level {
+        case .store, .fastest, .fast1, .fast2, .fast3, .fast4, .fast5, .level1: quality = 1
+        case .fast, .level2, .level3: quality = 3
+        case .normal, .level4, .level5, .level6: quality = 6
+        case .maximum, .level7, .level8, .level9: quality = 9
+        case .ultra, .level10, .level11: quality = 11
+        default: quality = 6
         }
-        guard status == 0 else { return false }
         
-        // 2. Stream compress TAR container with Pure Rust Brotli
-        return try compressFile(srcPath: tempTar, dstPath: outputPath, level: level, progressHandler: progressHandler)
+        // 2. Stream compress TAR container with Pure Rust Brotli in-memory pipeline
+        let compressedData = try compress(data: tarData, quality: quality, lgwin: 22)
+        
+        // 3. Write directly to destination output file
+        let outURL = URL(fileURLWithPath: outputPath)
+        try FileManager.default.createDirectory(at: outURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try compressedData.write(to: outURL, options: .atomic)
+        
+        let totalBytes = Int64(tarData.count)
+        progressHandler?(ArchiveProgress(
+            state: .completed,
+            bytesProcessed: totalBytes,
+            totalBytes: totalBytes,
+            currentFileName: (outputPath as NSString).lastPathComponent,
+            throughputMBs: 0
+        ))
+        return true
     }
     
-    /// Extracts a Brotli (.br / .tar.br) archive container.
+    /// Extracts a Brotli (.br / .tar.br) archive container using in-memory TAR pipe.
     public func extractArchive(
         archivePath: String,
         destinationDir: String,
         skipMacJunk: Bool = false,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws -> Bool {
-        let tempTar = FileManager.default.temporaryDirectory.appendingPathComponent("tt_br_ext_\(UUID().uuidString).tar").path
-        defer { try? FileManager.default.removeItem(atPath: tempTar) }
+        let archiveURL = URL(fileURLWithPath: archivePath)
+        guard FileManager.default.fileExists(atPath: archivePath) else { return false }
         
-        // 1. Decompress Brotli container to uncompressed TAR stream
-        let decOk = try decompressFile(srcPath: archivePath, dstPath: tempTar, progressHandler: progressHandler)
-        guard decOk else { return false }
+        let compressedData = try Data(contentsOf: archiveURL, options: .mappedIfSafe)
         
-        // 2. Extract TAR entries into target directory
-        let extractStatus = ttzip_extract_tar_native_c(tempTar, destinationDir, skipMacJunk)
-        return extractStatus == 0
+        // 1. Decompress Brotli container to uncompressed TAR stream in memory (0 disk I/O)
+        let uncompressedData = try decompress(compressedData: compressedData)
+        
+        // 2. Extract TAR entries directly into target directory from memory
+        let ok = try BrotliTarStreamPipe.extractTarData(
+            uncompressedData,
+            destinationDir: destinationDir,
+            skipMacJunk: skipMacJunk,
+            fallbackBaseName: archiveURL.deletingPathExtension().lastPathComponent
+        )
+        
+        let totalBytes = Int64(uncompressedData.count)
+        progressHandler?(ArchiveProgress(
+            state: .completed,
+            bytesProcessed: totalBytes,
+            totalBytes: totalBytes,
+            currentFileName: (archivePath as NSString).lastPathComponent,
+            throughputMBs: 0
+        ))
+        return ok
     }
 }

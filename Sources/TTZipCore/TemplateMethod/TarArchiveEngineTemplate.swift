@@ -35,10 +35,7 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
             if fmt == .aar, let firstInput = context.inputPaths.first {
                 let ok = (try? NativeAppleArchiveEngine.shared.compress(sourcePath: firstInput, outputPath: context.archivePath)) ?? false
                 if ok {
-                    var totalOrig: Int64 = 0
-                    for path in context.inputPaths {
-                        totalOrig += ArchiveWriter.recursivePathSize(at: path)
-                    }
+                    let totalOrig = totalInputBytes(for: context.inputPaths)
                     let compSize = (try? FileManager.default.attributesOfItem(atPath: context.archivePath)[.size] as? Int64) ?? 0
                     return WorkflowResult(
                         isSuccess: true,
@@ -58,10 +55,7 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                     skipMacJunk: context.options.skipMacJunk
                 )) ?? false
                 if ok {
-                    var totalOrig: Int64 = 0
-                    for path in context.inputPaths {
-                        totalOrig += ArchiveWriter.recursivePathSize(at: path)
-                    }
+                    let totalOrig = totalInputBytes(for: context.inputPaths)
                     let compSize = (try? FileManager.default.attributesOfItem(atPath: context.archivePath)[.size] as? Int64) ?? 0
                     return WorkflowResult(
                         isSuccess: true,
@@ -74,50 +68,10 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                 }
             }
 
-            let cFormat: String
-            switch fmt {
-            case .tarGz, .gz: cFormat = "tar.gz"
-            case .tarZst, .zst: cFormat = "tar.zst"
-            case .tarBz2, .bz2: cFormat = "tar.bz2"
-            case .tarXz, .xz: cFormat = "tar.xz"
-            case .lzip: cFormat = "lzip"
-            case .lz4: cFormat = "lz4"
-            case .brotli: cFormat = "brotli"
-            case .lrzip: cFormat = "lrzip"
-            case .snappy: cFormat = "snappy"
-            case .dmg, .iso: cFormat = "iso"
-            case .wim: cFormat = "wim"
-            default: cFormat = "tar"
-            }
-            let mappedLevel: TTZipCompressionLevel
-            if context.level.rawValue <= 0 {
-                mappedLevel = TTZIP_COMPRESSION_LEVEL_STORE
-            } else if context.level.rawValue <= 1 {
-                mappedLevel = TTZIP_COMPRESSION_LEVEL_FASTEST
-            } else if context.level.rawValue <= 3 {
-                mappedLevel = TTZIP_COMPRESSION_LEVEL_FAST
-            } else if context.level.rawValue <= 6 {
-                mappedLevel = TTZIP_COMPRESSION_LEVEL_NORMAL
-            } else if context.level.rawValue <= 9 {
-                mappedLevel = TTZIP_COMPRESSION_LEVEL_MAXIMUM
-            } else {
-                mappedLevel = TTZIP_COMPRESSION_LEVEL_ULTRA
-            }
-            
-            let mappedFormat: TTZipArchiveFormat
-            switch fmt {
-            case .tarGz, .gz: mappedFormat = TTZIP_ARCHIVE_FORMAT_TAR_GZ
-            case .tarZst, .zst: mappedFormat = TTZIP_ARCHIVE_FORMAT_TAR_ZSTD
-            case .tarBz2, .bz2: mappedFormat = TTZIP_ARCHIVE_FORMAT_TAR_BZ2
-            case .tarXz, .xz: mappedFormat = TTZIP_ARCHIVE_FORMAT_TAR_XZ
-            case .snappy: mappedFormat = TTZIP_ARCHIVE_FORMAT_SNAPPY
-            case .dmg, .iso: mappedFormat = TTZIP_ARCHIVE_FORMAT_DMG
-            case .sevenZip: mappedFormat = TTZIP_ARCHIVE_FORMAT_SEVEN_ZIP
-            case .zip: mappedFormat = TTZIP_ARCHIVE_FORMAT_ZIP
-            default: mappedFormat = TTZIP_ARCHIVE_FORMAT_TAR
-            }
-
+            let mappedLevel = mapLevel(context.level)
+            let mappedFormat = mapFormat(fmt)
             let threads = max(1, Int32(ProcessInfo.processInfo.activeProcessorCount))
+            
             let res = CUnsafeBufferAdapter.withCString(context.archivePath) { cOut in
                 CUnsafeBufferAdapter.withCStringsArray(context.inputPaths) { cInputs in
                     CUnsafeBufferAdapter.withCString(context.password) { cPwd in
@@ -140,14 +94,7 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                 throw ArchiveError.readFailed(code: Int32(res))
             }
 
-            var totalOrig: Int64 = 0
-            if context.inputPaths.count == 1 {
-                totalOrig = (try? FileManager.default.attributesOfItem(atPath: context.inputPaths[0])[.size] as? Int64) ?? 0
-            } else {
-                for path in context.inputPaths {
-                    totalOrig += ArchiveWriter.recursivePathSize(at: path)
-                }
-            }
+            let totalOrig = totalInputBytes(for: context.inputPaths)
             let compSize = (try? FileManager.default.attributesOfItem(atPath: context.archivePath)[.size] as? Int64) ?? 0
             return WorkflowResult(
                 isSuccess: true,
@@ -296,6 +243,45 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                 result.setMetadata("ZstdPipelineMounted", forKey: "tar_zstd_compression")
             }
             result.setMetadata("PaxHeaderVerified", forKey: "pax_header_verified")
+        }
+    }
+
+    // MARK: - Private Helpers
+
+    private func totalInputBytes(for paths: [String]) -> Int64 {
+        if paths.count == 1 {
+            return (try? FileManager.default.attributesOfItem(atPath: paths[0])[.size] as? Int64) ?? 0
+        }
+        var total: Int64 = 0
+        for path in paths {
+            total += ArchiveWriter.recursivePathSize(at: path)
+        }
+        return total
+    }
+
+    private func mapLevel(_ level: ArchiveCompressionLevel) -> TTZipCompressionLevel {
+        switch level {
+        case .store: return TTZIP_COMPRESSION_LEVEL_STORE
+        case .fastest, .fast1, .fast2: return TTZIP_COMPRESSION_LEVEL_FASTEST
+        case .fast, .fast3, .fast4, .fast5, .level1, .level2, .level3: return TTZIP_COMPRESSION_LEVEL_FAST
+        case .normal, .level4, .level5, .level6: return TTZIP_COMPRESSION_LEVEL_NORMAL
+        case .maximum, .level7, .level8, .level9: return TTZIP_COMPRESSION_LEVEL_MAXIMUM
+        case .ultra, .level10, .level11: return TTZIP_COMPRESSION_LEVEL_ULTRA
+        default: return TTZIP_COMPRESSION_LEVEL_NORMAL
+        }
+    }
+
+    private func mapFormat(_ fmt: ArchiveCompressionFormat) -> TTZipArchiveFormat {
+        switch fmt {
+        case .tarGz, .gz: return TTZIP_ARCHIVE_FORMAT_TAR_GZ
+        case .tarZst, .zst: return TTZIP_ARCHIVE_FORMAT_TAR_ZSTD
+        case .tarBz2, .bz2: return TTZIP_ARCHIVE_FORMAT_TAR_BZ2
+        case .tarXz, .xz: return TTZIP_ARCHIVE_FORMAT_TAR_XZ
+        case .snappy: return TTZIP_ARCHIVE_FORMAT_SNAPPY
+        case .dmg, .iso: return TTZIP_ARCHIVE_FORMAT_DMG
+        case .sevenZip: return TTZIP_ARCHIVE_FORMAT_SEVEN_ZIP
+        case .zip: return TTZIP_ARCHIVE_FORMAT_ZIP
+        default: return TTZIP_ARCHIVE_FORMAT_TAR
         }
     }
 }

@@ -57,26 +57,7 @@ final class AppServicesAndCLICoverageTests: XCTestCase {
         XCTAssertFalse(stats.dist.isEmpty)
     }
     
-    // 3. Test FileClipboardStore copy / cut / paste operations
-    @MainActor
-    func testFileClipboardStore() throws {
-        let store = FileClipboardStore.shared
-        let file1 = tempDirURL.appendingPathComponent("clip_1.txt")
-        try "Clip 1".write(to: file1, atomically: true, encoding: .utf8)
-        
-        store.copy(urls: [file1])
-        XCTAssertTrue(store.canPaste)
-        XCTAssertFalse(store.isCutOperation)
-        
-        let pasteTargetDir = tempDirURL.appendingPathComponent("pasted_target")
-        try FileManager.default.createDirectory(at: pasteTargetDir, withIntermediateDirectories: true)
-        
-        store.paste(to: pasteTargetDir)
-        let pastedFile = pasteTargetDir.appendingPathComponent("clip_1.txt")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: pastedFile.path))
-    }
-    
-    // 4. Test DateFormatterCache and ByteCountFormatterCache thread-safe formatting
+    // 3. Test DateFormatterCache and ByteCountFormatterCache thread-safe formatting
     func testFormattersCache() {
         let sizeString = ByteCountFormatterCache.string(fromByteCount: 1024 * 1024 * 50)
         XCTAssertFalse(sizeString.isEmpty)

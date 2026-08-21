@@ -26,7 +26,7 @@ pub fn check_bzip2_compliance(buffer: &[u8]) -> ComplianceReport {
     // 1. Validate magic bytes "BZh"
     if &buffer[0..3] != BZ_MAGIC {
         let citation = StandardCitation::new(ComplianceStandard::Bzip2Spec, "1.0", "BZh Identifier");
-        report.add_error(citation, "Invalid bzip2 magic bytes (expected 'BZh')", Some(0));
+        report.add_error(citation, "bzip2: Invalid BZh magic header", Some(0));
         return report;
     }
 
@@ -42,6 +42,7 @@ pub fn check_bzip2_compliance(buffer: &[u8]) -> ComplianceReport {
     } else {
         let block_size_kb = (level_char - b'0') as u32 * 100;
         report.add_metadata("block_size_kb", block_size_kb.to_string());
+        report.add_validated_header(format!("bzip2: BZh Header Magic and Block Size ({})", level_char as char));
     }
 
     // 3. Inspect first block or EOS magic
@@ -49,12 +50,14 @@ pub fn check_bzip2_compliance(buffer: &[u8]) -> ComplianceReport {
         let block_magic = &buffer[4..10];
         if block_magic == PI_BLOCK_MAGIC {
             report.add_metadata("first_block_type", "data_block");
+            report.add_validated_header("bzip2: Block / Stream-End Magic Sequence");
             if buffer.len() >= 14 {
                 let block_crc = u32::from_be_bytes(buffer[10..14].try_into().unwrap());
                 report.add_metadata("first_block_crc32", format!("0x{:08X}", block_crc));
             }
         } else if block_magic == EOS_BLOCK_MAGIC {
             report.add_metadata("first_block_type", "empty_stream_eos");
+            report.add_validated_header("bzip2: Block / Stream-End Magic Sequence");
         } else {
             let citation = StandardCitation::new(ComplianceStandard::Bzip2Spec, "2.0", "Block Header Magic");
             report.add_warning(

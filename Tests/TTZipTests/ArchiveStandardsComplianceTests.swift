@@ -294,6 +294,16 @@ final class ArchiveStandardsComplianceTests: XCTestCase {
         dmgBytes[513] = 0x6F
         dmgBytes[514] = 0x6C
         dmgBytes[515] = 0x79
+        // Version 4
+        dmgBytes[516] = 0x00
+        dmgBytes[517] = 0x00
+        dmgBytes[518] = 0x00
+        dmgBytes[519] = 0x04
+        // Header size 512 (0x00000200)
+        dmgBytes[520] = 0x00
+        dmgBytes[521] = 0x00
+        dmgBytes[522] = 0x02
+        dmgBytes[523] = 0x00
         let dmgData = Data(dmgBytes)
         let report = try StandardsComplianceChecker.checkCompliance(data: dmgData, expectedFormat: .dmg)
         XCTAssertTrue(report.isCompliant)

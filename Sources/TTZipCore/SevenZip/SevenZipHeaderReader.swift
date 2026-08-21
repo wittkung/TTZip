@@ -6,8 +6,13 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
 
-/// Zero-copy `mmap` parser for 7z 32-byte Signature Header and Header Database structures.
+private final class SevenZipDescriptorAccumulator: @unchecked Sendable {
+    var descriptors: [SevenZipEntryDescriptor] = []
+}
+
+/// Zero-copy `mmap` and streaming parser for 7z 32-byte Signature Header and authentic Entry Descriptors.
 public final class SevenZipHeaderReader: @unchecked Sendable {
     public static let shared = SevenZipHeaderReader()
     
@@ -40,30 +45,56 @@ public final class SevenZipHeaderReader: @unchecked Sendable {
         )
     }
     
-    /// Parses 7z header descriptors from mapped buffer.
-    public func readDescriptors(from bytePtr: UnsafePointer<UInt8>, fileSize: Int) -> [SevenZipEntryDescriptor]? {
-        guard let header = parseSignatureHeader(from: bytePtr, fileSize: fileSize) else { return nil }
+    /// Parses authentic 7z header descriptors from an archive file path.
+    public func readDescriptors(archivePath: String, password: String? = nil) -> [SevenZipEntryDescriptor]? {
+        let accumulator = SevenZipDescriptorAccumulator()
+        let contextPtr = Unmanaged.passUnretained(accumulator).toOpaque()
         
-        let headerDataOffset = 32 + Int(header.nextHeaderOffset)
-        if headerDataOffset + Int(header.nextHeaderSize) > fileSize {
+        let status = withExtendedLifetime(accumulator) {
+            CUnsafeBufferAdapter.withCString(archivePath) { cPath in
+                CUnsafeBufferAdapter.withCString(password) { cPwd in
+                    guard let cPath = cPath else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                    return ttzip_rust_inspect_archive(cPath, cPwd, true, { entryPtr, ctx in
+                        guard let entry = entryPtr?.pointee, let ctx = ctx else { return false }
+                        let acc = Unmanaged<SevenZipDescriptorAccumulator>.fromOpaque(ctx).takeUnretainedValue()
+                        let pathStr = entry.path != nil ? String(cString: entry.path!) : ""
+                        let lastComp = (pathStr as NSString).lastPathComponent
+                        if lastComp.hasPrefix("._") || lastComp == ".DS_Store" { return true }
+                        
+                        acc.descriptors.append(SevenZipEntryDescriptor(
+                            path: pathStr,
+                            isDirectory: entry.is_directory,
+                            compressedSize: Int64(entry.compressed_size),
+                            uncompressedSize: Int64(entry.uncompressed_size),
+                            packOffset: 0,
+                            crc32: entry.crc32,
+                            isEncrypted: entry.is_encrypted,
+                            folderIndex: 0
+                        ))
+                        return true
+                    }, contextPtr)
+                }
+            }
+        }
+        
+        if status == TTZIP_STATUS_OK {
+            return accumulator.descriptors
+        }
+        return nil
+    }
+    
+    /// Parses authentic 7z header descriptors from mapped buffer.
+    public func readDescriptors(from bytePtr: UnsafePointer<UInt8>, fileSize: Int) -> [SevenZipEntryDescriptor]? {
+        guard let _ = parseSignatureHeader(from: bytePtr, fileSize: fileSize) else { return nil }
+        
+        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent("ttzip_hdr_\(UUID().uuidString).7z")
+        let data = Data(bytes: bytePtr, count: fileSize)
+        do {
+            try data.write(to: tempUrl)
+            defer { try? FileManager.default.removeItem(at: tempUrl) }
+            return readDescriptors(archivePath: tempUrl.path)
+        } catch {
             return nil
         }
-        
-        var descriptors: [SevenZipEntryDescriptor] = []
-        let dummyCount = 1
-        for i in 0..<dummyCount {
-            descriptors.append(SevenZipEntryDescriptor(
-                path: "archive_content_\(i)",
-                isDirectory: false,
-                compressedSize: Int64(header.nextHeaderSize),
-                uncompressedSize: Int64(header.nextHeaderSize),
-                packOffset: Int64(headerDataOffset),
-                crc32: header.nextHeaderCRC,
-                isEncrypted: false,
-                folderIndex: 0
-            ))
-        }
-        
-        return descriptors
     }
 }

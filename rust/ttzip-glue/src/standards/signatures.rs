@@ -32,6 +32,11 @@ pub enum DetectedFormat {
     Lzfse = 15,
     Snappy = 16,
     Lz4 = 17,
+    Lzip = 18,
+    Lrzip = 19,
+    Brotli = 20,
+    Aar = 21,
+    Wim = 22,
 }
 
 impl DetectedFormat {
@@ -68,6 +73,11 @@ impl DetectedFormat {
             DetectedFormat::Lzfse => "lzfse",
             DetectedFormat::Snappy => "sz",
             DetectedFormat::Lz4 => "lz4",
+            DetectedFormat::Lzip => "lz",
+            DetectedFormat::Lrzip => "lrz",
+            DetectedFormat::Brotli => "br",
+            DetectedFormat::Aar => "aar",
+            DetectedFormat::Wim => "wim",
             DetectedFormat::Unknown => "bin",
         }
     }
@@ -92,6 +102,11 @@ impl DetectedFormat {
             DetectedFormat::Lzfse => "application/x-lzfse",
             DetectedFormat::Snappy => "application/x-snappy-framed",
             DetectedFormat::Lz4 => "application/x-lz4",
+            DetectedFormat::Lzip => "application/x-lzip",
+            DetectedFormat::Lrzip => "application/x-lrzip",
+            DetectedFormat::Brotli => "application/x-brotli",
+            DetectedFormat::Aar => "application/x-apple-archive",
+            DetectedFormat::Wim => "application/x-ms-wim",
             DetectedFormat::Unknown => "application/octet-stream",
         }
     }
@@ -198,6 +213,15 @@ pub static PRIORITIZED_SIGNATURES: &[SignatureEntry] = &[
         description: "eXtensible ARchive (XAR)",
         priority: 80,
     },
+    // 6b. Microsoft WIM Container
+    SignatureEntry {
+        format: DetectedFormat::Wim,
+        anchor: Anchor::Head(0),
+        magic: &[0x4D, 0x53, 0x57, 0x49, 0x4D, 0x00, 0x00, 0x00], // "MSWIM\0\0\0"
+        min_total_size: 208,
+        description: "Microsoft Windows Imaging Format",
+        priority: 76,
+    },
     // 7. Microsoft CAB Container
     SignatureEntry {
         format: DetectedFormat::Cab,
@@ -224,6 +248,42 @@ pub static PRIORITIZED_SIGNATURES: &[SignatureEntry] = &[
         min_total_size: 10,
         description: "Snappy Framed Stream",
         priority: 65,
+    },
+    // 9b. Lzip Compressed Stream
+    SignatureEntry {
+        format: DetectedFormat::Lzip,
+        anchor: Anchor::Head(0),
+        magic: &[0x4C, 0x5A, 0x49, 0x50], // "LZIP"
+        min_total_size: 6,
+        description: "Lzip Compressed Stream",
+        priority: 64,
+    },
+    // 9c. Long Range ZIP (LRZIP) Stream
+    SignatureEntry {
+        format: DetectedFormat::Lrzip,
+        anchor: Anchor::Head(0),
+        magic: &[0x4C, 0x52, 0x5A, 0x49], // "LRZI"
+        min_total_size: 6,
+        description: "Long Range ZIP (LRZIP) Stream",
+        priority: 63,
+    },
+    // 9d. Apple Archive (AAR)
+    SignatureEntry {
+        format: DetectedFormat::Aar,
+        anchor: Anchor::Head(0),
+        magic: &[0x41, 0x41, 0x30, 0x31], // "AA01"
+        min_total_size: 4,
+        description: "Apple Archive (AAR)",
+        priority: 62,
+    },
+    // 9e. Apple Encrypted Archive (AEA)
+    SignatureEntry {
+        format: DetectedFormat::Aar,
+        anchor: Anchor::Head(0),
+        magic: &[0x41, 0x45, 0x41, 0x31], // "AEA1"
+        min_total_size: 4,
+        description: "Apple Encrypted Archive (AEA)",
+        priority: 61,
     },
     // 10. LZ4 Framed Stream
     SignatureEntry {

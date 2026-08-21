@@ -29,6 +29,11 @@ pub enum ComplianceStandard {
     LzfseSpec,
     UnixArSpec,
     CabSpec,
+    WimSpec,
+    LzipSpec,
+    LrzipSpec,
+    AarSpec,
+    BrotliSpec,
     Generic,
 }
 
@@ -52,6 +57,11 @@ impl ComplianceStandard {
             ComplianceStandard::LzfseSpec => "Apple LZFSE Compression Format Specification",
             ComplianceStandard::UnixArSpec => "Unix Common Archive Format (ar) / Debian Package format",
             ComplianceStandard::CabSpec => "Microsoft Cabinet (CAB) File Format Specification",
+            ComplianceStandard::WimSpec => "Microsoft Windows Imaging Format (WIM) Specification",
+            ComplianceStandard::LzipSpec => "Lzip Compressed Format Specification",
+            ComplianceStandard::LrzipSpec => "Long Range ZIP (LRZIP) Format Specification",
+            ComplianceStandard::AarSpec => "Apple Archive (AAR) Format Specification",
+            ComplianceStandard::BrotliSpec => "RFC 7932 Brotli Compressed Data Format",
             ComplianceStandard::Generic => "General Container Standards",
         }
     }
@@ -106,6 +116,7 @@ pub struct ComplianceIssue {
 pub struct ComplianceReport {
     pub format: DetectedFormat,
     pub is_compliant: bool,
+    pub validated_headers: Vec<String>,
     pub issues: Vec<ComplianceIssue>,
     pub metadata: Vec<(String, String)>,
 }
@@ -115,9 +126,14 @@ impl ComplianceReport {
         Self {
             format,
             is_compliant: true,
+            validated_headers: Vec::new(),
             issues: Vec::new(),
             metadata: Vec::new(),
         }
+    }
+
+    pub fn add_validated_header(&mut self, header: impl Into<String>) {
+        self.validated_headers.push(header.into());
     }
 
     pub fn add_error(&mut self, citation: StandardCitation, message: impl Into<String>, offset: Option<u64>) {
@@ -170,6 +186,12 @@ impl ComplianceReport {
         json.push_str("{\n");
         json.push_str(&format!("  \"format\": \"{:?}\",\n", self.format));
         json.push_str(&format!("  \"is_compliant\": {},\n", self.is_compliant));
+        json.push_str("  \"validated_headers\": [\n");
+        for (idx, header) in self.validated_headers.iter().enumerate() {
+            let comma = if idx + 1 < self.validated_headers.len() { "," } else { "" };
+            json.push_str(&format!("    \"{}\"{}\n", escape_json(header), comma));
+        }
+        json.push_str("  ],\n");
         json.push_str("  \"metadata\": {\n");
         for (idx, (k, v)) in self.metadata.iter().enumerate() {
             let comma = if idx + 1 < self.metadata.len() { "," } else { "" };
@@ -186,7 +208,9 @@ impl ComplianceReport {
             json.push_str(&format!("      \"section\": \"{}\",\n", escape_json(issue.citation.section)));
             json.push_str(&format!("      \"message\": \"{}\",\n", escape_json(&issue.message)));
             json.push_str(&format!("      \"offset\": {}\n", offset_str));
-            json.push_str(&format!("    }}{}\n", comma));
+            json.push_str("    }");
+            json.push_str(comma);
+            json.push('\n');
         }
         json.push_str("  ]\n");
         json.push_str("}");

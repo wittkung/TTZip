@@ -26,16 +26,18 @@ pub fn check_gzip_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if buffer.len() < 10 {
         let citation = StandardCitation::new(ComplianceStandard::Rfc1952Gzip, "2.3.1", "Member Header Size");
-        report.add_error(citation, "Buffer is smaller than 10-byte GZIP fixed header", Some(0));
+        report.add_error(citation, format!("RFC 1952: GZIP stream truncated before 10-byte header ({} bytes)", buffer.len()), Some(0));
         return report;
     }
 
     // 1. Validate ID1 and ID2
-    if buffer[0] != GZIP_ID1 || buffer[1] != GZIP_ID2 {
+    if buffer[0] == GZIP_ID1 && buffer[1] == GZIP_ID2 {
+        report.add_validated_header("RFC 1952: GZIP Member ID1/ID2 Header Magic (0x1F8B)");
+    } else {
         let citation = StandardCitation::new(ComplianceStandard::Rfc1952Gzip, "2.3.1", "ID1 and ID2 Identification");
         report.add_error(
             citation,
-            format!("Invalid GZIP magic bytes: [0x{:02X}, 0x{:02X}]", buffer[0], buffer[1]),
+            format!("RFC 1952: Invalid GZIP magic header (expected 0x1F8B, got 0x{:02X}{:02X})", buffer[0], buffer[1]),
             Some(0),
         );
         return report;
@@ -43,9 +45,11 @@ pub fn check_gzip_compliance(buffer: &[u8]) -> ComplianceReport {
 
     // 2. Validate Compression Method (CM)
     let cm = buffer[2];
-    if cm != CM_DEFLATE {
+    if cm == CM_DEFLATE {
+        report.add_validated_header("RFC 1952: Compression Method DEFLATE (CM=8)");
+    } else {
         let citation = StandardCitation::new(ComplianceStandard::Rfc1952Gzip, "2.3.1", "Compression Method");
-        report.add_error(citation, format!("Unsupported GZIP compression method ID: {}", cm), Some(2));
+        report.add_error(citation, format!("RFC 1952: Unsupported GZIP compression method ID: {} (expected 8 for DEFLATE)", cm), Some(2));
     }
 
     // 3. Validate FLG and reserved bits
@@ -54,10 +58,11 @@ pub fn check_gzip_compliance(buffer: &[u8]) -> ComplianceReport {
         let citation = StandardCitation::new(ComplianceStandard::Rfc1952Gzip, "2.3.1", "Reserved Flags");
         report.add_error(
             citation,
-            format!("Reserved FLG bits 5, 6, 7 are non-zero: 0x{:02X}", flags & FLAG_RESERVED),
+            format!("RFC 1952: Reserved flag bits 5-7 must be zero (got 0x{:02X})", flags & FLAG_RESERVED),
             Some(3),
         );
     }
+    report.add_validated_header("RFC 1952: Header Flags and MTIME Specification");
 
     let mtime = u32::from_le_bytes(buffer[4..8].try_into().unwrap());
     let xfl = buffer[8];
@@ -73,25 +78,29 @@ pub fn check_gzip_compliance(buffer: &[u8]) -> ComplianceReport {
     if (flags & FLAG_FEXTRA) != 0 {
         if cursor + 2 > buffer.len() {
             let citation = StandardCitation::new(ComplianceStandard::Rfc1952Gzip, "2.3.1.1", "Extra Field Length");
-            report.add_error(citation, "Truncated GZIP XLEN field", Some(cursor as u64));
+            report.add_error(citation, "RFC 1952: Truncated GZIP XLEN field", Some(cursor as u64));
             return report;
         }
         let xlen = u16::from_le_bytes([buffer[cursor], buffer[cursor + 1]]) as usize;
         cursor += 2;
         if cursor + xlen > buffer.len() {
             let citation = StandardCitation::new(ComplianceStandard::Rfc1952Gzip, "2.3.1.1", "Extra Field Payload");
-            report.add_error(citation, "GZIP extra field extends beyond buffer boundary", Some(cursor as u64));
+            report.add_error(citation, "RFC 1952: GZIP extra field extends beyond buffer boundary", Some(cursor as u64));
             return report;
         }
         cursor += xlen;
+        report.add_validated_header("RFC 1952: FEXTRA Header Extension Block");
     }
 
     if (flags & FLAG_FNAME) != 0 {
         match buffer[cursor..].iter().position(|&b| b == 0) {
-            Some(pos) => cursor += pos + 1,
+            Some(pos) => {
+                cursor += pos + 1;
+                report.add_validated_header("RFC 1952: FNAME Original Filename Header");
+            }
             None => {
                 let citation = StandardCitation::new(ComplianceStandard::Rfc1952Gzip, "2.3.1", "Original File Name");
-                report.add_error(citation, "Unterminated GZIP original filename string", Some(cursor as u64));
+                report.add_error(citation, "RFC 1952: Unterminated GZIP original filename string", Some(cursor as u64));
                 return report;
             }
         }
@@ -99,10 +108,13 @@ pub fn check_gzip_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if (flags & FLAG_FCOMMENT) != 0 {
         match buffer[cursor..].iter().position(|&b| b == 0) {
-            Some(pos) => cursor += pos + 1,
+            Some(pos) => {
+                cursor += pos + 1;
+                report.add_validated_header("RFC 1952: FCOMMENT File Comment Header");
+            }
             None => {
                 let citation = StandardCitation::new(ComplianceStandard::Rfc1952Gzip, "2.3.1", "File Comment");
-                report.add_error(citation, "Unterminated GZIP comment string", Some(cursor as u64));
+                report.add_error(citation, "RFC 1952: Unterminated GZIP comment string", Some(cursor as u64));
                 return report;
             }
         }
@@ -111,14 +123,17 @@ pub fn check_gzip_compliance(buffer: &[u8]) -> ComplianceReport {
     if (flags & FLAG_FHCRC) != 0 {
         if cursor + 2 > buffer.len() {
             let citation = StandardCitation::new(ComplianceStandard::Rfc1952Gzip, "2.3.1", "Header CRC16");
-            report.add_error(citation, "Truncated GZIP header CRC16 field", Some(cursor as u64));
+            report.add_error(citation, "RFC 1952: Truncated GZIP header CRC16 field", Some(cursor as u64));
             return report;
         }
         cursor += 2;
+        let _ = cursor;
+        report.add_validated_header("RFC 1952: FHCRC Header CRC16 Checksum");
     }
 
     // 5. Verify Trailer (8 bytes: CRC32 + ISIZE) if full stream present
-    if buffer.len() >= cursor + 8 {
+    if buffer.len() >= 18 {
+        report.add_validated_header("RFC 1952: Trailer CRC32 and ISIZE Fields (offset EOF-8)");
         let trailer_start = buffer.len() - 8;
         let crc32_val = u32::from_le_bytes(buffer[trailer_start..trailer_start + 4].try_into().unwrap());
         let isize_val = u32::from_le_bytes(buffer[trailer_start + 4..trailer_start + 8].try_into().unwrap());
@@ -126,7 +141,7 @@ pub fn check_gzip_compliance(buffer: &[u8]) -> ComplianceReport {
         report.add_metadata("trailer_isize", isize_val.to_string());
     } else {
         let citation = StandardCitation::new(ComplianceStandard::Rfc1952Gzip, "2.3.1", "Member Trailer");
-        report.add_warning(citation, "Buffer does not include complete 8-byte GZIP trailer", Some(buffer.len() as u64));
+        report.add_warning(citation, "RFC 1952: Stream too short to contain full trailer CRC32 and ISIZE fields", Some(buffer.len() as u64));
     }
 
     report

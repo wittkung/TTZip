@@ -12,38 +12,14 @@ private final class SevenZipEntryAccumulator: @unchecked Sendable {
     var entries: [ArchiveEntry] = []
 }
 
-private func nativeSevenZipEntryCallback(
-    context: UnsafeMutableRawPointer?,
-    cPathname: UnsafePointer<CChar>?,
-    size: Int64,
-    isDir: Bool
-) {
-    guard let context = context, let cPathname = cPathname else { return }
-    let acc = Unmanaged<SevenZipEntryAccumulator>.fromOpaque(context).takeUnretainedValue()
-    let rawLen = strlen(cPathname)
-    let pathData = Data(bytes: cPathname, count: rawLen)
-    let sanitizedPath = CharsetDetector.sanitizeFilename(bytes: pathData)
-    let lastComp = (sanitizedPath as NSString).lastPathComponent
-    if lastComp.hasPrefix("._") || lastComp == ".DS_Store" {
-        return
-    }
-    let entry = ArchiveEntry(
-        path: sanitizedPath,
-        uncompressedSize: size,
-        isDirectory: isDir,
-        detectedEncoding: "UTF-8",
-        isEncrypted: false
-    )
-    acc.entries.append(entry)
-}
-
 /// Unified facade for 7z native parallel compression and decompression operations.
-public final class NativeSevenZipEngine: @unchecked Sendable {
+/// Directly interfaces with `SevenZipCAdapter` and C/Rust FFI bindings without intermediate onion forwarders.
+public final class NativeSevenZipEngine: SevenZipEngineProtocol, @unchecked Sendable {
     public static let shared = NativeSevenZipEngine()
     
     private init() {}
     
-    /// Parses 7z archive header via zero-copy mmap and returns entry descriptors.
+    /// Parses 7z archive header and returns entry descriptors.
     public func inspectSevenZip(archivePath: String, password: String? = nil) -> [ArchiveEntry]? {
         let accumulator = SevenZipEntryAccumulator()
         let contextPtr = Unmanaged.passUnretained(accumulator).toOpaque()
@@ -78,7 +54,8 @@ public final class NativeSevenZipEngine: @unchecked Sendable {
         return nil
     }
     
-    /// Extracts 7z archive using multi-core solid block zero-copy pipeline.
+    /// Extracts 7z archive directly via `SevenZipCAdapter`.
+    @inline(__always)
     public func extractSevenZipParallel(
         archivePath: String,
         destinationDir: String,
@@ -86,29 +63,71 @@ public final class NativeSevenZipEngine: @unchecked Sendable {
         skipMacJunk: Bool = true,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws -> Bool {
-        return try SevenZipParallelExtractor.shared.extract(
+        return try SevenZipCAdapter.shared.extractArchive(
             archivePath: archivePath,
             destinationDir: destinationDir,
-            password: password,
             skipMacJunk: skipMacJunk,
-            progressHandler: progressHandler
+            password: password
         )
     }
     
-    /// Compresses input paths into 7z archive using multi-core solid block pipeline.
+    /// Compresses input paths into 7z archive directly via `SevenZipCAdapter`.
+    @inline(__always)
     public func createSevenZipParallel(
         outputPath: String,
         inputPaths: [String],
         level: ArchiveCompressionLevel = .normal,
         password: String? = nil,
+        useZstd: Bool = false,
+        solidBlockSizeMb: Int = 128,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws -> Bool {
-        return try SevenZipParallelWriter.shared.createArchive(
+        return try SevenZipCAdapter.shared.createArchive(
             outputPath: outputPath,
             inputPaths: inputPaths,
             level: level,
             password: password,
+            useZstd: useZstd,
+            solidBlockSizeMb: solidBlockSizeMb,
             progressHandler: progressHandler
+        )
+    }
+    
+    // MARK: - SevenZipEngineProtocol
+    
+    @inline(__always)
+    public func createArchive(
+        outputPath: String,
+        inputPaths: [String],
+        level: ArchiveCompressionLevel = .normal,
+        password: String? = nil,
+        useZstd: Bool = false,
+        solidBlockSizeMb: Int = 128,
+        progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
+    ) throws -> Bool {
+        return try createSevenZipParallel(
+            outputPath: outputPath,
+            inputPaths: inputPaths,
+            level: level,
+            password: password,
+            useZstd: useZstd,
+            solidBlockSizeMb: solidBlockSizeMb,
+            progressHandler: progressHandler
+        )
+    }
+    
+    @inline(__always)
+    public func extractArchive(
+        archivePath: String,
+        destinationDir: String,
+        password: String? = nil
+    ) throws -> Bool {
+        return try extractSevenZipParallel(
+            archivePath: archivePath,
+            destinationDir: destinationDir,
+            password: password,
+            skipMacJunk: true,
+            progressHandler: nil
         )
     }
 }

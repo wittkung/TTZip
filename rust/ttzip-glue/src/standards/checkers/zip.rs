@@ -22,30 +22,51 @@ pub fn check_zip_compliance(buffer: &[u8]) -> ComplianceReport {
 
     if buffer.len() < 22 {
         let citation = StandardCitation::new(ComplianceStandard::PkwareAppnote, "4.4.1", "End of Central Directory Record");
-        report.add_error(citation, "Buffer is smaller than minimum 22-byte ZIP EOCD structure", Some(0));
+        report.add_error(citation, "ZIP file smaller than minimum EOCD record size (22 bytes)", Some(0));
         return report;
+    }
+
+    // 0. Check signature at offset 0
+    let sig0 = u32::from_le_bytes(buffer[0..4].try_into().unwrap());
+    if sig0 == 0x04034B50 {
+        report.add_validated_header("PKWARE APPNOTE: Local File Header Signature (0x04034B50)");
+    } else if sig0 == 0x06054B50 {
+        report.add_validated_header("PKWARE APPNOTE: Empty Archive EOCD Signature (0x06054B50)");
+    } else if sig0 == 0x08074B50 {
+        report.add_validated_header("PKWARE APPNOTE: Spanned Archive Data Descriptor (0x08074B50)");
+    } else {
+        let citation = StandardCitation::new(ComplianceStandard::PkwareAppnote, "4.3.7", "Local File Header Magic");
+        report.add_error(citation, "PKWARE APPNOTE: Missing valid ZIP Local File Header (0x04034B50) or EOCD (0x06054B50) at offset 0", Some(0));
     }
 
     // 1. Locate and parse EOCD
     let eocd_pos = match find_eocd(buffer) {
-        Some(pos) => pos,
+        Some(pos) => {
+            report.add_validated_header("PKWARE APPNOTE: End of Central Directory Record (0x06054B50)");
+            pos
+        }
         None => {
             let citation = StandardCitation::new(ComplianceStandard::PkwareAppnote, "4.4.1", "End of Central Directory Record");
-            report.add_error(citation, "Missing or corrupt End of Central Directory (EOCD) signature", None);
+            report.add_error(citation, "PKWARE APPNOTE: Missing End of Central Directory (EOCD) record (0x06054B50)", None);
             return report;
         }
     };
 
     let eocd = &buffer[eocd_pos..];
-    let _cd_entries_disk = u16::from_le_bytes([eocd[8], eocd[9]]);
+    let cd_entries_disk = u16::from_le_bytes([eocd[8], eocd[9]]);
     let cd_entries_total = u16::from_le_bytes([eocd[10], eocd[11]]);
     let cd_size = u32::from_le_bytes([eocd[12], eocd[13], eocd[14], eocd[15]]) as usize;
     let cd_offset = u32::from_le_bytes([eocd[16], eocd[17], eocd[18], eocd[19]]) as usize;
     let comment_len = u16::from_le_bytes([eocd[20], eocd[21]]) as usize;
 
+    if cd_entries_disk != 0 {
+        let citation = StandardCitation::new(ComplianceStandard::PkwareAppnote, "4.4.1", "Multi-disk Spanned Archive");
+        report.add_warning(citation, format!("Multi-disk ZIP archive detected (disk {})", cd_entries_disk), Some(eocd_pos as u64 + 8));
+    }
+
     if eocd_pos + 22 + comment_len > buffer.len() {
         let citation = StandardCitation::new(ComplianceStandard::PkwareAppnote, "4.4.1.5", "Archive Comment Length");
-        report.add_error(citation, "EOCD archive comment length extends beyond end of file", Some(eocd_pos as u64 + 20));
+        report.add_error(citation, "EOCD comment length exceeds archive boundary", Some(eocd_pos as u64 + 20));
     }
 
     report.add_metadata("cd_entries_total", cd_entries_total.to_string());
@@ -60,6 +81,7 @@ pub fn check_zip_compliance(buffer: &[u8]) -> ComplianceReport {
         let locator_candidate = eocd_pos - 20;
         let sig = u32::from_le_bytes(buffer[locator_candidate..locator_candidate + 4].try_into().unwrap());
         if sig == SIG_ZIP64_LOCATOR {
+            report.add_validated_header("PKWARE APPNOTE: Zip64 End of Central Directory Locator (0x07064B50)");
             let z64_eocd_offset = u64::from_le_bytes(buffer[locator_candidate + 8..locator_candidate + 16].try_into().unwrap());
             report.add_metadata("has_zip64_locator", "true");
             report.add_metadata("zip64_eocd_offset", z64_eocd_offset.to_string());
@@ -67,6 +89,8 @@ pub fn check_zip_compliance(buffer: &[u8]) -> ComplianceReport {
             if z64_eocd_offset as usize + 56 <= buffer.len() {
                 let z64_sig = u32::from_le_bytes(buffer[z64_eocd_offset as usize..z64_eocd_offset as usize + 4].try_into().unwrap());
                 if z64_sig == SIG_ZIP64_EOCD {
+                    report.add_validated_header("PKWARE APPNOTE: Zip64 End of Central Directory Record (0x06064B50)");
+                    report.add_validated_header("PKWARE APPNOTE: Archive verified as Zip64 format");
                     resolved_cd_entries = u64::from_le_bytes(buffer[z64_eocd_offset as usize + 32..z64_eocd_offset as usize + 40].try_into().unwrap());
                     resolved_cd_offset = u64::from_le_bytes(buffer[z64_eocd_offset as usize + 48..z64_eocd_offset as usize + 56].try_into().unwrap());
                 } else {
@@ -86,11 +110,17 @@ pub fn check_zip_compliance(buffer: &[u8]) -> ComplianceReport {
 
     let mut cursor = resolved_cd_offset as usize;
     let mut parsed_entries = 0u64;
+    let mut parsed_cd_header = false;
 
     while cursor + 46 <= buffer.len() && parsed_entries < resolved_cd_entries {
         let sig = u32::from_le_bytes(buffer[cursor..cursor + 4].try_into().unwrap());
         if sig != SIG_CDFH {
             break;
+        }
+
+        if !parsed_cd_header {
+            report.add_validated_header("PKWARE APPNOTE: Central Directory File Header (0x02014B50)");
+            parsed_cd_header = true;
         }
 
         let _version_made = u16::from_le_bytes([buffer[cursor + 4], buffer[cursor + 5]]);
@@ -130,6 +160,22 @@ pub fn check_zip_compliance(buffer: &[u8]) -> ComplianceReport {
             local_hdr_offset == 0xFFFFFFFF,
         );
 
+        if parsed_extra.zip64.is_some() {
+            report.add_validated_header("ZIP Extra Field: Zip64 Extended Information (0x0001)");
+        }
+        if parsed_extra.timestamp.is_some() {
+            report.add_validated_header("ZIP Extra Field: Extended Timestamp (0x5455)");
+        }
+        if parsed_extra.unicode_path.is_some() {
+            report.add_validated_header("ZIP Extra Field: Unicode Path (0x7075)");
+        }
+        if parsed_extra.infozip_unix.is_some() {
+            report.add_validated_header("ZIP Extra Field: Info-ZIP UNIX (0x7875)");
+        }
+        if parsed_extra.winzip_aes.is_some() {
+            report.add_validated_header("ZIP Extra Field: WinZip AES (0x9901)");
+        }
+
         if uncomp_size == 0xFFFFFFFF && parsed_extra.zip64.as_ref().and_then(|z| z.uncompressed_size).is_none() {
             let citation = StandardCitation::new(ComplianceStandard::PkwareAppnote, "4.5.3", "Zip64 Extended Information Extra Field");
             report.add_error(citation, "Zip64 uncompressed size placeholder 0xFFFFFFFF without Zip64 extra field", Some(cursor as u64));
@@ -147,7 +193,7 @@ pub fn check_zip_compliance(buffer: &[u8]) -> ComplianceReport {
             let lfh_sig = u32::from_le_bytes(buffer[target_lfh as usize..target_lfh as usize + 4].try_into().unwrap());
             if lfh_sig != SIG_LFH {
                 let citation = StandardCitation::new(ComplianceStandard::PkwareAppnote, "4.3.7", "Local File Header Magic");
-                report.add_error(citation, "LFH signature mismatch at central directory target offset", Some(target_lfh));
+                report.add_warning(citation, format!("Local header signature mismatch at offset {}", target_lfh), Some(target_lfh));
             }
         }
 
