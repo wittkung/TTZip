@@ -143,6 +143,12 @@ int32_t ttzip_rust_zipcrypto_init_keys(const char *password, uint32_t *key0, uin
 int32_t ttzip_rust_zipcrypto_decrypt_stream(uint32_t *key0, uint32_t *key1, uint32_t *key2, const uint8_t *src, size_t len, uint8_t *dst);
 int32_t ttzip_rust_zipcrypto_encrypt_stream(uint32_t *key0, uint32_t *key1, uint32_t *key2, const uint8_t *src, size_t len, uint8_t *dst);
 
+// Secure Password Vault & Memory Zeroize
+TTZipStatus ttzip_rust_vault_encrypt_key(const uint8_t *key, const uint8_t *iv, const uint8_t *src, size_t src_len, const uint8_t *aad, size_t aad_len, uint8_t *out_cipher, uint8_t *out_tag);
+TTZipStatus ttzip_rust_vault_decrypt_key(const uint8_t *key, const uint8_t *iv, const uint8_t *cipher, size_t cipher_len, const uint8_t *aad, size_t aad_len, const uint8_t *tag, uint8_t *out_plain);
+void ttzip_rust_vault_wipe(uint8_t *ptr, size_t len);
+
+
 // Reed-Solomon FEC & Compliance
 int32_t ttzip_rust_rs_encode(const uint8_t *const *data_ptrs, size_t k_data, uint8_t *const *parity_ptrs, size_t m_parity, size_t block_size);
 int32_t ttzip_rust_rs_decode(const uint8_t *const *available_ptrs, const int32_t *available_indices, size_t num_available, size_t k_data, size_t m_parity, const int32_t *missing_indices, size_t num_missing, uint8_t *const *reconstructed_ptrs, size_t block_size);
@@ -375,7 +381,18 @@ typedef struct TTZipParetoPointRaw {
     bool is_on_convex_envelope;
 } TTZipParetoPointRaw;
 
+typedef struct TTZipParetoCodecPointRaw {
+    char codec_name[64];
+    double compression_ratio;
+    double speed_mb_s;
+    double memory_mb;
+    uint32_t pareto_rank;
+    bool is_pareto_optimal;
+    bool is_on_convex_hull;
+} TTZipParetoCodecPointRaw;
+
 TTZipStatus ttzip_rust_bench_run_mips(uint32_t dictionary_size_mb, uint32_t thread_count, uint32_t iterations, TTZipMIPSBenchmarkResult *out_result);
+TTZipStatus ttzip_rust_calculate_pareto_frontier(TTZipParetoCodecPointRaw *points, size_t count);
 TTZipStatus ttzip_rust_bench_compute_pareto_frontier(TTZipParetoPointRaw *points, size_t count);
 uint64_t ttzip_rust_bench_monotonic_nanos(void);
 double ttzip_rust_bench_calc_throughput_mbs(size_t bytes, double elapsed_secs);

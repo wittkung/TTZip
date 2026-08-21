@@ -17,6 +17,7 @@
 pub mod analytics;
 pub mod archive;
 pub mod bench;
+pub mod benchmark;
 pub mod charset;
 pub mod codecs;
 pub mod crypto;
@@ -38,7 +39,7 @@ pub use archive::{
     repair_damaged_zip, SplitVolumeWriter, VirtualMultiVolumeReader, VolumeNamingScheme,
     VolumeSegment,
 };
-pub use bench::*;
+pub use benchmark::*;
 pub use charset::*;
 pub use codecs::*;
 pub use crypto::*;

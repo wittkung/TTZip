@@ -22,19 +22,13 @@ extension PasswordVaultManager {
         return digest.compactMap { String(format: "%02x", $0) }.joined()
     }
     
-    // MARK: - Crypto v4 (PBKDF2-SHA256 + Per-vault 32-byte Random Salt + 600k rounds)
+    // MARK: - Crypto v4 (PBKDF2-SHA256 + Per-vault 32-byte Random Salt + 600k rounds + Rust AES-256-GCM)
     
     static let vaultMagicV4 = Data([0x54, 0x54, 0x56, 0x34]) // "TTV4"
     static let defaultV4Iterations: UInt32 = 600_000
     
-    func deriveSymmetricKeyV4(_ password: String, salt: Data, iterations: UInt32 = defaultV4Iterations) -> SymmetricKey {
+    func deriveSymmetricKeyBytesV4(_ password: String, salt: Data, iterations: UInt32 = defaultV4Iterations) -> [UInt8] {
         var derivedKey = [UInt8](repeating: 0, count: 32)
-        defer {
-            derivedKey.withUnsafeMutableBytes { ptr in
-                guard let base = ptr.baseAddress else { return }
-                memset_s(base, ptr.count, 0, ptr.count)
-            }
-        }
         let passBytes = Array(password.utf8)
         let status = salt.withUnsafeBytes { sBuf in
             CCKeyDerivationPBKDF(
@@ -46,11 +40,11 @@ extension PasswordVaultManager {
                 &derivedKey, 32
             )
         }
-        if status == kCCSuccess {
-            return SymmetricKey(data: derivedKey)
+        if status != kCCSuccess {
+            let hash = SHA256.hash(data: Data(password.utf8))
+            derivedKey = Array(hash)
         }
-        let hash = SHA256.hash(data: Data(password.utf8))
-        return SymmetricKey(data: hash)
+        return derivedKey
     }
     
     func encryptDataV4(_ data: Data, password: String) -> Data? {
@@ -60,12 +54,42 @@ extension PasswordVaultManager {
         }
         let salt = Data(saltBytes)
         let iterations = Self.defaultV4Iterations
-        let key = deriveSymmetricKeyV4(password, salt: salt, iterations: iterations)
+        var keyBytes = deriveSymmetricKeyBytesV4(password, salt: salt, iterations: iterations)
+        defer {
+            keyBytes.withUnsafeMutableBufferPointer { ptr in
+                if let base = ptr.baseAddress {
+                    ttzip_rust_vault_wipe(base, ptr.count)
+                }
+            }
+        }
         
-        guard let sealedBox = try? AES.GCM.seal(data, using: key),
-              let combinedPayload = sealedBox.combined else {
+        var ivBytes = [UInt8](repeating: 0, count: 12)
+        guard SecRandomCopyBytes(kSecRandomDefault, ivBytes.count, &ivBytes) == errSecSuccess else {
             return nil
         }
+        
+        var ciphertext = [UInt8](repeating: 0, count: data.count)
+        var tag = [UInt8](repeating: 0, count: 16)
+        
+        let status = data.withUnsafeBytes { dataBuf in
+            let dataPtr = dataBuf.baseAddress?.assumingMemoryBound(to: UInt8.self)
+            return ttzip_rust_vault_encrypt_key(
+                &keyBytes,
+                &ivBytes,
+                dataPtr,
+                data.count,
+                nil,
+                0,
+                &ciphertext,
+                &tag
+            )
+        }
+        guard status == TTZIP_STATUS_OK else { return nil }
+        
+        var combinedPayload = Data()
+        combinedPayload.append(contentsOf: ivBytes) // 12 bytes nonce
+        combinedPayload.append(contentsOf: ciphertext) // N bytes cipher
+        combinedPayload.append(contentsOf: tag) // 16 bytes tag
         
         var result = Data()
         result.append(Self.vaultMagicV4) // 4 bytes
@@ -90,14 +114,40 @@ extension PasswordVaultManager {
         let salt = data.subdata(in: 9..<(9 + saltLen))
         
         let payload = data.subdata(in: (9 + saltLen)..<data.count)
-        let key = deriveSymmetricKeyV4(password, salt: salt, iterations: iterations)
+        guard payload.count >= 28 else { return nil }
         
-        guard let sealedBox = try? AES.GCM.SealedBox(combined: payload),
-              let decrypted = try? AES.GCM.open(sealedBox, using: key) else {
-            return nil
+        let iv = Array(payload.prefix(12))
+        let tag = Array(payload.suffix(16))
+        let cipherData = payload.subdata(in: 12..<(payload.count - 16))
+        
+        var keyBytes = deriveSymmetricKeyBytesV4(password, salt: salt, iterations: iterations)
+        defer {
+            keyBytes.withUnsafeMutableBufferPointer { ptr in
+                if let base = ptr.baseAddress {
+                    ttzip_rust_vault_wipe(base, ptr.count)
+                }
+            }
         }
-        return decrypted
+        
+        var plaintext = [UInt8](repeating: 0, count: cipherData.count)
+        let status = cipherData.withUnsafeBytes { cipherBuf in
+            let cipherPtr = cipherBuf.baseAddress?.assumingMemoryBound(to: UInt8.self)
+            return ttzip_rust_vault_decrypt_key(
+                &keyBytes,
+                iv,
+                cipherPtr,
+                cipherData.count,
+                nil,
+                0,
+                tag,
+                &plaintext
+            )
+        }
+        guard status == TTZIP_STATUS_OK else { return nil }
+        return Data(plaintext)
     }
+
+
     
     // MARK: - Deprecated Crypto v3 (PBKDF2-SHA1 Legacy Fallback)
     

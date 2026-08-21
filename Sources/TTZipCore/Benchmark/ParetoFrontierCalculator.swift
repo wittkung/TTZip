@@ -10,7 +10,8 @@ import CTTZipBridge
 
 /// 2D 帕累托非支配前沿与凸包包络线计算中枢 (2D Skyline & Monotone Chain Algorithm)
 ///
-/// Backed by high-performance Rust core `compute_pareto_frontier_raw` ($O(N \log K)$ Dilworth's Theorem & $O(M \log M)$ Monotone Chain).
+/// Backed by high-performance Rust core `ttzip_rust_calculate_pareto_frontier` / `ttzip_rust_bench_compute_pareto_frontier`
+/// ($O(N \log K)$ Dilworth's Theorem & $O(M \log M)$ Andrew's Monotone Chain).
 public final class ParetoFrontierCalculator: @unchecked Sendable {
     public static let shared = ParetoFrontierCalculator()
     private init() {}
@@ -80,7 +81,6 @@ public final class ParetoFrontierCalculator: @unchecked Sendable {
         }
 
         if st == TTZIP_STATUS_OK {
-            // Rust sorts the raw points in-place by (throughput desc, space savings desc)
             var reorderedPoints = [ParetoPoint]()
             reorderedPoints.reserveCapacity(rawPoints.count)
 
@@ -107,5 +107,53 @@ public final class ParetoFrontierCalculator: @unchecked Sendable {
             convexEnvelopePoints: convexHull,
             allPoints: points
         )
+    }
+
+    /// 计算指定编解码器配置集合的 2D 帕累托上凸包与最优前沿 (Direct C-ABI delegation to ttzip_rust_calculate_pareto_frontier)
+    public func calculateCodecFrontier(
+        codecs: [(name: String, compressionRatio: Double, speedMBs: Double, memoryMB: Double)]
+    ) -> [TTZipParetoCodecPointRaw] {
+        guard !codecs.isEmpty else { return [] }
+
+        var rawPoints = [TTZipParetoCodecPointRaw]()
+        rawPoints.reserveCapacity(codecs.count)
+
+        for c in codecs {
+            var raw = TTZipParetoCodecPointRaw()
+            var nameBuf = (
+                CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0),
+                CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0),
+                CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0),
+                CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0),
+                CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0),
+                CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0),
+                CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0),
+                CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0), CChar(0)
+            )
+            withUnsafeMutableBytes(of: &nameBuf) { buf in
+                let cStr = c.name.utf8CString
+                let copyLen = min(buf.count - 1, cStr.count)
+                for i in 0..<copyLen {
+                    buf[i] = UInt8(bitPattern: cStr[i])
+                }
+            }
+            raw.codec_name = nameBuf
+            raw.compression_ratio = c.compressionRatio
+            raw.speed_mb_s = c.speedMBs
+            raw.memory_mb = c.memoryMB
+            raw.pareto_rank = 1
+            raw.is_pareto_optimal = false
+            raw.is_on_convex_hull = false
+            rawPoints.append(raw)
+        }
+
+        let st = rawPoints.withUnsafeMutableBufferPointer { bufPtr in
+            ttzip_rust_calculate_pareto_frontier(bufPtr.baseAddress, bufPtr.count)
+        }
+
+        guard st == TTZIP_STATUS_OK else {
+            return []
+        }
+        return rawPoints
     }
 }

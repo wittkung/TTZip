@@ -10,6 +10,7 @@
 pub mod analytics_ffi;
 pub mod archive_ffi;
 pub mod bench_ffi;
+pub mod benchmark_ffi;
 pub mod codecs_ffi;
 pub mod crypto_ffi;
 pub mod filter_ffi;
@@ -21,7 +22,7 @@ pub mod vfs_ffi;
 
 pub use analytics_ffi::*;
 pub use archive_ffi::*;
-pub use bench_ffi::*;
+pub use benchmark_ffi::*;
 pub use codecs_ffi::*;
 pub use crypto_ffi::*;
 pub use filter_ffi::*;

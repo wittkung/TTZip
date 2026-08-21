@@ -14,6 +14,7 @@ pub mod recovery;
 pub mod rs_fec;
 pub mod sha1;
 pub mod sha256;
+pub mod vault;
 pub mod zipcrypto;
 
 pub use adler32::{adler32, adler32_fast};
@@ -28,6 +29,11 @@ pub use sha1::{
     winzip_aes256_derive_keys, winzip_aes256_encrypt_and_tag, FastSha1, WinZipAes256Keys,
 };
 pub use sha256::{sha256_7z_kdf, FastSha256};
+pub use vault::{
+    aes256_gcm_decrypt, aes256_gcm_encrypt, constant_time_eq_16, secure_wipe, secure_wipe_slice,
+    GHash,
+};
 pub use zipcrypto::{
     zipcrypto_decrypt_slice, zipcrypto_encrypt_slice, ZipCryptoBatch4, ZipCryptoKeys,
 };
+

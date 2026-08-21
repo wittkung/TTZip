@@ -10,54 +10,12 @@ import CryptoKit
 import Security
 import CTTZipBridge
 
-/// Value type representing a secure credential entry within the password vault.
-public struct PasswordVaultEntry: Identifiable, Codable, Equatable, Sendable {
-    public let id: UUID
-    public var label: String
-    public var password: String
-    public var category: String
-    public var createdAt: Date
-    public var useCount: Int
-    public var lastUsedAt: Date?
-    
-    public init(
-        id: UUID = UUID(),
-        label: String,
-        password: String,
-        category: String = "General",
-        createdAt: Date = Date(),
-        useCount: Int = 0,
-        lastUsedAt: Date? = nil
-    ) {
-        self.id = id
-        self.label = label
-        self.password = password
-        self.category = category
-        self.createdAt = createdAt
-        self.useCount = useCount
-        self.lastUsedAt = lastUsedAt
-    }
-}
-
-/// Backup envelope structure storing serialized vault entries and historical master hash.
-public struct VaultBackupData: Codable {
-    public let oldMasterHash: String
-    public let entries: [PasswordVaultEntry]
-    public let backupDate: Date
-}
-
-/// Protocol abstraction for password vault management and candidate querying.
-public protocol PasswordVaultManaging: Sendable {
-    var autoUnlockArchives: Bool { get }
-    func getEntries() -> [PasswordVaultEntry]
-    func recordUsage(id: UUID)
-}
-
 /// High-security password vault manager with hardware AES-256 GCM persistence and Keychain integration.
 public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Sendable {
     public static let shared = PasswordVaultManager()
     
     let vaultLock = NSLock()
+
     var entries: [PasswordVaultEntry] = []
     
     var _isUnlocked: Bool = false
@@ -288,7 +246,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         return success
     }
     
-    /// Locks vault and securely scrubs active password buffers from memory.
+    /// Locks vault and securely scrubs active password buffers from memory using Rust C-ABI compiler fence.
     public func lockVault() {
         vaultLock.withLock {
             _isUnlocked = false
@@ -296,7 +254,7 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
                 var bytes = Array(pwd.utf8)
                 bytes.withUnsafeMutableBytes { ptr in
                     if let base = ptr.baseAddress {
-                        PlatformMemory.secureZero(pointer: base, byteCount: ptr.count)
+                        ttzip_rust_vault_wipe(base.assumingMemoryBound(to: UInt8.self), ptr.count)
                     }
                 }
             }
@@ -379,38 +337,5 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
         }
         notifyChange()
     }
-    
-    /// Generates high-entropy pseudo-random password string.
-    public func generateRandomPassword(length: Int = 16, includeSymbols: Bool = true) -> String {
-        let letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        let symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?"
-        let charset = includeSymbols ? (letters + symbols) : letters
-        
-        var result = ""
-        for _ in 0..<length {
-            if let randomChar = charset.randomElement() {
-                result.append(randomChar)
-            }
-        }
-        return result
-    }
-    
-    /// Evaluates password entropy and strength score (0 to 5).
-    public func evaluatePasswordStrength(_ pwd: String) -> (score: Int, label: String) {
-        if pwd.isEmpty { return (0, "Very Weak") }
-        var score = 0
-        if pwd.count >= 8 { score += 1 }
-        if pwd.count >= 12 { score += 1 }
-        if pwd.rangeOfCharacter(from: .decimalDigits) != nil { score += 1 }
-        if pwd.rangeOfCharacter(from: CharacterSet(charactersIn: "!@#$%^&*()_+-=[]{}|;:,.<>?")) != nil { score += 1 }
-        if pwd.rangeOfCharacter(from: .uppercaseLetters) != nil && pwd.rangeOfCharacter(from: .lowercaseLetters) != nil { score += 1 }
-        
-        switch score {
-        case 0...1: return (score, "Very Weak")
-        case 2: return (score, "Weak")
-        case 3: return (score, "Medium")
-        case 4: return (score, "Strong")
-        default: return (score, "Very Strong")
-        }
-    }
 }
+
