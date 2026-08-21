@@ -105,12 +105,8 @@ for target in "${TARGETS[@]}"; do
     
     TARGET_LIB="${RUST_DIR}/target/${target}/${BUILD_MODE}/libttzip_glue.a"
     if [ -f "${TARGET_LIB}" ]; then
-        # Strip DWARF debug sections from individual member objects to optimize staticlib size
-        STRIP_DIR="${RUST_DIR}/target/${target}/${BUILD_MODE}/stripped_objs"
-        rm -rf "${STRIP_DIR}" && mkdir -p "${STRIP_DIR}"
-        (cd "${STRIP_DIR}" && ar -x "${TARGET_LIB}" && strip -S *.o 2>/dev/null || true)
-        libtool -static -no_warning_for_no_symbols -o "${TARGET_LIB}" "${STRIP_DIR}"/*.o
-        rm -rf "${STRIP_DIR}"
+        # Strip DWARF debug sections to optimize staticlib size
+        strip -S "${TARGET_LIB}" 2>/dev/null || true
         BUILT_LIBS+=("${TARGET_LIB}")
     else
         echo "❌ Error: Expected static library not found at ${TARGET_LIB}"

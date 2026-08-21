@@ -9,10 +9,12 @@
 
 pub mod apfs;
 pub mod filter;
+pub mod filter_dsl;
 pub mod safe_extract;
 pub mod scanner;
 
 pub use apfs::*;
 pub use filter::*;
+pub use filter_dsl::*;
 pub use safe_extract::*;
 pub use scanner::*;

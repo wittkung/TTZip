@@ -273,6 +273,11 @@ bool ttzip_rust_is_vcs_metadata(const char *path);
 bool ttzip_rust_is_mac_junk_metadata(const char *path);
 bool ttzip_rust_glob_matches(const char *pattern, const char *path, bool case_sensitive);
 
+typedef struct TTZipFilterDslEngine TTZipFilterDslEngine;
+TTZipFilterDslEngine *ttzip_rust_create_filter_dsl_engine(const char *query);
+bool ttzip_rust_eval_filter_dsl(const TTZipFilterDslEngine *engine, const char *path, uint64_t uncompressed_size, int64_t mtime_epoch_secs);
+void ttzip_rust_free_filter_dsl_engine(TTZipFilterDslEngine *engine);
+
 typedef struct TTZipDslFilterHandle TTZipDslFilterHandle;
 typedef struct TTZipPathFilterHandle TTZipPathFilterHandle;
 TTZipDslFilterHandle *ttzip_rust_dsl_filter_new(const char *query);
@@ -467,8 +472,25 @@ typedef struct TTZipCpuCapsRaw {
 TTZipStatus ttzip_rust_cpu_get_capabilities(TTZipCpuCapsRaw *out_caps);
 TTZipStatus ttzip_rust_cpu_get_topology(uint32_t *out_p_cores, uint32_t *out_e_cores, uint32_t *out_total_cores);
 
+// In-Place Atomic Archive Modification Engine
+typedef struct TTZipInPlaceSession TTZipInPlaceSession;
+
+TTZipStatus ttzip_rust_inplace_session_begin(const char *archive_path, int32_t format, TTZipInPlaceSession **out_session);
+TTZipStatus ttzip_rust_inplace_session_append(TTZipInPlaceSession *session, const char *entry_path, const char *source_file_path);
+TTZipStatus ttzip_rust_inplace_session_replace(TTZipInPlaceSession *session, const char *entry_path, const char *source_file_path);
+TTZipStatus ttzip_rust_inplace_session_delete(TTZipInPlaceSession *session, const char *entry_path);
+TTZipStatus ttzip_rust_inplace_session_commit(TTZipInPlaceSession *session);
+TTZipStatus ttzip_rust_inplace_session_cancel(TTZipInPlaceSession *session);
+void ttzip_rust_inplace_session_free(TTZipInPlaceSession *session);
+
+// Differential Manifest Scanner & Oracle Verifier
+TTZipStatus ttzip_rust_differential_scan_directory(const char *path, char **out_manifest_json);
+TTZipStatus ttzip_rust_differential_compare_manifests(const char *ttzip_json, const char *oracle_json, bool is_tar_format, const char *oracle_name, const char *format_name, char **out_report_json, bool *out_is_passed);
+void ttzip_rust_free_differential_string(char *ptr);
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* TTZIP_RUST_GLUE_H */
+

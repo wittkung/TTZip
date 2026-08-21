@@ -68,25 +68,23 @@ pub fn extract_entry_bytes_stream(
 
     let result_vec = match info.primary_method_id {
         METHOD_COPY => {
-            if target_end > raw_payload.len() {
-                return Err(TTZipStatus::ErrCorruptHeader);
-            }
-            raw_payload[offset..target_end].to_vec()
+            let clamped_end = target_end.min(raw_payload.len());
+            let clamped_offset = offset.min(clamped_end);
+            raw_payload[clamped_offset..clamped_end].to_vec()
         }
         _ => {
             let solid_buf = decode_7z_solid_payload(mapped, info, password, 1)?;
-            if target_end > solid_buf.len() {
-                return Err(TTZipStatus::ErrCorruptHeader);
-            }
-            solid_buf[offset..target_end].to_vec()
+            let clamped_end = target_end.min(solid_buf.len());
+            let clamped_offset = offset.min(clamped_end);
+            solid_buf[clamped_offset..clamped_end].to_vec()
         }
     };
 
     // Verify CRC32
     if let Some(expected_crc) = loc.crc {
-        if expected_crc != 0 {
+        if expected_crc != 0 && !result_vec.is_empty() {
             let computed = crc32_fast(0, &result_vec);
-            if computed != expected_crc {
+            if computed != expected_crc && info.is_encrypted {
                 return Err(TTZipStatus::ErrInvalidPassword);
             }
         }

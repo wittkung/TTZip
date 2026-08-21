@@ -63,7 +63,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
 }
 
-@main
 struct TTZipApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     

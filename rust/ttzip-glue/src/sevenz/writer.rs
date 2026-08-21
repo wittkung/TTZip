@@ -189,14 +189,18 @@ pub fn create_7z_solid_archive_bytes(
     let (method_id, compressed_payload, coder_props) = if level == 0 || solid_buf.is_empty() {
         (METHOD_COPY, solid_buf, Vec::new())
     } else {
-        let bound = fl2_compress_bound(solid_buf.len()) + 1024;
+        let bound = fl2_compress_bound(solid_buf.len()) + 65536;
         let mut comp_buf = vec![0u8; bound];
-        let actual_len = fl2_compress(&solid_buf, &mut comp_buf, level, threads)?;
-        comp_buf.truncate(actual_len);
-
-        // Dictionary property for fast-lzma2 / 7z (e.g. 0x27 for 64MB dictionary)
-        let dict_prop = 0x27u8;
-        (METHOD_LZMA2, comp_buf, vec![dict_prop])
+        match fl2_compress(&solid_buf, &mut comp_buf, level, threads) {
+            Ok(actual_len) => {
+                comp_buf.truncate(actual_len);
+                let dict_prop = 20u8; // 2MB dictionary
+                (METHOD_LZMA2, comp_buf, vec![dict_prop])
+            }
+            Err(_) => {
+                (METHOD_COPY, solid_buf, Vec::new())
+            }
+        }
     };
 
     let compressed_len = compressed_payload.len() as u64;

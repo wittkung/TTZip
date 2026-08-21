@@ -154,4 +154,114 @@ final class InPlaceArchiveEditSyncTests: XCTestCase {
         // 7. Clean up session
         mutationEngine.closeEditingSession(session: session)
     }
+    
+    func testInPlaceAddAndMultipleDeleteOperations() async throws {
+        // 1. Create initial files and ZIP
+        let srcDir = tempWorkDir.appendingPathComponent("src_add_del", isDirectory: true)
+        try FileManager.default.createDirectory(at: srcDir, withIntermediateDirectories: true)
+        
+        let file1 = srcDir.appendingPathComponent("keep1.txt")
+        let file2 = srcDir.appendingPathComponent("delete_me.txt")
+        try "Keep 1".write(to: file1, atomically: true, encoding: .utf8)
+        try "Delete Me".write(to: file2, atomically: true, encoding: .utf8)
+        
+        let archiveURL = tempWorkDir.appendingPathComponent("add_del_test.zip")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: archiveURL.path, format: .zip, inputPaths: [file1.path, file2.path])
+        
+        // 2. Add a new file in-place
+        let newFile = tempWorkDir.appendingPathComponent("appended_doc.txt")
+        try "Appended Payload".write(to: newFile, atomically: true, encoding: .utf8)
+        
+        let engine = InPlaceEditEngine.shared
+        try await engine.addFilesToArchive(
+            archivePath: archiveURL.path,
+            sourceFilePaths: [newFile.path],
+            destinationVirtualFolder: "docs"
+        )
+        
+        // 3. Delete file2 from archive
+        try await engine.deleteEntriesFromArchive(
+            archivePath: archiveURL.path,
+            entryPathsToDelete: ["delete_me.txt"]
+        )
+        
+        // 4. Verify contents
+        let extractDest = tempWorkDir.appendingPathComponent("extracted_add_del", isDirectory: true)
+        try FileManager.default.createDirectory(at: extractDest, withIntermediateDirectories: true)
+        let extractor = ArchiveExtractor()
+        _ = try await extractor.extract(archivePath: archiveURL.path, destinationDir: extractDest.path)
+        
+        XCTAssertTrue(FileManager.default.fileExists(atPath: extractDest.appendingPathComponent("keep1.txt").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: extractDest.appendingPathComponent("delete_me.txt").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: extractDest.appendingPathComponent("docs/appended_doc.txt").path))
+    }
+    
+    func testInPlace7zAppendReplaceAndVerify() async throws {
+        let srcDir = tempWorkDir.appendingPathComponent("src_7z", isDirectory: true)
+        try FileManager.default.createDirectory(at: srcDir, withIntermediateDirectories: true)
+        
+        let fileA = srcDir.appendingPathComponent("alpha.txt")
+        let fileB = srcDir.appendingPathComponent("beta.txt")
+        try "Alpha Original".write(to: fileA, atomically: true, encoding: .utf8)
+        try "Beta Original".write(to: fileB, atomically: true, encoding: .utf8)
+        
+        let archiveURL = tempWorkDir.appendingPathComponent("test_7z.7z")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: archiveURL.path, format: .sevenZip, inputPaths: [fileA.path, fileB.path])
+        
+        let engine = InPlaceEditEngine.shared
+        
+        // Replace alpha.txt
+        let repFile = tempWorkDir.appendingPathComponent("alpha_new.txt")
+        try "Alpha Replaced Content".write(to: repFile, atomically: true, encoding: .utf8)
+        
+        try await engine.synchronizeEntryBackToArchive(
+            archivePath: archiveURL.path,
+            entryPath: "alpha.txt",
+            stagedFilePath: repFile.path
+        )
+        
+        // Extract and verify
+        let reader = ArchiveReader()
+        let entries = try await reader.inspect(archivePath: archiveURL.path)
+        XCTAssertFalse(entries.isEmpty)
+        
+        let dataAlpha = SevenZipSeekTable.extractSingleEntryData(archivePath: archiveURL.path, entryPath: "alpha.txt")
+        XCTAssertNotNil(dataAlpha)
+        if let data = dataAlpha, let str = String(data: data, encoding: .utf8) {
+            XCTAssertEqual(str, "Alpha Replaced Content")
+        }
+    }
+    
+    func testInPlaceTransactionalRollbackOnUnsavedClose() async throws {
+        let srcDir = tempWorkDir.appendingPathComponent("src_rollback", isDirectory: true)
+        try FileManager.default.createDirectory(at: srcDir, withIntermediateDirectories: true)
+        
+        let fileA = srcDir.appendingPathComponent("sample.txt")
+        try "Initial Rollback Content".write(to: fileA, atomically: true, encoding: .utf8)
+        
+        let archiveURL = tempWorkDir.appendingPathComponent("rollback_bundle.zip")
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: archiveURL.path, format: .zip, inputPaths: [fileA.path])
+        
+        let engine = InPlaceEditEngine.shared
+        let session = try await engine.beginEditingSession(archivePath: archiveURL.path, entryPath: "sample.txt")
+        
+        // Modify staged file
+        try "Corrupted Unsaved".write(toFile: session.stagedFilePath, atomically: true, encoding: .utf8)
+        
+        // Discard without sync
+        engine.closeEditingSession(session: session, discardUnsaved: true)
+        
+        XCTAssertFalse(FileManager.default.fileExists(atPath: session.stagedDirectoryPath))
+        
+        // Verify original archive intact
+        let extractDest = tempWorkDir.appendingPathComponent("extracted_rollback", isDirectory: true)
+        let extractor = ArchiveExtractor()
+        _ = try await extractor.extract(archivePath: archiveURL.path, destinationDir: extractDest.path)
+        let readBack = try String(contentsOf: extractDest.appendingPathComponent("sample.txt"), encoding: .utf8)
+        XCTAssertEqual(readBack, "Initial Rollback Content")
+    }
 }
+

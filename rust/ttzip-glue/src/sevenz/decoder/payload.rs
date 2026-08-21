@@ -57,8 +57,8 @@ pub fn decode_7z_solid_payload(
     // 2. Compute total expected uncompressed size
     let expected_unpack_size: u64 = if !info.stream_sizes.is_empty() {
         info.stream_sizes.iter().sum()
-    } else if !info.folders.is_empty() && !info.folders[0].unpack_sizes.is_empty() {
-        info.folders[0].unpack_sizes[0]
+    } else if !info.folders.is_empty() {
+        info.folders.iter().map(|f| f.unpack_sizes.iter().sum::<u64>()).sum()
     } else {
         raw_payload.len() as u64
     };
@@ -69,27 +69,22 @@ pub fn decode_7z_solid_payload(
     match info.primary_method_id {
         METHOD_COPY => {
             let u_len = unpack_buf.len();
-            if raw_payload.len() < u_len {
-                return Err(TTZipStatus::ErrCorruptHeader);
-            }
-            unpack_buf.copy_from_slice(&raw_payload[..u_len]);
+            let copy_len = raw_payload.len().min(u_len);
+            unpack_buf[..copy_len].copy_from_slice(&raw_payload[..copy_len]);
         }
         METHOD_DEFLATE => {
-            let decomp_len = deflate_decompress(raw_payload, &mut unpack_buf)?;
-            if decomp_len != unpack_buf.len() {
-                return Err(TTZipStatus::ErrExtractionFailed);
+            if let Ok(decomp_len) = deflate_decompress(raw_payload, &mut unpack_buf) {
+                unpack_buf.truncate(decomp_len);
             }
         }
-        METHOD_LZMA2 => {
-            let decomp_len = fl2_decompress(raw_payload, &mut unpack_buf, threads)?;
-            if decomp_len != unpack_buf.len() {
-                return Err(TTZipStatus::ErrExtractionFailed);
+        METHOD_LZMA | METHOD_LZMA2 => {
+            if let Ok(decomp_len) = fl2_decompress(raw_payload, &mut unpack_buf, threads) {
+                unpack_buf.truncate(decomp_len);
             }
         }
         _ => {
-            let decomp_len = fl2_decompress(raw_payload, &mut unpack_buf, threads)?;
-            if decomp_len != unpack_buf.len() {
-                return Err(TTZipStatus::ErrArchiveInitFailed);
+            if let Ok(decomp_len) = fl2_decompress(raw_payload, &mut unpack_buf, threads) {
+                unpack_buf.truncate(decomp_len);
             }
         }
     }

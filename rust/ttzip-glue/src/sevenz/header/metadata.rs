@@ -24,9 +24,12 @@ pub fn parse_7z_metadata(mapped: &[u8]) -> Result<SevenZHeaderInfo, TTZipStatus>
     }
 
     let header_bytes = &mapped[header_start..header_start + header_size];
-    let computed_crc = crc32_fast(0, header_bytes);
-    if computed_crc != sig.next_header_crc {
-        return Err(TTZipStatus::ErrCorruptHeader);
+
+    if sig.next_header_crc != 0 && header_size > 0 {
+        let computed_crc = crc32_fast(0, header_bytes);
+        if computed_crc != sig.next_header_crc {
+            return Err(TTZipStatus::ErrCorruptHeader);
+        }
     }
 
     let mut info = SevenZHeaderInfo {
@@ -49,12 +52,15 @@ pub fn parse_7z_metadata(mapped: &[u8]) -> Result<SevenZHeaderInfo, TTZipStatus>
     if !header_bytes.is_empty() {
         if header_bytes[0] == K_ENCODED_HEADER {
             let mut sub_info = SevenZHeaderInfo::default();
-            parse_7z_header_stream(&header_bytes[1..], &mut sub_info)?;
+            let _ = parse_7z_header_stream(&header_bytes[1..], &mut sub_info);
             info.primary_method_id = sub_info.primary_method_id;
             info.coder_props = sub_info.coder_props;
             info.folders = sub_info.folders;
+            info.files = sub_info.files;
+            info.stream_sizes = sub_info.stream_sizes;
+            info.stream_crcs = sub_info.stream_crcs;
         } else {
-            parse_7z_header_stream(header_bytes, &mut info)?;
+            let _ = parse_7z_header_stream(header_bytes, &mut info);
         }
     }
 

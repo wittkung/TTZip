@@ -270,3 +270,104 @@ fn test_phase5_archive_error_handling() {
     };
     assert_eq!(null_status, TTZipStatus::ErrInvalidParam);
 }
+
+#[test]
+fn test_phase5_inplace_editing_ffi_roundtrip() {
+    let temp_dir = std::env::temp_dir().join("ttzip_test_phase5_inplace_ffi");
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    let src_file = temp_dir.join("initial.txt");
+    fs::write(&src_file, b"Initial FFI Content").unwrap();
+
+    let c_src_path = CString::new(src_file.to_str().unwrap()).unwrap();
+    let src_ptrs = [c_src_path.as_ptr()];
+
+    let archive_path = temp_dir.join("inplace_test.zip");
+    let c_archive_path = CString::new(archive_path.to_str().unwrap()).unwrap();
+
+    let create_options = TTZipCreateOptions {
+        format: TTZipArchiveFormat::Zip,
+        level: TTZipCompressionLevel::Normal,
+        encryption: TTZipEncryptionMethod::None,
+        password: std::ptr::null(),
+        thread_budget: 2,
+        solid_block_size_mb: 0,
+        progress_callback: None,
+        user_data: std::ptr::null_mut(),
+    };
+
+    let create_status = unsafe {
+        ttzip_rust_create_archive(
+            src_ptrs.as_ptr(),
+            src_ptrs.len(),
+            c_archive_path.as_ptr(),
+            &create_options,
+        )
+    };
+    assert_eq!(create_status, TTZipStatus::Ok);
+
+    // FFI In-place session begin
+    let mut session_ptr: *mut ttzip_glue::ffi::TTZipInPlaceSession = std::ptr::null_mut();
+    let begin_status = unsafe {
+        ttzip_rust_inplace_session_begin(c_archive_path.as_ptr(), 1, &mut session_ptr)
+    };
+    assert_eq!(begin_status, TTZipStatus::Ok);
+    assert!(!session_ptr.is_null());
+
+    let rep_file = temp_dir.join("replaced.txt");
+    fs::write(&rep_file, b"Replaced FFI Content").unwrap();
+    let c_rep_file = CString::new(rep_file.to_str().unwrap()).unwrap();
+    let c_entry_name = CString::new("initial.txt").unwrap();
+
+    let rep_status = unsafe {
+        ttzip_rust_inplace_session_replace(session_ptr, c_entry_name.as_ptr(), c_rep_file.as_ptr())
+    };
+    assert_eq!(rep_status, TTZipStatus::Ok);
+
+    let app_file = temp_dir.join("appended.txt");
+    fs::write(&app_file, b"Appended FFI Content").unwrap();
+    let c_app_file = CString::new(app_file.to_str().unwrap()).unwrap();
+    let c_app_entry = CString::new("appended.txt").unwrap();
+
+    let app_status = unsafe {
+        ttzip_rust_inplace_session_append(session_ptr, c_app_entry.as_ptr(), c_app_file.as_ptr())
+    };
+    assert_eq!(app_status, TTZipStatus::Ok);
+
+    let commit_status = unsafe { ttzip_rust_inplace_session_commit(session_ptr) };
+    assert_eq!(commit_status, TTZipStatus::Ok);
+
+    unsafe { ttzip_rust_inplace_session_free(session_ptr) };
+
+    // Extract and verify updated archive
+    let out_dir = temp_dir.join("extracted_inplace");
+    let c_out_dir = CString::new(out_dir.to_str().unwrap()).unwrap();
+    let extract_options = TTZipExtractOptions {
+        destination_path: c_out_dir.as_ptr(),
+        password: std::ptr::null(),
+        thread_budget: 2,
+        overwrite_existing: true,
+        preserve_permissions: true,
+        dry_run: false,
+        progress_callback: None,
+        user_data: std::ptr::null_mut(),
+    };
+
+    let ext_status = unsafe {
+        ttzip_rust_extract_archive(
+            c_archive_path.as_ptr(),
+            c_out_dir.as_ptr(),
+            &extract_options,
+        )
+    };
+    assert_eq!(ext_status, TTZipStatus::Ok);
+
+    let content_rep = fs::read_to_string(out_dir.join("initial.txt")).unwrap();
+    assert_eq!(content_rep, "Replaced FFI Content");
+    let content_app = fs::read_to_string(out_dir.join("appended.txt")).unwrap();
+    assert_eq!(content_app, "Appended FFI Content");
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+

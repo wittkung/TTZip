@@ -129,6 +129,33 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         
         // Fast-path for 7z / DMG / ISO containers
         if pathLower.contains(".7z") || pathLower.contains("sevenzip") || pathLower.hasSuffix(".cb7") || pathLower.hasSuffix(".dmg") || pathLower.hasSuffix(".iso") {
+            let activePwd = password ?? passCandidates.first
+            let pwd = (activePwd != nil && !activePwd!.isEmpty) ? activePwd : nil
+            let rStatus = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
+                CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
+                    CUnsafeBufferAdapter.withCString(pwd) { pPtr in
+                        guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                        var opt = TTZipExtractOptions(
+                            destination_path: dPtr,
+                            password: pPtr,
+                            thread_budget: 0,
+                            overwrite_existing: true,
+                            preserve_permissions: true,
+                            dry_run: false,
+                            progress_callback: nil,
+                            user_data: nil
+                        )
+                        return ttzip_rust_extract_archive(aPtr, dPtr, &opt)
+                    }
+                }
+            }
+            if rStatus == TTZIP_STATUS_OK {
+                let items = (try? FileManager.default.contentsOfDirectory(atPath: destinationDir)) ?? []
+                if !items.isEmpty {
+                    return
+                }
+            }
+            
             let candidates: [String?] = passCandidates.isEmpty ? [password] : passCandidates.map { Optional($0) }
             for cand in candidates {
                 if let ok = try? SevenZipEngine.shared.extract(archivePath: archivePath, destinationDir: destinationDir, password: cand), ok {

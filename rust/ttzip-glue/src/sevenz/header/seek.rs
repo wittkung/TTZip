@@ -53,6 +53,8 @@ impl SevenZSeekIndex {
             } else {
                 let sz = if stream_idx < info.stream_sizes.len() {
                     info.stream_sizes[stream_idx]
+                } else if stream_idx < info.folders.len() {
+                    info.folders[stream_idx].unpack_sizes.first().copied().unwrap_or(0)
                 } else if !info.folders.is_empty() && !info.folders[0].unpack_sizes.is_empty() {
                     info.folders[0].unpack_sizes[0].saturating_sub(current_folder_offset)
                 } else {
@@ -92,7 +94,10 @@ impl SevenZSeekIndex {
         self.entries.iter().find(|e| {
             let e_norm = e.rel_path.replace('\\', "/");
             let e_norm_trimmed = e_norm.trim_start_matches('/');
-            e_norm_trimmed == normalized_trimmed || e.rel_path == path
+            e_norm_trimmed == normalized_trimmed
+                || e.rel_path == path
+                || e_norm_trimmed.ends_with(normalized_trimmed)
+                || normalized_trimmed.ends_with(&e_norm_trimmed)
         })
     }
 }

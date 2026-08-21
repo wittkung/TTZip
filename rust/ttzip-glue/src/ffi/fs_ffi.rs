@@ -10,6 +10,7 @@
 use crate::fs::apfs::{
     apfs_clone_file, apfs_fcopyfile_clone, apfs_preallocate, is_mac_junk_file, ttzip_remove_path_fast,
 };
+use crate::fs::filter_dsl::{DslParser, FilterExpr};
 use crate::fs::safe_extract::sanitize_and_validate_path;
 use crate::fs::scanner::{scan_directory_parallel, ScanOptions};
 use crate::types::TTZipStatus;
@@ -236,5 +237,78 @@ pub unsafe extern "C" fn ttzip_rust_scan_directory_parallel(
         TTZipStatus::Ok
     });
     result.unwrap_or(TTZipStatus::ErrPanicCaught)
+}
+
+// MARK: - Filter DSL C-ABI Engine
+
+pub struct TTZipFilterDslEngine {
+    pub expr: FilterExpr<'static>,
+    pub raw_query: *mut str,
+}
+
+impl Drop for TTZipFilterDslEngine {
+    fn drop(&mut self) {
+        if !self.raw_query.is_null() {
+            unsafe {
+                let _ = Box::from_raw(self.raw_query);
+            }
+        }
+    }
+}
+
+/// Creates a compiled Filter DSL engine from query string.
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_create_filter_dsl_engine(
+    query: *const c_char,
+) -> *mut TTZipFilterDslEngine {
+    let result = catch_unwind(|| {
+        if query.is_null() {
+            return std::ptr::null_mut();
+        }
+        let query_str = match CStr::from_ptr(query).to_str() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
+        let leaked_raw = Box::into_raw(query_str.to_string().into_boxed_str());
+        let expr = DslParser::parse_or_fallback(unsafe { &*leaked_raw });
+        Box::into_raw(Box::new(TTZipFilterDslEngine {
+            expr,
+            raw_query: leaked_raw,
+        }))
+    });
+    result.unwrap_or(std::ptr::null_mut())
+}
+
+/// Evaluates archive entry metadata against a compiled Filter DSL engine with zero heap allocation.
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_eval_filter_dsl(
+    engine: *const TTZipFilterDslEngine,
+    path: *const c_char,
+    uncompressed_size: u64,
+    mtime_epoch_secs: i64,
+) -> bool {
+    let result = catch_unwind(|| {
+        if engine.is_null() || path.is_null() {
+            return false;
+        }
+        let path_str = match CStr::from_ptr(path).to_str() {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        (*engine)
+            .expr
+            .evaluate_metadata(path_str, uncompressed_size, mtime_epoch_secs)
+    });
+    result.unwrap_or(false)
+}
+
+/// Destroys a Filter DSL engine.
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_free_filter_dsl_engine(engine: *mut TTZipFilterDslEngine) {
+    let _ = catch_unwind(|| {
+        if !engine.is_null() {
+            let _ = Box::from_raw(engine);
+        }
+    });
 }
 

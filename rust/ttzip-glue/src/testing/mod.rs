@@ -7,9 +7,11 @@
 
 //! Testing utilities, SIMD binary hex diff engine, and deterministic fuzz mutation suite.
 
+pub mod differential;
 pub mod fuzz;
 pub mod hex_diff;
 
+pub use differential::*;
 pub use fuzz::*;
 pub use hex_diff::*;
 

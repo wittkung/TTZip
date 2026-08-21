@@ -64,7 +64,10 @@ public final class SevenZipEngine: @unchecked Sendable {
             return ok
         }
         
-        let ok = try SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, skipMacJunk: true, password: pwd)
+        var ok = (try? SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, skipMacJunk: true, password: pwd)) ?? false
+        if !ok {
+            ok = (try? SevenZipParallelWriter.shared.extractArchive(archivePath: archivePath, destinationDir: destinationDir, password: pwd)) ?? false
+        }
         if !ok {
             TTLogger.debug("[SevenZipEngine] Extraction failed: \(archivePath)")
             return false

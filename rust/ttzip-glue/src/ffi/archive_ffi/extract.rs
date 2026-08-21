@@ -98,6 +98,13 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
 
         let open_rc = archive_read_open_filename(a, archive_path, 65536);
         if open_rc != 0 {
+            if let Ok(mapped) = fs::read(archive_p) {
+                if let Ok(sevenz) = crate::sevenz::decoder::archive::SevenZArchive::open_slice(&mapped) {
+                    if let Ok(_report) = sevenz.extract_all(dest_p, &*options) {
+                        return TTZipStatus::Ok;
+                    }
+                }
+            }
             return TTZipStatus::ErrOpenFailed;
         }
 
@@ -208,6 +215,13 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
                     if r < 0 {
                         drop(file);
                         let _ = fs::remove_file(&target_path);
+                        if let Ok(mapped) = fs::read(archive_p) {
+                            if let Ok(sevenz) = crate::sevenz::decoder::archive::SevenZArchive::open_slice(&mapped) {
+                                if let Ok(_report) = sevenz.extract_all(dest_p, &*options) {
+                                    return TTZipStatus::Ok;
+                                }
+                            }
+                        }
                         return TTZipStatus::ErrInvalidPassword;
                     }
                     if r == 0 {
@@ -233,6 +247,16 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
         }
 
         drop(guard);
+
+        if total_processed == 0 && !dry_run {
+            if let Ok(mapped) = fs::read(archive_p) {
+                if let Ok(sevenz) = crate::sevenz::decoder::archive::SevenZArchive::open_slice(&mapped) {
+                    if let Ok(_report) = sevenz.extract_all(dest_p, &*options) {
+                        return TTZipStatus::Ok;
+                    }
+                }
+            }
+        }
 
         if !dry_run {
             if let Err(e) = engine.apply_deferred_metadata(preserve_perm) {

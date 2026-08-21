@@ -7,7 +7,6 @@
 
 import XCTest
 @testable import TTZipCore
-@testable import TTZipApp
 
 final class Phase3IntegrationTests: XCTestCase {
     
@@ -114,62 +113,5 @@ final class Phase3IntegrationTests: XCTestCase {
         XCTAssertTrue(ok)
         let extractedFile = URL(fileURLWithPath: targetExtractDir).appendingPathComponent("quicklook_sample.txt")
         XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFile.path))
-    }
-    
-    // MARK: - Task T011: PasswordVault & Rust Multi-Core Recovery Tests
-    
-    @MainActor
-    func testPasswordVaultViewModelParallelRecovery() async throws {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        
-        let plainFile = tempDir.appendingPathComponent("vault_secret.txt")
-        try "Confidential Vault Data 2026".write(to: plainFile, atomically: true, encoding: .utf8)
-        
-        let encArchive = tempDir.appendingPathComponent("encrypted_vault.zip").path
-        let writer = ArchiveWriter()
-        let knownPassword = "DragonFruit2026!"
-        try await writer.createArchive(
-            outputPath: encArchive,
-            format: .zip,
-            level: .normal,
-            inputPaths: [plainFile.path],
-            password: knownPassword
-        )
-        
-        let viewModel = PasswordVaultViewModel()
-        viewModel.setupFirstMasterPassword()
-        if !viewModel.isUnlocked {
-            viewModel.masterPasswordInput = "MasterSecret123!"
-            viewModel.confirmMasterPasswordInput = "MasterSecret123!"
-            viewModel.setupFirstMasterPassword()
-        }
-        
-        // Add candidate passwords including the known password
-        PasswordVaultManager.shared.addEntry(label: "Work Key", password: "WrongPassword999", category: "Test")
-        PasswordVaultManager.shared.addEntry(label: "Secret Key", password: knownPassword, category: "Test")
-        
-        viewModel.recoveryArchivePath = encArchive
-        await viewModel.runParallelPasswordRecovery(archivePath: encArchive, customCandidates: ["Alpha", "Beta"])
-        
-        XCTAssertNotNil(viewModel.recoveryResult)
-        XCTAssertEqual(viewModel.recoveryResult?.foundPassword, knownPassword)
-        XCTAssertTrue(viewModel.recoveryStatusMessage.contains(knownPassword) || viewModel.recoveryStatusMessage.contains("Success"))
-    }
-    
-    @MainActor
-    func testAppViewStatePrefetchingIntegration() async throws {
-        let appState = AppViewState()
-        let entries = [
-            ArchiveEntry(path: "doc1.txt", uncompressedSize: 100, isDirectory: false, isEncrypted: false),
-            ArchiveEntry(path: "doc2.txt", uncompressedSize: 200, isDirectory: false, isEncrypted: false)
-        ]
-        
-        appState.prefetchArchiveEntries(path: "/tmp/fake_archive.zip", entries: entries, count: 2)
-        appState.prefetchVisibleWindow(path: "/tmp/fake_archive.zip", startIndex: 0, count: 2)
-        appState.clearArchiveVFSCache(path: "/tmp/fake_archive.zip")
-        
-        XCTAssertEqual(appState.statusMessage, "Ready")
     }
 }

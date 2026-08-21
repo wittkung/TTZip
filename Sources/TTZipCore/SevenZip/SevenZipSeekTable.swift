@@ -206,7 +206,10 @@ public final class SevenZipSeekTable: @unchecked Sendable {
         try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(atPath: tempDir) }
         
-        let success = (try? SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: tempDir, skipMacJunk: false, password: password)) ?? false
+        var success = (try? SevenZipCAdapter.shared.extractArchive(archivePath: archivePath, destinationDir: tempDir, skipMacJunk: false, password: password)) ?? false
+        if !success {
+            success = (try? SevenZipParallelWriter.shared.extractArchive(archivePath: archivePath, destinationDir: tempDir, password: password)) ?? false
+        }
         if success {
             let directOut = URL(fileURLWithPath: tempDir).appendingPathComponent(entryPath).path
             if let data = try? Data(contentsOf: URL(fileURLWithPath: directOut)) {
@@ -218,7 +221,7 @@ public final class SevenZipSeekTable: @unchecked Sendable {
                 for case let file as String in enumerator {
                     if file == entryPath || file.hasSuffix("/\(entryPath)") || (file as NSString).lastPathComponent == fileName {
                         let fPath = URL(fileURLWithPath: tempDir).appendingPathComponent(file).path
-                        if let data = try? Data(contentsOf: URL(fileURLWithPath: fPath)) {
+                        if let data = try? Data(contentsOf: URL(fileURLWithPath: fPath)), !data.isEmpty {
                             return data
                         }
                     }

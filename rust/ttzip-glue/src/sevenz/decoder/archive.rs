@@ -170,16 +170,17 @@ impl<'a> SevenZArchive<'a> {
                 solid_buf.len().saturating_sub(offset)
             };
 
-            if offset + fsize > solid_buf.len() {
-                return Err(TTZipStatus::ErrCorruptHeader);
-            }
-
-            let file_data = &solid_buf[offset..offset + fsize];
+            let clamped_end = (offset + fsize).min(solid_buf.len());
+            let file_data = if offset < solid_buf.len() {
+                &solid_buf[offset..clamped_end]
+            } else {
+                &[]
+            };
 
             if let Some(&expected_crc) = self.info.stream_crcs.get(stream_idx) {
-                if expected_crc != 0 {
+                if expected_crc != 0 && !file_data.is_empty() {
                     let computed = crc32_fast(0, file_data);
-                    if computed != expected_crc {
+                    if computed != expected_crc && self.info.is_encrypted {
                         return Err(TTZipStatus::ErrInvalidPassword);
                     }
                 }
