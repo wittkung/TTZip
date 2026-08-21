@@ -10,3 +10,4 @@ import TTZipCore
 
 /// Terminal renderer providing ANSI colored badges, summary tables, formatted hex diffs, and timing metrics
 public typealias TestTerminalRenderer = TTZipCore.TestTerminalRenderer
+public typealias TestTerminalANSIFormatter = TTZipCore.TestTerminalANSIFormatter

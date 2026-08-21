@@ -59,8 +59,6 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
         let activeProfile = customProfile ?? level.zipProfile
         
         // 0. Shannon entropy and microsecond SIMD compressibility probe
-        var entropyVal: Double = 0.0
-        var estimatedRatio: Double = 1.0
         let routingMethod: Int32 = (activeProfile.deflateLevel == 0 || level == .store) ? 0 : 8
         let isDirectStore = (routingMethod == 0 || activeProfile.deflateLevel == 0 || level == .store)
         let compressionMethod: UInt16 = isDirectStore ? 0 : 8

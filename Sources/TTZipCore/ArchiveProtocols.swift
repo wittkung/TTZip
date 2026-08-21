@@ -34,39 +34,6 @@ public protocol ArchiveReading: Sendable {
     func probeEncryption(archivePath: String) async throws -> ArchiveEncryptionTier
 }
 
-extension ArchiveReading {
-    public func inspect(archivePath: String, password: String?) async throws -> [ArchiveEntry] {
-        return try await inspect(archivePath: archivePath, password: password, candidatePasswords: nil)
-    }
-    
-    public func inspectTree(archivePath: String, password: String? = nil, candidatePasswords: [String]? = nil) async throws -> ArchiveCompositeDirectory {
-        let entries = try await inspect(archivePath: archivePath, password: password, candidatePasswords: candidatePasswords)
-        return ArchiveComponentTreeBuilder.buildTree(from: entries)
-    }
-    
-    public func probeEncryption(archivePath: String) async throws -> ArchiveEncryptionTier {
-        do {
-            let entries = try await inspect(archivePath: archivePath, password: nil, candidatePasswords: nil)
-            if entries.isEmpty {
-                return .none
-            }
-            let hasEncrypted = entries.contains { $0.isEncrypted }
-            return hasEncrypted ? .dataOnly : .none
-        } catch let error as ArchiveError {
-            switch error {
-            case .passwordRequired, .passwordRequiredDetailed(_, .headerAndData):
-                return .headerAndData
-            case .passwordRequiredDetailed(_, .dataOnly):
-                return .dataOnly
-            default:
-                throw error
-            }
-        } catch {
-            throw error
-        }
-    }
-}
-
 /// Core archive creation and compression engine interface.
 public protocol ArchiveWriting: Sendable {
     func createArchive(
@@ -92,106 +59,6 @@ public protocol ArchiveWriting: Sendable {
         advancedOptions: ArchiveAdvancedOptions,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)?
     ) throws
-}
-
-extension ArchiveWriting {
-    public func createArchive(
-        outputPath: String,
-        format: ArchiveCompressionFormat = .zip,
-        level: ArchiveCompressionLevel = .normal,
-        inputPaths: [String],
-        options: ArchiveFilterOptions = .defaultClean,
-        splitVolumeSizeBytes: Int64? = nil,
-        password: String? = nil,
-        advancedOptions: ArchiveAdvancedOptions = .defaultOptions,
-        progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
-    ) async throws {
-        try await createArchive(
-            outputPath: outputPath,
-            format: format,
-            level: level,
-            inputPaths: inputPaths,
-            options: options,
-            splitVolumeSizeBytes: splitVolumeSizeBytes,
-            password: password,
-            advancedOptions: advancedOptions,
-            progressHandler: progressHandler
-        )
-    }
-
-    public func createArchiveSync(
-        outputPath: String,
-        format: ArchiveCompressionFormat = .zip,
-        level: ArchiveCompressionLevel = .normal,
-        inputPaths: [String],
-        options: ArchiveFilterOptions = .defaultClean,
-        password: String? = nil,
-        splitVolumeSizeBytes: Int64? = nil,
-        advancedOptions: ArchiveAdvancedOptions = .defaultOptions,
-        progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
-    ) throws {
-        try createArchiveSync(
-            outputPath: outputPath,
-            format: format,
-            level: level,
-            inputPaths: inputPaths,
-            options: options,
-            password: password,
-            splitVolumeSizeBytes: splitVolumeSizeBytes,
-            advancedOptions: advancedOptions,
-            progressHandler: progressHandler
-        )
-    }
-
-    public func createArchive(
-        outputPath: String,
-        format: ArchiveCompressionFormat = .zip,
-        level: ArchiveCompressionLevel = .normal,
-        components: [ArchiveComponentProtocol],
-        options: ArchiveFilterOptions = .defaultClean,
-        splitVolumeSizeBytes: Int64? = nil,
-        password: String? = nil,
-        advancedOptions: ArchiveAdvancedOptions = .defaultOptions,
-        progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
-    ) async throws {
-        let inputPaths = components.map { $0.path }
-        try await createArchive(
-            outputPath: outputPath,
-            format: format,
-            level: level,
-            inputPaths: inputPaths,
-            options: options,
-            splitVolumeSizeBytes: splitVolumeSizeBytes,
-            password: password,
-            advancedOptions: advancedOptions,
-            progressHandler: progressHandler
-        )
-    }
-
-    public func createArchiveSync(
-        outputPath: String,
-        format: ArchiveCompressionFormat = .zip,
-        level: ArchiveCompressionLevel = .normal,
-        components: [ArchiveComponentProtocol],
-        options: ArchiveFilterOptions = .defaultClean,
-        password: String? = nil,
-        splitVolumeSizeBytes: Int64? = nil,
-        advancedOptions: ArchiveAdvancedOptions = .defaultOptions,
-        progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
-    ) throws {
-        let inputPaths = components.map { $0.path }
-        try createArchiveSync(
-            outputPath: outputPath,
-            format: format,
-            level: level,
-            inputPaths: inputPaths,
-            options: options,
-            password: password,
-            splitVolumeSizeBytes: splitVolumeSizeBytes,
-            advancedOptions: advancedOptions,
-            progressHandler: progressHandler
-        )
-    }
 }
 
 /// Core archive decompression and extraction engine interface.
@@ -222,82 +89,6 @@ public protocol ArchiveExtracting: Sendable {
     func joinSplitVolumes(firstVolumePath: String, outputPath: String) -> Bool
 }
 
-extension ArchiveExtracting {
-    public func joinSplitVolumes(firstVolumePath: String, outputPath: String) -> Bool {
-        if let extractor = self as? ArchiveExtractor {
-            return extractor.joinSplitVolumes(firstVolumePath: firstVolumePath, outputPath: outputPath)
-        }
-        return false
-    }
-
-    public func extract(
-        archivePath: String,
-        destinationDir: String,
-        options: ArchiveFilterOptions = .defaultClean,
-        password: String? = nil,
-        advancedOptions: ArchiveAdvancedOptions? = nil
-    ) async throws {
-        try await extract(
-            archivePath: archivePath,
-            destinationDir: destinationDir,
-            options: options,
-            password: password,
-            advancedOptions: advancedOptions
-        )
-    }
-
-    public func extractSingleFile(
-        archivePath: String,
-        entryPath: String,
-        destinationDir: String,
-        password: String? = nil
-    ) async throws {
-        if let extractor = self as? ArchiveExtractor {
-            try await extractor.extractSingleFile(
-                archivePath: archivePath,
-                entryPath: entryPath,
-                destinationDir: destinationDir,
-                password: password
-            )
-        } else {
-            try await extract(
-                archivePath: archivePath,
-                destinationDir: destinationDir,
-                options: .defaultClean,
-                password: password,
-                advancedOptions: nil
-            )
-        }
-    }
-
-    public func extractSync(
-        archivePath: String,
-        destinationDir: String,
-        options: ArchiveFilterOptions = .defaultClean,
-        password: String? = nil,
-        advancedOptions: ArchiveAdvancedOptions? = nil
-    ) throws {
-        if let extractor = self as? ArchiveExtractor {
-            try extractor.extractSync(
-                archivePath: archivePath,
-                destinationDir: destinationDir,
-                options: options,
-                password: password,
-                advancedOptions: advancedOptions
-            )
-        } else {
-            let extractor = ArchiveEngineFactory.makeExtractor()
-            try extractor.extractSync(
-                archivePath: archivePath,
-                destinationDir: destinationDir,
-                options: options,
-                password: password,
-                advancedOptions: advancedOptions
-            )
-        }
-    }
-}
-
 /// Archive data integrity and checksum verification interface.
 public protocol ArchiveIntegrityChecking: Sendable {
     func computeCRC32(filePath: String) -> String
@@ -310,25 +101,6 @@ public protocol ArchiveIntegrityChecking: Sendable {
         sourceCRC32: String?,
         label: String
     ) -> (isValid: Bool, totalExtractedBytes: Int64, crc32: String?)
-}
-
-extension ArchiveIntegrityChecking {
-    @discardableResult
-    public func verifyExtractedDirectory(
-        directoryPath: String,
-        expectedOriginalBytes: Int64,
-        sourceFilePath: String? = nil,
-        sourceCRC32: String? = nil,
-        label: String = "Verification"
-    ) -> (isValid: Bool, totalExtractedBytes: Int64, crc32: String?) {
-        return verifyExtractedDirectory(
-            directoryPath: directoryPath,
-            expectedOriginalBytes: expectedOriginalBytes,
-            sourceFilePath: sourceFilePath,
-            sourceCRC32: sourceCRC32,
-            label: label
-        )
-    }
 }
 
 /// Cryptographic hash calculation interface.

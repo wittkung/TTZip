@@ -205,11 +205,11 @@ public final class ZipParallelWriter: @unchecked Sendable {
             var extraData = Data()
             
             if needsZip64 {
-                var extraHeaderId: UInt16 = 0x0001
-                var extraDataLen: UInt16 = 24
-                var uSize64: Int64 = cdfh.uncompressedSize
-                var cSize64: Int64 = cdfh.compressedSize
-                var off64: Int64 = cdfh.offset
+                let extraHeaderId: UInt16 = 0x0001
+                let extraDataLen: UInt16 = 24
+                let uSize64: Int64 = cdfh.uncompressedSize
+                let cSize64: Int64 = cdfh.compressedSize
+                let off64: Int64 = cdfh.offset
                 
                 withUnsafeBytes(of: extraHeaderId) { extraData.append(contentsOf: $0) }
                 withUnsafeBytes(of: extraDataLen) { extraData.append(contentsOf: $0) }
