@@ -72,7 +72,7 @@ pub fn winzip_aes256_decrypt_and_verify(
     // 2. Authentication check
     let computed_mac = hmac_sha1_10(&keys.auth_key, ciphertext);
     if computed_mac != stored_mac {
-        return Err(TTZipStatus::ErrCorruptHeader);
+        return Err(TTZipStatus::ErrInvalidPassword);
     }
 
     if dst.len() < cipher_len {

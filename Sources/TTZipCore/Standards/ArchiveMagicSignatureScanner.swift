@@ -6,15 +6,15 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
 
 /// High-performance, zero-allocation multi-anchor magic signature scanner.
 ///
-/// Supports scanning byte sequences at `.head(offset)`, `.tail(offsetFromEOF)`,
-/// `.sector(sectorIndex, byteOffset)` (e.g. ISO 9660 volume descriptors), and `.tarOffset(byteOffset)` (POSIX/GNU ustar).
+/// Dispatches primary format sniffing and SFX detection to high-performance Rust C-ABI
+/// while providing zero-copy fallback inspection across registered specifications.
 public enum ArchiveMagicSignatureScanner {
 
     /// Prioritized sequence of formats for signature scanning.
-    /// Formats with longer and more distinctive signatures are evaluated first.
     public static let prioritizedFormats: [ArchiveCompressionFormat] = [
         .wim,       // 8 bytes (MSWIM\0\0\0)
         .snappy,    // 10 bytes (\xFF\x06\x00\x00sNaPpY)
@@ -36,11 +36,6 @@ public enum ArchiveMagicSignatureScanner {
     // MARK: - Offset Calculation
 
     /// Resolves the absolute starting byte offset in the archive stream for a given anchor.
-    ///
-    /// - Parameters:
-    ///   - anchor: Signature position anchor (.head, .tail, .sector, .tarOffset).
-    ///   - fileSize: Total size of the archive stream in bytes.
-    /// - Returns: Absolute 0-indexed byte offset from the start of the file.
     @inline(__always)
     public static func targetOffset(for anchor: ArchiveMagicSignature.Anchor, fileSize: Int64) -> Int64 {
         switch anchor {
@@ -58,12 +53,6 @@ public enum ArchiveMagicSignatureScanner {
     // MARK: - Buffer Matching (Zero Heap Allocation)
 
     /// Verifies if a magic signature matches the contents of an in-memory raw buffer at its designated anchor.
-    ///
-    /// - Parameters:
-    ///   - signature: Magic signature descriptor with anchor and expected byte pattern.
-    ///   - buffer: Raw byte buffer (typically mmap or contiguous memory).
-    ///   - fileSize: Total file size corresponding to the underlying stream (used for `.tail` calculation).
-    /// - Returns: `true` if all signature bytes match identically at the anchored offset; `false` otherwise.
     @inline(__always)
     public static func matchesSignature(
         _ signature: ArchiveMagicSignature,
@@ -78,19 +67,16 @@ public enum ArchiveMagicSignatureScanner {
         guard offset >= 0 else { return false }
 
         let endOffset = offset + Int64(sigLen)
-        guard endOffset <= fileSize else { return false }
-        guard endOffset <= Int64(buffer.count) else { return false }
-
+        guard endOffset <= fileSize, endOffset <= Int64(buffer.count) else { return false }
         guard let baseAddress = buffer.baseAddress else { return false }
-        let targetPtr = baseAddress.advanced(by: Int(offset))
 
+        let targetPtr = baseAddress.advanced(by: Int(offset))
         return sigBytes.withUnsafeBufferPointer { sigBuf in
             guard let sigBase = sigBuf.baseAddress else { return false }
             return memcmp(targetPtr, sigBase, sigLen) == 0
         }
     }
 
-    /// Verifies if a magic signature matches within an `UnsafeBufferPointer<UInt8>`.
     @inline(__always)
     public static func matchesSignature(
         _ signature: ArchiveMagicSignature,
@@ -100,7 +86,6 @@ public enum ArchiveMagicSignatureScanner {
         return matchesSignature(signature, in: UnsafeRawBufferPointer(buffer), fileSize: fileSize)
     }
 
-    /// Verifies if a magic signature matches within a `Data` instance.
     @inline(__always)
     public static func matchesSignature(
         _ signature: ArchiveMagicSignature,
@@ -115,13 +100,6 @@ public enum ArchiveMagicSignatureScanner {
 
     // MARK: - FileHandle Matching
 
-    /// Verifies if a magic signature matches the contents of a file stream via `FileHandle` seek and read.
-    ///
-    /// - Parameters:
-    ///   - signature: Magic signature descriptor with anchor and expected byte pattern.
-    ///   - fileHandle: Open `FileHandle` with read permissions.
-    ///   - fileSize: Total file size in bytes.
-    /// - Returns: `true` if signature matches; `false` otherwise.
     public static func matchesSignature(
         _ signature: ArchiveMagicSignature,
         fileHandle: FileHandle,
@@ -132,10 +110,7 @@ public enum ArchiveMagicSignatureScanner {
         guard sigLen > 0 else { return false }
 
         let offset = targetOffset(for: signature.anchor, fileSize: fileSize)
-        guard offset >= 0 else { return false }
-
-        let endOffset = offset + Int64(sigLen)
-        guard endOffset <= fileSize else { return false }
+        guard offset >= 0, offset + Int64(sigLen) <= fileSize else { return false }
 
         try fileHandle.seek(toOffset: UInt64(offset))
         guard let data = try fileHandle.read(upToCount: sigLen), data.count == sigLen else {
@@ -151,23 +126,34 @@ public enum ArchiveMagicSignatureScanner {
         }
     }
 
-    // MARK: - Format Detection (Buffer)
+    // MARK: - Format Detection (Buffer & Rust C-ABI Bridge)
 
     /// Detects the archive or compression format of an in-memory buffer by evaluating magic signatures.
-    ///
-    /// - Parameters:
-    ///   - buffer: Raw byte buffer.
-    ///   - fileSize: Total file size in bytes.
-    /// - Returns: Matched `ArchiveCompressionFormat`, or `nil` if unrecognized.
     public static func detectFormat(
         buffer: UnsafeRawBufferPointer,
         fileSize: Int64
     ) -> ArchiveCompressionFormat? {
-        guard !buffer.isEmpty, fileSize > 0 else { return nil }
+        guard !buffer.isEmpty, fileSize > 0, let base = buffer.baseAddress else { return nil }
 
+        var rawFormat: Int32 = 0
+        var isSfx: Bool = false
+        var sfxOffset: Int = 0
+
+        let status = ttzip_rust_detect_format_buffer(
+            base.assumingMemoryBound(to: UInt8.self),
+            buffer.count,
+            nil,
+            &rawFormat,
+            &isSfx,
+            &sfxOffset
+        )
+
+        if status == TTZIP_STATUS_OK, let format = mapDetectedFormat(rawFormat) {
+            return format
+        }
+
+        // Secondary fallback for extended formats (.wim, .lzip, .lrzip, .aar)
         let registry = ArchiveFormatStandardRegistry.shared
-
-        // 1. Evaluate prioritized formats against registered magic signatures
         for format in prioritizedFormats {
             guard let spec = registry.spec(for: format) else { continue }
             for signature in spec.magicSignatures {
@@ -176,8 +162,6 @@ public enum ArchiveMagicSignatureScanner {
                 }
             }
         }
-
-        // 2. Evaluate any remaining registered specifications
         for spec in registry.allSpecs() {
             if prioritizedFormats.contains(spec.format) { continue }
             for signature in spec.magicSignatures {
@@ -187,37 +171,9 @@ public enum ArchiveMagicSignatureScanner {
             }
         }
 
-        // 3. Self-Extracting (.exe / SFX) Zip and 7z fallback scanning
-        if buffer.count >= 16, let base = buffer.baseAddress {
-            let byte0 = base.load(fromByteOffset: 0, as: UInt8.self)
-            let byte1 = base.load(fromByteOffset: 1, as: UInt8.self)
-            if byte0 == 0x4D && byte1 == 0x5A { // MZ header
-                let limit = min(buffer.count, 65536) - 6
-                if limit > 0 {
-                    for i in 0..<limit {
-                        let b0 = base.load(fromByteOffset: i, as: UInt8.self)
-                        let b1 = base.load(fromByteOffset: i + 1, as: UInt8.self)
-                        let b2 = base.load(fromByteOffset: i + 2, as: UInt8.self)
-                        let b3 = base.load(fromByteOffset: i + 3, as: UInt8.self)
-                        if b0 == 0x50 && b1 == 0x4B && b2 == 0x03 && b3 == 0x04 {
-                            return .zip
-                        }
-                        if b0 == 0x37 && b1 == 0x7A && b2 == 0xBC && b3 == 0xAF {
-                            let b4 = base.load(fromByteOffset: i + 4, as: UInt8.self)
-                            let b5 = base.load(fromByteOffset: i + 5, as: UInt8.self)
-                            if b4 == 0x27 && b5 == 0x1C {
-                                return .sevenZip
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         return nil
     }
 
-    /// Detects the format of a `Data` instance.
     public static func detectFormat(data: Data, fileSize: Int64? = nil) -> ArchiveCompressionFormat? {
         let size = fileSize ?? Int64(data.count)
         return data.withUnsafeBytes { rawBuffer in
@@ -225,84 +181,86 @@ public enum ArchiveMagicSignatureScanner {
         }
     }
 
-    // MARK: - Format Detection (File URL)
+    // MARK: - Format Detection (File URL & Path)
 
-    /// Detects the archive or compression format of a file at the given URL using multi-anchor magic scanning.
-    ///
-    /// - Parameter fileURL: Target file URL.
-    /// - Returns: Matched `ArchiveCompressionFormat`, or `nil` if unrecognized.
     public static func detectFormat(fileURL: URL) throws -> ArchiveCompressionFormat? {
         let path = fileURL.path
         guard FileManager.default.fileExists(atPath: path) else { return nil }
 
+        var rawFormat: Int32 = 0
+        var isSfx: Bool = false
+        var sfxOffset: Int = 0
+
+        let status = path.withCString { cPath in
+            ttzip_rust_detect_format_file(cPath, &rawFormat, &isSfx, &sfxOffset)
+        }
+
+        if status == TTZIP_STATUS_OK, let format = mapDetectedFormat(rawFormat) {
+            return resolveCompoundFormat(detected: format, fileURL: fileURL)
+        }
+
+        // Fallback to FileHandle inspect or extension heuristic
         let fileHandle = try FileHandle(forReadingFrom: fileURL)
         defer { try? fileHandle.close() }
 
         let fileSize = Int64(try fileHandle.seekToEnd())
-        guard fileSize > 0 else { return nil }
-
-        let registry = ArchiveFormatStandardRegistry.shared
-
-        // 1. Evaluate prioritized formats via FileHandle seeking
-        for format in prioritizedFormats {
-            guard let spec = registry.spec(for: format) else { continue }
-            for signature in spec.magicSignatures {
-                if try matchesSignature(signature, fileHandle: fileHandle, fileSize: fileSize) {
-                    return resolveCompoundFormat(detected: format, fileURL: fileURL)
+        if fileSize > 0 {
+            let registry = ArchiveFormatStandardRegistry.shared
+            for spec in registry.allSpecs() {
+                for signature in spec.magicSignatures {
+                    if try matchesSignature(signature, fileHandle: fileHandle, fileSize: fileSize) {
+                        return resolveCompoundFormat(detected: spec.format, fileURL: fileURL)
+                    }
                 }
             }
         }
 
-        // 2. Evaluate remaining registered specs
-        for spec in registry.allSpecs() {
-            if prioritizedFormats.contains(spec.format) { continue }
-            for signature in spec.magicSignatures {
-                if try matchesSignature(signature, fileHandle: fileHandle, fileSize: fileSize) {
-                    return resolveCompoundFormat(detected: spec.format, fileURL: fileURL)
-                }
-            }
-        }
-
-        // 3. Fallback to extension for formats without standard magic (e.g. Brotli)
-        if let extFormat = detectFormatFromExtension(fileURL: fileURL) {
-            return extFormat
-        }
-
-        return nil
+        return detectFormatFromExtension(fileURL: fileURL)
     }
 
-    /// Detects format from a file path string.
     public static func detectFormat(path: String) throws -> ArchiveCompressionFormat? {
         return try detectFormat(fileURL: URL(fileURLWithPath: path))
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Mapping & Compound Resolution Helpers
 
-    /// Resolves single-stream compression formats (.gz, .bz2, .xz, .zst) to compound tarball formats (.tar.gz, .tar.bz2, etc.) when the filename indicates a tar archive.
+    @inline(__always)
+    private static func mapDetectedFormat(_ code: Int32) -> ArchiveCompressionFormat? {
+        switch code {
+        case 1: return .zip
+        case 2: return .sevenZip
+        case 3: return .tar
+        case 4: return .gz
+        case 5: return .bz2
+        case 6: return .xz
+        case 7: return .zst
+        case 10: return .iso
+        case 11: return .dmg
+        case 16: return .snappy
+        case 17: return .lz4
+        default: return nil
+        }
+    }
+
     private static func resolveCompoundFormat(
         detected: ArchiveCompressionFormat,
         fileURL: URL
     ) -> ArchiveCompressionFormat {
         let lower = fileURL.lastPathComponent.lowercased()
         switch detected {
-        case .gz:
-            if lower.hasSuffix(".tar.gz") || lower.hasSuffix(".tgz") { return .tarGz }
-            return .gz
-        case .bz2:
-            if lower.hasSuffix(".tar.bz2") || lower.hasSuffix(".tbz2") || lower.hasSuffix(".tbz") { return .tarBz2 }
-            return .bz2
-        case .xz:
-            if lower.hasSuffix(".tar.xz") || lower.hasSuffix(".txz") { return .tarXz }
-            return .xz
-        case .zst:
-            if lower.hasSuffix(".tar.zst") || lower.hasSuffix(".tzst") { return .tarZst }
-            return .zst
+        case .gz where lower.hasSuffix(".tar.gz") || lower.hasSuffix(".tgz"):
+            return .tarGz
+        case .bz2 where lower.hasSuffix(".tar.bz2") || lower.hasSuffix(".tbz2") || lower.hasSuffix(".tbz"):
+            return .tarBz2
+        case .xz where lower.hasSuffix(".tar.xz") || lower.hasSuffix(".txz"):
+            return .tarXz
+        case .zst where lower.hasSuffix(".tar.zst") || lower.hasSuffix(".tzst"):
+            return .tarZst
         default:
             return detected
         }
     }
 
-    /// Extension-based format heuristic for formats lacking fixed magic bytes (RFC 7932 Brotli).
     private static func detectFormatFromExtension(fileURL: URL) -> ArchiveCompressionFormat? {
         let lower = fileURL.lastPathComponent.lowercased()
         if lower.hasSuffix(".tar.gz") || lower.hasSuffix(".tgz") { return .tarGz }

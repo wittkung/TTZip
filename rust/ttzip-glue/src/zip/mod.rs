@@ -118,4 +118,64 @@ mod tests {
         let wrong_res = archive.extract_entry_bytes(0, Some("WrongPassword"));
         assert_eq!(wrong_res, Err(TTZipStatus::ErrInvalidPassword));
     }
+
+    #[test]
+    fn test_zip_store_parallel_disk_roundtrip() {
+        use crate::types::{TTZipArchiveFormat, TTZipCompressionLevel, TTZipCreateOptions, TTZipExtractOptions};
+        use std::fs;
+
+        let temp_src = std::env::temp_dir().join("ttzip_test_store_src");
+        let temp_dst_zip = std::env::temp_dir().join("ttzip_test_store_out.zip");
+        let temp_extract = std::env::temp_dir().join("ttzip_test_store_extracted");
+
+        let _ = fs::remove_dir_all(&temp_src);
+        let _ = fs::remove_file(&temp_dst_zip);
+        let _ = fs::remove_dir_all(&temp_extract);
+
+        fs::create_dir_all(temp_src.join("nested")).unwrap();
+        fs::write(temp_src.join("file1.txt"), b"Hello Store Stream!").unwrap();
+        fs::write(temp_src.join("nested/file2.bin"), vec![0x33u8; 8192]).unwrap();
+
+        let create_opt = TTZipCreateOptions {
+            format: TTZipArchiveFormat::Zip,
+            level: TTZipCompressionLevel::Store,
+            encryption: TTZipEncryptionMethod::None,
+            password: std::ptr::null(),
+            thread_budget: 4,
+            solid_block_size_mb: 0,
+            progress_callback: None,
+            user_data: std::ptr::null_mut(),
+        };
+
+        let report = create_zip_archive(&temp_dst_zip, &[temp_src.clone()], &create_opt).unwrap();
+        assert_eq!(report.total_entries, 4); // root dir + nested dir + 2 files
+
+        let zip_bytes = fs::read(&temp_dst_zip).unwrap();
+        let archive = ZipArchive::open_slice(&zip_bytes).unwrap();
+        assert_eq!(archive.len(), 4);
+
+        let extract_opt = TTZipExtractOptions {
+            destination_path: std::ptr::null(),
+            password: std::ptr::null(),
+            thread_budget: 4,
+            overwrite_existing: true,
+            preserve_permissions: true,
+            dry_run: false,
+            progress_callback: None,
+            user_data: std::ptr::null_mut(),
+        };
+
+        let ext_report = archive.extract_all(&temp_extract, &extract_opt).unwrap();
+        assert_eq!(ext_report.processed_entries_count, 4);
+
+        let c1 = fs::read(temp_extract.join("ttzip_test_store_src/file1.txt")).unwrap();
+        assert_eq!(c1, b"Hello Store Stream!");
+
+        let c2 = fs::read(temp_extract.join("ttzip_test_store_src/nested/file2.bin")).unwrap();
+        assert_eq!(c2, vec![0x33u8; 8192]);
+
+        let _ = fs::remove_dir_all(&temp_src);
+        let _ = fs::remove_file(&temp_dst_zip);
+        let _ = fs::remove_dir_all(&temp_extract);
+    }
 }

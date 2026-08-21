@@ -25,51 +25,44 @@ public final class ZipCryptoEngine: ZipCryptoEngineProtocol, @unchecked Sendable
         public var key2: UInt32 = 0x34567890
         
         public init(password: String) {
-            for b in password.utf8 {
-                updateKeys(byte: b)
+            password.withCString { passPtr in
+                _ = ttzip_rust_zipcrypto_init_keys(passPtr, &key0, &key1, &key2)
             }
         }
         
         public mutating func updateKeys(byte: UInt8) {
-            key0 = crc32(key0, byte)
-            key1 = (key1 &+ (key0 & 0xFF)) &* 134775813 &+ 1
-            key2 = crc32(key2, UInt8(truncatingIfNeeded: key1 >> 24))
+            var src = byte
+            var dst: UInt8 = 0
+            _ = ttzip_rust_zipcrypto_encrypt_stream(&key0, &key1, &key2, &src, 1, &dst)
         }
         
         public func decryptByte() -> UInt8 {
             let temp = UInt16(key2 | 2)
             return UInt8(truncatingIfNeeded: (temp &* (temp ^ 1)) >> 8)
         }
-        
-        private func crc32(_ key: UInt32, _ byte: UInt8) -> UInt32 {
-            let table: [UInt32] = [
-                0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
-                0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91
-            ]
-            let idx = Int((key ^ UInt32(byte)) & 0x0F)
-            return table[idx] ^ (key >> 4)
-        }
     }
     
     /// Decrypts traditional ZipCrypto payload (strips the initial 12-byte header).
     public func decryptZipCrypto(payload: Data, password: String) -> Data? {
         guard payload.count >= 12 else { return nil }
-        var keys = ZipCryptoKeys(password: password)
-        var decrypted = Data(count: payload.count)
+        var key0: UInt32 = 0
+        var key1: UInt32 = 0
+        var key2: UInt32 = 0
         
-        payload.withUnsafeBytes { inPtr in
+        let initStatus = password.withCString { passPtr in
+            ttzip_rust_zipcrypto_init_keys(passPtr, &key0, &key1, &key2)
+        }
+        guard initStatus == 0 else { return nil }
+        
+        var decrypted = Data(count: payload.count)
+        let cryptStatus = payload.withUnsafeBytes { inPtr in
             decrypted.withUnsafeMutableBytes { outPtr in
                 guard let src = inPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                      let dst = outPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                
-                for i in 0..<payload.count {
-                    let k = keys.decryptByte()
-                    let c = src[i] ^ k
-                    keys.updateKeys(byte: c)
-                    dst[i] = c
-                }
+                      let dst = outPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return Int32(-1) }
+                return ttzip_rust_zipcrypto_decrypt_stream(&key0, &key1, &key2, src, payload.count, dst)
             }
         }
+        guard cryptStatus == 0 else { return nil }
         
         // Strip the 12-byte encryption check header
         return decrypted.subdata(in: 12..<decrypted.count)

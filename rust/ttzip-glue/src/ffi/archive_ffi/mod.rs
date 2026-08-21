@@ -18,7 +18,11 @@ mod extract;
 mod guards;
 mod inspect;
 mod sys;
+mod tar;
+mod zip;
 
 pub use create::ttzip_rust_create_archive;
 pub use extract::ttzip_rust_extract_archive;
 pub use inspect::ttzip_rust_inspect_archive;
+pub use tar::{ttzip_rust_tar_extract_entry, ttzip_rust_tar_scan_entries};
+pub use zip::ttzip_rust_zip_scan_entries;

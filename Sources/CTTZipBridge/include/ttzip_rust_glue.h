@@ -142,11 +142,32 @@ uint32_t ttzip_rust_crc32(uint32_t crc, const uint8_t *data, size_t len);
 uint32_t ttzip_rust_adler32(uint32_t adler, const uint8_t *data, size_t len);
 
 /**
- * AES-256 Crypto operations
+ * AES-256 & ZipCrypto Crypto operations
  */
 int32_t ttzip_rust_aes256_ctr(const uint8_t *key, uint64_t initial_counter, const uint8_t *src, size_t len, uint8_t *dst);
 int32_t ttzip_rust_aes256_cbc_decrypt(const uint8_t *key, const uint8_t *iv, const uint8_t *src, size_t len, uint8_t *dst);
 int32_t ttzip_rust_7z_kdf_sha256(const char *password, const uint8_t *salt, size_t salt_len, uint32_t num_cycles_power, uint8_t *out_key);
+int32_t ttzip_rust_zipcrypto_init_keys(const char *password, uint32_t *key0, uint32_t *key1, uint32_t *key2);
+int32_t ttzip_rust_zipcrypto_decrypt_stream(uint32_t *key0, uint32_t *key1, uint32_t *key2, const uint8_t *src, size_t len, uint8_t *dst);
+int32_t ttzip_rust_zipcrypto_encrypt_stream(uint32_t *key0, uint32_t *key1, uint32_t *key2, const uint8_t *src, size_t len, uint8_t *dst);
+
+/**
+ * Reed-Solomon FEC & Self-Healing operations
+ */
+int32_t ttzip_rust_rs_encode(const uint8_t *const *data_ptrs, size_t k_data, uint8_t *const *parity_ptrs, size_t m_parity, size_t block_size);
+int32_t ttzip_rust_rs_decode(const uint8_t *const *available_ptrs, const int32_t *available_indices, size_t num_available, size_t k_data, size_t m_parity, const int32_t *missing_indices, size_t num_missing, uint8_t *const *reconstructed_ptrs, size_t block_size);
+int32_t ttzip_rust_rs_create_recovery_record(const uint8_t *payload, size_t payload_len, double redundancy_percent, size_t slice_size, uint8_t **out_record, size_t *out_record_len);
+int32_t ttzip_rust_rs_repair_archive(const char *archive_path, bool *out_repaired);
+void ttzip_rust_rs_free_buffer(uint8_t *ptr, size_t len);
+
+/**
+ * Archive Standards & Magic Signatures Format Sniffing & Compliance
+ */
+TTZipStatus ttzip_rust_detect_format_buffer(const uint8_t *buf, size_t len, const char *filename_hint, int32_t *out_format, bool *out_is_sfx, size_t *out_sfx_offset);
+TTZipStatus ttzip_rust_detect_format_file(const char *file_path, int32_t *out_format, bool *out_is_sfx, size_t *out_sfx_offset);
+TTZipStatus ttzip_rust_check_compliance_buffer(const uint8_t *buf, size_t len, int32_t format_hint, char **out_report_json, bool *out_is_compliant);
+TTZipStatus ttzip_rust_check_compliance_file(const char *file_path, char **out_report_json, bool *out_is_compliant);
+void ttzip_rust_free_compliance_report(char *report_ptr);
 
 /**
  * DEFLATE / zlib / gzip Codecs (libdeflate)
@@ -271,6 +292,29 @@ TTZipStatus ttzip_rust_create_archive(
     size_t source_count,
     const char *destination_path,
     const TTZipCreateOptions *options
+);
+
+/**
+ * Pure Rust TAR & ZIP Direct C-ABI Operations
+ */
+TTZipStatus ttzip_rust_tar_scan_entries(
+    const char *archive_path,
+    TTZipInspectCallback callback,
+    void *user_data
+);
+
+TTZipStatus ttzip_rust_tar_extract_entry(
+    const char *archive_path,
+    size_t entry_index,
+    uint8_t *out_buffer,
+    size_t buffer_capacity,
+    size_t *out_extracted_len
+);
+
+TTZipStatus ttzip_rust_zip_scan_entries(
+    const char *archive_path,
+    TTZipInspectCallback callback,
+    void *user_data
 );
 
 #ifdef __cplusplus

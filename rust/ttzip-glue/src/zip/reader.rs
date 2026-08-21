@@ -7,22 +7,27 @@
 
 //! ZIP Archive Decompression and Extraction Engine.
 //!
-//! Features multi-core parallel extraction, libdeflate thread-local handle pooling,
-//! WinZip AES-256 hardware decryption passthrough, and ZipSlip-immune safe file landing.
+//! Features Rayon multi-core parallel decompression, thread-local libdeflate pooling,
+//! WinZip AES-256 hardware decryption, Direct I/O + APFS extent preallocation, and ZipSlip-immune safe landing.
 
 use crate::codecs::deflate::with_thread_local_decompressor;
 use crate::crypto::crc32::crc32_fast;
 use crate::crypto::sha1::winzip_aes256_decrypt_and_verify;
+use crate::fs::apfs::apfs_preallocate;
 use crate::fs::safe_extract::{sanitize_and_validate_path, SafeExtractEngine};
 use crate::types::{TTZipExtractOptions, TTZipStatus};
 use crate::zip::parser::{parse_all_entries, parse_local_file_header, ZipEntry};
+use rayon::prelude::*;
 use std::ffi::CString;
 use std::fs::{self, File};
 use std::io::Write;
+use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::thread;
+
+/// Threshold for enabling Direct I/O (F_NOCACHE) on large files (1 MB).
+const DIRECT_IO_THRESHOLD: u64 = 1024 * 1024;
 
 /// Detailed report from an archive extraction operation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -75,11 +80,7 @@ impl<'a> ZipArchive<'a> {
             .get(entry_idx)
             .ok_or(TTZipStatus::ErrInvalidOffset)?;
 
-        if entry.is_directory {
-            return Ok(Vec::new());
-        }
-
-        if entry.uncompressed_size == 0 {
+        if entry.is_directory || entry.uncompressed_size == 0 {
             return Ok(Vec::new());
         }
 
@@ -99,7 +100,6 @@ impl<'a> ZipArchive<'a> {
             if pass.is_empty() {
                 return Err(TTZipStatus::ErrInvalidPassword);
             }
-
             if comp_size < 28 {
                 return Err(TTZipStatus::ErrCorruptHeader);
             }
@@ -117,14 +117,12 @@ impl<'a> ZipArchive<'a> {
 
         match entry.actual_method {
             0 => {
-                // Store (uncompressed)
                 if effective_payload.len() != uncomp_size {
                     return Err(TTZipStatus::ErrCorruptHeader);
                 }
                 out_buffer.copy_from_slice(effective_payload);
             }
             8 => {
-                // Deflate
                 let decomp_size = with_thread_local_decompressor(|dec| {
                     dec.decompress(effective_payload, &mut out_buffer)
                 })?;
@@ -132,12 +130,9 @@ impl<'a> ZipArchive<'a> {
                     return Err(TTZipStatus::ErrCorruptHeader);
                 }
             }
-            _ => {
-                return Err(TTZipStatus::ErrArchiveInitFailed);
-            }
+            _ => return Err(TTZipStatus::ErrArchiveInitFailed),
         }
 
-        // Verify CRC32 if not WinZip AES AE-2
         if !entry.is_encrypted || entry.crc32 != 0 {
             let computed_crc = crc32_fast(0, &out_buffer);
             if computed_crc != entry.crc32 {
@@ -148,7 +143,7 @@ impl<'a> ZipArchive<'a> {
         Ok(out_buffer)
     }
 
-    /// Extracts all entries to the destination directory.
+    /// Extracts all entries to the destination directory with Direct I/O and APFS extent preallocation.
     pub fn extract_all(
         &self,
         dest_dir: &Path,
@@ -170,7 +165,6 @@ impl<'a> ZipArchive<'a> {
             None
         };
 
-        // First pass: register directories and metadata with SafeExtractEngine
         for entry in &self.entries {
             total_uncomp_bytes += entry.uncompressed_size;
             total_comp_bytes += entry.compressed_size;
@@ -198,51 +192,29 @@ impl<'a> ZipArchive<'a> {
             });
         }
 
-        // Collect non-directory tasks
-        let mut file_indices = Vec::new();
-        for (idx, entry) in self.entries.iter().enumerate() {
-            if !entry.is_directory {
-                file_indices.push(idx);
-            }
-        }
+        let file_indices: Vec<usize> = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| !e.is_directory)
+            .map(|(i, _)| i)
+            .collect();
 
-        let thread_count = (options.thread_budget as usize)
-            .clamp(1, 64)
-            .min(file_indices.len().max(1));
-
+        let thread_budget = (options.thread_budget as usize).clamp(1, 64);
         let processed_bytes = Arc::new(AtomicU64::new(0));
         let cancel_flag = Arc::new(AtomicBool::new(false));
 
-        if thread_count <= 1 || file_indices.len() <= 4 {
-            // Single-threaded path
+        if thread_budget <= 1 || file_indices.len() <= 4 {
             for &idx in &file_indices {
                 let entry = &self.entries[idx];
-                let safe_path = sanitize_and_validate_path(dest_dir, &entry.rel_path)?;
-
-                if let Some(parent) = safe_path.parent() {
-                    fs::create_dir_all(parent).map_err(|_| TTZipStatus::ErrExtractionFailed)?;
-                }
-
-                if entry.uncompressed_size == 0 {
-                    File::create(&safe_path).map_err(|_| TTZipStatus::ErrExtractionFailed)?;
-                } else {
-                    let bytes = self.extract_entry_bytes(idx, password_str)?;
-                    let mut file = File::create(&safe_path).map_err(|_| TTZipStatus::ErrExtractionFailed)?;
-                    file.write_all(&bytes).map_err(|_| TTZipStatus::ErrExtractionFailed)?;
-                }
-
+                self.extract_single_file_to_disk(dest_dir, idx, entry, password_str)?;
                 let current_done = processed_bytes.fetch_add(entry.uncompressed_size, Ordering::Relaxed)
                     + entry.uncompressed_size;
 
                 if let Some(cb) = options.progress_callback {
                     let c_path = CString::new(entry.rel_path.as_str()).unwrap_or_default();
                     let should_continue = unsafe {
-                        cb(
-                            current_done,
-                            total_uncomp_bytes,
-                            c_path.as_ptr(),
-                            options.user_data,
-                        )
+                        cb(current_done, total_uncomp_bytes, c_path.as_ptr(), options.user_data)
                     };
                     if !should_continue {
                         return Err(TTZipStatus::Cancelled);
@@ -250,64 +222,27 @@ impl<'a> ZipArchive<'a> {
                 }
             }
         } else {
-            // Multi-threaded parallel extraction
-            let chunk_size = (file_indices.len() + thread_count - 1) / thread_count;
-            let dest_dir_buf = dest_dir.to_path_buf();
-            let password_owned = password_str.map(|s| s.to_string());
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(thread_budget)
+                .build()
+                .map_err(|_| TTZipStatus::ErrArchiveInitFailed)?;
 
-            let scope_res: Result<(), TTZipStatus> = thread::scope(|s| {
-                let mut handles = Vec::new();
-
-                for chunk in file_indices.chunks(chunk_size) {
-                    let chunk_indices = chunk.to_vec();
-                    let dest_dir_cloned = dest_dir_buf.clone();
-                    let pwd_cloned = password_owned.clone();
-                    let proc_bytes_cloned = Arc::clone(&processed_bytes);
-                    let cancel_cloned = Arc::clone(&cancel_flag);
-
-                    let handle = s.spawn(move || -> Result<(), TTZipStatus> {
-                        for &idx in &chunk_indices {
-                            if cancel_cloned.load(Ordering::Relaxed) {
-                                return Err(TTZipStatus::Cancelled);
-                            }
-
-                            let entry = &self.entries[idx];
-                            let safe_path = sanitize_and_validate_path(&dest_dir_cloned, &entry.rel_path)?;
-
-                            if let Some(parent) = safe_path.parent() {
-                                let _ = fs::create_dir_all(parent);
-                            }
-
-                            if entry.uncompressed_size == 0 {
-                                File::create(&safe_path).map_err(|_| TTZipStatus::ErrExtractionFailed)?;
-                            } else {
-                                let bytes = self.extract_entry_bytes(idx, pwd_cloned.as_deref())?;
-                                let mut file = File::create(&safe_path)
-                                    .map_err(|_| TTZipStatus::ErrExtractionFailed)?;
-                                file.write_all(&bytes)
-                                    .map_err(|_| TTZipStatus::ErrExtractionFailed)?;
-                            }
-
-                            proc_bytes_cloned.fetch_add(entry.uncompressed_size, Ordering::Relaxed);
-                        }
-                        Ok(())
-                    });
-
-                    handles.push(handle);
-                }
-
-                for handle in handles {
-                    match handle.join() {
-                        Ok(res) => res?,
-                        Err(_) => return Err(TTZipStatus::ErrPanicCaught),
+            let pwd_owned = password_str.map(|s| s.to_string());
+            let par_res = pool.install(|| {
+                file_indices.par_iter().try_for_each(|&idx| -> Result<(), TTZipStatus> {
+                    if cancel_flag.load(Ordering::Relaxed) {
+                        return Err(TTZipStatus::Cancelled);
                     }
-                }
-                Ok(())
+
+                    let entry = &self.entries[idx];
+                    self.extract_single_file_to_disk(dest_dir, idx, entry, pwd_owned.as_deref())?;
+                    processed_bytes.fetch_add(entry.uncompressed_size, Ordering::Relaxed);
+                    Ok(())
+                })
             });
-            scope_res?;
+            par_res?;
         }
 
-        // Apply two-stage bottom-up permissions and timestamp restoration
         if options.preserve_permissions {
             engine.apply_all()?;
         }
@@ -318,5 +253,39 @@ impl<'a> ZipArchive<'a> {
             total_compressed_bytes: total_comp_bytes,
             duration_ms: start_time.elapsed().as_millis() as u64,
         })
+    }
+
+    fn extract_single_file_to_disk(
+        &self,
+        dest_dir: &Path,
+        idx: usize,
+        entry: &ZipEntry,
+        password: Option<&str>,
+    ) -> Result<(), TTZipStatus> {
+        let safe_path = sanitize_and_validate_path(dest_dir, &entry.rel_path)?;
+        if let Some(parent) = safe_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+
+        if entry.uncompressed_size == 0 {
+            File::create(&safe_path).map_err(|_| TTZipStatus::ErrExtractionFailed)?;
+            return Ok(());
+        }
+
+        let bytes = self.extract_entry_bytes(idx, password)?;
+        let mut file = File::create(&safe_path).map_err(|_| TTZipStatus::ErrExtractionFailed)?;
+        let fd = file.as_raw_fd();
+
+        let _ = apfs_preallocate(fd, entry.uncompressed_size as i64);
+
+        #[cfg(target_os = "macos")]
+        if entry.uncompressed_size >= DIRECT_IO_THRESHOLD {
+            unsafe {
+                libc::fcntl(fd, libc::F_NOCACHE, 1);
+            }
+        }
+
+        file.write_all(&bytes).map_err(|_| TTZipStatus::ErrExtractionFailed)?;
+        Ok(())
     }
 }

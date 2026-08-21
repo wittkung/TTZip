@@ -304,6 +304,13 @@ impl FastSha256 {
         }
     }
 
+    /// Computes one-shot SHA-256 digest of input data.
+    pub fn digest(data: &[u8]) -> [u8; 32] {
+        let mut hasher = Self::new();
+        hasher.update(data);
+        hasher.finalize()
+    }
+
     #[inline(always)]
     fn compress(&mut self, data: *const u8, blocks: usize) {
         #[cfg(target_arch = "aarch64")]

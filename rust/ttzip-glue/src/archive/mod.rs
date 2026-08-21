@@ -8,5 +8,7 @@
 //! Archive streaming and libarchive adapter module.
 
 pub mod stream_adapter;
+pub mod tar;
 
 pub use stream_adapter::*;
+pub use tar::*;

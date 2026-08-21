@@ -138,74 +138,38 @@ public final class ZipStoreStreamWriter: @unchecked Sendable {
                         let inBytePtr = mappedIn.assumingMemoryBound(to: UInt8.self)
                         posix_madvise(mappedIn, totalFileSize, POSIX_MADV_WILLNEED | POSIX_MADV_SEQUENTIAL)
 
-                        let cloneRet = -1
-                        if cloneRet == 0 {
-                            let crcChunkSize = 64 * 1024 * 1024
-                            let numChunks = (totalFileSize + crcChunkSize - 1) / crcChunkSize
-                            var chunkCRCs = [UInt32](repeating: 0, count: numChunks)
+                        let crcChunkSize = 16 * 1024 * 1024
+                        let numChunks = (totalFileSize + crcChunkSize - 1) / crcChunkSize
+                        var chunkCRCs = [UInt32](repeating: 0, count: numChunks)
 
-                            chunkCRCs.withUnsafeMutableBufferPointer { crcBuf in
-                                let rawCrcPtr = UInt(bitPattern: crcBuf.baseAddress)
-                                let rawInPtr = UInt(bitPattern: inBytePtr)
-                                ConcurrencyBridge.parallelFor(iterations: numChunks) { idx in
-                                    guard let basePtr = UnsafePointer<UInt8>(bitPattern: rawInPtr),
-                                          let outBufPtr = UnsafeMutablePointer<UInt32>(bitPattern: rawCrcPtr) else { return }
-                                    let offset = idx * crcChunkSize
-                                    let len = min(crcChunkSize, totalFileSize - offset)
-                                    let chunkPtr = basePtr.advanced(by: offset)
-                                    outBufPtr[idx] = ttzip_rust_crc32(0, chunkPtr, len)
-                                }
+                        chunkCRCs.withUnsafeMutableBufferPointer { crcBuf in
+                            let rawCrcPtr = UInt(bitPattern: crcBuf.baseAddress)
+                            let rawInPtr = UInt(bitPattern: inBytePtr)
+                            ConcurrencyBridge.parallelFor(iterations: numChunks) { idx in
+                                guard let basePtr = UnsafePointer<UInt8>(bitPattern: rawInPtr),
+                                      let outBufPtr = UnsafeMutablePointer<UInt32>(bitPattern: rawCrcPtr) else { return }
+                                let offset = idx * crcChunkSize
+                                let len = min(crcChunkSize, totalFileSize - offset)
+                                let chunkPtr = basePtr.advanced(by: offset)
+                                outBufPtr[idx] = ttzip_rust_crc32(0, chunkPtr, len)
+                                _ = pwrite(outFd, chunkPtr, len, off_t(item.dataOffset + UInt64(offset)))
                             }
-                            
-                            var finalCRC: UInt32 = 0
-                            for idx in 0..<numChunks {
-                                let len = min(crcChunkSize, totalFileSize - (idx * crcChunkSize))
-                                finalCRC = HardwareChecksumAdapter.combineCRC32(crc1: finalCRC, crc2: chunkCRCs[idx], len2: len)
-                            }
-                            fileCRC = finalCRC
-                            
-                            let pb = tracker.add(Int64(totalFileSize))
-                            
-                            let elapsed = max(0.001, Date().timeIntervalSince(startTime))
-                            let throughput = (Double(pb) / (1024 * 1024)) / elapsed
-                            progressHandler?(ArchiveProgress(
-                                state: .processing, bytesProcessed: pb, totalBytes: totalOriginalBytes,
-                                currentFileName: item.relPath, throughputMBs: throughput
-                            ))
-                        } else {
-                            let crcChunkSize = 16 * 1024 * 1024
-                            let numChunks = (totalFileSize + crcChunkSize - 1) / crcChunkSize
-                            var chunkCRCs = [UInt32](repeating: 0, count: numChunks)
-
-                            chunkCRCs.withUnsafeMutableBufferPointer { crcBuf in
-                                let rawCrcPtr = UInt(bitPattern: crcBuf.baseAddress)
-                                let rawInPtr = UInt(bitPattern: inBytePtr)
-                                ConcurrencyBridge.parallelFor(iterations: numChunks) { idx in
-                                    guard let basePtr = UnsafePointer<UInt8>(bitPattern: rawInPtr),
-                                          let outBufPtr = UnsafeMutablePointer<UInt32>(bitPattern: rawCrcPtr) else { return }
-                                    let offset = idx * crcChunkSize
-                                    let len = min(crcChunkSize, totalFileSize - offset)
-                                    let chunkPtr = basePtr.advanced(by: offset)
-                                    outBufPtr[idx] = ttzip_rust_crc32(0, chunkPtr, len)
-                                    _ = pwrite(outFd, chunkPtr, len, off_t(item.dataOffset + UInt64(offset)))
-                                }
-                            }
-                            
-                            var finalCRC: UInt32 = 0
-                            for idx in 0..<numChunks {
-                                let len = min(crcChunkSize, totalFileSize - (idx * crcChunkSize))
-                                finalCRC = HardwareChecksumAdapter.combineCRC32(crc1: finalCRC, crc2: chunkCRCs[idx], len2: len)
-                            }
-                            fileCRC = finalCRC
-                            
-                            let pb = tracker.add(Int64(totalFileSize))
-                            let elapsed = max(0.001, Date().timeIntervalSince(startTime))
-                            let throughput = (Double(pb) / (1024 * 1024)) / elapsed
-                            progressHandler?(ArchiveProgress(
-                                state: .processing, bytesProcessed: pb, totalBytes: totalOriginalBytes,
-                                currentFileName: item.relPath, throughputMBs: throughput
-                            ))
                         }
+                        
+                        var finalCRC: UInt32 = 0
+                        for idx in 0..<numChunks {
+                            let len = min(crcChunkSize, totalFileSize - (idx * crcChunkSize))
+                            finalCRC = HardwareChecksumAdapter.combineCRC32(crc1: finalCRC, crc2: chunkCRCs[idx], len2: len)
+                        }
+                        fileCRC = finalCRC
+                        
+                        let pb = tracker.add(Int64(totalFileSize))
+                        let elapsed = max(0.001, Date().timeIntervalSince(startTime))
+                        let throughput = (Double(pb) / (1024 * 1024)) / elapsed
+                        progressHandler?(ArchiveProgress(
+                            state: .processing, bytesProcessed: pb, totalBytes: totalOriginalBytes,
+                            currentFileName: item.relPath, throughputMBs: throughput
+                        ))
                         munmap(mappedIn, totalFileSize)
                     } else {
                         let chunkSize = 16 * 1024 * 1024
@@ -356,9 +320,5 @@ public final class ZipStoreStreamWriter: @unchecked Sendable {
         ftruncate(outFd, off_t(currentOffset))
 
         return true
-    }
-
-    private func isMacJunk(_ name: String) -> Bool {
-        return name == "__MACOSX" || name == ".DS_Store" || name.hasPrefix("._")
     }
 }

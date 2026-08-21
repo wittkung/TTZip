@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 6f8a3c382c9005695da4214d81140e22c13941fb4c68a986116b5f0c02263ddf # shrinks to password = "pw=sG-", wrong_password = "--KK-RN&&!*$=%F6-!2", entries = [GeneratedEntry { rel_path: "a/_.txt/", data: [], is_directory: true }, GeneratedEntry { rel_path: "root_default.txt", data: [84, 84, 90, 105, 112, 32, 83, 97, 102, 101, 32, 65, 114, 99, 104, 105, 118, 101, 32, 80, 97, 121, 108, 111, 97, 100], is_directory: false }]

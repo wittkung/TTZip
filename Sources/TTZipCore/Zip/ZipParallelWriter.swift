@@ -48,17 +48,11 @@ public final class ZipParallelWriter: @unchecked Sendable {
             let item = captureItems[idx]
             if item.isDirectory {
                 let dirPath = item.relPath.hasSuffix("/") ? item.relPath : item.relPath + "/"
-                let res = CompressedResult(
-                    relPath: dirPath,
-                    isDirectory: true,
-                    uncompressedSize: 0,
-                    compressedSize: 0,
-                    crc32: 0,
-                    compressionMethod: 0,
-                    payload: Data(),
-                    aesExtraField: nil
-                )
-                compressedResultsBox.set(idx: idx, res: res)
+                compressedResultsBox.set(idx: idx, res: CompressedResult(
+                    relPath: dirPath, isDirectory: true, uncompressedSize: 0,
+                    compressedSize: 0, crc32: 0, compressionMethod: 0,
+                    payload: Data(), aesExtraField: nil
+                ))
                 return
             }
             
@@ -208,16 +202,6 @@ public final class ZipParallelWriter: @unchecked Sendable {
             let needsZip64 = cdfh.uncompressedSize >= 0xFFFFFFFF || cdfh.compressedSize >= 0xFFFFFFFF || cdfh.offset >= 0xFFFFFFFF
             
             var record = Data()
-            var sig: UInt32 = 0x02014b50
-            var verMade: UInt16 = 45
-            var verNeed: UInt16 = 20
-            var flag: UInt16 = 0x0800
-            var method: UInt16 = cdfh.compressionMethod
-            var time: UInt16 = 0
-            var date: UInt16 = 0x5421
-            var crc: UInt32 = cdfh.crc32
-            var compSize32: UInt32 = needsZip64 ? 0xFFFFFFFF : UInt32(cdfh.compressedSize)
-            var uncompSize32: UInt32 = needsZip64 ? 0xFFFFFFFF : UInt32(cdfh.uncompressedSize)
             var extraData = Data()
             
             if needsZip64 {
@@ -227,41 +211,50 @@ public final class ZipParallelWriter: @unchecked Sendable {
                 var cSize64: Int64 = cdfh.compressedSize
                 var off64: Int64 = cdfh.offset
                 
-                extraData.append(Data(bytes: &extraHeaderId, count: 2))
-                extraData.append(Data(bytes: &extraDataLen, count: 2))
-                extraData.append(Data(bytes: &uSize64, count: 8))
-                extraData.append(Data(bytes: &cSize64, count: 8))
-                extraData.append(Data(bytes: &off64, count: 8))
+                withUnsafeBytes(of: extraHeaderId) { extraData.append(contentsOf: $0) }
+                withUnsafeBytes(of: extraDataLen) { extraData.append(contentsOf: $0) }
+                withUnsafeBytes(of: uSize64) { extraData.append(contentsOf: $0) }
+                withUnsafeBytes(of: cSize64) { extraData.append(contentsOf: $0) }
+                withUnsafeBytes(of: off64) { extraData.append(contentsOf: $0) }
             }
             if let aesExtra = cdfh.aesExtraField {
                 extraData.append(aesExtra)
-                flag |= 0x0001
             }
             
-            var extraLen: UInt16 = UInt16(extraData.count)
-            var commentLen: UInt16 = 0
-            var diskStart: UInt16 = 0
-            var internalAttr: UInt16 = 0
-            var externalAttr: UInt32 = cdfh.isDirectory ? 0x10 : 0x20
-            var localHeaderOff32: UInt32 = needsZip64 ? 0xFFFFFFFF : UInt32(cdfh.offset)
+            let sig: UInt32 = 0x02014b50
+            let verMade: UInt16 = 45
+            let verNeed: UInt16 = 20
+            let flag: UInt16 = cdfh.aesExtraField != nil ? 0x0801 : 0x0800
+            let method: UInt16 = cdfh.compressionMethod
+            let time: UInt16 = 0
+            let date: UInt16 = 0x5421
+            let crc: UInt32 = cdfh.crc32
+            let compSize32: UInt32 = needsZip64 ? 0xFFFFFFFF : UInt32(cdfh.compressedSize)
+            let uncompSize32: UInt32 = needsZip64 ? 0xFFFFFFFF : UInt32(cdfh.uncompressedSize)
+            let extraLen: UInt16 = UInt16(extraData.count)
+            let commentLen: UInt16 = 0
+            let diskStart: UInt16 = 0
+            let internalAttr: UInt16 = 0
+            let externalAttr: UInt32 = cdfh.isDirectory ? 0x10 : 0x20
+            let localHeaderOff32: UInt32 = needsZip64 ? 0xFFFFFFFF : UInt32(cdfh.offset)
             
-            record.append(Data(bytes: &sig, count: 4))
-            record.append(Data(bytes: &verMade, count: 2))
-            record.append(Data(bytes: &verNeed, count: 2))
-            record.append(Data(bytes: &flag, count: 2))
-            record.append(Data(bytes: &method, count: 2))
-            record.append(Data(bytes: &time, count: 2))
-            record.append(Data(bytes: &date, count: 2))
-            record.append(Data(bytes: &crc, count: 4))
-            record.append(Data(bytes: &compSize32, count: 4))
-            record.append(Data(bytes: &uncompSize32, count: 4))
-            record.append(Data(bytes: &fnLen, count: 2))
-            record.append(Data(bytes: &extraLen, count: 2))
-            record.append(Data(bytes: &commentLen, count: 2))
-            record.append(Data(bytes: &diskStart, count: 2))
-            record.append(Data(bytes: &internalAttr, count: 2))
-            record.append(Data(bytes: &externalAttr, count: 4))
-            record.append(Data(bytes: &localHeaderOff32, count: 4))
+            withUnsafeBytes(of: sig) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: verMade) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: verNeed) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: flag) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: method) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: time) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: date) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: crc) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: compSize32) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: uncompSize32) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: fnLen) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: extraLen) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: commentLen) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: diskStart) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: internalAttr) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: externalAttr) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: localHeaderOff32) { record.append(contentsOf: $0) }
             record.append(pathData)
             if !extraData.isEmpty { record.append(extraData) }
             
@@ -277,61 +270,61 @@ public final class ZipParallelWriter: @unchecked Sendable {
         
         if needsZip64Global {
             let z64EocdOff = cdStartOffset + cdSize
-            var z64EocdSig: UInt32 = 0x06064b50
-            var z64EocdSize: UInt64 = 44
-            var verMade: UInt16 = 45
-            var verNeed: UInt16 = 45
-            var diskNum: UInt32 = 0
-            var cdStartDisk: UInt32 = 0
-            var entriesOnDisk: UInt64 = UInt64(cdfhEntries.count)
-            var totalEntries: UInt64 = UInt64(cdfhEntries.count)
-            var cdSize64: UInt64 = UInt64(cdSize)
-            var cdOff64: UInt64 = UInt64(cdStartOffset)
-            
             var z64Record = Data()
-            z64Record.append(Data(bytes: &z64EocdSig, count: 4))
-            z64Record.append(Data(bytes: &z64EocdSize, count: 8))
-            z64Record.append(Data(bytes: &verMade, count: 2))
-            z64Record.append(Data(bytes: &verNeed, count: 2))
-            z64Record.append(Data(bytes: &diskNum, count: 4))
-            z64Record.append(Data(bytes: &cdStartDisk, count: 4))
-            z64Record.append(Data(bytes: &entriesOnDisk, count: 8))
-            z64Record.append(Data(bytes: &totalEntries, count: 8))
-            z64Record.append(Data(bytes: &cdSize64, count: 8))
-            z64Record.append(Data(bytes: &cdOff64, count: 8))
+            let z64EocdSig: UInt32 = 0x06064b50
+            let z64EocdSize: UInt64 = 44
+            let verMade: UInt16 = 45
+            let verNeed: UInt16 = 45
+            let diskNum: UInt32 = 0
+            let cdStartDisk: UInt32 = 0
+            let entriesOnDisk: UInt64 = UInt64(cdfhEntries.count)
+            let totalEntries: UInt64 = UInt64(cdfhEntries.count)
+            let cdSize64: UInt64 = UInt64(cdSize)
+            let cdOff64: UInt64 = UInt64(cdStartOffset)
+            
+            withUnsafeBytes(of: z64EocdSig) { z64Record.append(contentsOf: $0) }
+            withUnsafeBytes(of: z64EocdSize) { z64Record.append(contentsOf: $0) }
+            withUnsafeBytes(of: verMade) { z64Record.append(contentsOf: $0) }
+            withUnsafeBytes(of: verNeed) { z64Record.append(contentsOf: $0) }
+            withUnsafeBytes(of: diskNum) { z64Record.append(contentsOf: $0) }
+            withUnsafeBytes(of: cdStartDisk) { z64Record.append(contentsOf: $0) }
+            withUnsafeBytes(of: entriesOnDisk) { z64Record.append(contentsOf: $0) }
+            withUnsafeBytes(of: totalEntries) { z64Record.append(contentsOf: $0) }
+            withUnsafeBytes(of: cdSize64) { z64Record.append(contentsOf: $0) }
+            withUnsafeBytes(of: cdOff64) { z64Record.append(contentsOf: $0) }
             writeBuffer.append(z64Record)
             
-            var locatorSig: UInt32 = 0x07064b50
-            var locatorDisk: UInt32 = 0
-            var locatorOff: UInt64 = UInt64(z64EocdOff)
-            var totalDisks: UInt32 = 1
-            
             var locatorData = Data()
-            locatorData.append(Data(bytes: &locatorSig, count: 4))
-            locatorData.append(Data(bytes: &locatorDisk, count: 4))
-            locatorData.append(Data(bytes: &locatorOff, count: 8))
-            locatorData.append(Data(bytes: &totalDisks, count: 4))
+            let locatorSig: UInt32 = 0x07064b50
+            let locatorDisk: UInt32 = 0
+            let locatorOff: UInt64 = UInt64(z64EocdOff)
+            let totalDisks: UInt32 = 1
+            
+            withUnsafeBytes(of: locatorSig) { locatorData.append(contentsOf: $0) }
+            withUnsafeBytes(of: locatorDisk) { locatorData.append(contentsOf: $0) }
+            withUnsafeBytes(of: locatorOff) { locatorData.append(contentsOf: $0) }
+            withUnsafeBytes(of: totalDisks) { locatorData.append(contentsOf: $0) }
             writeBuffer.append(locatorData)
         }
         
-        var eocdSig: UInt32 = 0x06054b50
-        var diskNo: UInt16 = 0
-        var cdDiskNo: UInt16 = 0
-        var entriesDisk: UInt16 = needsZip64Global ? 0xFFFF : UInt16(min(0xFFFF, cdfhEntries.count))
-        var entriesTotal: UInt16 = needsZip64Global ? 0xFFFF : UInt16(min(0xFFFF, cdfhEntries.count))
-        var cdSize32: UInt32 = needsZip64Global ? 0xFFFFFFFF : UInt32(cdSize)
-        var cdOff32: UInt32 = needsZip64Global ? 0xFFFFFFFF : UInt32(cdStartOffset)
-        var commentLen: UInt16 = 0
-        
         var eocd = Data()
-        eocd.append(Data(bytes: &eocdSig, count: 4))
-        eocd.append(Data(bytes: &diskNo, count: 2))
-        eocd.append(Data(bytes: &cdDiskNo, count: 2))
-        eocd.append(Data(bytes: &entriesDisk, count: 2))
-        eocd.append(Data(bytes: &entriesTotal, count: 2))
-        eocd.append(Data(bytes: &cdSize32, count: 4))
-        eocd.append(Data(bytes: &cdOff32, count: 4))
-        eocd.append(Data(bytes: &commentLen, count: 2))
+        let eocdSig: UInt32 = 0x06054b50
+        let diskNo: UInt16 = 0
+        let cdDiskNo: UInt16 = 0
+        let entriesDisk: UInt16 = needsZip64Global ? 0xFFFF : UInt16(min(0xFFFF, cdfhEntries.count))
+        let entriesTotal: UInt16 = needsZip64Global ? 0xFFFF : UInt16(min(0xFFFF, cdfhEntries.count))
+        let cdSize32: UInt32 = needsZip64Global ? 0xFFFFFFFF : UInt32(cdSize)
+        let cdOff32: UInt32 = needsZip64Global ? 0xFFFFFFFF : UInt32(cdStartOffset)
+        let commentLen: UInt16 = 0
+        
+        withUnsafeBytes(of: eocdSig) { eocd.append(contentsOf: $0) }
+        withUnsafeBytes(of: diskNo) { eocd.append(contentsOf: $0) }
+        withUnsafeBytes(of: cdDiskNo) { eocd.append(contentsOf: $0) }
+        withUnsafeBytes(of: entriesDisk) { eocd.append(contentsOf: $0) }
+        withUnsafeBytes(of: entriesTotal) { eocd.append(contentsOf: $0) }
+        withUnsafeBytes(of: cdSize32) { eocd.append(contentsOf: $0) }
+        withUnsafeBytes(of: cdOff32) { eocd.append(contentsOf: $0) }
+        withUnsafeBytes(of: commentLen) { eocd.append(contentsOf: $0) }
         writeBuffer.append(eocd)
         
         if !writeBuffer.isEmpty {

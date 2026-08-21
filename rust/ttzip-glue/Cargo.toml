@@ -15,6 +15,7 @@ libc = "0.2"
 zeroize = { version = "1.8", features = ["zeroize_derive", "alloc"] }
 cfg-if = "1.0"
 log = "0.4"
+rayon = "1.10"
 
 [dev-dependencies]
 hex = "0.4"

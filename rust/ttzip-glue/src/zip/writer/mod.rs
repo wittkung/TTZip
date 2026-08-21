@@ -12,13 +12,15 @@
 
 pub mod assemble;
 pub mod parallel;
+pub mod store_stream;
 pub mod types;
 
 pub use assemble::*;
 pub use parallel::*;
+pub use store_stream::*;
 pub use types::*;
 
-use crate::types::{TTZipCompressionLevel, TTZipCreateOptions, TTZipStatus};
+use crate::types::{TTZipCompressionLevel, TTZipCreateOptions, TTZipEncryptionMethod, TTZipStatus};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -29,6 +31,10 @@ pub fn create_zip_archive(
     source_paths: &[PathBuf],
     options: &TTZipCreateOptions,
 ) -> Result<ZipCreateReport, TTZipStatus> {
+    if options.level == TTZipCompressionLevel::Store && options.encryption == TTZipEncryptionMethod::None {
+        return create_zip_store_parallel(dest_path, source_paths, options);
+    }
+
     let start_time = std::time::Instant::now();
 
     let mut input_items = Vec::new();

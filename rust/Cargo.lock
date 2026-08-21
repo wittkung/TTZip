@@ -1444,6 +1444,7 @@ dependencies = [
  "libc",
  "log",
  "proptest",
+ "rayon",
  "sha2",
  "tar",
  "tempfile",

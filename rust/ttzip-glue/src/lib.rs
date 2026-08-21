@@ -20,6 +20,7 @@ pub mod ffi;
 pub mod fs;
 pub mod runtime;
 pub mod sevenz;
+pub mod standards;
 pub mod types;
 pub mod zip;
 
@@ -30,6 +31,7 @@ pub use ffi::*;
 pub use fs::*;
 pub use runtime::*;
 pub use sevenz::{create_7z_archive, decode_7z_solid_payload, parse_7z_metadata, SevenZArchive, SevenZFileMeta, SevenZHeaderInfo};
+pub use standards::*;
 pub use types::*;
 pub use zip::{create_zip_archive, ZipArchive, ZipEntry, ZipInputItem};
 

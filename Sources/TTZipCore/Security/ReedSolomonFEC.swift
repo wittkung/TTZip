@@ -88,7 +88,7 @@ public final class ReedSolomonFEC: @unchecked Sendable {
             return dataPointers.withUnsafeBufferPointer { dPtrs in
                 parityPointers.withUnsafeBufferPointer { pPtrs in
                     guard let dBase = dPtrs.baseAddress, let pBasePtrs = pPtrs.baseAddress else { return false }
-                    return ttzip_rs_encode_neon(
+                    return ttzip_rust_rs_encode(
                         dBase,
                         K,
                         pBasePtrs,
@@ -112,7 +112,7 @@ public final class ReedSolomonFEC: @unchecked Sendable {
     }
     
     // MARK: - Decode & Reconstruct
-    /// Reconstructs corrupted data slices given available intact slices and parity slices via C11 ARM NEON.
+    /// Reconstructs corrupted data slices given available intact slices and parity slices via Rust C-ABI.
     public static func decode(
         intactSlices: [Int: Data],
         totalK: Int,
@@ -158,7 +158,7 @@ public final class ReedSolomonFEC: @unchecked Sendable {
                                   let sBase = sIdxPtrs.baseAddress,
                                   let mBase = mIdxPtrs.baseAddress,
                                   let rBasePtrs = rPtrs.baseAddress else { return false }
-                            return ttzip_rs_decode_neon(
+                            return ttzip_rust_rs_decode(
                                 aBase,
                                 sBase,
                                 totalK,

@@ -6,6 +6,7 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
 
 /// Comprehensive standards compliance report detailing specification adherence, validated headers, warnings, and violations.
 public struct StandardsComplianceReport: Sendable, Equatable, Codable {
@@ -238,5 +239,71 @@ public enum StandardsComplianceChecker {
             warnings: report.warnings,
             violations: report.violations
         )
+    }
+
+    // MARK: - Native Rust C-ABI Compliance Verification
+
+    /// Performs fast direct standards compliance verification via Rust C-ABI.
+    public static func checkComplianceNative(
+        buffer: UnsafeRawBufferPointer,
+        expectedFormat: ArchiveCompressionFormat? = nil
+    ) -> (isCompliant: Bool, reportJson: String?) {
+        guard let base = buffer.baseAddress, !buffer.isEmpty else { return (false, nil) }
+        var reportPtr: UnsafeMutablePointer<CChar>? = nil
+        var isCompliant: Bool = false
+        let formatHint = mapFormatToRustCode(expectedFormat)
+
+        let status = ttzip_rust_check_compliance_buffer(
+            base.assumingMemoryBound(to: UInt8.self),
+            buffer.count,
+            formatHint,
+            &reportPtr,
+            &isCompliant
+        )
+
+        guard status == TTZIP_STATUS_OK, let ptr = reportPtr else {
+            return (false, nil)
+        }
+        defer { ttzip_rust_free_compliance_report(ptr) }
+        return (isCompliant, String(cString: ptr))
+    }
+
+    /// Performs fast direct standards compliance verification on disk via Rust C-ABI.
+    public static func checkComplianceNative(
+        fileURL: URL
+    ) -> (isCompliant: Bool, reportJson: String?) {
+        let path = fileURL.path
+        guard FileManager.default.fileExists(atPath: path) else { return (false, nil) }
+
+        var reportPtr: UnsafeMutablePointer<CChar>? = nil
+        var isCompliant: Bool = false
+
+        let status = path.withCString { cPath in
+            ttzip_rust_check_compliance_file(cPath, &reportPtr, &isCompliant)
+        }
+
+        guard status == TTZIP_STATUS_OK, let ptr = reportPtr else {
+            return (false, nil)
+        }
+        defer { ttzip_rust_free_compliance_report(ptr) }
+        return (isCompliant, String(cString: ptr))
+    }
+
+    private static func mapFormatToRustCode(_ format: ArchiveCompressionFormat?) -> Int32 {
+        guard let format = format else { return 0 }
+        switch format {
+        case .zip: return 1
+        case .sevenZip: return 2
+        case .tar: return 3
+        case .gz, .tarGz: return 4
+        case .bz2, .tarBz2: return 5
+        case .xz, .tarXz: return 6
+        case .zst, .tarZst: return 7
+        case .iso: return 10
+        case .dmg: return 11
+        case .snappy: return 16
+        case .lz4: return 17
+        default: return 0
+        }
     }
 }
