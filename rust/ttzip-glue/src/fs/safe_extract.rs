@@ -37,15 +37,21 @@ pub fn sanitize_and_validate_path(dest_dir: &Path, raw_entry_path: &str) -> Resu
         }
     }
 
-    let input_path = Path::new(raw_entry_path);
+    if raw_entry_path.starts_with('/') || raw_entry_path.starts_with('\\') || raw_entry_path.contains("://") {
+        return Err(TTZipStatus::ErrSecurityViolation);
+    }
+
+    let normalized_slashes = raw_entry_path.replace('\\', "/");
+    let input_path = Path::new(&normalized_slashes);
     let mut normalized_components = Vec::new();
 
     for comp in input_path.components() {
         match comp {
             Component::Normal(c) => {
                 let s = c.to_string_lossy();
-                // Redundant check for internal ".."
-                if s == ".." {
+                // Reject internal ".." and multi-dot obfuscation (e.g. "...", "....")
+                // Redundant check for internal ".." or multi-dot sequences
+                if s.contains("..") || s.chars().all(|c| c == '.') {
                     return Err(TTZipStatus::ErrSecurityViolation);
                 }
                 normalized_components.push(s.to_string());

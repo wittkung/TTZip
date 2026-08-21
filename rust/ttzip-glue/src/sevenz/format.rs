@@ -130,7 +130,7 @@ pub fn read_varint(buf: &[u8]) -> Option<(u64, usize)> {
         return Some((val, 9));
     }
 
-    let mask = 0xFF >> (k + 1);
+    let mask = ((0xFFu16 >> (k + 1)) & 0xFF) as u8;
     let high_part = ((first & mask) as u64) << (k * 8);
 
     let mut low_part = 0u64;

@@ -141,7 +141,9 @@ if [ -d "${XCFRAMEWORK_MAC_DIR}" ]; then
     else
         cp "${VENDOR_DIR}/libTTZipVendor.a" "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a"
     fi
+    strip -S -x "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a" 2>/dev/null || true
 fi
+strip -S -x "${VENDOR_DIR}/libTTZipVendor.a" 2>/dev/null || true
 
 # 4. 生成或维护 C-ABI 头文件
 echo "--> [INFO] Generating C headers: Sources/CTTZipBridge/include/ttzip_rust_glue.h..."

@@ -74,6 +74,7 @@ declare -a STAGE_NAMES=(
     "Malformed Stream Fuzzing"
     "Libarchive Golden Corpus"
     "Deflate-Bench 50-Point Matrix Gate"
+    "Rust Industrial Suite (Props, Fuzz, Differential)"
 )
 
 declare -a STAGE_KEYS=(
@@ -83,6 +84,7 @@ declare -a STAGE_KEYS=(
     "fuzzing"
     "golden-corpus"
     "performance"
+    "rust-industrial"
 )
 
 declare -a STAGE_COMMANDS=(
@@ -92,6 +94,7 @@ declare -a STAGE_COMMANDS=(
     "swift test --filter ArchiveMutationFuzzTests"
     "swift test --filter LibarchiveGoldenCorpusTests"
     "swift run ttzip-bench gate"
+    "./scripts/run_rust_tests.sh --unit --props --fuzz"
 )
 
 TOTAL_STAGES=${#STAGE_NAMES[@]}
