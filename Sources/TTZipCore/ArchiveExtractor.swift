@@ -268,33 +268,12 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
     }
     
     public func joinSplitVolumes(firstVolumePath: String, outputPath: String) -> Bool {
-        let fm = FileManager.default
-        guard firstVolumePath.hasSuffix(".001") else { return false }
-        let basePath = String(firstVolumePath.dropLast(4))
-        
-        fm.createFile(atPath: outputPath, contents: nil)
-        let outFd = open(outputPath, O_WRONLY | O_TRUNC, 0644)
-        guard outFd >= 0 else { return false }
-        defer { close(outFd) }
-        
-        var idx = 1
-        return MemoryPageFlyweightPool.shared.withBuffer(size: .page64K) { ptr, capacity in
-            while true {
-                let partPath = String(format: "%@.%03d", basePath, idx)
-                guard fm.fileExists(atPath: partPath) else { break }
-                let inFd = open(partPath, O_RDONLY)
-                guard inFd >= 0 else { break }
-                
-                while true {
-                    let bytesRead = read(inFd, ptr, capacity)
-                    if bytesRead <= 0 { break }
-                    _ = write(outFd, ptr, bytesRead)
-                }
-                close(inFd)
-                idx += 1
+        let status = firstVolumePath.withCString { cFirst in
+            outputPath.withCString { cOut in
+                ttzip_rust_join_split_volumes(cFirst, cOut, nil, nil)
             }
-            return idx > 1
         }
+        return status == TTZIP_STATUS_OK
     }
 
     /// Template Method Pattern execution of streaming archive extraction.

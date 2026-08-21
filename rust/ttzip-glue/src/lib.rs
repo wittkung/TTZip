@@ -12,7 +12,9 @@
 
 #![allow(non_camel_case_types)]
 #![allow(clippy::missing_safety_doc)]
+#![allow(ambiguous_glob_reexports)]
 
+pub mod analytics;
 pub mod archive;
 pub mod bench;
 pub mod codecs;
@@ -23,9 +25,15 @@ pub mod runtime;
 pub mod sevenz;
 pub mod standards;
 pub mod types;
+pub mod vfs;
 pub mod zip;
 
-pub use archive::*;
+pub use analytics::*;
+pub use archive::{
+    compute_volume_path, detect_volume_chain, find_next_pk_signature, repair_damaged_tar,
+    repair_damaged_zip, SplitVolumeWriter, VirtualMultiVolumeReader, VolumeNamingScheme,
+    VolumeSegment,
+};
 pub use bench::*;
 pub use codecs::*;
 pub use crypto::*;
@@ -35,6 +43,7 @@ pub use runtime::*;
 pub use sevenz::{create_7z_archive, decode_7z_solid_payload, parse_7z_metadata, SevenZArchive, SevenZFileMeta, SevenZHeaderInfo};
 pub use standards::*;
 pub use types::*;
+pub use vfs::*;
 pub use zip::{create_zip_archive, ZipArchive, ZipEntry, ZipInputItem};
 
 use libc::c_char;

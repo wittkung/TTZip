@@ -186,6 +186,17 @@ TTZipStatus ttzip_rust_snappy_decompress(const uint8_t *src, size_t src_len, uin
 size_t ttzip_rust_snappy_max_compressed_length(size_t src_len);
 TTZipStatus ttzip_rust_snappy_uncompressed_length(const uint8_t *src, size_t src_len, size_t *out_len);
 bool ttzip_rust_snappy_validate(const uint8_t *src, size_t src_len);
+TTZipStatus ttzip_rust_snappy_frame_encode(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
+TTZipStatus ttzip_rust_snappy_frame_decode(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
+size_t ttzip_rust_snappy_frame_max_encoded_length(size_t src_len);
+bool ttzip_rust_snappy_is_framed(const uint8_t *src, size_t src_len);
+TTZipStatus ttzip_rust_snappy_compress_file_stream(const char *src_path, const char *dst_path, TTZipProgressCallback progress_callback, void *user_data);
+TTZipStatus ttzip_rust_snappy_decompress_file_stream(const char *src_path, const char *dst_path, TTZipProgressCallback progress_callback, void *user_data);
+TTZipStatus ttzip_rust_brotli_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, uint32_t quality, uint32_t lgwin, size_t *out_len);
+TTZipStatus ttzip_rust_brotli_decompress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
+size_t ttzip_rust_brotli_compress_bound(size_t src_len);
+TTZipStatus ttzip_rust_brotli_compress_file_stream(const char *src_path, const char *dst_path, uint32_t quality, uint32_t lgwin, TTZipProgressCallback progress_callback, void *user_data);
+TTZipStatus ttzip_rust_brotli_decompress_file_stream(const char *src_path, const char *dst_path, TTZipProgressCallback progress_callback, void *user_data);
 TTZipStatus ttzip_rust_lzfse_compress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 TTZipStatus ttzip_rust_lzfse_decompress(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_capacity, size_t *out_len);
 TTZipStatus ttzip_rust_detect_charset(const uint8_t *data, size_t data_len, char *out_buf, size_t out_buf_capacity);
@@ -200,6 +211,38 @@ TTZipStreamWriterHandle *ttzip_rust_stream_writer_new_file(const char *path, siz
 int32_t ttzip_rust_stream_writer_write(TTZipStreamWriterHandle *handle, const uint8_t *data, size_t len);
 int32_t ttzip_rust_stream_writer_flush(TTZipStreamWriterHandle *handle);
 void ttzip_rust_stream_writer_free(TTZipStreamWriterHandle *handle);
+
+// Multi-Volume Split Container & Virtual Continuous Reader
+typedef enum TTZipVolumeNamingScheme {
+    TTZIP_VOLUME_NAMING_NUMBERED = 0,
+    TTZIP_VOLUME_NAMING_PKZIP = 1,
+    TTZIP_VOLUME_NAMING_RAW = 2
+} TTZipVolumeNamingScheme;
+
+typedef struct TTZipSplitWriterHandle TTZipSplitWriterHandle;
+typedef struct TTZipSplitReaderHandle TTZipSplitReaderHandle;
+
+TTZipSplitWriterHandle *ttzip_rust_split_writer_new(const char *base_path, uint64_t volume_size_bytes, int32_t naming_scheme, bool clean_on_failure);
+int32_t ttzip_rust_split_writer_write(TTZipSplitWriterHandle *handle, const uint8_t *data, size_t len);
+TTZipStatus ttzip_rust_split_writer_flush(TTZipSplitWriterHandle *handle);
+TTZipStatus ttzip_rust_split_writer_close(TTZipSplitWriterHandle *handle);
+void ttzip_rust_split_writer_cancel(TTZipSplitWriterHandle *handle);
+uint64_t ttzip_rust_split_writer_get_total_bytes(const TTZipSplitWriterHandle *handle);
+size_t ttzip_rust_split_writer_get_volume_count(TTZipSplitWriterHandle *handle);
+TTZipStatus ttzip_rust_split_writer_get_volume_path(TTZipSplitWriterHandle *handle, size_t index, char *out_buf, size_t buf_capacity);
+void ttzip_rust_split_writer_free(TTZipSplitWriterHandle *handle);
+
+TTZipSplitReaderHandle *ttzip_rust_split_reader_open(const char *seed_path);
+TTZipStatus ttzip_rust_split_reader_read(TTZipSplitReaderHandle *handle, uint8_t *buf, size_t len, size_t *out_bytes_read);
+TTZipStatus ttzip_rust_split_reader_seek(TTZipSplitReaderHandle *handle, int64_t offset, int32_t whence, uint64_t *out_new_offset);
+uint64_t ttzip_rust_split_reader_get_total_size(const TTZipSplitReaderHandle *handle);
+size_t ttzip_rust_split_reader_get_volume_count(const TTZipSplitReaderHandle *handle);
+TTZipStatus ttzip_rust_split_reader_get_volume_path(const TTZipSplitReaderHandle *handle, size_t index, char *out_buf, size_t buf_capacity);
+void ttzip_rust_split_reader_free(TTZipSplitReaderHandle *handle);
+
+TTZipStatus ttzip_rust_split_file(const char *src_path, const char *dst_base_path, uint64_t volume_size_bytes, int32_t naming_scheme, bool clean_on_failure);
+TTZipStatus ttzip_rust_join_split_volumes(const char *first_volume_path, const char *output_path, TTZipProgressCallback progress_callback, void *user_data);
+
 
 // Filesystem Security & Filter DSL
 TTZipStatus ttzip_rust_validate_path(const char *dest_dir, const char *entry_path, char *out_sanitized, size_t out_capacity);
@@ -314,6 +357,49 @@ TTZipStatus ttzip_rust_bench_run_mips(uint32_t dictionary_size_mb, uint32_t thre
 TTZipStatus ttzip_rust_bench_compute_pareto_frontier(TTZipParetoPointRaw *points, size_t count);
 uint64_t ttzip_rust_bench_monotonic_nanos(void);
 double ttzip_rust_bench_calc_throughput_mbs(size_t bytes, double elapsed_secs);
+
+// Analytics, SIMD Shannon Entropy & Cascaded Codec Selector
+typedef enum TTZipSelectorScenario {
+    TTZIP_SCENARIO_INSTANT_TRANSFER = 0,
+    TTZIP_SCENARIO_BALANCED_DAILY = 1,
+    TTZIP_SCENARIO_COLD_STORAGE = 2
+} TTZipSelectorScenario;
+
+typedef struct TTZipRecommendationResult {
+    int32_t scenario;
+    double measured_entropy;
+    double trial_compressibility_ratio;
+    char recommended_algorithm[32];
+    int32_t recommended_level;
+    char rationale[512];
+    double projected_throughput_mbs;
+    double projected_space_savings_pct;
+    double probe_duration_ms;
+} TTZipRecommendationResult;
+
+double ttzip_rust_estimate_entropy(const uint8_t *buf, size_t len);
+double ttzip_rust_estimate_entropy_strided(const uint8_t *buf, size_t len, size_t sample_limit);
+bool ttzip_rust_should_bypass_compression(const uint8_t *buf, size_t len, double threshold, size_t min_sample_bytes);
+TTZipStatus ttzip_rust_recommend_codec(const uint8_t *buf, size_t len, int32_t scenario, TTZipRecommendationResult *out_result);
+
+// VFS LZ4 Cache Pool (16-way Sharded O(1) Arena LRU with Compact Disk Spill)
+typedef struct TTZipVfsCacheHandle TTZipVfsCacheHandle;
+TTZipVfsCacheHandle *ttzip_rust_vfs_cache_new(size_t max_ram_bytes, const char *spill_dir);
+TTZipStatus ttzip_rust_vfs_cache_put(TTZipVfsCacheHandle *handle, const char *session_id, uint64_t chunk_index, const uint8_t *raw_data, size_t raw_len, int32_t acceleration);
+TTZipStatus ttzip_rust_vfs_cache_get(TTZipVfsCacheHandle *handle, const char *session_id, uint64_t chunk_index, uint8_t *out_buf, size_t out_cap, size_t *out_len);
+TTZipStatus ttzip_rust_vfs_cache_clear_session(TTZipVfsCacheHandle *handle, const char *session_id);
+void ttzip_rust_vfs_cache_get_stats(const TTZipVfsCacheHandle *handle, size_t *out_ram_count, size_t *out_disk_count, size_t *out_ram_bytes);
+void ttzip_rust_vfs_cache_free(TTZipVfsCacheHandle *handle);
+
+// In-Memory Multi-Core Password Recovery Pipeline
+bool ttzip_rust_crypto_recover_zipcrypto(const char *const *passwords, size_t count, const uint8_t *enc_header, uint8_t check_byte, char *out_found_pwd, size_t out_capacity);
+bool ttzip_rust_crypto_recover_winzip_aes(const char *const *passwords, size_t count, const uint8_t *salt, const uint8_t *stored_pvv, char *out_found_pwd, size_t out_capacity);
+bool ttzip_rust_crypto_recover_7z_aes(const char *const *passwords, size_t count, const uint8_t *salt, size_t salt_len, uint32_t num_cycles_power, const uint8_t *probe_cipher, size_t probe_len, const uint8_t *expected_magic, size_t magic_len, char *out_found_pwd, size_t out_capacity);
+
+// NEON-Accelerated Corrupted Archive Self-Healing & Repair Engine
+TTZipStatus ttzip_rust_archive_repair_zip(const char *damaged_path, const char *repaired_path, size_t *out_salvaged_count);
+TTZipStatus ttzip_rust_archive_repair_tar(const char *damaged_path, const char *repaired_path, size_t *out_salvaged_count);
+TTZipStatus ttzip_rust_archive_repair_auto(const char *damaged_path, const char *repaired_path, size_t *out_salvaged_count);
 
 #ifdef __cplusplus
 }

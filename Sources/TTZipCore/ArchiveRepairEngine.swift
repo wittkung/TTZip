@@ -8,7 +8,7 @@
 import Foundation
 import CTTZipBridge
 
-/// Disaster recovery and damaged archive repair engine.
+/// Disaster recovery and damaged archive repair engine with NEON-accelerated TOC reconstruction.
 public final class ArchiveRepairEngine: @unchecked Sendable {
     public init() {}
     
@@ -34,10 +34,18 @@ public final class ArchiveRepairEngine: @unchecked Sendable {
             operationType: .repair
         ))
         
-        let count = try await ArchiveRepairStrategyContext.shared.repairArchive(
+        var count = 0
+        if let nativeSalvaged = repairArchiveNative(
             damagedArchivePath: damagedArchivePath,
             repairedOutputPath: repairedOutputPath
-        )
+        ) {
+            count = nativeSalvaged
+        } else {
+            count = try await ArchiveRepairStrategyContext.shared.repairArchive(
+                damagedArchivePath: damagedArchivePath,
+                repairedOutputPath: repairedOutputPath
+            )
+        }
         
         ArchiveProgressBroadcaster.shared.broadcastProgress(ArchiveProgressInfo(
             state: .completed,
@@ -57,5 +65,21 @@ public final class ArchiveRepairEngine: @unchecked Sendable {
         )
         
         return count
+    }
+    
+    /// Fast hardware NEON-accelerated direct archive repair via Rust FFI.
+    public func repairArchiveNative(damagedArchivePath: String, repairedOutputPath: String) -> Int? {
+        guard FileManager.default.fileExists(atPath: damagedArchivePath) else { return nil }
+        return CUnsafeBufferAdapter.withCString(damagedArchivePath) { cSrc in
+            CUnsafeBufferAdapter.withCString(repairedOutputPath) { cDst in
+                guard let cSrc = cSrc, let cDst = cDst else { return nil }
+                var salvaged: Int = 0
+                let status = ttzip_rust_archive_repair_auto(cSrc, cDst, &salvaged)
+                if status == TTZIP_STATUS_OK && salvaged > 0 {
+                    return salvaged
+                }
+                return nil
+            }
+        }
     }
 }

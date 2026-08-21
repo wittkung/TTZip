@@ -6,38 +6,35 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
 
-/// In-stream zero-copy multi-volume split archive writer sink.
+/// High-performance Rust-backed in-stream multi-volume split archive writer sink.
 ///
-/// Intercepts archive byte streams in real time at byte-level accuracy, seamlessly closing
-/// the active volume and opening subsequent volume files without double disk buffering.
+/// Intercepts archive byte streams in real time with byte-level accuracy, seamlessly rotating
+/// volume files without intermediate disk or memory buffering.
 public final class MultiVolumeStreamSink: @unchecked Sendable {
     public let baseOutputPath: String
     public let volumeSizeBytes: Int64
     public let namingPattern: VolumeNamingPattern
     public let cleanOnFailure: Bool
     
-    private var currentVolumeIndex: Int = 1
-    private var bytesWrittenInCurrentVolume: Int64 = 0
-    private var totalBytesWritten: Int64 = 0
-    private var activeFileHandle: FileHandle?
-    private var activeVolumePath: String?
-    private var generatedVolumePaths: [String] = []
+    private var writerHandle: OpaquePointer?
     private let lock = NSLock()
     private var isClosed = false
     
     public var totalBytes: Int64 {
         lock.lock()
         defer { lock.unlock() }
-        return totalBytesWritten
+        guard let handle = writerHandle else { return 0 }
+        return Int64(ttzip_rust_split_writer_get_total_bytes(handle))
     }
     
     public var generatedVolumes: [String] {
         lock.lock()
         defer { lock.unlock() }
-        return generatedVolumePaths
+        guard let handle = writerHandle else { return [] }
+        return fetchVolumePaths(from: handle)
     }
-
     
     public init(
         baseOutputPath: String,
@@ -53,7 +50,24 @@ public final class MultiVolumeStreamSink: @unchecked Sendable {
         self.namingPattern = namingPattern
         self.cleanOnFailure = cleanOnFailure
         
-        try openVolume(index: 1)
+        let schemeVal: Int32
+        switch namingPattern {
+        case .numberedExtension:
+            schemeVal = Int32(TTZIP_VOLUME_NAMING_NUMBERED.rawValue)
+        case .pkzipSpanned:
+            schemeVal = Int32(TTZIP_VOLUME_NAMING_PKZIP.rawValue)
+        case .rawSplit:
+            schemeVal = Int32(TTZIP_VOLUME_NAMING_RAW.rawValue)
+        }
+        
+        let handle = baseOutputPath.withCString { cPath in
+            ttzip_rust_split_writer_new(cPath, UInt64(volumeSizeBytes), schemeVal, cleanOnFailure)
+        }
+        
+        guard let validHandle = handle else {
+            throw ArchiveError.readFailed(code: -1)
+        }
+        self.writerHandle = validHandle
     }
     
     /// Writes a data buffer across volume boundaries.
@@ -68,69 +82,21 @@ public final class MultiVolumeStreamSink: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         
-        guard !isClosed, let basePtr = buffer.baseAddress else { return }
-        var bytesRemaining = buffer.count
-        var currentOffset = 0
-        
-        while bytesRemaining > 0 {
-            guard let handle = activeFileHandle else {
-                throw ArchiveError.readFailed(code: -1)
-            }
-            
-            let spaceInCurrent = volumeSizeBytes - bytesWrittenInCurrentVolume
-            let bytesToWrite = min(Int(spaceInCurrent), bytesRemaining)
-            
-            if bytesToWrite > 0 {
-                let chunkData = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: basePtr.advanced(by: currentOffset)), count: bytesToWrite, deallocator: .none)
-                try handle.write(contentsOf: chunkData)
-                bytesWrittenInCurrentVolume += Int64(bytesToWrite)
-                totalBytesWritten += Int64(bytesToWrite)
-                currentOffset += bytesToWrite
-                bytesRemaining -= bytesToWrite
-            }
-            
-            if bytesWrittenInCurrentVolume >= volumeSizeBytes && bytesRemaining > 0 {
-                try rotateToNextVolume()
-            }
+        guard !isClosed, let handle = writerHandle, let basePtr = buffer.baseAddress else { return }
+        let res = ttzip_rust_split_writer_write(handle, basePtr.assumingMemoryBound(to: UInt8.self), buffer.count)
+        if res != 0 {
+            throw ArchiveError.readFailed(code: res)
         }
-    }
-    
-    private func openVolume(index: Int) throws {
-        let path = volumePath(for: index)
-        let fm = FileManager.default
-        if fm.fileExists(atPath: path) {
-            try? fm.removeItem(atPath: path)
-        }
-        fm.createFile(atPath: path, contents: nil)
-        let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
-        self.activeFileHandle = handle
-        self.activeVolumePath = path
-        self.currentVolumeIndex = index
-        self.bytesWrittenInCurrentVolume = 0
-        self.generatedVolumePaths.append(path)
-    }
-    
-    private func rotateToNextVolume() throws {
-        try activeFileHandle?.close()
-        activeFileHandle = nil
-        try openVolume(index: currentVolumeIndex + 1)
     }
     
     /// Computes volume file path for the given 1-based index according to the naming pattern.
     public func volumePath(for index: Int) -> String {
         switch namingPattern {
-        case .numberedExtension:
-            // Standard: archive.7z.001, archive.zip.001, archive.tar.001
+        case .numberedExtension, .rawSplit:
             return String(format: "%@.%03d", baseOutputPath, index)
-            
         case .pkzipSpanned:
-            // PKZIP standard: archive.z01, archive.z02, ... archive.zip (final part renamed on close)
             let baseWithoutExt = (baseOutputPath as NSString).deletingPathExtension
             return String(format: "%@.z%02d", baseWithoutExt, index)
-            
-        case .rawSplit:
-            // Raw split: archive.001, archive.002
-            return String(format: "%@.%03d", baseOutputPath, index)
         }
     }
     
@@ -140,25 +106,17 @@ public final class MultiVolumeStreamSink: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         
-        guard !isClosed else { return generatedVolumePaths }
+        guard !isClosed, let handle = writerHandle else {
+            return writerHandle.map { fetchVolumePaths(from: $0) } ?? []
+        }
         isClosed = true
         
-        try activeFileHandle?.close()
-        activeFileHandle = nil
-        
-        // For PKZIP spanned format, the last volume should be named base.zip
-        if namingPattern == .pkzipSpanned && !generatedVolumePaths.isEmpty {
-            let lastPath = generatedVolumePaths.removeLast()
-            let finalZipPath = baseOutputPath
-            let fm = FileManager.default
-            if fm.fileExists(atPath: finalZipPath) {
-                try? fm.removeItem(atPath: finalZipPath)
-            }
-            try fm.moveItem(atPath: lastPath, toPath: finalZipPath)
-            generatedVolumePaths.append(finalZipPath)
+        let status = ttzip_rust_split_writer_close(handle)
+        guard status == TTZIP_STATUS_OK else {
+            throw ArchiveError.readFailed(code: status.rawValue)
         }
         
-        return generatedVolumePaths
+        return fetchVolumePaths(from: handle)
     }
     
     /// Purges all generated volumes in the event of an archive failure.
@@ -166,20 +124,33 @@ public final class MultiVolumeStreamSink: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         
+        guard !isClosed, let handle = writerHandle else { return }
         isClosed = true
-        try? activeFileHandle?.close()
-        activeFileHandle = nil
+        ttzip_rust_split_writer_cancel(handle)
+    }
+    
+    private func fetchVolumePaths(from handle: OpaquePointer) -> [String] {
+        let count = ttzip_rust_split_writer_get_volume_count(handle)
+        var paths: [String] = []
+        paths.reserveCapacity(count)
         
-        if cleanOnFailure {
-            let fm = FileManager.default
-            for path in generatedVolumePaths {
-                try? fm.removeItem(atPath: path)
+        var buf = [CChar](repeating: 0, count: 1024)
+        for i in 0..<count {
+            let res = ttzip_rust_split_writer_get_volume_path(handle, i, &buf, buf.count)
+            if res == TTZIP_STATUS_OK {
+                buf.withUnsafeBufferPointer { ptr in
+                    if let base = ptr.baseAddress {
+                        paths.append(String(cString: base))
+                    }
+                }
             }
         }
-        generatedVolumePaths.removeAll()
+        return paths
     }
     
     deinit {
-        try? activeFileHandle?.close()
+        if let handle = writerHandle {
+            ttzip_rust_split_writer_free(handle)
+        }
     }
 }

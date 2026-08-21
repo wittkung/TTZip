@@ -7,8 +7,16 @@
 
 //! Archive streaming and libarchive adapter module.
 
+pub mod repair;
+pub mod split;
 pub mod stream_adapter;
 pub mod tar;
 
+pub use repair::*;
+pub use split::{
+    compute_volume_path, detect_volume_chain, SplitVolumeWriter, VirtualMultiVolumeReader,
+    VolumeNamingScheme, VolumeSegment,
+};
 pub use stream_adapter::*;
 pub use tar::*;
+

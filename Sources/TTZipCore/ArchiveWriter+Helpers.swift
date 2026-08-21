@@ -59,23 +59,29 @@ extension ArchiveWriter {
         guard let fileSize = attrs[.size] as? Int64, fileSize > 0 else { return }
         guard splitSizeBytes >= 65536 && splitSizeBytes < fileSize else { return }
         
-        let sink = try MultiVolumeStreamSink(
-            baseOutputPath: archivePath,
-            volumeSizeBytes: splitSizeBytes,
-            namingPattern: namingPattern,
-            cleanOnFailure: true
-        )
-        
-        let fileHandle = try FileHandle(forReadingFrom: URL(fileURLWithPath: archivePath))
-        defer { try? fileHandle.close() }
-        
-        let bufferSize = 4 * 1024 * 1024
-        while let chunk = try fileHandle.read(upToCount: bufferSize), !chunk.isEmpty {
-            try sink.write(data: chunk)
+        let schemeVal: Int32
+        switch namingPattern {
+        case .numberedExtension:
+            schemeVal = Int32(TTZIP_VOLUME_NAMING_NUMBERED.rawValue)
+        case .pkzipSpanned:
+            schemeVal = Int32(TTZIP_VOLUME_NAMING_PKZIP.rawValue)
+        case .rawSplit:
+            schemeVal = Int32(TTZIP_VOLUME_NAMING_RAW.rawValue)
         }
         
-        try sink.close()
-        try? fm.removeItem(atPath: archivePath)
+        let res = archivePath.withCString { cSrc in
+            archivePath.withCString { cDst in
+                ttzip_rust_split_file(cSrc, cDst, UInt64(splitSizeBytes), schemeVal, true)
+            }
+        }
+        
+        guard res == TTZIP_STATUS_OK else {
+            throw ArchiveError.readFailed(code: res.rawValue)
+        }
+        
+        if namingPattern != .pkzipSpanned {
+            try? fm.removeItem(atPath: archivePath)
+        }
     }
 }
 

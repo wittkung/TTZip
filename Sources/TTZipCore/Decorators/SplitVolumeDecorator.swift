@@ -37,8 +37,9 @@ open class SplitVolumeDecorator: ArchiveOperationDecorator, @unchecked Sendable 
             options: options
         )
 
-        if bytesWritten > splitSize {
-            TTLogger.debug("[SplitVolumeDecorator] Output size exceeds single volume limit (\(bytesWritten) B > \(splitSize) B).")
+        if bytesWritten > splitSize && FileManager.default.fileExists(atPath: outputPath) {
+            TTLogger.debug("[SplitVolumeDecorator] Output size exceeds single volume limit (\(bytesWritten) B > \(splitSize) B). Slicing archive...")
+            try ArchiveWriter.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitSize)
         }
 
         return bytesWritten

@@ -29,43 +29,18 @@ public enum ArchiveEntropyEvaluator {
         }
     }
 
-    /// Computes Shannon entropy (0.00 ~ 8.00) for a memory buffer.
+    /// Computes Shannon entropy (0.00 ~ 8.00) for a memory buffer using hardware SIMD.
     public static func estimateEntropy(buffer: UnsafeRawPointer, count: Int) -> Double {
         guard count > 0 else { return 0.0 }
         let ptr = buffer.assumingMemoryBound(to: UInt8.self)
-        var counts = [Int](repeating: 0, count: 256)
-        for i in 0..<count {
-            counts[Int(ptr[i])] += 1
-        }
-        var entropy: Double = 0.0
-        let total = Double(count)
-        for c in counts where c > 0 {
-            let p = Double(c) / total
-            entropy -= p * log2(p)
-        }
-        return entropy
+        return ttzip_rust_estimate_entropy(ptr, count)
     }
 
     /// Dynamically samples buffer across equidistant strides to evaluate Shannon entropy.
     public static func estimateEntropyDynamic(buffer: UnsafeRawPointer, count: Int) -> Double {
         guard count > 0 else { return 0.0 }
-        if count <= 65536 {
-            return estimateEntropy(buffer: buffer, count: count)
-        }
-        let sampleSize = 65536
-        let stride = count / sampleSize
         let ptr = buffer.assumingMemoryBound(to: UInt8.self)
-        var counts = [Int](repeating: 0, count: 256)
-        for i in 0..<sampleSize {
-            counts[Int(ptr[i * stride])] += 1
-        }
-        var entropy: Double = 0.0
-        let total = Double(sampleSize)
-        for c in counts where c > 0 {
-            let p = Double(c) / total
-            entropy -= p * log2(p)
-        }
-        return entropy
+        return ttzip_rust_estimate_entropy_strided(ptr, count, 65536)
     }
 
     /// Dynamically samples physical file across equidistant strides to evaluate Shannon entropy.
@@ -83,7 +58,8 @@ public enum ArchiveEntropyEvaluator {
     public static func shouldBypassCompression(buffer: UnsafeRawPointer, count: Int, threshold: Double = defaultEntropyThreshold) -> Bool {
         guard isSmartStoreBypassEnabled else { return false }
         guard count >= minimumSampleSizeBytes else { return false }
-        return estimateEntropyDynamic(buffer: buffer, count: count) > threshold
+        let ptr = buffer.assumingMemoryBound(to: UInt8.self)
+        return ttzip_rust_should_bypass_compression(ptr, count, threshold, minimumSampleSizeBytes)
     }
 
     /// Checks if Data payload should bypass compression directly to STORE mode.

@@ -8,7 +8,7 @@
 import Foundation
 import CTTZipBridge
 
-/// High-performance in-process Swift wrapper around Google Snappy native engine.
+/// High-performance in-process Swift wrapper around Pure Rust Google Snappy native engine.
 public final class SnappyBlockEngine: Sendable {
 
     public static let shared = SnappyBlockEngine()
@@ -47,7 +47,7 @@ public final class SnappyBlockEngine: Sendable {
         return resultLength
     }
 
-    /// Compresses uncompressed data block using native Google Snappy.
+    /// Compresses uncompressed data block using pure Rust Google Snappy.
     public func compress(data: Data) throws -> Data {
         if data.isEmpty {
             return Data()

@@ -6,153 +6,127 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
-import Compression
 import CTTZipBridge
 
 /// Native in-process Brotli (.br / .tar.br) streaming codec engine.
 ///
-/// Backed by Apple `Compression.framework` (`COMPRESSION_BROTLI`) and native TAR pipeline.
+/// Backed directly by Pure Rust Google Brotli streaming engine (`ttzip_rust_brotli_...`)
+/// and unified POSIX TAR archive pipeline. Completely eliminates Apple `Compression.framework` dependencies.
 public final class NativeBrotliEngine: @unchecked Sendable {
     public static let shared = NativeBrotliEngine()
     
     private init() {}
+
+    /// Computes worst-case output buffer size for Brotli block compression.
+    public func compressBound(for sourceLength: Int) -> Int {
+        guard sourceLength >= 0 else { return 1024 }
+        return ttzip_rust_brotli_compress_bound(sourceLength)
+    }
+
+    /// Compresses in-memory data using pure Rust Brotli codec.
+    public func compress(data: Data, quality: UInt32 = 6, lgwin: UInt32 = 22) throws -> Data {
+        if data.isEmpty {
+            return Data()
+        }
+        let bound = compressBound(for: data.count)
+        var compressed = Data(count: bound)
+        var actualLen = bound
+
+        let status: CTTZipBridge.TTZipStatus = data.withUnsafeBytes { inBuf in
+            guard let inBase = inBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return TTZIP_STATUS_ERR_INVALID_PARAM
+            }
+            return compressed.withUnsafeMutableBytes { outBuf in
+                guard let outBase = outBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                    return TTZIP_STATUS_ERR_INVALID_PARAM
+                }
+                return ttzip_rust_brotli_compress(inBase, inBuf.count, outBase, bound, quality, lgwin, &actualLen)
+            }
+        }
+
+        guard status == TTZIP_STATUS_OK else {
+            throw ArchiveError.corruptedData(archivePath: "memory", entryPath: "brotli_compress")
+        }
+
+        compressed.count = actualLen
+        return compressed
+    }
+
+    /// Decompresses in-memory Brotli compressed data into raw Data.
+    public func decompress(compressedData: Data, maxAllowedSize: Int = 1_073_741_824) throws -> Data {
+        guard !compressedData.isEmpty else {
+            return Data()
+        }
+
+        var decompressed = Data(count: min(maxAllowedSize, max(compressedData.count * 4, 65536)))
+        var actualLen = decompressed.count
+        var status: CTTZipBridge.TTZipStatus = TTZIP_STATUS_OK
+        var success = false
+
+        while decompressed.count <= maxAllowedSize {
+            actualLen = decompressed.count
+            status = compressedData.withUnsafeBytes { inBuf in
+                guard let inBase = inBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                    return TTZIP_STATUS_ERR_INVALID_PARAM
+                }
+                return decompressed.withUnsafeMutableBytes { outBuf in
+                    guard let outBase = outBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                        return TTZIP_STATUS_ERR_INVALID_PARAM
+                    }
+                    return ttzip_rust_brotli_decompress(inBase, inBuf.count, outBase, outBuf.count, &actualLen)
+                }
+            }
+
+            if status == TTZIP_STATUS_OK {
+                success = true
+                break
+            }
+
+            if decompressed.count * 2 > maxAllowedSize {
+                if decompressed.count == maxAllowedSize { break }
+                decompressed.count = maxAllowedSize
+            } else {
+                decompressed.count *= 2
+            }
+        }
+
+        guard success, status == TTZIP_STATUS_OK else {
+            throw ArchiveError.corruptedData(archivePath: "memory", entryPath: "brotli_decompress")
+        }
+
+        decompressed.count = actualLen
+        return decompressed
+    }
     
-    /// Stream-compresses a single file into Brotli (.br) format.
+    /// Stream-compresses a single file into Brotli (.br) format with 4MB bounded pipe.
     public func compressFile(
         srcPath: String,
         dstPath: String,
         level: ArchiveCompressionLevel = .normal,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws -> Bool {
-        guard let inHandle = FileHandle(forReadingAtPath: srcPath) else { return false }
-        defer { try? inHandle.close() }
-        
-        FileManager.default.createFile(atPath: dstPath, contents: nil)
-        guard let outHandle = FileHandle(forWritingAtPath: dstPath) else { return false }
-        defer { try? outHandle.close() }
-        
-        let bufferSize = 8 * 1024 * 1024 // 8MB chunk
-        let inBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-        let outBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-        defer {
-            inBuffer.deallocate()
-            outBuffer.deallocate()
+        let quality: UInt32
+        switch level {
+        case .fastest: quality = 1
+        case .fast:    quality = 3
+        case .normal:  quality = 6
+        case .maximum: quality = 9
+        case .ultra:   quality = 11
+        @unknown default: quality = 6
         }
-        
-        var stream = compression_stream(dst_ptr: outBuffer, dst_size: bufferSize, src_ptr: inBuffer, src_size: 0, state: nil)
-        let status = compression_stream_init(&stream, COMPRESSION_STREAM_ENCODE, COMPRESSION_BROTLI)
-        guard status == COMPRESSION_STATUS_OK else { return false }
-        defer { compression_stream_destroy(&stream) }
-        
-        while true {
-            let data = inHandle.readData(ofLength: bufferSize)
-            if data.isEmpty {
-                // Finalize stream
-                stream.src_size = 0
-                while true {
-                    stream.dst_ptr = outBuffer
-                    stream.dst_size = bufferSize
-                    let res = compression_stream_process(&stream, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
-                    let written = bufferSize - stream.dst_size
-                    if written > 0 {
-                        outHandle.write(Data(bytesNoCopy: outBuffer, count: written, deallocator: .none))
-                    }
-                    if res == COMPRESSION_STATUS_END { break }
-                    if res == COMPRESSION_STATUS_ERROR { return false }
-                    if written == 0 { break }
-                }
-                break
-            }
-            
-            data.withUnsafeBytes { rawBytes in
-                guard let base = rawBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                stream.src_ptr = base
-                stream.src_size = data.count
-                
-                var processStatus = COMPRESSION_STATUS_OK
-                repeat {
-                    stream.dst_ptr = outBuffer
-                    stream.dst_size = bufferSize
-                    processStatus = compression_stream_process(&stream, 0)
-                    let written = bufferSize - stream.dst_size
-                    if written > 0 {
-                        outHandle.write(Data(bytesNoCopy: outBuffer, count: written, deallocator: .none))
-                    }
-                    if processStatus == COMPRESSION_STATUS_ERROR { break }
-                } while stream.src_size > 0 || (processStatus == COMPRESSION_STATUS_OK && stream.dst_size == 0)
-            }
-        }
-        return true
+
+        let status = ttzip_rust_brotli_compress_file_stream(srcPath, dstPath, quality, 22, nil, nil)
+        return status == TTZIP_STATUS_OK
     }
     
-    /// Stream-decompresses a Brotli (.br) file.
+    /// Stream-decompresses a Brotli (.br) file with 4MB bounded pipe.
     public func decompressFile(
         srcPath: String,
         dstPath: String,
         progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) throws -> Bool {
-        guard let inHandle = FileHandle(forReadingAtPath: srcPath) else { return false }
-        defer { try? inHandle.close() }
-        
-        FileManager.default.createFile(atPath: dstPath, contents: nil)
-        guard let outHandle = FileHandle(forWritingAtPath: dstPath) else { return false }
-        defer { try? outHandle.close() }
-        
-        let bufferSize = 8 * 1024 * 1024 // 8MB chunk
-        let inBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-        let outBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-        defer {
-            inBuffer.deallocate()
-            outBuffer.deallocate()
-        }
-        
-        var stream = compression_stream(dst_ptr: outBuffer, dst_size: bufferSize, src_ptr: inBuffer, src_size: 0, state: nil)
-        let status = compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_BROTLI)
-        guard status == COMPRESSION_STATUS_OK else { return false }
-        defer { compression_stream_destroy(&stream) }
-        
-        var isFinished = false
-        while !isFinished {
-            let data = inHandle.readData(ofLength: bufferSize)
-            if data.isEmpty { break }
-            
-            data.withUnsafeBytes { rawBytes in
-                guard let base = rawBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                stream.src_ptr = base
-                stream.src_size = data.count
-                
-                var processStatus = COMPRESSION_STATUS_OK
-                repeat {
-                    stream.dst_ptr = outBuffer
-                    stream.dst_size = bufferSize
-                    processStatus = compression_stream_process(&stream, 0)
-                    let written = bufferSize - stream.dst_size
-                    if written > 0 {
-                        outHandle.write(Data(bytesNoCopy: outBuffer, count: written, deallocator: .none))
-                    }
-                    if processStatus == COMPRESSION_STATUS_END {
-                        isFinished = true
-                        break
-                    }
-                    if processStatus == COMPRESSION_STATUS_ERROR { break }
-                } while stream.src_size > 0 || (processStatus == COMPRESSION_STATUS_OK && stream.dst_size == 0)
-            }
-        }
-        
-        if !isFinished {
-            while true {
-                stream.dst_ptr = outBuffer
-                stream.dst_size = bufferSize
-                stream.src_size = 0
-                let res = compression_stream_process(&stream, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
-                let written = bufferSize - stream.dst_size
-                if written > 0 {
-                    outHandle.write(Data(bytesNoCopy: outBuffer, count: written, deallocator: .none))
-                }
-                if res == COMPRESSION_STATUS_END || res == COMPRESSION_STATUS_ERROR || written == 0 { break }
-            }
-        }
-        return true
+        let status = ttzip_rust_brotli_decompress_file_stream(srcPath, dstPath, nil, nil)
+        return status == TTZIP_STATUS_OK
     }
     
     /// Packs and compresses input paths into Brotli (.br / .tar.br) archive container.
@@ -172,7 +146,7 @@ public final class NativeBrotliEngine: @unchecked Sendable {
         }
         guard status == 0 else { return false }
         
-        // 2. Stream compress TAR container with Brotli
+        // 2. Stream compress TAR container with Pure Rust Brotli
         return try compressFile(srcPath: tempTar, dstPath: outputPath, level: level, progressHandler: progressHandler)
     }
     

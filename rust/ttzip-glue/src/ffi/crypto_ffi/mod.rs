@@ -10,7 +10,9 @@
 pub mod checksum;
 pub mod ciphers;
 pub mod fec;
+mod recovery;
 
 pub use checksum::*;
 pub use ciphers::*;
 pub use fec::*;
+pub use recovery::*;

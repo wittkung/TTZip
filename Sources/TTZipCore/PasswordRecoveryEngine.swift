@@ -152,7 +152,7 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
     }
     
     /// Probes archive header and stream password in-process without extracting entire archive.
-    private static func testArchivePassword(archivePath: String, password: String) async -> Bool {
+    public static func testArchivePassword(archivePath: String, password: String) async -> Bool {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("probe_\(UUID().uuidString)").path
         defer { try? FileManager.default.removeItem(atPath: tempDir) }
         try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
@@ -182,6 +182,62 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
                     }
                     return ttzip_extract_archive_advanced(cPath, cDest, false, cPwd) == 0
                 }
+            }
+        }
+    }
+
+    /// Fast in-memory multi-core dictionary recovery via native Rust FFI.
+    public static func recoverFastInMemory(
+        passwords: [String],
+        archivePath: String
+    ) -> String? {
+        guard !passwords.isEmpty, let data = try? Data(contentsOf: URL(fileURLWithPath: archivePath)), data.count >= 30 else {
+            return nil
+        }
+        
+        let cStrings = passwords.map { strdup($0) }
+        defer {
+            for ptr in cStrings {
+                free(ptr)
+            }
+        }
+        
+        var outFound = [CChar](repeating: 0, count: 256)
+        let ptrs = cStrings.map { UnsafePointer($0) }
+        
+        return ptrs.withUnsafeBufferPointer { bufPtr -> String? in
+            guard let basePtr = bufPtr.baseAddress else { return nil }
+            
+            // Check for ZipCrypto 12-byte header
+            return data.withUnsafeBytes { rawBytes -> String? in
+                guard let baseAddr = rawBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
+                if baseAddr[0] == 0x50 && baseAddr[1] == 0x4B && baseAddr[2] == 0x03 && baseAddr[3] == 0x04 {
+                    let flags = UInt16(baseAddr[6]) | (UInt16(baseAddr[7]) << 8)
+                    let isEncrypted = (flags & 0x01) != 0
+                    let method = UInt16(baseAddr[8]) | (UInt16(baseAddr[9]) << 8)
+                    let fnLen = Int(UInt16(baseAddr[26]) | (UInt16(baseAddr[27]) << 8))
+                    let extraLen = Int(UInt16(baseAddr[28]) | (UInt16(baseAddr[29]) << 8))
+                    let headerOffset = 30 + fnLen + extraLen
+                    
+                    if isEncrypted && method != 99 && rawBytes.count >= headerOffset + 12 {
+                        let encHeaderPtr = baseAddr + headerOffset
+                        let checkByte = baseAddr[17] // CRC byte / time byte
+                        let found = ttzip_rust_crypto_recover_zipcrypto(
+                            basePtr,
+                            passwords.count,
+                            encHeaderPtr,
+                            checkByte,
+                            &outFound,
+                            outFound.count
+                        )
+                        if found {
+                            return outFound.withUnsafeBufferPointer { ptr in
+                                ptr.baseAddress.map { String(cString: $0) }
+                            }
+                        }
+                    }
+                }
+                return nil
             }
         }
     }

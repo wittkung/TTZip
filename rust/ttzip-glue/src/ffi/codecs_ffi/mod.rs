@@ -10,14 +10,18 @@
 //! Every exported entry point contains a `std::panic::catch_unwind` exception barrier
 //! to guarantee that internal panics never unwind across foreign language boundaries.
 
+mod brotli;
 mod chardet;
 mod deflate;
 mod fast_blocks;
 mod lzma2;
+mod snappy;
 mod zstd;
 
+pub use brotli::*;
 pub use chardet::*;
 pub use deflate::*;
 pub use fast_blocks::*;
 pub use lzma2::*;
+pub use snappy::*;
 pub use zstd::*;

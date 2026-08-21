@@ -6,6 +6,7 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import CTTZipBridge
 
 /// Corrupted archive salvage and structural repair strategy interface (Strategy Pattern).
 public protocol ArchiveRepairStrategyProtocol: Sendable {
@@ -45,6 +46,17 @@ public final class ZipCentralDirectoryReconstructionStrategy: ArchiveRepairStrat
         }
         
         return try await Task.detached(priority: .userInitiated) {
+            var salvaged: Int = 0
+            let nativeStatus = CUnsafeBufferAdapter.withCString(damagedArchivePath) { cSrc in
+                CUnsafeBufferAdapter.withCString(repairedOutputPath) { cDst in
+                    guard let cSrc = cSrc, let cDst = cDst else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                    return ttzip_rust_archive_repair_zip(cSrc, cDst, &salvaged)
+                }
+            }
+            if nativeStatus == TTZIP_STATUS_OK && salvaged > 0 {
+                return salvaged
+            }
+            
             let tempDir = fileManager.temporaryDirectory.appendingPathComponent("repair_zip_\(UUID().uuidString)").path
             try? fileManager.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
             defer { try? fileManager.removeItem(atPath: tempDir) }
@@ -143,6 +155,17 @@ public final class TarTruncatedSalvageStrategy: ArchiveRepairStrategyProtocol {
         }
         
         return try await Task.detached(priority: .userInitiated) {
+            var salvaged: Int = 0
+            let nativeStatus = CUnsafeBufferAdapter.withCString(damagedArchivePath) { cSrc in
+                CUnsafeBufferAdapter.withCString(repairedOutputPath) { cDst in
+                    guard let cSrc = cSrc, let cDst = cDst else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                    return ttzip_rust_archive_repair_tar(cSrc, cDst, &salvaged)
+                }
+            }
+            if nativeStatus == TTZIP_STATUS_OK && salvaged > 0 {
+                return salvaged
+            }
+            
             let tempDir = fileManager.temporaryDirectory.appendingPathComponent("repair_tar_\(UUID().uuidString)").path
             try? fileManager.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
             defer { try? fileManager.removeItem(atPath: tempDir) }
