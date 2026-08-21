@@ -140,6 +140,7 @@ extension AppViewState {
             self.isLoading = false
             self.showPasswordPrompt = false
             self.addRecentArchive(path: path)
+            self.prefetchArchiveEntries(path: path, entries: res.entries, count: 16)
             NotificationCenter.default.post(name: NSNotification.Name("TTZipArchiveUnlockedRefresh"), object: path)
             return true
         } catch {
@@ -149,6 +150,37 @@ extension AppViewState {
             self.isLoading = false
             return false
         }
+    }
+    
+    /// Prefetches initial or visible archive entries into the 16-way sharded VFS LZ4 cache pool.
+    public func prefetchArchiveEntries(path: String, entries: [ArchiveEntry], count: Int = 16) {
+        let candidates = Array(entries.filter { !$0.isDirectory && $0.uncompressedSize > 0 && $0.uncompressedSize <= 2 * 1024 * 1024 }.prefix(count))
+        guard !candidates.isEmpty else { return }
+        
+        let pwd = self.activePassword
+        Task.detached(priority: .background) {
+            for entry in candidates {
+                if VFSLz4CachePool.shared.getCachedEntry(archivePath: path, entryPath: entry.path) == nil {
+                    if let data = try? await ArchiveSelectiveExtractor.shared.extractSingleEntryData(archivePath: path, entryPath: entry.path, password: pwd) {
+                        VFSLz4CachePool.shared.cacheEntry(archivePath: path, entryPath: entry.path, data: data)
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Prefetches entries within a scrolling viewport window into the VFS cache pool.
+    public func prefetchVisibleWindow(path: String, startIndex: Int, count: Int = 32) {
+        let entries = self.currentEntries
+        guard startIndex >= 0 && startIndex < entries.count else { return }
+        let endIndex = min(entries.count, startIndex + count)
+        let window = Array(entries[startIndex..<endIndex])
+        prefetchArchiveEntries(path: path, entries: window, count: count)
+    }
+    
+    /// Clears cached entries associated with the specified archive.
+    public func clearArchiveVFSCache(path: String) {
+        VFSLz4CachePool.shared.clearSession(sessionId: path)
     }
     
     public func addRecentArchive(path: String) {
@@ -197,6 +229,9 @@ extension AppViewState {
     }
     
     public func reset() {
+        if let path = currentArchivePath {
+            VFSLz4CachePool.shared.clearSession(sessionId: path)
+        }
         currentArchivePath = nil
         activePassword = nil
         currentEntries = []

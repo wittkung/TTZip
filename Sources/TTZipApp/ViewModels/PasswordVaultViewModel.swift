@@ -197,4 +197,69 @@ public final class PasswordVaultViewModel: ObservableObject {
             recoverErrorMessage = "Failed to verify previous master password."
         }
     }
+    
+    // MARK: - Multi-Core Parallel Password Recovery
+    @Published public var isRecoverySheetPresented: Bool = false
+    @Published public var recoveryArchivePath: String = ""
+    @Published public var customCandidatesInput: String = ""
+    @Published public var isRecoveringPassword: Bool = false
+    @Published public var recoveryResult: PasswordRecoveryResult? = nil
+    @Published public var recoveryStatusMessage: String = ""
+    
+    public func runParallelPasswordRecovery(archivePath: String, customCandidates: [String] = []) async {
+        guard !archivePath.isEmpty else { return }
+        isRecoveringPassword = true
+        recoveryResult = nil
+        recoveryStatusMessage = "Analyzing archive encryption and launching multi-core workers..."
+        
+        let vaultCandidates = manager.candidatePasswordsForAutoUnlock()
+        var allCandidates = vaultCandidates
+        for c in customCandidates {
+            let trimmed = c.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty && !allCandidates.contains(trimmed) {
+                allCandidates.append(trimmed)
+            }
+        }
+        
+        if allCandidates.isEmpty {
+            recoveryStatusMessage = "No password candidates available. Add words or save vault passwords."
+            isRecoveringPassword = false
+            return
+        }
+        
+        let candidates = allCandidates
+        let start = Date()
+        
+        // 1. Fast path: in-memory multi-core Rust recovery
+        if let fastFound = PasswordRecoveryEngine.recoverFastInMemory(passwords: candidates, archivePath: archivePath) {
+            let duration = max(0.001, Date().timeIntervalSince(start))
+            let res = PasswordRecoveryResult(foundPassword: fastFound, totalAttempts: Int64(candidates.count), durationSeconds: duration)
+            self.recoveryResult = res
+            self.recoveryStatusMessage = "⚡️ Success! Found password: \(fastFound)"
+            self.isRecoveringPassword = false
+            return
+        }
+        
+        // 2. Comprehensive parallel recovery engine
+        let engine = PasswordRecoveryEngine()
+        do {
+            let res = try await engine.recoverPassword(archivePath: archivePath, dictionary: candidates)
+            self.recoveryResult = res
+            if let pwd = res.foundPassword {
+                self.recoveryStatusMessage = "⚡️ Success! Found password: \(pwd)"
+            } else {
+                self.recoveryStatusMessage = "Recovery finished. Tested \(res.totalAttempts) candidates without match."
+            }
+        } catch {
+            self.recoveryStatusMessage = "Recovery failed: \(error.localizedDescription)"
+        }
+        self.isRecoveringPassword = false
+    }
+    
+    public func saveRecoveredPasswordToVault(label: String, password: String, category: String = "Recovered") {
+        guard !password.isEmpty else { return }
+        let entry = PasswordVaultEntry(label: label, password: password, category: category)
+        try? repository.save(entry)
+        refreshState()
+    }
 }

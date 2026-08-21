@@ -103,7 +103,12 @@ public final class ArchiveSelectiveExtractor: @unchecked Sendable {
     ) async throws -> Data? {
         let pathLower = archivePath.lowercased()
         
-        // Fast Path: ZIP random seek table in memory
+        // 0. VFS LZ4 Cache Pool Fast Path
+        if let cached = VFSLz4CachePool.shared.getCachedEntry(archivePath: archivePath, entryPath: entryPath) {
+            return cached
+        }
+        
+        // 1. ZIP Fast Path: Direct Random Seek via Central Directory
         if pathLower.hasSuffix(".zip") || pathLower.hasSuffix(".zipx") || pathLower.hasSuffix(".aar") {
             let fd = open(archivePath, O_RDONLY)
             if fd >= 0 {
@@ -117,6 +122,7 @@ public final class ArchiveSelectiveExtractor: @unchecked Sendable {
                         if let descriptors = ZipCentralDirectoryReader.shared.readDescriptors(from: bytePtr, fileSize: fileSize, skipMacJunk: false) {
                             let seekTable = ZipSeekTable(descriptors: descriptors, archiveSize: fileSize, bytePtr: bytePtr)
                             if let entryData = seekTable.extractSingleEntry(path: entryPath, from: bytePtr, fileSize: fileSize, password: password) {
+                                VFSLz4CachePool.shared.cacheEntry(archivePath: archivePath, entryPath: entryPath, data: entryData)
                                 return entryData
                             }
                         }
@@ -125,7 +131,15 @@ public final class ArchiveSelectiveExtractor: @unchecked Sendable {
             }
         }
         
-        // General Streaming Path: Extract single entry to ephemeral temp directory
+        // 2. 7z Fast Path: Direct Rust in-memory streaming truncation extraction (<10ms zero disk write)
+        if pathLower.hasSuffix(".7z") || pathLower.hasSuffix(".cb7") {
+            if let entryData = SevenZipSeekTable.extractSingleEntryData(archivePath: archivePath, entryPath: entryPath, password: password) {
+                VFSLz4CachePool.shared.cacheEntry(archivePath: archivePath, entryPath: entryPath, data: entryData)
+                return entryData
+            }
+        }
+        
+        // 3. General Streaming Path: Extract single entry to ephemeral temp directory
         let fm = FileManager.default
         let tempDir = fm.temporaryDirectory.appendingPathComponent("ttzip_preview_\(UUID().uuidString)").path
         defer { try? fm.removeItem(atPath: tempDir) }
@@ -139,6 +153,10 @@ public final class ArchiveSelectiveExtractor: @unchecked Sendable {
         
         guard count > 0 else { return nil }
         let outPath = (tempDir as NSString).appendingPathComponent(entryPath)
-        return try? Data(contentsOf: URL(fileURLWithPath: outPath))
+        if let data = try? Data(contentsOf: URL(fileURLWithPath: outPath)) {
+            VFSLz4CachePool.shared.cacheEntry(archivePath: archivePath, entryPath: entryPath, data: data)
+            return data
+        }
+        return nil
     }
 }

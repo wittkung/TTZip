@@ -1531,6 +1531,7 @@ dependencies = [
  "fuzzy-matcher",
  "libc",
  "ratatui",
+ "rayon",
  "serde",
  "serde_json",
  "syntect",

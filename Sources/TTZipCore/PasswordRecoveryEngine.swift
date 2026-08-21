@@ -14,6 +14,12 @@ public struct PasswordRecoveryResult: Sendable {
     public let totalAttempts: Int64
     public let durationSeconds: Double
     
+    public init(foundPassword: String?, totalAttempts: Int64, durationSeconds: Double) {
+        self.foundPassword = foundPassword
+        self.totalAttempts = totalAttempts
+        self.durationSeconds = durationSeconds
+    }
+    
     public var attemptsPerSecond: Double {
         return durationSeconds > 0 ? Double(totalAttempts) / durationSeconds : 0
     }

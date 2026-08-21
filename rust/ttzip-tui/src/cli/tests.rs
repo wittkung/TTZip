@@ -64,6 +64,8 @@ fn test_cli_parsing_subcommands() {
         "9",
         "-f",
         "7z",
+        "-v",
+        "10M",
     ]);
     match cli_create.command {
         Some(Commands::Create {
@@ -71,14 +73,86 @@ fn test_cli_parsing_subcommands() {
             sources,
             level,
             format,
+            volume_size,
             ..
         }) => {
             assert_eq!(archive, PathBuf::from("out.7z"));
             assert_eq!(sources, vec![PathBuf::from("file1.txt"), PathBuf::from("dir2")]);
             assert_eq!(level, 9);
             assert_eq!(format, Some("7z".to_string()));
+            assert_eq!(volume_size, Some("10M".to_string()));
         }
         _ => panic!("Expected Create subcommand"),
+    }
+
+    let cli_recover = Cli::parse_from([
+        "ttzip", "recover", "secret.zip", "-d", "passwords.txt", "-t", "16", "--json",
+    ]);
+    match cli_recover.command {
+        Some(Commands::Recover {
+            archive,
+            dictionary,
+            threads,
+            json,
+        }) => {
+            assert_eq!(archive, PathBuf::from("secret.zip"));
+            assert_eq!(dictionary, PathBuf::from("passwords.txt"));
+            assert_eq!(threads, Some(16));
+            assert!(json);
+        }
+        _ => panic!("Expected Recover subcommand"),
+    }
+
+    let cli_repair = Cli::parse_from([
+        "ttzip", "repair", "corrupted.zip", "-o", "fixed.zip", "-f", "zip", "--json",
+    ]);
+    match cli_repair.command {
+        Some(Commands::Repair {
+            damaged_archive,
+            output,
+            format,
+            json,
+        }) => {
+            assert_eq!(damaged_archive, PathBuf::from("corrupted.zip"));
+            assert_eq!(output, PathBuf::from("fixed.zip"));
+            assert_eq!(format, Some("zip".to_string()));
+            assert!(json);
+        }
+        _ => panic!("Expected Repair subcommand"),
+    }
+
+    let cli_split = Cli::parse_from([
+        "ttzip", "split", "huge.iso", "-v", "100M", "-o", "./parts", "-n", "numbered",
+    ]);
+    match cli_split.command {
+        Some(Commands::Split {
+            source_archive,
+            volume_size,
+            output_dir,
+            naming,
+        }) => {
+            assert_eq!(source_archive, PathBuf::from("huge.iso"));
+            assert_eq!(volume_size, "100M");
+            assert_eq!(output_dir, Some(PathBuf::from("./parts")));
+            assert_eq!(naming, Some("numbered".to_string()));
+        }
+        _ => panic!("Expected Split subcommand"),
+    }
+
+    let cli_join = Cli::parse_from([
+        "ttzip", "join", "huge.iso.001", "-o", "restored.iso", "--json",
+    ]);
+    match cli_join.command {
+        Some(Commands::Join {
+            first_volume,
+            output,
+            json,
+        }) => {
+            assert_eq!(first_volume, PathBuf::from("huge.iso.001"));
+            assert_eq!(output, PathBuf::from("restored.iso"));
+            assert!(json);
+        }
+        _ => panic!("Expected Join subcommand"),
     }
 }
 
@@ -99,6 +173,7 @@ fn test_headless_create_list_extract_roundtrip_zip() {
         6,
         None,
         2,
+        None,
     );
     assert!(create_res.is_ok(), "create_res: {:?}", create_res);
     assert!(archive_file.exists());
@@ -143,6 +218,7 @@ fn test_headless_create_list_extract_roundtrip_7z() {
         3,
         None,
         2,
+        None,
     );
     assert!(create_res.is_ok(), "create_res 7z: {:?}", create_res);
     assert!(archive_file.exists());

@@ -48,6 +48,19 @@ public enum QuickLookPreviewEngine: Sendable {
         )
     }
     
+    /// Extracts a single in-archive file directly into memory for QuickLook previews (<10ms zero disk write).
+    public static func extractSingleFileMemoryStream(
+        archivePath: String,
+        entryPath: String,
+        password: String? = nil
+    ) async throws -> Data? {
+        return try await ArchiveSelectiveExtractor.shared.extractSingleEntryData(
+            archivePath: archivePath,
+            entryPath: entryPath,
+            password: password
+        )
+    }
+    
     /// Generates a rich, responsive, dark/light adaptive HTML5 preview document for QuickLook rendering.
     public static func generateHTMLPreview(for archivePath: String, password: String? = nil) async throws -> String {
         let data = try await inspectForPreview(archivePath: archivePath, password: password)

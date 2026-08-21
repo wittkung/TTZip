@@ -18,6 +18,13 @@ final class CLIPackagingTests: XCTestCase {
         XCTAssertTrue(fm.isExecutableFile(atPath: scriptPath))
     }
     
+    func testLocalReleasePackagingScriptExistsAndIsExecutable() {
+        let scriptPath = "scripts/package_local_release.sh"
+        let fm = FileManager.default
+        XCTAssertTrue(fm.fileExists(atPath: scriptPath))
+        XCTAssertTrue(fm.isExecutableFile(atPath: scriptPath))
+    }
+    
     func testHomebrewFormulaSyntaxAndDirectives() throws {
         let formulaPath = "Formula/ttzip-cli.rb"
         let fm = FileManager.default
