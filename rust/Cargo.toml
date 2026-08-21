@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "ttzip-glue",
+    "ttzip-tui",
 ]
 resolver = "2"
 

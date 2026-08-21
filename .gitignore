@@ -22,6 +22,7 @@ Icon?
 build/
 build_*/
 rust/target/
+bin/
 dist/
 build_dist/
 build_app/
