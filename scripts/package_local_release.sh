@@ -185,15 +185,11 @@ generate_dmg() {
     if [ "${SKIP_DMG}" = true ]; then
         echo "==> [5/6] Skipping DMG Generation (--skip-dmg)"; return 0
     fi
-    echo "==> [5/6] Generating Release DMG (${DMG_NAME})..."
-    local dmg_staging="${OUTPUT_DIR}/dmg_staging"
-    rm -rf "${dmg_staging}" && mkdir -p "${dmg_staging}"
-    cp -R "${APP_BUNDLE}" "${dmg_staging}/"
-    ln -s /Applications "${dmg_staging}/Applications"
-    
-    rm -f "${OUTPUT_DIR}/${DMG_NAME}"
-    hdiutil create -volname "TTZip" -srcfolder "${dmg_staging}" -ov -format UDZO "${OUTPUT_DIR}/${DMG_NAME}" >/dev/null
-    rm -rf "${dmg_staging}"
+    echo "==> [5/6] Generating Retina Release DMG (${DMG_NAME})..."
+    "${SCRIPT_DIR}/create_dmg_installer.sh" \
+        --app "${APP_BUNDLE}" \
+        --volname "TTZip" \
+        --output "${OUTPUT_DIR}/${DMG_NAME}"
     
     DMG_SHA256="$(shasum -a 256 "${OUTPUT_DIR}/${DMG_NAME}" | awk '{print $1}')"
     echo "  ✓ DMG Image : ${OUTPUT_DIR}/${DMG_NAME}"
