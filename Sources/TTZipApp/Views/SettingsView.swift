@@ -44,9 +44,10 @@ public struct SettingsView: View {
     @State private var selectedTab: SettingsTab = .general
     @State private var licenseKeyInput = ""
     @State private var activationStatus = ""
-    @State private var isPro = LicenseManager.shared.isPro
     @State private var defaultFormat: ArchiveCompressionFormat = .zip
     @State private var defaultLevel: ArchiveCompressionLevel = .normal
+    @State private var isPro = LicenseManager.shared.isPro
+    @AppStorage("isSmartStoreBypassEnabled") private var isSmartStoreBypassEnabled: Bool = true
     
     public init() {}
     
@@ -110,10 +111,7 @@ public struct SettingsView: View {
                 .fill(TTZipTheme.hairlineBorder)
                 .frame(height: 0.5)
             
-            Toggle(isOn: Binding(
-                get: { ArchiveEntropyEvaluator.isSmartStoreBypassEnabled },
-                set: { ArchiveEntropyEvaluator.isSmartStoreBypassEnabled = $0 }
-            )) {
+            Toggle(isOn: $isSmartStoreBypassEnabled) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l10n.t(L10n.Compress.smartStoreBypassTitle))
                         .font(TTZipTheme.Typography.bodyMedium)

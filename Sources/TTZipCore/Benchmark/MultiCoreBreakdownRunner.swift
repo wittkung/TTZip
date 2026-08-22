@@ -71,7 +71,7 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
             var outBuf = [UInt8](repeating: 0, count: chunkSize + 512)
             let outCap = outBuf.count
             mutexLock.lock()
-            _ = testData.withUnsafeBytes { inPtr in
+            testData.withUnsafeBytes { inPtr in
                 outBuf.withUnsafeMutableBytes { outPtr in
                     var outLen: Int = 0
                     _ = ttzip_rust_deflate_compress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), chunkSize, outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), outCap, 1, &outLen)
@@ -86,7 +86,7 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
         ConcurrencyBridge.parallelFor(iterations: chunkCount) { _ in
             var outBuf = [UInt8](repeating: 0, count: chunkSize + 512)
             let outCap = outBuf.count
-            _ = testData.withUnsafeBytes { inPtr in
+            testData.withUnsafeBytes { inPtr in
                 outBuf.withUnsafeMutableBytes { outPtr in
                     var outLen: Int = 0
                     _ = ttzip_rust_deflate_compress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), chunkSize, outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), outCap, 1, &outLen)
@@ -111,7 +111,7 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
         let t0 = PlatformMonotonicTimer.nowNanoseconds()
         var singleOut = Data(count: size + 512)
         let outCap = singleOut.count
-        _ = data.withUnsafeBytes { inPtr in
+        data.withUnsafeBytes { inPtr in
             singleOut.withUnsafeMutableBytes { outPtr in
                 var outLen: Int = 0
                 _ = ttzip_rust_deflate_compress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), size, outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), outCap, 1, &outLen)
@@ -121,7 +121,7 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
         let baseSec = max(0.000001, Double(t1 - t0) / 1_000_000_000.0)
 
         let t2 = PlatformMonotonicTimer.nowNanoseconds()
-        _ = ZipBlockParallelCompressor.shared.compressBlocksConcurrently(data: data, level: 1)
+        _ = FastContainerEngine.compressZlib(data, level: 1)
         let t3 = PlatformMonotonicTimer.nowNanoseconds()
         let optSec = max(0.000001, Double(t3 - t2) / 1_000_000_000.0)
 
@@ -137,25 +137,17 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
         let numChunks = 4
         let rawChunk = Data((0..<chunkSize).map { UInt8(($0 * 17) & 0xFF) })
         var compressedChunks: [Data] = []
-        var offsets: [Int] = []
-        var compressedSizes: [Int] = []
-        var uncompressedSizes: [Int] = []
-        var combinedData = Data()
 
         for _ in 0..<numChunks {
             var outBuf = Data(count: chunkSize + 512)
             let outCap = outBuf.count
             var compSize: Int = 0
-            _ = rawChunk.withUnsafeBytes { inPtr in
+            rawChunk.withUnsafeBytes { inPtr in
                 outBuf.withUnsafeMutableBytes { outPtr in
                     _ = ttzip_rust_deflate_compress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), chunkSize, outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), outCap, 1, &compSize)
                 }
             }
             let chunkData = outBuf.prefix(compSize)
-            offsets.append(combinedData.count)
-            compressedSizes.append(compSize)
-            uncompressedSizes.append(chunkSize)
-            combinedData.append(chunkData)
             compressedChunks.append(chunkData)
         }
         let totalRawSize = numChunks * chunkSize
@@ -165,7 +157,7 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
         var seqOut = Data(count: totalRawSize)
         for (i, c) in compressedChunks.enumerated() {
             let off = i * chunkSize
-            _ = c.withUnsafeBytes { inPtr in
+            c.withUnsafeBytes { inPtr in
                 seqOut.withUnsafeMutableBytes { outPtr in
                     var outLen: Int = 0
                     _ = ttzip_rust_deflate_decompress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), c.count, outPtr.baseAddress!.advanced(by: off).assumingMemoryBound(to: UInt8.self), chunkSize, &outLen)
@@ -176,13 +168,15 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
         let baseSec = max(0.000001, Double(t1 - t0) / 1_000_000_000.0)
 
         let t2 = PlatformMonotonicTimer.nowNanoseconds()
-        _ = ZipBlockParallelDecompressor.shared.decompressBlocksConcurrently(
-            compressedData: combinedData,
-            uncompressedSize: Int64(totalRawSize),
-            blockOffsets: offsets,
-            blockCompressedSizes: compressedSizes,
-            blockUncompressedSizes: uncompressedSizes
-        )
+        for (i, c) in compressedChunks.enumerated() {
+            let off = i * chunkSize
+            c.withUnsafeBytes { inPtr in
+                seqOut.withUnsafeMutableBytes { outPtr in
+                    var outLen: Int = 0
+                    _ = ttzip_rust_deflate_decompress(inPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), c.count, outPtr.baseAddress!.advanced(by: off).assumingMemoryBound(to: UInt8.self), chunkSize, &outLen)
+                }
+            }
+        }
         let t3 = PlatformMonotonicTimer.nowNanoseconds()
         let optSec = max(0.000001, Double(t3 - t2) / 1_000_000_000.0)
 
@@ -222,7 +216,8 @@ public final class MultiCoreBreakdownRunner: @unchecked Sendable {
 
         let optZip = tempDir.appendingPathComponent("opt.zip").path
         let t2 = PlatformMonotonicTimer.nowNanoseconds()
-        _ = try? ZipParallelWriter.shared.createArchive(outputPath: optZip, inputPaths: [tempDir.path], level: .fast)
+        let writer = ArchiveWriter()
+        _ = try? writer.createArchiveSync(outputPath: optZip, format: .zip, level: .fast, inputPaths: [tempDir.path], options: .defaultClean)
         let t3 = PlatformMonotonicTimer.nowNanoseconds()
         let optSec = max(0.000001, Double(t3 - t2) / 1_000_000_000.0)
 

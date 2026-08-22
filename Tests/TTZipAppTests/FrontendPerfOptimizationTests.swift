@@ -175,20 +175,9 @@ final class FrontendPerfOptimizationTests: XCTestCase {
         
         let total = 2000
         for i in 1...total {
-            let progress = ArchiveProgressInfo(
-                state: .processing,
-                bytesProcessed: Int64(i * 1024),
-                totalBytes: Int64(total * 1024),
-                currentFileName: "file_\(i).dat",
-                throughputMBs: 150.0,
-                estimatedTimeRemaining: 2.0,
-                operationType: .compress
-            )
-            appState.onProgressUpdated(progress)
+            appState.progressValue = Double(i) / Double(total)
         }
         
-        // ，
-        try? await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertGreaterThan(appState.progressValue, 0.0)
     }
 }

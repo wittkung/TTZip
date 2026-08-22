@@ -68,12 +68,14 @@ final class ArchiveEncryptionIntrospectionTests: XCTestCase {
         try "Content of file B with more data 123456789".write(to: fileB, atomically: true, encoding: .utf8)
         
         let out7z = tempDir.appendingPathComponent("test_archive.7z").path
-        let success = try SevenZipEngine.shared.createArchive(
+        let writer = ArchiveWriter()
+        try writer.createArchiveSync(
             outputPath: out7z,
+            format: .sevenZip,
+            level: .fast,
             inputPaths: [fileA.path, fileB.path],
-            level: .fast
+            options: .defaultClean
         )
-        XCTAssertTrue(success, "7z archive creation must succeed")
         
         let reader = ArchiveReader()
         let t0 = CFAbsoluteTimeGetCurrent()

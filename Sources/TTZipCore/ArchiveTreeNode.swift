@@ -28,12 +28,11 @@ public struct ArchiveTreeNode: Identifiable, Sendable, Equatable {
         children: [ArchiveTreeNode]? = nil,
         entry: ArchiveEntry? = nil
     ) {
-        let factory = ArchiveEntryFlyweightFactory.shared
-        self.name = factory.internPath(name)
-        self.path = factory.internPath(path)
+        self.name = name
+        self.path = path
         self.uncompressedSize = uncompressedSize
         self.isDirectory = isDirectory
-        self.detectedEncoding = factory.internPath(detectedEncoding)
+        self.detectedEncoding = detectedEncoding
         self.children = children
         self.entry = entry
     }

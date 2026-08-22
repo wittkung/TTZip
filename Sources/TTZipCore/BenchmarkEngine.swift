@@ -147,12 +147,8 @@ public final class BenchmarkEngine: @unchecked Sendable {
         try? FileManager.default.createDirectory(atPath: decompTargetDir, withIntermediateDirectories: true)
 
         let decompStartNanos = monotonicNanos()
-        if format == .zip {
-            _ = try? ZipParallelExtractor.shared.extract(archivePath: outputArchivePath, destinationDir: decompTargetDir)
-        } else {
-            let extractor = ArchiveEngineFactory.makeExtractor(for: format)
-            try? await extractor.extract(archivePath: outputArchivePath, destinationDir: decompTargetDir)
-        }
+        let extractor = ArchiveEngineFactory.makeExtractor(for: format)
+        try? await extractor.extract(archivePath: outputArchivePath, destinationDir: decompTargetDir)
         let decompEndNanos = monotonicNanos()
         let decompElapsedNanos = max(500_000, decompEndNanos - decompStartNanos)
         let decompElapsed = Double(decompElapsedNanos) / 1_000_000_000.0

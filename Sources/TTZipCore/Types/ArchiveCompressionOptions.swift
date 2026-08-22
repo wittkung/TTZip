@@ -80,14 +80,28 @@ public enum ArchiveCompressionLevel: Int, Sendable, CaseIterable, Identifiable, 
         self = ArchiveCompressionLevel(rawValue: clamped) ?? .level6
     }
     
-    /// 获取该压缩级别在 ZIP 格式下的强类型物理配置 Profile
-    public var zipProfile: ZipCompressionProfile {
-        return ZipCompressionProfile.profile(for: self)
-    }
-
     /// 将通用压缩级别透明映射至底层 Deflate 引擎的原生物理等级
     public var effectiveZipRawLevel: Int32 {
-        return zipProfile.deflateLevel
+        switch self {
+        case .fast5, .fast4, .fast3, .fast2, .fast1:
+            return 1
+        case .store:
+            return 0
+        case .level1, .level2:
+            return 1
+        case .level3, .level4:
+            return 3
+        case .level5:
+            return 5
+        case .level6:
+            return 6
+        case .level7, .level8:
+            return 7
+        case .level9, .level10, .level11, .level12, .level13, .level14, .level15:
+            return 9
+        case .level16, .level17, .level18, .level19, .level20, .level21, .level22:
+            return 12
+        }
     }
     
     /// Measured relative throughput percentage (100% is peak).

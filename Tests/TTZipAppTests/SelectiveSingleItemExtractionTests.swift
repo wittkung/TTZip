@@ -23,12 +23,12 @@ final class SelectiveSingleItemExtractionTests: XCTestCase {
         try "Content 1 payload".write(to: file1, atomically: true, encoding: .utf8)
         try "Content 2 target payload for single extraction".write(to: file2, atomically: true, encoding: .utf8)
         
-        let res = try ZipParallelWriter.shared.createArchive(
+        try ArchiveWriter().createArchiveSync(
             outputPath: zipPath,
-            inputPaths: [file1.path, file2.path],
-            level: .fastest
+            format: .zip,
+            level: .fastest,
+            inputPaths: [file1.path, file2.path]
         )
-        XCTAssertTrue(res)
         
         // Single Entry On-Demand Extraction
         let t0 = ContinuousClock.now

@@ -11,13 +11,12 @@ import CTTZipBridge
 
 /// High-performance data integrity and checksum verification engine (CRC32, SHA256 & Stream Decompression).
 public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked Sendable {
-    private let hashCalculator: HashCalculating
     private var sourceCRCCache: [String: String] = [:]
     private let cacheLock = NSLock()
     
-    public init(hashCalculator: HashCalculating = ArchiveEngineFactory.makeHashCalculator()) {
-        self.hashCalculator = hashCalculator
-    }
+    public init() {}
+    
+    public init(hashCalculator: HashCalculating) {}
     
     /// Computes CRC32 checksum string for a file (e.g. `"A1B2C3D4"`).
     public func computeCRC32(filePath: String) -> String {
@@ -35,7 +34,14 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
     
     /// Asynchronously computes SHA256 digest string for a file.
     public func computeSHA256(filePath: String) async throws -> String {
-        return try await hashCalculator.computeHash(filePath: filePath, type: .sha256)
+        guard let handle = FileHandle(forReadingAtPath: filePath) else { throw ArchiveError.fileNotFound }
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let chunk = try? handle.read(upToCount: 65536), !chunk.isEmpty {
+            hasher.update(data: chunk)
+        }
+        let digest = hasher.finalize()
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
     
     /// Performs pure in-memory stream-discarding archive verification without disk writes.
@@ -90,7 +96,7 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
         
         totalEntries = entries.count
         
-        // 2. Perform in-memory stream decompression verification for each non-directory entry
+        // 2. Perform verification for each non-directory entry
         for (index, entry) in entries.enumerated() {
             let progress = totalEntries > 0 ? Double(index) / Double(totalEntries) : 0.0
             progressHandler?(progress, entry.path)
@@ -240,25 +246,6 @@ public final class ArchiveIntegrityChecker: ArchiveIntegrityChecking, @unchecked
             TTLogger.debug("  ✅ [\(label) Integrity Check] 100% Bit-exact verified (\(totalExtractedBytes) bytes\(crcDisplay))")
         } else if !sizeValid {
             TTLogger.error("  ❌ [\(label) Byte Count Mismatch] Expected: \(expectedOriginalBytes) bytes vs Actual: \(totalExtractedBytes) bytes (checkDir: \(checkDir))")
-            if let dbgEnum = fm.enumerator(atPath: checkDir) {
-                while let r = dbgEnum.nextObject() as? String {
-                    let fp = (checkDir as NSString).appendingPathComponent(r)
-                    var id: ObjCBool = false
-                    if fm.fileExists(atPath: fp, isDirectory: &id) {
-                        let s = (try? fm.attributesOfItem(atPath: fp)[.size] as? Int64) ?? 0
-                        TTLogger.error("     - rel: \(r) | isDir: \(id.boolValue) | size: \(s)")
-                    }
-                }
-            }
-            SingleTestDiagnosticRunner.shared.reportFailure(
-                stage: .integrityVerification,
-                format: .zip,
-                level: .level1,
-                errorMessage: "[\(label)] Extracted byte size mismatch",
-                destinationDir: directoryPath,
-                expectedBytes: expectedOriginalBytes,
-                actualBytes: totalExtractedBytes
-            )
         }
         return (isValid, totalExtractedBytes, crcStr)
     }

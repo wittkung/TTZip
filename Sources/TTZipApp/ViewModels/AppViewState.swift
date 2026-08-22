@@ -13,10 +13,6 @@ import TTZipCore
 /// TTZip GUI main view ViewModel coordinating UI interactions with decoupled domain state trees.
 @MainActor
 public final class AppViewState: ObservableObject {
-    public typealias Memento = AppViewStateMemento
-    
-    public let workspaceCaretaker = AppViewStateCaretaker()
-
     // Domain Sub-States
     public let navigationState: NavigationState
     public let explorerState: ArchiveExplorerState
@@ -85,10 +81,6 @@ public final class AppViewState: ObservableObject {
         get { taskState.lastCommandDescription }
         set { taskState.lastCommandDescription = newValue }
     }
-    public var activeTaskStateMachine: ArchiveTaskStateMachine? {
-        get { taskState.activeTaskStateMachine }
-        set { taskState.activeTaskStateMachine = newValue }
-    }
     public var taskStateName: String {
         get { taskState.taskStateName }
         set { taskState.taskStateName = newValue }
@@ -141,9 +133,8 @@ public final class AppViewState: ObservableObject {
     
     @Published public var recentArchives: [RecentArchiveRecord] = []
     
-    @Injected public var historyManager: CommandHistoryManager
-    @Injected public var passwordVaultManager: PasswordVaultManager
-    @Injected public var appMediator: ArchiveMediatorProtocol
+    public var historyManager: CommandHistoryManager
+    public var passwordVaultManager: PasswordVaultManager
     
     let fileViewer: FileViewerServiceProtocol
     let passwordVault: PasswordVaultManaging
@@ -157,7 +148,8 @@ public final class AppViewState: ObservableObject {
         overlayState: OverlayState = OverlayState(),
         fileViewer: FileViewerServiceProtocol = MacNSWorkspaceFileViewer(),
         passwordVault: PasswordVaultManaging = PasswordVaultManager.shared,
-        historyManager: CommandHistoryManager = CommandHistoryManager.shared
+        historyManager: CommandHistoryManager = CommandHistoryManager.shared,
+        passwordVaultManager: PasswordVaultManager = PasswordVaultManager.shared
     ) {
         self.navigationState = navigationState
         self.explorerState = explorerState
@@ -165,6 +157,8 @@ public final class AppViewState: ObservableObject {
         self.overlayState = overlayState
         self.fileViewer = fileViewer
         self.passwordVault = passwordVault
+        self.historyManager = historyManager
+        self.passwordVaultManager = passwordVaultManager
 
         navigationState.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
         explorerState.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
@@ -179,9 +173,6 @@ public final class AppViewState: ObservableObject {
             RootFolderAccessManager.shared.ensureAccess(for: self.currentDirectory, promptIfMissing: true)
         }
         
-        ArchiveProgressBroadcaster.shared.addObserver(self)
-        ArchiveEventCenter.shared.addObserver(self)
-        
         NotificationCenter.default.addObserver(forName: NSNotification.Name("TTZipPerformUndoNotification"), object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 self?.performUndo()
@@ -194,6 +185,5 @@ public final class AppViewState: ObservableObject {
         }
         
         updateUndoRedoState()
-        ArchiveAppMediator.shared.register(component: self)
     }
 }

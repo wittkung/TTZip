@@ -25,40 +25,8 @@ extension TTZipEngineFacade {
             throw ArchiveError.readFailed(code: -10)
         }
         
-        let valCtx = ArchiveValidationContext.forCompress(
-            sourcePaths: inputs,
-            destinationPath: outputPath,
-            format: format,
-            level: level,
-            password: password,
-            splitSize: splitSize,
-            options: ArchiveValidationOptions(
-                isSplit: splitSize != nil && splitSize! > 0,
-                splitVolumeSizeBytes: splitSize,
-                isEncrypted: password != nil && !password!.isEmpty,
-                compressionLevel: level,
-                skipMacJunk: filterOptions.skipMacJunk,
-                format: format
-            )
-        )
-        do {
-            try ArchiveValidationPipeline.buildDefaultCompressPipeline().validateOrThrow(context: valCtx)
-        } catch let valErr as ArchiveValidationError {
-            throw valErr.asArchiveError
-        }
-        
         let combinedProgress: @Sendable (ArchiveProgress) -> Void = { p in
             progress?(p)
-            let info = ArchiveProgressInfo(
-                state: p.state,
-                bytesProcessed: p.bytesProcessed,
-                totalBytes: p.totalBytes,
-                currentFileName: p.currentFileName,
-                throughputMBs: p.throughputMBs,
-                estimatedTimeRemaining: ArchiveProgressInfo.calculateETA(bytesProcessed: p.bytesProcessed, totalBytes: p.totalBytes, throughputMBs: p.throughputMBs),
-                operationType: .compress
-            )
-            ArchiveProgressBroadcaster.shared.broadcastProgress(info)
         }
         
         if let splitBytes = splitSize, splitBytes > 0, (format == .sevenZip || format == .zip) {
@@ -99,20 +67,13 @@ extension TTZipEngineFacade {
             }
             let rate = (Double(totalOrigBytes) / 1024.0 / 1024.0) / elapsed
             
-            let res = ArchiveOperationResult(
+            return ArchiveOperationResult(
                 outputPath: outputPath,
                 originalBytes: totalOrigBytes,
                 compressedBytes: compressedSize,
                 durationSeconds: elapsed,
                 throughputMBs: rate
             )
-            ArchiveEventCenter.shared.postArchiveCompleted(
-                archivePath: outputPath,
-                operationType: .compress,
-                duration: elapsed,
-                totalBytes: totalOrigBytes
-            )
-            return res
         }
         
         var builder = pipelineBuilderProvider()
@@ -130,13 +91,6 @@ extension TTZipEngineFacade {
         
         builder = builder.withProgressHandler(combinedProgress)
         
-        let res = try await builder.executeCreate()
-        ArchiveEventCenter.shared.postArchiveCompleted(
-            archivePath: outputPath,
-            operationType: .compress,
-            duration: res.durationSeconds,
-            totalBytes: res.originalBytes
-        )
-        return res
+        return try await builder.executeCreate()
     }
 }

@@ -126,7 +126,3 @@ extension AppleSiliconTuner: HardwareTunerProtocol {
         return self.topology.totalCores
     }
 }
-
-extension NativeZipEngine: ZipEngineProtocol {}
-extension SevenZipParallelWriter: SevenZipEngineProtocol {}
-extension NativeZstdEngine: ZstdEngineProtocol {}

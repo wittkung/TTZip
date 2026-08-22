@@ -6,31 +6,32 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
-import CryptoKit
 import CTTZipBridge
 
-/// High-performance multi-format archive compression engine.
+/// High-performance multi-format archive compression engine (Ultra-Thin Rust C-ABI Facade).
 public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
-    internal let zipEngine: ZipEngineProtocol
-    internal let sevenZipEngine: SevenZipEngineProtocol
-    internal let zstdEngine: ZstdEngineProtocol
     internal let hardwareTuner: HardwareTunerProtocol
     public let targetFormat: ArchiveCompressionFormat?
-    
+
     public init(
-        zipEngine: ZipEngineProtocol = NativeZipEngine.shared,
-        sevenZipEngine: SevenZipEngineProtocol = SevenZipParallelWriter.shared,
-        zstdEngine: ZstdEngineProtocol = NativeZstdEngine.shared,
         hardwareTuner: HardwareTunerProtocol = ArchiveEngineFamilyProvider.shared.currentFactory.tuner,
         targetFormat: ArchiveCompressionFormat? = nil
     ) {
-        self.zipEngine = zipEngine
-        self.sevenZipEngine = sevenZipEngine
-        self.zstdEngine = zstdEngine
         self.hardwareTuner = hardwareTuner
         self.targetFormat = targetFormat
     }
-    
+
+    /// Backward-compatible initializer accepting legacy engine parameters.
+    public convenience init(
+        zipEngine: Any? = nil,
+        sevenZipEngine: Any? = nil,
+        zstdEngine: Any? = nil,
+        hardwareTuner: HardwareTunerProtocol = ArchiveEngineFamilyProvider.shared.currentFactory.tuner,
+        targetFormat: ArchiveCompressionFormat? = nil
+    ) {
+        self.init(hardwareTuner: hardwareTuner, targetFormat: targetFormat)
+    }
+
     /// Asynchronously compresses files and directories into an archive with validation and progress tracking.
     public func createArchive(
         outputPath: String,
@@ -46,31 +47,9 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         guard !inputPaths.isEmpty else {
             throw ArchiveError.readFailed(code: -10)
         }
-        
-        let valCtx = ArchiveValidationContext.forCompress(
-            sourcePaths: inputPaths,
-            destinationPath: outputPath,
-            format: format,
-            level: level,
-            password: password,
-            splitSize: splitVolumeSizeBytes,
-            options: ArchiveValidationOptions(
-                isSplit: splitVolumeSizeBytes != nil && splitVolumeSizeBytes! > 0,
-                splitVolumeSizeBytes: splitVolumeSizeBytes,
-                isEncrypted: password != nil && !password!.isEmpty,
-                compressionLevel: level,
-                skipMacJunk: options.skipMacJunk,
-                format: format
-            )
-        )
-        try ArchiveValidationPipeline.buildDefaultCompressPipeline().validateOrThrow(context: valCtx)
-        
-        if level == .ultra && !LicenseManager.shared.canUseFeature(.ultraCompression) {
-            throw ArchiveError.readFailed(code: -403)
-        }
-        
+
         try Task.checkCancellation()
-        
+
         try await Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
             try self.createArchiveSync(
@@ -103,6 +82,9 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         guard !inputPaths.isEmpty else {
             throw ArchiveError.readFailed(code: -10)
         }
+        if (level == .ultra || level.rawValue >= 9) && !LicenseManager.shared.isPro {
+            throw ArchiveError.readFailed(code: -403)
+        }
 
         let startTime = Date()
         let totalBytes = inputPaths.reduce(Int64(0)) { $0 + Self.recursivePathSize(at: $1) }
@@ -122,34 +104,6 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         )
     }
 
-    /// Template Method Pattern execution of archive compression workflow.
-    public func createArchiveViaTemplate(
-        outputPath: String,
-        format: ArchiveCompressionFormat = .zip,
-        level: ArchiveCompressionLevel = .normal,
-        inputPaths: [String],
-        options: ArchiveFilterOptions = .defaultClean,
-        splitVolumeSizeBytes: Int64? = nil,
-        password: String? = nil,
-        advancedOptions: ArchiveAdvancedOptions = .defaultOptions,
-        progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
-    ) throws -> WorkflowResult {
-        let context = ArchiveTemplateContext(
-            operation: .compress,
-            archivePath: outputPath,
-            inputPaths: inputPaths,
-            format: format,
-            level: level,
-            password: password,
-            options: options,
-            advancedOptions: advancedOptions,
-            splitVolumeSizeBytes: splitVolumeSizeBytes,
-            progressHandler: progressHandler
-        )
-        let template = ArchiveEngineTemplateRegistry.shared.template(for: format)
-        return try template.performWorkflow(context: context)
-    }
-
     // MARK: - Format Mappings
 
     internal static func mapFormat(_ format: ArchiveCompressionFormat) -> TTZipArchiveFormat {
@@ -163,6 +117,7 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         case .tarZst, .zst: return TTZIP_ARCHIVE_FORMAT_TAR_ZSTD
         case .dmg: return TTZIP_ARCHIVE_FORMAT_DMG
         case .snappy: return TTZIP_ARCHIVE_FORMAT_SNAPPY
+        case .aar: return TTZIP_ARCHIVE_FORMAT_LZFSE
         default: return TTZIP_ARCHIVE_FORMAT_ZIP
         }
     }
@@ -170,8 +125,7 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
     internal static func mapLevel(_ level: ArchiveCompressionLevel) -> TTZipCompressionLevel {
         switch level {
         case .store: return TTZIP_COMPRESSION_LEVEL_STORE
-        case .fastest: return TTZIP_COMPRESSION_LEVEL_FASTEST
-        case .fast: return TTZIP_COMPRESSION_LEVEL_FAST
+        case .fastest, .fast: return TTZIP_COMPRESSION_LEVEL_FASTEST
         case .normal: return TTZIP_COMPRESSION_LEVEL_NORMAL
         case .maximum: return TTZIP_COMPRESSION_LEVEL_MAXIMUM
         case .ultra: return TTZIP_COMPRESSION_LEVEL_ULTRA

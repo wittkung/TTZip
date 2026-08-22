@@ -289,24 +289,11 @@ public struct CompressModalView: View {
         guard !isProcessing && !itemsList.isEmpty && !outputName.isEmpty else { return }
         let ext = selectedFormat.fileExtension.trimmingCharacters(in: CharacterSet(charactersIn: "."))
         let inputPaths = itemsList.map { $0.path }
+        guard !inputPaths.isEmpty else { return }
         let fullOutputPath = (targetDirectory as NSString).appendingPathComponent("\(outputName).\(ext)")
-        let valCtx = ArchiveValidationContext.forCompress(
-            sourcePaths: inputPaths,
-            destinationPath: fullOutputPath,
-            format: selectedFormat,
-            level: compressionLevel,
-            password: enableEncryption ? password : nil,
-            splitSize: splitVolumeOption
-        )
-        let valResult = (try? ArchiveValidationPipeline.buildDefaultCompressPipeline().validate(context: valCtx)) ?? .success
-        if case .failure(let err) = valResult {
-            TTLogger.warning("Compression validation intercept: \(err.localizedDescription)")
-            return
-        }
         
         isProcessing = true
         isProgressModalPresented = true
-        ArchiveAppMediator.shared.send(event: .requestCompression(inputPaths: inputPaths, outputPath: fullOutputPath))
         
         let throttler = ThrottledProgressPublisher(maxFrequencyHz: 60.0)
         activeCompressionTask = Task {
@@ -361,8 +348,6 @@ public struct CompressModalView: View {
                 let originalSize = (cmdResult.metadata["originalSize"] as NSString?)?.longLongValue ?? 0
                 let elapsed = cmdResult.executionDuration
                 let throughput = elapsed > 0 ? (Double(originalSize) / 1024.0 / 1024.0) / elapsed : 0.0
-                
-                ArchiveAppMediator.shared.send(event: .compressionCompleted(outputPath: fullOutputPath))
                 
                 Task { @MainActor in
                     self.completedArchivePath = fullOutputPath

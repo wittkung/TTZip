@@ -105,7 +105,6 @@ public protocol TTZipEngineFacading: Sendable {
     func verifyIntegrity(archivePath: String) async throws -> HashVerificationResult
     func repairArchive(damagedPath: String, outputPath: String) async throws -> Int
     func recoverPassword(archivePath: String, dictionary: [String]) async throws -> PasswordRecoveryResult
-    func recoverPassword(archivePath: String, dictionary: [String], stateMachine: ArchiveTaskStateMachine?) async throws -> PasswordRecoveryResult
     
     // MARK: - 【3.4 命令模式 (Command Pattern)】命令与 Undo/Redo 控制
     var historyManager: CommandHistoryManager { get }
@@ -116,18 +115,6 @@ public protocol TTZipEngineFacading: Sendable {
     func redoCommand() async throws -> CommandResult?
     func undoLastCommand() async throws -> CommandResult?
     func redoLastCommand() async throws -> CommandResult?
-    
-    // MARK: - 【3.5 状态模式 (State Pattern)】任务状态机生命周期管理
-    func createTaskStateMachine(taskName: String, totalBytes: Int64) -> ArchiveTaskStateMachine
-    func getTaskStateMachine(id: UUID) -> ArchiveTaskStateMachine?
-    func pauseTask(id: UUID) throws
-    func resumeTask(id: UUID) throws
-    func cancelTask(id: UUID) throws
-
-    // MARK: - 【3.6 模板方法模式 (Template Method Pattern)】算法骨架与格式特化模板工作流
-    func performTemplateWorkflow(context: ArchiveTemplateContext) throws -> WorkflowResult
-    func performTemplateWorkflowAsync(context: ArchiveTemplateContext) async throws -> WorkflowResult
-    func getTemplateEngine(for format: ArchiveCompressionFormat) -> BaseArchiveEngineTemplate
     
     // MARK: - 【桥接模式 & 装饰器模式】Bridge Abstraction & Decorator Integration
     func operationAbstraction(for format: ArchiveCompressionFormat) -> ArchiveOperationAbstraction
@@ -247,43 +234,8 @@ extension TTZipEngineFacading {
     }
     
     public func recoverPassword(archivePath: String, dictionary: [String]) async throws -> PasswordRecoveryResult {
-        return try await recoverPassword(archivePath: archivePath, dictionary: dictionary, stateMachine: nil)
-    }
-    
-    public func recoverPassword(archivePath: String, dictionary: [String], stateMachine: ArchiveTaskStateMachine?) async throws -> PasswordRecoveryResult {
-        return try await recoverPassword(archivePath: archivePath, dictionary: dictionary)
-    }
-    
-    public func createTaskStateMachine(taskName: String = "ArchiveTask", totalBytes: Int64 = 0) -> ArchiveTaskStateMachine {
-        return TTZipEngineFacade.shared.createTaskStateMachine(taskName: taskName, totalBytes: totalBytes)
-    }
-    
-    public func getTaskStateMachine(id: UUID) -> ArchiveTaskStateMachine? {
-        return TTZipEngineFacade.shared.getTaskStateMachine(id: id)
-    }
-    
-    public func pauseTask(id: UUID) throws {
-        try TTZipEngineFacade.shared.pauseTask(id: id)
-    }
-    
-    public func resumeTask(id: UUID) throws {
-        try TTZipEngineFacade.shared.resumeTask(id: id)
-    }
-    
-    public func cancelTask(id: UUID) throws {
-        try TTZipEngineFacade.shared.cancelTask(id: id)
-    }
-
-    public func performTemplateWorkflow(context: ArchiveTemplateContext) throws -> WorkflowResult {
-        return try ArchiveEngineTemplateRegistry.shared.executeWorkflow(context: context)
-    }
-
-    public func performTemplateWorkflowAsync(context: ArchiveTemplateContext) async throws -> WorkflowResult {
-        return try await ArchiveEngineTemplateRegistry.shared.executeWorkflowAsync(context: context)
-    }
-
-    public func getTemplateEngine(for format: ArchiveCompressionFormat) -> BaseArchiveEngineTemplate {
-        return ArchiveEngineTemplateRegistry.shared.template(for: format)
+        let engine = PasswordRecoveryEngine()
+        return try await engine.recoverPassword(archivePath: archivePath, dictionary: dictionary)
     }
 
     public func operationAbstraction(for format: ArchiveCompressionFormat = .zip) -> ArchiveOperationAbstraction {

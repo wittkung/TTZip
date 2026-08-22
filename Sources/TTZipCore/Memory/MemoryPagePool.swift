@@ -14,13 +14,13 @@ public enum MemoryPageSize: Int, Sendable, CaseIterable {
     case page64K = 65536
 }
 
-/// Flyweight buffer wrapping shared physical page memory.
-public final class MemoryPageBufferFlyweight: @unchecked Sendable {
+/// Page-aligned physical memory buffer wrapper.
+public final class MemoryPageBuffer: @unchecked Sendable {
     public let pointer: UnsafeMutableRawPointer
     public let capacity: Int
     public let pageSize: MemoryPageSize
     internal var inUse: Bool = false
-    
+
     internal init?(pageSize: MemoryPageSize) {
         self.pageSize = pageSize
         self.capacity = pageSize.rawValue
@@ -33,20 +33,20 @@ public final class MemoryPageBufferFlyweight: @unchecked Sendable {
         memset(validPtr, 0, capacity)
         self.pointer = validPtr
     }
-    
-    public static let sharedEmergencyFallback: MemoryPageBufferFlyweight = {
-        if let flyweight = MemoryPageBufferFlyweight(pageSize: .page16K) {
-            return flyweight
+
+    public static let sharedEmergencyFallback: MemoryPageBuffer = {
+        if let buf = MemoryPageBuffer(pageSize: .page16K) {
+            return buf
         }
         var rawPtr: UnsafeMutableRawPointer? = nil
         let res = posix_memalign(&rawPtr, 16384, 4096)
         if res == 0, let ptr = rawPtr {
             memset(ptr, 0, 4096)
-            return MemoryPageBufferFlyweight(rawPointer: ptr, capacity: 4096, pageSize: .page4K)
+            return MemoryPageBuffer(rawPointer: ptr, capacity: 4096, pageSize: .page4K)
         }
         let fallbackPtr = malloc(4096)!
         memset(fallbackPtr, 0, 4096)
-        return MemoryPageBufferFlyweight(rawPointer: fallbackPtr, capacity: 4096, pageSize: .page4K)
+        return MemoryPageBuffer(rawPointer: fallbackPtr, capacity: 4096, pageSize: .page4K)
     }()
 
     private init(rawPointer: UnsafeMutableRawPointer, capacity: Int, pageSize: MemoryPageSize) {
@@ -55,52 +55,54 @@ public final class MemoryPageBufferFlyweight: @unchecked Sendable {
         self.pageSize = pageSize
         self.inUse = false
     }
-    
+
     deinit {
         free(pointer)
     }
-    
+
     /// Clears buffer memory for subsequent reuse.
     public func reset() {
         memset(pointer, 0, capacity)
     }
 }
 
-/// Flyweight Pattern: Page-aligned memory buffer pooling and recycling mechanism.
+public typealias MemoryPageBufferFlyweight = MemoryPageBuffer
+
+/// Page-aligned memory buffer pooling and recycling manager.
 ///
 /// Supplies zero-heap-allocation memory buffers for streaming I/O, hash calculation, and mmap.
-public final class MemoryPageFlyweightPool: @unchecked Sendable {
-    public static let shared = MemoryPageFlyweightPool()
-    
+public final class MemoryPageBufferPool: @unchecked Sendable {
+    public static let shared = MemoryPageBufferPool()
+
     private let lock = NSLock()
-    private var pool4K: [MemoryPageBufferFlyweight] = []
-    private var pool16K: [MemoryPageBufferFlyweight] = []
-    private var pool64K: [MemoryPageBufferFlyweight] = []
-    
+    private var pool4K: [MemoryPageBuffer] = []
+    private var pool16K: [MemoryPageBuffer] = []
+    private var pool64K: [MemoryPageBuffer] = []
+
     private let maxPoolCapacity = 64
-    
+
     private var totalBorrowed: Int = 0
     private var totalReturned: Int = 0
     private var totalAllocatedCount: Int = 0
-    
+
     private init() {
         for _ in 0..<4 {
-            if let b4 = MemoryPageBufferFlyweight(pageSize: .page4K) {
+            if let b4 = MemoryPageBuffer(pageSize: .page4K) {
                 pool4K.append(b4)
                 totalAllocatedCount += 1
             }
-            if let b16 = MemoryPageBufferFlyweight(pageSize: .page16K) {
+            if let b16 = MemoryPageBuffer(pageSize: .page16K) {
                 pool16K.append(b16)
                 totalAllocatedCount += 1
             }
-            if let b64 = MemoryPageBufferFlyweight(pageSize: .page64K) {
+            if let b64 = MemoryPageBuffer(pageSize: .page64K) {
                 pool64K.append(b64)
                 totalAllocatedCount += 1
             }
         }
         setupMemoryPressureObserver()
     }
-    
+
     private func setupMemoryPressureObserver() {
         #if canImport(AppKit)
         _ = NotificationCenter.default.addObserver(
@@ -111,7 +113,7 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
             self?.clearPool()
         }
         #endif
-        
+
         #if os(macOS) || os(iOS)
         let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .global(qos: .utility))
         source.setEventHandler { [weak self] in
@@ -120,14 +122,14 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
         source.resume()
         #endif
     }
-    
+
     // MARK: - Borrow & Return API
-    
+
     /// Borrows a page-aligned buffer of the requested size from the pool.
-    public func borrowBuffer(size: MemoryPageSize = .page64K) -> MemoryPageBufferFlyweight {
+    public func borrowBuffer(size: MemoryPageSize = .page64K) -> MemoryPageBuffer {
         lock.lock()
         totalBorrowed += 1
-        
+
         switch size {
         case .page4K:
             if let existing = pool4K.popLast() {
@@ -148,27 +150,27 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
                 return existing
             }
         }
-        
+
         totalAllocatedCount += 1
         lock.unlock()
-        
-        if let newBuffer = MemoryPageBufferFlyweight(pageSize: size) {
+
+        if let newBuffer = MemoryPageBuffer(pageSize: size) {
             newBuffer.inUse = true
             return newBuffer
         }
-        let fallback = MemoryPageBufferFlyweight(pageSize: .page16K) ?? MemoryPageBufferFlyweight(pageSize: .page4K)
+        let fallback = MemoryPageBuffer(pageSize: .page16K) ?? MemoryPageBuffer(pageSize: .page4K)
         fallback?.inUse = true
-        return fallback ?? MemoryPageBufferFlyweight.sharedEmergencyFallback
+        return fallback ?? MemoryPageBuffer.sharedEmergencyFallback
     }
-    
+
     /// Returns a borrowed buffer back to the pool.
-    public func returnBuffer(_ buffer: MemoryPageBufferFlyweight) {
+    public func returnBuffer(_ buffer: MemoryPageBuffer) {
         lock.lock()
         defer { lock.unlock() }
         guard buffer.inUse else { return }
         totalReturned += 1
         buffer.inUse = false
-        
+
         switch buffer.pageSize {
         case .page4K:
             if pool4K.count < maxPoolCapacity {
@@ -184,7 +186,7 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
             }
         }
     }
-    
+
     /// RAII scoped borrow and return closure API.
     public func withBuffer<T>(
         size: MemoryPageSize = .page64K,
@@ -194,9 +196,9 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
         defer { returnBuffer(buffer) }
         return try block(buffer.pointer, buffer.capacity)
     }
-    
+
     // MARK: - Pool Maintenance & Statistics
-    
+
     public func clearPool() {
         lock.lock()
         defer { lock.unlock() }
@@ -207,7 +209,7 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
         totalReturned = 0
         totalAllocatedCount = 0
     }
-    
+
     public var poolStats: (
         idle4K: Int,
         idle16K: Int,
@@ -232,3 +234,5 @@ public final class MemoryPageFlyweightPool: @unchecked Sendable {
         )
     }
 }
+
+public typealias MemoryPageFlyweightPool = MemoryPageBufferPool

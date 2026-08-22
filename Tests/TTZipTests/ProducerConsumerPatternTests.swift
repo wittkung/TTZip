@@ -347,27 +347,6 @@ final class ProducerConsumerPatternTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: outputPath))
     }
 
-    // MARK: - 11. ZipParallelWriter
-
-    func testZipParallelWriterBoundedQueueIntegration() async throws {
-        let file1 = tempDirURL.appendingPathComponent("f1.txt").path
-        let file2 = tempDirURL.appendingPathComponent("f2.txt").path
-        let zipOut = tempDirURL.appendingPathComponent("bounded_writer.zip").path
-
-        try "Content 1".write(toFile: file1, atomically: true, encoding: .utf8)
-        try "Content 2".write(toFile: file2, atomically: true, encoding: .utf8)
-
-        let success = try await ZipParallelWriter.shared.createArchiveWithBoundedQueue(
-            outputPath: zipOut,
-            inputPaths: [file1, file2],
-            level: .normal,
-            maxQueueCapacity: 4
-        )
-
-        XCTAssertTrue(success)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: zipOut))
-    }
-
     // MARK: - 12. ArchiveOperationPipeline -
 
     func testArchiveOperationPipelineIntegration() async throws {

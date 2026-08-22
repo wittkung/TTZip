@@ -36,8 +36,8 @@ final class GapBridgingTests: XCTestCase {
         try "print('Hello 2')".write(toFile: sample2, atomically: true, encoding: .utf8)
         
         let solidZip = (tempDirPath as NSString).appendingPathComponent("solid_result.tar.zst")
-        let engine = SolidArchiveEngine()
-        try await engine.createSolidArchive(outputPath: solidZip, inputPaths: [sample1, sample2])
+        let writer = ArchiveWriter()
+        try await writer.createArchive(outputPath: solidZip, format: .tarZst, level: .normal, inputPaths: [sample1, sample2])
         
         XCTAssertTrue(FileManager.default.fileExists(atPath: solidZip))
     }

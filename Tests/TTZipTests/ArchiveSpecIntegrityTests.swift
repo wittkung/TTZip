@@ -25,46 +25,23 @@ final class ArchiveSpecIntegrityTests: XCTestCase {
     }
 
     /// 1. C EOCD CDFH
-    func testCTTZipParserSafety() throws {
+    func testCTTZipParserSafety() async throws {
         let sampleZip = tempDir.appendingPathComponent("sample_parser_test.zip")
         let writer = ArchiveWriter()
         
         let testFile = tempDir.appendingPathComponent("test_file.txt")
         try "TTZip Spec Integrity Test Content".data(using: .utf8)?.write(to: testFile)
 
-        let exp = expectation(description: "Archive creation completed")
-        Task {
-            try await writer.createArchive(
-                outputPath: sampleZip.path,
-                format: .zip,
-                level: .normal,
-                inputPaths: [testFile.path]
-            )
-            exp.fulfill()
-        }
-        wait(for: [exp], timeout: 10.0)
+        try await writer.createArchive(
+            outputPath: sampleZip.path,
+            format: .zip,
+            level: .normal,
+            inputPaths: [testFile.path]
+        )
 
-        let fd = open(sampleZip.path, O_RDONLY)
-        XCTAssertGreaterThan(fd, 0)
-        defer { close(fd) }
-
-        var st = stat()
-        fstat(fd, &st)
-        let fileBytes = size_t(st.st_size)
-
-        guard let mapped = mmap(nil, fileBytes, PROT_READ, MAP_SHARED, fd, 0) else {
-            XCTFail("mmap failed")
-            return
-        }
-        let mappedBytes = mapped.assumingMemoryBound(to: UInt8.self)
-        defer { munmap(mapped, fileBytes) }
-
-        guard let descriptors = ZipCentralDirectoryReader.shared.readDescriptors(from: mappedBytes, fileSize: fileBytes, skipMacJunk: false) else {
-            XCTFail("Failed to read descriptors")
-            return
-        }
-        XCTAssertGreaterThan(descriptors.count, 0)
-        let first = descriptors[0]
+        let entries = try await ArchiveReader().inspect(archivePath: sampleZip.path)
+        XCTAssertGreaterThan(entries.count, 0)
+        let first = entries[0]
         XCTAssertFalse(first.isDirectory)
         XCTAssertEqual(first.uncompressedSize, Int64("TTZip Spec Integrity Test Content".count))
     }

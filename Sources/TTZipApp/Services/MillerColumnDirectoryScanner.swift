@@ -15,11 +15,12 @@ public enum MillerColumnDirectoryScanner {
         
         await RootFolderAccessManager.shared.ensureAccess(for: dirURL, promptIfMissing: false)
         if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
-            let scannerIterator = LazyDiskScannerIterator(diskPath: path)
             var diskItems: [DiskItemInfo] = []
-            while let entry = scannerIterator.next() {
-                let itemURL = dirURL.appendingPathComponent(entry.path)
-                diskItems.append(DiskItemInfo(url: itemURL))
+            if let files = try? FileManager.default.contentsOfDirectory(atPath: path) {
+                for file in files {
+                    let itemURL = dirURL.appendingPathComponent(file)
+                    diskItems.append(DiskItemInfo(url: itemURL))
+                }
             }
             return diskItems.sorted { a, b in
                 if a.isDirectory != b.isDirectory { return a.isDirectory }
@@ -51,7 +52,6 @@ public enum MillerColumnDirectoryScanner {
         let fetchedEntries = inspectionResult?.entries
         
         guard let entries = fetchedEntries else {
-            ArchiveEventCenter.shared.postExtractionFailed(archivePath: archivePath, error: "Password required")
             await MainActor.run {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("TTZipEncryptedArchivePromptRequired"),
@@ -104,12 +104,11 @@ public enum MillerColumnDirectoryScanner {
             
             let visitor = ArchiveComponentVisitor<DiskItemInfo>(
                 visitLeaf: { leaf in
-                    let factory = ArchiveEntryFlyweightFactory.shared
-                    let ext = factory.internExtension((leaf.name as NSString).pathExtension)
-                    let sizeText = ByteCountFormatterFlyweight.shared.string(fromByteCount: leaf.sizeBytes)
-                    let kind = factory.internPath(ext.isEmpty ? "File" : "\(ext.uppercased()) File")
+                    let ext = (leaf.name as NSString).pathExtension
+                    let sizeText = ByteCountFormatter.string(fromByteCount: leaf.sizeBytes, countStyle: .file)
+                    let kind = ext.isEmpty ? "File" : "\(ext.uppercased()) File"
                     return DiskItemInfo(
-                        virtualName: factory.internPath(leaf.name),
+                        virtualName: leaf.name,
                         virtualURL: virtualURL,
                         isDirectory: false,
                         isArchive: false,
@@ -119,15 +118,14 @@ public enum MillerColumnDirectoryScanner {
                     )
                 },
                 visitComposite: { composite in
-                    let factory = ArchiveEntryFlyweightFactory.shared
                     return DiskItemInfo(
-                        virtualName: factory.internPath(composite.name),
+                        virtualName: composite.name,
                         virtualURL: virtualURL,
                         isDirectory: true,
                         isArchive: false,
-                        sizeText: factory.internPath("Folder"),
+                        sizeText: "Folder",
                         rawSizeBytes: composite.sizeBytes,
-                        kindText: factory.internPath("Archive Folder")
+                        kindText: "Archive Folder"
                     )
                 }
             )

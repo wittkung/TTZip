@@ -7,22 +7,6 @@
 
 import Foundation
 
-// MARK: - 【3.6 模板方法模式 (Template Method Pattern)】算法骨架与格式特化模板工作流实现
-
-extension TTZipEngineFacade {
-    public func performTemplateWorkflow(context: ArchiveTemplateContext) throws -> WorkflowResult {
-        return try ArchiveEngineTemplateRegistry.shared.executeWorkflow(context: context)
-    }
-
-    public func performTemplateWorkflowAsync(context: ArchiveTemplateContext) async throws -> WorkflowResult {
-        return try await ArchiveEngineTemplateRegistry.shared.executeWorkflowAsync(context: context)
-    }
-
-    public func getTemplateEngine(for format: ArchiveCompressionFormat) -> BaseArchiveEngineTemplate {
-        return ArchiveEngineTemplateRegistry.shared.template(for: format)
-    }
-}
-
 // MARK: - 【2.7 代理模式 (Proxy Pattern)】代理通道集成
 
 extension TTZipEngineFacade {

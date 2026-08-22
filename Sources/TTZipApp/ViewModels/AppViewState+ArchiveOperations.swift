@@ -58,9 +58,6 @@ extension AppViewState {
             destDir = (parentDir as NSString).appendingPathComponent(archiveName)
         }
 
-        let stateMachine = createAndBindTaskStateMachine(taskName: "QuickExtract_\(archiveName)")
-        try? stateMachine.start()
-        
         await MainActor.run {
             self.statusMessage = "Extracting \(archiveName)..."
         }
@@ -72,7 +69,6 @@ extension AppViewState {
                 password: pwd,
                 autoVaultUnlock: self.passwordVault.autoUnlockArchives
             )
-            try? stateMachine.complete()
             await MainActor.run {
                 if res.isVaultUnlocked, let pwd = res.unlockedPassword {
                     self.statusMessage = "Extracted with vault password: \(archiveName)"

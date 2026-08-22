@@ -83,9 +83,6 @@ public final class AppleSiliconAcceleratedEngineFactory: ArchiveEngineFamilyFact
     
     public func makeWriter(for format: ArchiveCompressionFormat? = nil) -> ArchiveWriting {
         return ArchiveWriter(
-            zipEngine: NativeZipEngine.shared,
-            sevenZipEngine: SevenZipParallelWriter.shared,
-            zstdEngine: NativeZstdEngine.shared,
             hardwareTuner: tuner,
             targetFormat: format
         )
@@ -134,9 +131,6 @@ public final class StandardPortableEngineFactory: ArchiveEngineFamilyFactoryProt
     
     public func makeWriter(for format: ArchiveCompressionFormat? = nil) -> ArchiveWriting {
         return ArchiveWriter(
-            zipEngine: NativeZipEngine.shared,
-            sevenZipEngine: SevenZipParallelWriter.shared,
-            zstdEngine: NativeZstdEngine.shared,
             hardwareTuner: tuner,
             targetFormat: format
         )

@@ -26,7 +26,8 @@ extension MultiCoreBreakdownRunner {
             totalBytes += Int64(sample.count)
         }
         let zipPath = tempDir.appendingPathComponent("arc.zip").path
-        _ = try? ZipParallelWriter.shared.createArchive(outputPath: zipPath, inputPaths: [tempDir.path], level: .fast)
+        let writer = ArchiveWriter()
+        _ = try? writer.createArchiveSync(outputPath: zipPath, format: .zip, level: .fast, inputPaths: [tempDir.path], options: .defaultClean)
         let totalMB = Double(totalBytes) / (1024.0 * 1024.0)
 
         let t0 = PlatformMonotonicTimer.nowNanoseconds()
@@ -37,7 +38,8 @@ extension MultiCoreBreakdownRunner {
 
         let optDest = tempDir.appendingPathComponent("opt_out")
         let t2 = PlatformMonotonicTimer.nowNanoseconds()
-        _ = try? ZipParallelExtractor.shared.extract(archivePath: zipPath, destinationDir: optDest.path)
+        let extractor = ArchiveExtractor()
+        _ = try? extractor.extractSync(archivePath: zipPath, destinationDir: optDest.path, options: .defaultClean, password: nil)
         let t3 = PlatformMonotonicTimer.nowNanoseconds()
         let optSec = max(0.000001, Double(t3 - t2) / 1_000_000_000.0)
 
@@ -105,7 +107,15 @@ extension MultiCoreBreakdownRunner {
 
         let optFile = tempDir.appendingPathComponent("opt.dat").path
         let t2 = PlatformMonotonicTimer.nowNanoseconds()
-        _ = ZipDirectIOWriter.shared.writeDirect(filePath: optFile, data: payload, expectedSize: Int64(size))
+        payload.withUnsafeBytes { rawPtr in
+            if let ptr = rawPtr.baseAddress {
+                let fd = open(optFile, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+                if fd >= 0 {
+                    _ = write(fd, ptr, size)
+                    close(fd)
+                }
+            }
+        }
         let t3 = PlatformMonotonicTimer.nowNanoseconds()
         let optSec = max(0.000001, Double(t3 - t2) / 1_000_000_000.0)
 
@@ -122,12 +132,12 @@ extension MultiCoreBreakdownRunner {
         let totalMB = Double(size) / (1024.0 * 1024.0)
 
         let t0 = PlatformMonotonicTimer.nowNanoseconds()
-        _ = ZipBlockParallelCompressor.shared.compressBlocksConcurrently(data: data, level: 6)
+        _ = FastContainerEngine.compressZlib(data, level: 6)
         let t1 = PlatformMonotonicTimer.nowNanoseconds()
         let baseSec = max(0.000001, Double(t1 - t0) / 1_000_000_000.0)
 
         let t2 = PlatformMonotonicTimer.nowNanoseconds()
-        _ = ZipBlockParallelCompressor.shared.compressBlocksConcurrently(data: data, level: 1)
+        _ = FastContainerEngine.compressZlib(data, level: 1)
         let t3 = PlatformMonotonicTimer.nowNanoseconds()
         let optSec = max(0.000001, Double(t3 - t2) / 1_000_000_000.0)
 

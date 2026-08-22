@@ -126,13 +126,4 @@ public final class LibdeflateCAdapter: LibdeflateEngineProtocol, Sendable {
             return Data(bytes: dstPtr, count: actual)
         }
     }
-    
-    /// Creates a 1MB chunked multi-threaded streaming writer for large files (> 256MB).
-    /// - Parameters:
-    ///   - outFd: File descriptor to write compressed chunks into.
-    ///   - level: Compression level.
-    /// - Returns: `ChunkedDeflateStreamWriter` instance, or `nil` on initialization error.
-    public func createChunkedWriter(outFd: Int32, level: Int = 6) -> ChunkedDeflateStreamWriter? {
-        return ChunkedDeflateStreamWriter(outFd: outFd, level: level)
-    }
 }

@@ -140,6 +140,36 @@ public final class InPlaceEditEngine: @unchecked Sendable {
             throw ArchiveError.fileNotFound
         }
         
+        let rawFmt = resolveRawFormat(for: archivePath)
+        if (rawFmt == 2 || archivePath.hasSuffix(".7z")), let bin7z = SevenZipBinaryResolver.resolveBinaryPath() {
+            let tempDir = fileManager.temporaryDirectory.appendingPathComponent("ttzip_7z_inplace_\(UUID().uuidString)")
+            try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            defer { try? fileManager.removeItem(at: tempDir) }
+            
+            let destStagedFile = tempDir.appendingPathComponent(entryPath)
+            let parentDir = destStagedFile.deletingLastPathComponent()
+            try fileManager.createDirectory(at: parentDir, withIntermediateDirectories: true)
+            try fileManager.copyItem(atPath: stagedFilePath, toPath: destStagedFile.path)
+            
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: bin7z)
+            proc.currentDirectoryURL = tempDir
+            var args = ["u", archivePath, entryPath]
+            if let p = password, !p.isEmpty {
+                args.append("-p\(p)")
+            }
+            proc.arguments = args
+            let pipe = Pipe()
+            proc.standardOutput = pipe
+            proc.standardError = FileHandle.nullDevice
+            if (try? proc.run()) != nil {
+                proc.waitUntilExit()
+                if proc.terminationStatus == 0 {
+                    return
+                }
+            }
+        }
+        
         try CUnsafeBufferAdapter.withCString(archivePath) { cArchive in
             try CUnsafeBufferAdapter.withCString(entryPath) { cEntry in
                 try CUnsafeBufferAdapter.withCString(stagedFilePath) { cStaged in
@@ -148,8 +178,6 @@ public final class InPlaceEditEngine: @unchecked Sendable {
                     }
                     
                     var sessionPtr: OpaquePointer?
-                    let rawFmt = resolveRawFormat(for: archivePath)
-                    
                     let beginStatus = ttzip_rust_inplace_session_begin(cArchive, rawFmt, &sessionPtr)
                     guard beginStatus == TTZIP_STATUS_OK, let session = sessionPtr else {
                         throw ArchiveError.invalidFormat

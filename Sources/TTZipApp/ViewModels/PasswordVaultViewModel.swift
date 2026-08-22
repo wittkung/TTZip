@@ -32,13 +32,15 @@ public final class PasswordVaultViewModel: ObservableObject {
     @Published public var copiedID: UUID? = nil
     @Published public var visiblePasswordIDs: Set<UUID> = []
     
-    @Injected public var repository: KeychainPasswordRepository
-    @Injected public var manager: PasswordVaultManager
+    public var repository: KeychainPasswordRepository
+    public var manager: PasswordVaultManager
     
     public init(
         repository: KeychainPasswordRepository = KeychainPasswordRepository.shared,
         manager: PasswordVaultManager = .shared
     ) {
+        self.repository = repository
+        self.manager = manager
         refreshState()
     }
     

@@ -7,67 +7,6 @@
 
 import Foundation
 
-// MARK: - ZipParallelWriter Bounded Queue Extension
-
-extension ZipParallelWriter {
-    
-    /// Creates archive with cooperative backpressure control via `BoundedProducerConsumerQueue`.
-    public func createArchiveWithBoundedQueue(
-        outputPath: String,
-        inputPaths: [String],
-        level: ArchiveCompressionLevel = .normal,
-        maxQueueCapacity: Int = 16,
-        progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
-    ) async throws -> Bool {
-        let queue = BoundedProducerConsumerQueue<String>(maxCapacity: maxQueueCapacity)
-        let totalItemsCount = inputPaths.count
-        
-        let producerTask = Task {
-            for path in inputPaths {
-                try await queue.push(path)
-            }
-            queue.finish()
-        }
-        
-        let progressCounter = ConcurrencyProgressCounter()
-        let workerCount = max(2, min(16, ProcessInfo.processInfo.activeProcessorCount))
-        
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for _ in 0..<workerCount {
-                group.addTask {
-                    while let path = try await queue.pop() {
-                        let fm = FileManager.default
-                        if fm.fileExists(atPath: path) {
-                            let current = progressCounter.increment()
-                            progressHandler?(ArchiveProgress(
-                                state: .processing,
-                                bytesProcessed: current,
-                                totalBytes: Int64(totalItemsCount),
-                                currentFileName: path,
-                                throughputMBs: 0
-                            ))
-                        }
-                    }
-                }
-            }
-            try await group.waitForAll()
-        }
-        
-        _ = try await producerTask.value
-        
-        let result = try self.createArchive(
-            outputPath: outputPath,
-            inputPaths: inputPaths,
-            level: level,
-            skipMacJunk: true,
-            password: nil,
-            progressHandler: progressHandler
-        )
-        
-        return result
-    }
-}
-
 // MARK: - ArchiveOperationPipeline Producer-Consumer Engine Extension
 
 extension ArchiveOperationPipeline {

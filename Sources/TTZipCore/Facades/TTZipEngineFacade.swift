@@ -23,9 +23,6 @@ public final class TTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
     internal let recoveryEngine: PasswordRecoveryEngine
     internal let splitEngine: NativeParallelEncryptedSplitEngine
     
-    private var activeStateMachines: [UUID: ArchiveTaskStateMachine] = [:]
-    private let stateMachineLock = NSLock()
-    
     private convenience init() {
         self.init(
             historyManager: CommandHistoryManager.shared,
@@ -60,43 +57,6 @@ public final class TTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
         self.repairEngine = repairEngine
         self.recoveryEngine = recoveryEngine
         self.splitEngine = splitEngine
-    }
-    
-    // MARK: - 【3.5 状态模式 (State Pattern)】任务状态机生命周期 API 实现
-    
-    public func createTaskStateMachine(taskName: String = "ArchiveTask", totalBytes: Int64 = 0) -> ArchiveTaskStateMachine {
-        let sm = ArchiveTaskStateMachine(taskName: taskName, totalBytes: totalBytes)
-        stateMachineLock.lock()
-        activeStateMachines[sm.id] = sm
-        stateMachineLock.unlock()
-        return sm
-    }
-    
-    public func getTaskStateMachine(id: UUID) -> ArchiveTaskStateMachine? {
-        stateMachineLock.lock()
-        defer { stateMachineLock.unlock() }
-        return activeStateMachines[id]
-    }
-    
-    public func pauseTask(id: UUID) throws {
-        guard let sm = getTaskStateMachine(id: id) else {
-            throw CommandError.invalidState(reason: "未找到 ID 为 \(id) 的任务状态机")
-        }
-        try sm.pause()
-    }
-    
-    public func resumeTask(id: UUID) throws {
-        guard let sm = getTaskStateMachine(id: id) else {
-            throw CommandError.invalidState(reason: "未找到 ID 为 \(id) 的任务状态机")
-        }
-        try sm.resume()
-    }
-    
-    public func cancelTask(id: UUID) throws {
-        guard let sm = getTaskStateMachine(id: id) else {
-            throw CommandError.invalidState(reason: "未找到 ID 为 \(id) 的任务状态机")
-        }
-        try sm.cancel()
     }
     
     // MARK: - 命令模式便捷包装方法

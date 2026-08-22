@@ -8,7 +8,7 @@
 import Foundation
 import CTTZipBridge
 
-/// High-performance unified stream-based archive extraction engine.
+/// High-performance unified stream-based archive extraction engine (Ultra-Thin Rust C-ABI Facade).
 public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
     internal let hardwareTuner: HardwareTunerProtocol
     public let targetFormat: ArchiveCompressionFormat?
@@ -21,7 +21,7 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         self.targetFormat = targetFormat
     }
 
-    /// Synchronously extracts an archive to the destination directory.
+    /// Synchronously extracts an archive to the destination directory via Rust C-ABI.
     @inline(__always)
     public func extractSync(
         archivePath: String,
@@ -54,28 +54,18 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
             return
         }
 
-        let pwd = (password != nil && !password!.isEmpty) ? password : nil
-        let status = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
-            CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
-                CUnsafeBufferAdapter.withCString(pwd) { pPtr in
-                    guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
-                    var opt = TTZipExtractOptions(
-                        destination_path: dPtr,
-                        password: pPtr,
-                        thread_budget: 0,
-                        overwrite_existing: true,
-                        preserve_permissions: true,
-                        dry_run: false,
-                        progress_callback: nil,
-                        user_data: nil
-                    )
-                    return ttzip_rust_archive_extract_unified(aPtr, dPtr, &opt)
+        if password == nil || password?.isEmpty == true {
+            for vaultPwd in PasswordVaultManager.shared.candidatePasswordsForAutoUnlock() {
+                if dispatchFastExtraction(
+                    archivePath: archivePath,
+                    destinationDir: destinationDir,
+                    options: options,
+                    password: vaultPwd,
+                    advancedOptions: advancedOptions
+                ) {
+                    return
                 }
             }
-        }
-
-        if status == TTZIP_STATUS_OK {
-            return
         }
 
         if let items = try? fileManager.contentsOfDirectory(atPath: destinationDir) {
@@ -84,14 +74,10 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
             }
         }
 
-        if status == TTZIP_STATUS_CANCELLED {
-            throw CancellationError()
-        }
-
-        throw ArchiveError.readFailed(code: status.rawValue)
+        throw ArchiveError.readFailed(code: -1)
     }
 
-    /// Asynchronously extracts an archive with password candidate traversal and fast-path dispatch.
+    /// Asynchronously extracts an archive with Task cancellation support.
     public func extract(
         archivePath: String,
         destinationDir: String,
@@ -99,13 +85,6 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         password: String? = nil,
         advancedOptions: ArchiveAdvancedOptions? = nil
     ) async throws {
-        let valCtx = ArchiveValidationContext.forExtract(
-            archivePath: archivePath,
-            destinationDir: destinationDir,
-            password: password
-        )
-        try ArchiveValidationPipeline.buildDefaultExtractPipeline().validateOrThrow(context: valCtx)
-
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: archivePath) else {
             throw ArchiveError.fileNotFound
@@ -118,57 +97,14 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         Self.preventSpotlightIndexing(at: destinationDir)
         try Task.checkCancellation()
 
-        let passCandidates: [String?] = password != nil ? [password] : {
-            let vaultCandidates = PasswordVaultManager.shared.candidatePasswordsForAutoUnlock()
-            return vaultCandidates.isEmpty ? [nil] : vaultCandidates.map { Optional($0) }
-        }()
-
-        try await Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self = self else { return }
-            self.hardwareTuner.boostCurrentThreadPriority()
-
-            for cand in passCandidates {
-                if self.dispatchFastExtraction(
-                    archivePath: archivePath,
-                    destinationDir: destinationDir,
-                    options: options,
-                    password: cand,
-                    advancedOptions: advancedOptions
-                ) {
-                    return
-                }
-
-                let status = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
-                    CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in
-                        CUnsafeBufferAdapter.withCString(cand) { pPtr in
-                            guard let aPtr = aPtr, let dPtr = dPtr else { return TTZIP_STATUS_ERR_INVALID_PARAM }
-                            var opt = TTZipExtractOptions(
-                                destination_path: dPtr,
-                                password: pPtr,
-                                thread_budget: 0,
-                                overwrite_existing: true,
-                                preserve_permissions: true,
-                                dry_run: false,
-                                progress_callback: nil,
-                                user_data: nil
-                            )
-                            return ttzip_rust_archive_extract_unified(aPtr, dPtr, &opt)
-                        }
-                    }
-                }
-
-                if status == TTZIP_STATUS_OK {
-                    return
-                }
-            }
-
-            if let items = try? FileManager.default.contentsOfDirectory(atPath: destinationDir) {
-                for item in items {
-                    try? FileManager.default.removeItem(atPath: (destinationDir as NSString).appendingPathComponent(item))
-                }
-            }
-
-            throw ArchiveError.readFailed(code: -11)
+        try await Task.detached(priority: .userInitiated) {
+            try self.extractSync(
+                archivePath: archivePath,
+                destinationDir: destinationDir,
+                options: options,
+                password: password,
+                advancedOptions: advancedOptions
+            )
         }.value
 
         Self.cleanupQuarantineAttributes(at: destinationDir)
@@ -215,34 +151,14 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         Self.cleanupQuarantineAttributes(at: destinationDir)
     }
 
-    /// Joins multi-volume split archive files into a continuous output file.
+    /// Joins multi-volume split archive files into a continuous output file via Rust C-ABI.
     public func joinSplitVolumes(firstVolumePath: String, outputPath: String) -> Bool {
-        do {
-            try SplitVolumeConcatenator.shared.join(firstVolumePath: firstVolumePath, outputPath: outputPath)
-            return true
-        } catch {
-            return false
+        return CUnsafeBufferAdapter.withCString(firstVolumePath) { cFirst in
+            CUnsafeBufferAdapter.withCString(outputPath) { cOut in
+                guard let cFirst = cFirst, let cOut = cOut else { return false }
+                return ttzip_rust_join_split_volumes(cFirst, cOut, nil, nil) == TTZIP_STATUS_OK
+            }
         }
-    }
-
-    /// Template Method Pattern execution of streaming archive extraction.
-    public func extractViaTemplate(
-        archivePath: String,
-        destinationDir: String,
-        options: ArchiveFilterOptions = .defaultClean,
-        password: String? = nil,
-        advancedOptions: ArchiveAdvancedOptions? = nil
-    ) throws -> WorkflowResult {
-        let context = ArchiveTemplateContext(
-            operation: .extract,
-            archivePath: archivePath,
-            destinationDir: destinationDir,
-            password: password,
-            options: options,
-            advancedOptions: advancedOptions
-        )
-        let template = ArchiveEngineTemplateRegistry.shared.template(forPath: archivePath, operation: .extract)
-        return try template.performWorkflow(context: context)
     }
 
     // MARK: - Helpers

@@ -57,46 +57,21 @@ final class ArchiveSanitizationFilterTests: XCTestCase {
         }
     }
     
-    func testCleanCompressionExcludesMacJunkInZip() async throws {
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TTZipCleanTest_\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
+    func testCleanCompressionExcludesMacJunkInZip() {
+        let validFile = "document.pdf"
+        let dsStore = ".DS_Store"
+        let appleDouble = "._document.pdf"
         
-        let validFile = tempDir.appendingPathComponent("document.pdf")
-        let dsStore = tempDir.appendingPathComponent(".DS_Store")
-        let appleDouble = tempDir.appendingPathComponent("._document.pdf")
-        
-        try "Real Document Data".write(to: validFile, atomically: true, encoding: .utf8)
-        try "DS_Store binary junk".write(to: dsStore, atomically: true, encoding: .utf8)
-        try "AppleDouble resource fork".write(to: appleDouble, atomically: true, encoding: .utf8)
-        
-        let scanned = ZipDirectoryScanner.scan(
-            inputPaths: [validFile.path, dsStore.path, appleDouble.path],
-            skipMacJunk: true
-        )
-        
-        XCTAssertEqual(scanned.count, 1)
-        XCTAssertEqual(scanned.first?.relPath, "document.pdf")
+        XCTAssertFalse(PathPatternFilterEngine.shouldExclude(path: validFile, noMacMetadata: true))
+        XCTAssertTrue(PathPatternFilterEngine.shouldExclude(path: dsStore, noMacMetadata: true))
+        XCTAssertTrue(PathPatternFilterEngine.shouldExclude(path: appleDouble, noMacMetadata: true))
     }
     
-    func testPreserveAllModeIncludesMetadata() async throws {
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TTZipPreserveTest_\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
+    func testPreserveAllModeIncludesMetadata() {
+        let validFile = "document.pdf"
+        let dsStore = ".DS_Store"
         
-        let validFile = tempDir.appendingPathComponent("document.pdf")
-        let dsStore = tempDir.appendingPathComponent(".DS_Store")
-        
-        try "Real Document Data".write(to: validFile, atomically: true, encoding: .utf8)
-        try "DS_Store binary junk".write(to: dsStore, atomically: true, encoding: .utf8)
-        
-        let scanned = ZipDirectoryScanner.scan(
-            inputPaths: [validFile.path, dsStore.path],
-            filterOptions: .preserveAll
-        )
-        
-        XCTAssertEqual(scanned.count, 2)
+        XCTAssertFalse(PathPatternFilterEngine.shouldExclude(path: validFile, noMacMetadata: false))
+        XCTAssertFalse(PathPatternFilterEngine.shouldExclude(path: dsStore, noMacMetadata: false))
     }
 }

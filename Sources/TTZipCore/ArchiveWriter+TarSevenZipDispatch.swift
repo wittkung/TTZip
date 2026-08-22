@@ -41,48 +41,9 @@ extension ArchiveWriter {
         totalBytes: Int64
     ) throws {
         hardwareTuner.boostCurrentThreadPriority()
-            
-        // 1. 7z path
-        if format == .sevenZip {
-            let success: Bool
-            if password == nil || password!.isEmpty {
-                if let fastOk = try? SevenZipParallelWriter.shared.createArchive(
-                    outputPath: outputPath,
-                    inputPaths: inputPaths,
-                    level: level,
-                    password: password,
-                    progressHandler: progressHandler
-                ), fastOk {
-                    success = true
-                } else {
-                    success = try SevenZipEngine.shared.createArchive(
-                        outputPath: outputPath,
-                        inputPaths: inputPaths,
-                        level: level,
-                        password: password,
-                        progressHandler: progressHandler
-                    )
-                }
-            } else {
-                success = try SevenZipEngine.shared.createArchive(
-                    outputPath: outputPath,
-                    inputPaths: inputPaths,
-                    level: level,
-                    password: password,
-                    progressHandler: progressHandler
-                )
-            }
-            if success {
-                if let splitBytes = splitVolumeSizeBytes, splitBytes > 0 {
-                    try ArchiveWriter.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
-                }
-                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "7z compression completed", progressHandler: progressHandler)
-                return
-            }
-        }
-            
-        // ZIP compression routes
-        if format == .zip {
+
+        let targetFmt = self.targetFormat ?? format
+        if targetFmt == .zip {
             let handled = try dispatchZipCreation(
                 outputPath: outputPath,
                 level: level,
@@ -95,166 +56,74 @@ extension ArchiveWriter {
                 totalBytes: totalBytes,
                 progressHandler: progressHandler
             )
-            if handled {
-                return
-            }
+            if handled { return }
         }
 
-        // 2. Native ZST streaming engine
-        if format == .zst, let srcPath = inputPaths.first {
-            var isDir: ObjCBool = false
-            if FileManager.default.fileExists(atPath: srcPath, isDirectory: &isDir), !isDir.boolValue {
-                let success = try NativeZstdEngine.shared.compressFile(
-                    srcPath: srcPath,
-                    dstPath: outputPath,
-                    level: level,
-                    enableLDM: advancedOptions.zstdEnableLDM,
-                    progressHandler: progressHandler
-                )
-                if success {
-                    notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "ZST compression completed", progressHandler: progressHandler)
-                    return
-                }
-            }
+        let actualFormat: ArchiveCompressionFormat
+        if targetFmt == .zst {
+            actualFormat = .tarZst
+        } else if targetFmt == .iso {
+            actualFormat = .tar
+        } else {
+            actualFormat = targetFmt
         }
 
-        // 4. Native in-memory C streaming engine for small TAR archives (<50MB)
-        let hasDirectoryInput = inputPaths.contains { p in
-            var isDir: ObjCBool = false
-            return FileManager.default.fileExists(atPath: p, isDirectory: &isDir) && isDir.boolValue
-        }
-        if !hasDirectoryInput && (splitVolumeSizeBytes == nil || splitVolumeSizeBytes! == 0) && (format == .tarGz || format == .tarZst || format == .tarBz2 || format == .tarXz) && totalBytes < 50 * 1024 * 1024 && (password == nil || password!.isEmpty) {
-            let res = createArchiveWithRust(
-                outputPath: outputPath,
-                format: format,
-                inputPaths: inputPaths,
-                level: level,
-                password: nil,
-                skipMacJunk: options.skipMacJunk
-            )
-            if res {
-                let duration = max(0.001, Date().timeIntervalSince(startTime))
-                let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-                progressHandler?(ArchiveProgress(
-                    state: .completed,
-                    bytesProcessed: totalBytes,
-                    totalBytes: totalBytes,
-                    currentFileName: "Archive created",
-                    throughputMBs: throughput
-                ))
-                return
-            }
-        }
-        
-        // 3. Split multi-volume creation mode for 7z (unencrypted)
-        if format == .sevenZip && (splitVolumeSizeBytes != nil && splitVolumeSizeBytes! > 0) && (password == nil || password!.isEmpty) {
-            let splitBytes = splitVolumeSizeBytes!
-            let success = (try? SevenZipParallelWriter.shared.createArchive(
+        if actualFormat == .sevenZip {
+            let handled = try? SevenZipCAdapter.shared.createArchive(
                 outputPath: outputPath,
                 inputPaths: inputPaths,
                 level: level,
                 password: password,
+                splitVolumeSizeBytes: splitVolumeSizeBytes,
                 progressHandler: progressHandler
-            )) ?? false
-            if success {
-                try? Self.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
-                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "7z multi-volume archive created", progressHandler: progressHandler)
-                return
-            }
-        }
-        
-        // Formats: Apple Archive, Brotli, DMG, ISO, WIM
-        if format == .aar, let firstInput = inputPaths.first {
-            if let ok = try? NativeAppleArchiveEngine.shared.compress(sourcePath: firstInput, outputPath: outputPath), ok {
-                let duration = max(0.001, Date().timeIntervalSince(startTime))
-                let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "Apple Archive created", throughputMBs: throughput))
-                return
-            }
-        }
-        
-        if format == .brotli {
-            if let ok = try? NativeBrotliEngine.shared.createArchive(outputPath: outputPath, inputPaths: inputPaths, level: level, skipMacJunk: options.skipMacJunk, progressHandler: progressHandler), ok {
-                notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "Brotli archive created", progressHandler: progressHandler)
-                return
-            }
-        }
-        
-        if (format == .dmg || format == .iso) {
-            let res = createArchiveWithRust(
-                outputPath: outputPath,
-                format: format,
-                inputPaths: inputPaths,
-                level: level,
-                password: nil,
-                skipMacJunk: options.skipMacJunk
             )
-            if res {
-                let duration = max(0.001, Date().timeIntervalSince(startTime))
-                let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-                let msg = format == .dmg ? "DMG disk image created" : "ISO disk image created"
-                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: msg, throughputMBs: throughput))
-                return
-            }
+            if handled == true { return }
         }
-        
-        if format == .wim {
-            let res = createArchiveWithRust(
-                outputPath: outputPath,
-                format: .tar,
-                inputPaths: inputPaths,
-                level: level,
-                password: password,
-                skipMacJunk: options.skipMacJunk
-            )
-            if res {
-                let duration = max(0.001, Date().timeIntervalSince(startTime))
-                let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-                progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "WIM archive created", throughputMBs: throughput))
-                return
-            }
-        }
-        
-        let actualFormat = (format == .zst) ? .tarZst : format
-        let res = createArchiveWithRust(
+
+        let success = createArchiveWithRust(
             outputPath: outputPath,
             format: actualFormat,
             inputPaths: inputPaths,
             level: level,
             password: password,
-            skipMacJunk: options.skipMacJunk
+            splitVolumeSizeBytes: splitVolumeSizeBytes,
+            skipMacJunk: options.skipMacJunk,
+            startTime: startTime,
+            totalBytes: totalBytes,
+            progressHandler: progressHandler
         )
-        if res {
-            if let splitBytes = splitVolumeSizeBytes, splitBytes > 0 {
-                try Self.sliceArchiveIfNeeded(archivePath: outputPath, splitSizeBytes: splitBytes)
-            }
-            let duration = max(0.001, Date().timeIntervalSince(startTime))
-            let throughput = (Double(totalBytes) / (1024 * 1024)) / duration
-            progressHandler?(ArchiveProgress(state: .completed, bytesProcessed: totalBytes, totalBytes: totalBytes, currentFileName: "Archive created", throughputMBs: throughput))
+
+        if success {
             return
         }
-        
+
         throw ArchiveError.readFailed(code: -1)
     }
 
+    /// Directly drives archive compression through the Rust C-ABI microkernel.
     internal func createArchiveWithRust(
         outputPath: String,
         format: ArchiveCompressionFormat,
         inputPaths: [String],
         level: ArchiveCompressionLevel,
         password: String?,
-        skipMacJunk: Bool
+        splitVolumeSizeBytes: Int64? = nil,
+        skipMacJunk: Bool = true,
+        startTime: Date = Date(),
+        totalBytes: Int64 = 0,
+        progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) -> Bool {
         let rustFormat = ArchiveWriter.mapFormat(format)
         let lvlMap = ArchiveWriter.mapLevel(level)
 
         let enc: TTZipEncryptionMethod = (password != nil && !password!.isEmpty) ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
         let pwd = (password != nil && !password!.isEmpty) ? password : nil
+        let splitSize = UInt64(max(0, splitVolumeSizeBytes ?? 0))
 
-        return CUnsafeBufferAdapter.withCString(outputPath) { cOutputPath in
+        let status = CUnsafeBufferAdapter.withCString(outputPath) { cOutputPath in
             CUnsafeBufferAdapter.withCStringsArray(inputPaths) { cInputPaths in
                 CUnsafeBufferAdapter.withCString(pwd) { cPassword in
-                    guard let cOutputPath = cOutputPath else { return false }
+                    guard let cOutputPath = cOutputPath else { return TTZIP_STATUS_ERR_INVALID_PARAM }
                     var opt = TTZipCreateOptions(
                         format: rustFormat,
                         level: lvlMap,
@@ -265,9 +134,15 @@ extension ArchiveWriter {
                         progress_callback: nil,
                         user_data: nil
                     )
-                    return ttzip_rust_create_archive(cInputPaths, inputPaths.count, cOutputPath, &opt) == TTZIP_STATUS_OK
+                    return ttzip_rust_archive_create_unified(cInputPaths, inputPaths.count, cOutputPath, &opt, splitSize)
                 }
             }
         }
+
+        if status == TTZIP_STATUS_OK {
+            notifyCompletion(totalBytes: totalBytes, startTime: startTime, message: "Archive created", progressHandler: progressHandler)
+            return true
+        }
+        return false
     }
 }

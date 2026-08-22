@@ -8,21 +8,20 @@
 import Foundation
 import os
 
-/// Flyweight Pattern: Shared intrinsic string and metadata interning pool for archive entries.
+/// Shared intrinsic string and metadata interning pool for archive entries.
 ///
-/// Reduces memory footprint by up to 70%+ when browsing massive archives (e.g. `node_modules`
-/// or deep hierarchies with 500,000+ files) by canonicalizing shared path prefixes, extensions,
+/// Reduces memory footprint when browsing massive archives by canonicalizing shared path prefixes, extensions,
 /// and MIME types.
-public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
-    public static let shared = ArchiveEntryFlyweightFactory()
-    
+public final class ArchiveEntryMetadataPool: @unchecked Sendable {
+    public static let shared = ArchiveEntryMetadataPool()
+
     private var unfairLock = os_unfair_lock_s()
-    
+
     private var pathPool: [String: String] = [:]
     private var extensionPool: [String: String] = [:]
     private var mimeTypePool: [String: String] = [:]
     private var directoryPrefixPool: [String: String] = [:]
-    
+
     private static let predefinedMimeTypes: [String: String] = [
         "swift": "text/x-swift",
         "js": "application/javascript",
@@ -53,7 +52,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         "mp4": "video/mp4",
         "mov": "video/quicktime"
     ]
-    
+
     public var maxPathPoolCapacity: Int = 50_000
 
     private init() {
@@ -63,7 +62,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         }
         setupMemoryPressureObserver()
     }
-    
+
     private func setupMemoryPressureObserver() {
         #if canImport(AppKit)
         _ = NotificationCenter.default.addObserver(
@@ -74,7 +73,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
             self?.clearPool()
         }
         #endif
-        
+
         #if os(macOS) || os(iOS)
         let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .global(qos: .utility))
         source.setEventHandler { [weak self] in
@@ -83,10 +82,9 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         source.resume()
         #endif
     }
-    
+
     // MARK: - Interning API
-    
-    /// Interns shared path string.
+
     public func internPath(_ path: String) -> String {
         guard !path.isEmpty else { return "" }
         os_unfair_lock_lock(&unfairLock)
@@ -100,8 +98,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         pathPool[path] = path
         return path
     }
-    
-    /// Interns shared file extension string.
+
     public func internExtension(_ ext: String) -> String {
         let lowerExt = ext.lowercased()
         guard !lowerExt.isEmpty else { return "" }
@@ -113,8 +110,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         extensionPool[lowerExt] = lowerExt
         return lowerExt
     }
-    
-    /// Interns shared MIME type string.
+
     public func internMimeType(_ mime: String) -> String {
         guard !mime.isEmpty else { return "application/octet-stream" }
         os_unfair_lock_lock(&unfairLock)
@@ -125,8 +121,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         mimeTypePool[mime] = mime
         return mime
     }
-    
-    /// Interns shared directory prefix string.
+
     public func internDirectoryPrefix(_ prefix: String) -> String {
         guard !prefix.isEmpty else { return "" }
         os_unfair_lock_lock(&unfairLock)
@@ -137,8 +132,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         directoryPrefixPool[prefix] = prefix
         return prefix
     }
-    
-    /// Detects and interns MIME type from file path.
+
     public func detectMimeType(forPath path: String) -> String {
         let ext = (path as NSString).pathExtension.lowercased()
         if let mime = Self.predefinedMimeTypes[ext] {
@@ -146,8 +140,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         }
         return internMimeType("application/octet-stream")
     }
-    
-    /// Extracts and interns directory prefix from path.
+
     public func extractAndInternDirectoryPrefix(fromPath path: String) -> String {
         let nsPath = path as NSString
         let dir = nsPath.deletingLastPathComponent
@@ -155,9 +148,7 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         let prefix = dir.hasSuffix("/") ? dir : "\(dir)/"
         return internDirectoryPrefix(prefix)
     }
-    
-    // MARK: - Pool Management & Statistics
-    
+
     public func clearPool() {
         clearPools()
     }
@@ -169,43 +160,36 @@ public final class ArchiveEntryFlyweightFactory: @unchecked Sendable {
         extensionPool.removeAll(keepingCapacity: false)
         mimeTypePool.removeAll(keepingCapacity: false)
         directoryPrefixPool.removeAll(keepingCapacity: false)
-        
+
         for (ext, mime) in Self.predefinedMimeTypes {
             extensionPool[ext] = ext
             mimeTypePool[mime] = mime
         }
     }
-    
+
     public var poolCounts: (paths: Int, extensions: Int, mimeTypes: Int, prefixes: Int) {
         os_unfair_lock_lock(&unfairLock)
         defer { os_unfair_lock_unlock(&unfairLock) }
         return (pathPool.count, extensionPool.count, mimeTypePool.count, directoryPrefixPool.count)
     }
-    
-    public func estimatedMemorySavingsRatio(totalEntriesProcessed: Int) -> Double {
-        guard totalEntriesProcessed > 0 else { return 0.0 }
-        let counts = poolCounts
-        let totalUniqueFlyweights = counts.paths + counts.extensions + counts.mimeTypes + counts.prefixes
-        let totalRawAllocations = totalEntriesProcessed * 4
-        if totalRawAllocations <= totalUniqueFlyweights { return 0.0 }
-        let saved = Double(totalRawAllocations - totalUniqueFlyweights) / Double(totalRawAllocations)
-        return min(0.95, max(0.0, saved))
-    }
 }
 
-/// Flyweight shared intrinsic state representation.
-public struct ArchiveEntryFlyweightState: Sendable, Equatable {
+public typealias ArchiveEntryFlyweightFactory = ArchiveEntryMetadataPool
+
+public struct ArchiveEntryMetadataState: Sendable, Equatable {
     public let path: String
     public let extensionName: String
     public let mimeType: String
     public let directoryPrefix: String
-    
+
     public init(path: String) {
-        let factory = ArchiveEntryFlyweightFactory.shared
-        self.path = factory.internPath(path)
+        let pool = ArchiveEntryMetadataPool.shared
+        self.path = pool.internPath(path)
         let ext = (path as NSString).pathExtension
-        self.extensionName = factory.internExtension(ext)
-        self.mimeType = factory.detectMimeType(forPath: path)
-        self.directoryPrefix = factory.extractAndInternDirectoryPrefix(fromPath: path)
+        self.extensionName = pool.internExtension(ext)
+        self.mimeType = pool.detectMimeType(forPath: path)
+        self.directoryPrefix = pool.extractAndInternDirectoryPrefix(fromPath: path)
     }
 }
+
+public typealias ArchiveEntryFlyweightState = ArchiveEntryMetadataState

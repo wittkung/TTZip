@@ -13,18 +13,15 @@ import CTTZipBridge
 /// Bridge implementor for ZIP archives.
 public final class ZipEngineBridgeImplementor: ArchiveEngineImplementorProtocol, @unchecked Sendable {
     public let supportedFormat: ArchiveCompressionFormat = .zip
-    public let zipEngine: ZipEngineProtocol
 
-    public init(zipEngine: ZipEngineProtocol = NativeZipEngine.shared) {
-        self.zipEngine = zipEngine
-    }
+    public init() {}
 
     public func compressStream(
         inputPaths: [String],
         outputPath: String,
         options: ArchiveAdvancedOptions
     ) async throws -> Int64 {
-        let writer = ArchiveWriter(zipEngine: zipEngine)
+        let writer = ArchiveWriter()
         try writer.createArchiveSync(
             outputPath: outputPath,
             format: .zip,
@@ -42,7 +39,7 @@ public final class ZipEngineBridgeImplementor: ArchiveEngineImplementorProtocol,
         destinationDir: String,
         options: ArchiveAdvancedOptions
     ) async throws -> Int64 {
-        let extractor = ArchiveEngineFactory.makeExtractor(for: .zip)
+        let extractor = ArchiveExtractor()
         try extractor.extractSync(
             archivePath: archivePath,
             destinationDir: destinationDir,
@@ -56,18 +53,15 @@ public final class ZipEngineBridgeImplementor: ArchiveEngineImplementorProtocol,
 /// Bridge implementor for 7z archives.
 public final class SevenZipEngineBridgeImplementor: ArchiveEngineImplementorProtocol, @unchecked Sendable {
     public let supportedFormat: ArchiveCompressionFormat = .sevenZip
-    public let sevenZipEngine: SevenZipEngineProtocol
 
-    public init(sevenZipEngine: SevenZipEngineProtocol = SevenZipParallelWriter.shared) {
-        self.sevenZipEngine = sevenZipEngine
-    }
+    public init() {}
 
     public func compressStream(
         inputPaths: [String],
         outputPath: String,
         options: ArchiveAdvancedOptions
     ) async throws -> Int64 {
-        let writer = ArchiveWriter(sevenZipEngine: sevenZipEngine)
+        let writer = ArchiveWriter()
         try writer.createArchiveSync(
             outputPath: outputPath,
             format: .sevenZip,
@@ -85,7 +79,7 @@ public final class SevenZipEngineBridgeImplementor: ArchiveEngineImplementorProt
         destinationDir: String,
         options: ArchiveAdvancedOptions
     ) async throws -> Int64 {
-        let extractor = ArchiveEngineFactory.makeExtractor(for: .sevenZip)
+        let extractor = ArchiveExtractor()
         try extractor.extractSync(
             archivePath: archivePath,
             destinationDir: destinationDir,
@@ -99,18 +93,15 @@ public final class SevenZipEngineBridgeImplementor: ArchiveEngineImplementorProt
 /// Bridge implementor for Zstandard (.zst) archives.
 public final class ZstdEngineBridgeImplementor: ArchiveEngineImplementorProtocol, @unchecked Sendable {
     public let supportedFormat: ArchiveCompressionFormat = .zst
-    public let zstdEngine: ZstdEngineProtocol
 
-    public init(zstdEngine: ZstdEngineProtocol = NativeZstdEngine.shared) {
-        self.zstdEngine = zstdEngine
-    }
+    public init() {}
 
     public func compressStream(
         inputPaths: [String],
         outputPath: String,
         options: ArchiveAdvancedOptions
     ) async throws -> Int64 {
-        let writer = ArchiveWriter(zstdEngine: zstdEngine)
+        let writer = ArchiveWriter()
         try writer.createArchiveSync(
             outputPath: outputPath,
             format: .zst,
@@ -128,7 +119,7 @@ public final class ZstdEngineBridgeImplementor: ArchiveEngineImplementorProtocol
         destinationDir: String,
         options: ArchiveAdvancedOptions
     ) async throws -> Int64 {
-        let extractor = ArchiveEngineFactory.makeExtractor(for: .zst)
+        let extractor = ArchiveExtractor()
         try extractor.extractSync(
             archivePath: archivePath,
             destinationDir: destinationDir,

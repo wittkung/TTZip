@@ -20,9 +20,9 @@ import Glibc
 /// interactive explorer invocation, and returns POSIX standard exit status codes.
 @MainActor
 public enum CLICommandRouter {
-    @Injected static var facade: TTZipEngineFacading
-    @Injected static var securityProxy: SecurityProtectionProxy
-    @Injected static var taskDispatcher: ArchiveTaskDispatcher
+    public static var facade: TTZipEngineFacading = TTZipEngineFacade.shared
+    public static var securityProxy: SecurityProtectionProxy = SecurityProtectionProxy.shared
+    public static var taskDispatcher: ArchiveTaskDispatcher = ArchiveTaskDispatcher()
     
     /// Routes and executes a parsed CLI command with the specified options.
     /// - Parameters:
@@ -31,12 +31,6 @@ public enum CLICommandRouter {
     /// - Returns: POSIX compliant exit code (`EX_OK`, `EX_USAGE`, `EX_DATAERR`, `EX_NOINPUT`, etc.).
     @discardableResult
     public static func route(command: CLICommand, options: CLIOptions) async -> CLIExitCode {
-        CLIEventAndProgressConsoleObserver.shared.isJsonMode = options.jsonOutput
-        CLIEventAndProgressConsoleObserver.shared.isSilenced = (options.outputPath == "-" || command == .cat)
-        
-        ArchiveProgressBroadcaster.shared.addObserver(CLIEventAndProgressConsoleObserver.shared)
-        ArchiveEventCenter.shared.addObserver(CLIEventAndProgressConsoleObserver.shared)
-        
         switch command {
         case .archive, .create:
             var inputPaths: [String] = []

@@ -71,7 +71,6 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
     private func notifyChange() {
         Task { @MainActor in
             NotificationCenter.default.post(name: PasswordVaultManager.vaultDidChangeNotification, object: nil)
-            ArchiveEventCenter.shared.postPasswordVaultUnlocked(archivePath: "", password: "", isVaultUnlocked: self.isUnlocked)
         }
     }
 
@@ -289,9 +288,6 @@ public final class PasswordVaultManager: PasswordVaultManaging, @unchecked Senda
     /// Returns sorted candidate passwords for automated decryption attempts.
     public func candidatePasswordsForAutoUnlock() -> [String] {
         if !isUnlocked {
-            if PasswordVaultManager.isCLIProcess {
-                return []
-            }
             _ = unlockWithBiometrics()
         }
         let list = getEntries()

@@ -33,7 +33,7 @@ final class ArchiveCompressionTypesTests: XCTestCase {
     func testArchiveCompressionLevelAndProfiles() {
         let level6 = ArchiveCompressionLevel(levelInt: 6)
         XCTAssertEqual(level6, .level6)
-        XCTAssertEqual(level6.effectiveZipRawLevel, ZipCompressionProfile.extremePeak.deflateLevel)
+        XCTAssertEqual(level6.effectiveZipRawLevel, 6)
         
         let store = ArchiveCompressionLevel.store
         XCTAssertEqual(store.effectiveZipRawLevel, 0)

@@ -67,39 +67,28 @@ public final class PresetManager: @unchecked Sendable {
             try? repository.save(preset)
             return old
         }
-        ArchiveEventCenter.shared.postPresetChanged(oldPresetName: oldName, newPresetName: preset.name)
     }
     
     public func deletePreset(id: UUID) {
-        let deletedName = rwLock.withWriteLock { () -> String? in
+        rwLock.withWriteLock {
             presetCache.removeAll()
-            let deleted = cachedPresets.first(where: { $0.id == id })
             cachedPresets.removeAll(where: { $0.id == id })
             try? repository.delete(id: id)
-            return deleted?.name
-        }
-        if let name = deletedName {
-            ArchiveEventCenter.shared.postPresetChanged(oldPresetName: name, newPresetName: "<Deleted>")
         }
     }
     
     /// Duplicates an existing preset using Prototype Pattern.
     @discardableResult
     public func duplicatePreset(id: UUID, newName: String? = nil) -> CompressionPreset? {
-        let result: (String, CompressionPreset)? = rwLock.withWriteLock {
+        return rwLock.withWriteLock {
             presetCache.removeAll()
             guard let source = cachedPresets.first(where: { $0.id == id }) else { return nil }
             let defaultName = newName ?? "\(source.name) Copy"
             let item = source.clone(newId: UUID(), newName: defaultName)
             cachedPresets.append(item)
             try? repository.save(item)
-            return (source.name, item)
-        }
-        if let (src, item) = result {
-            ArchiveEventCenter.shared.postPresetChanged(oldPresetName: src, newPresetName: item.name)
             return item
         }
-        return nil
     }
     
     /// Derives and saves a new preset from a prototype model.
@@ -112,7 +101,6 @@ public final class PresetManager: @unchecked Sendable {
             try? repository.save(item)
             return item
         }
-        ArchiveEventCenter.shared.postPresetChanged(oldPresetName: prototype.name, newPresetName: cloned.name)
         return cloned
     }
     
@@ -122,7 +110,6 @@ public final class PresetManager: @unchecked Sendable {
             cachedPresets = PresetManager.defaultBuiltInPresets
             try? repository.resetToDefaults()
         }
-        ArchiveEventCenter.shared.postPresetChanged(oldPresetName: "Custom", newPresetName: "Defaults")
     }
     
     private func syncRepositoryLocked() {

@@ -354,12 +354,38 @@ public struct FolderMediaArtboardView: View {
     
     private func calculateStats() async {
         isCalculating = true
-        let res = await FolderStatsCalculator.calculateStats(for: item.path)
+        let targetPath = item.path
+        let (size, subfolders, files, dist) = await Task.detached {
+            var totalSize: Int64 = 0
+            var folderCount = 0
+            var fileCount = 0
+            var typeDist: [String: Int] = [:]
+            
+            let fm = FileManager.default
+            if let enumerator = fm.enumerator(at: URL(fileURLWithPath: targetPath), includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey], options: [.skipsHiddenFiles]) {
+                while let fileURL = enumerator.nextObject() as? URL {
+                    if let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey]) {
+                        if resourceValues.isDirectory == true {
+                            folderCount += 1
+                        } else {
+                            fileCount += 1
+                            let s = Int64(resourceValues.fileSize ?? 0)
+                            totalSize += s
+                            let ext = fileURL.pathExtension.lowercased()
+                            typeDist[ext.isEmpty ? "other" : ext, default: 0] += 1
+                        }
+                    }
+                }
+            }
+            let distArray: [(category: String, count: Int)] = typeDist.map { (category: $0.key, count: $0.value) }.sorted { $0.count > $1.count }
+            return (totalSize, folderCount, fileCount, distArray)
+        }.value
+        
         await MainActor.run {
-            self.totalSizeBytes = res.size
-            self.subfolderCount = res.subfolders
-            self.fileCount = res.files
-            self.fileTypeDistribution = res.dist
+            self.totalSizeBytes = size
+            self.subfolderCount = subfolders
+            self.fileCount = files
+            self.fileTypeDistribution = dist
             self.isCalculating = false
         }
     }

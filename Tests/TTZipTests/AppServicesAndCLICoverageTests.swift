@@ -39,22 +39,18 @@ final class AppServicesAndCLICoverageTests: XCTestCase {
         XCTAssertNotNil(metadata["APFS Inode"])
     }
     
-    // 2. Test FolderStatsCalculator directory sizing and distribution
-    func testFolderStatsCalculator() async throws {
-        let subDir = tempDirURL.appendingPathComponent("subfolder")
-        try FileManager.default.createDirectory(at: subDir, withIntermediateDirectories: true)
+    // 2. Test FolderStatsVisitor directory sizing and distribution
+    func testFolderStatsVisitor() throws {
+        let leaf1 = ArchiveLeafFile(name: "doc.txt", path: "subfolder/doc.txt", sizeBytes: 100)
+        let leaf2 = ArchiveLeafFile(name: "video.mp4", path: "subfolder/video.mp4", sizeBytes: 2000)
+        let dir = ArchiveCompositeDirectory(name: "subfolder", path: "subfolder", children: [leaf1, leaf2])
+        let root = ArchiveCompositeDirectory(name: "root", path: "", children: [dir])
         
-        let docFile = subDir.appendingPathComponent("doc.txt")
-        try "Text Document Content".write(to: docFile, atomically: true, encoding: .utf8)
-        
-        let mediaFile = subDir.appendingPathComponent("video.mp4")
-        try Data([0x00, 0x00, 0x00, 0x18]).write(to: mediaFile)
-        
-        let stats = await FolderStatsCalculator.calculateStats(for: tempDirPath)
-        XCTAssertGreaterThan(stats.size, 0)
-        XCTAssertEqual(stats.subfolders, 1)
-        XCTAssertEqual(stats.files, 2)
-        XCTAssertFalse(stats.dist.isEmpty)
+        let stats = root.accept(visitor: FolderStatsVisitor())
+        XCTAssertGreaterThan(stats.totalSizeBytes, 0)
+        XCTAssertEqual(stats.totalDirectories, 1)
+        XCTAssertEqual(stats.totalFiles, 2)
+        XCTAssertFalse(stats.categoryDistribution.isEmpty)
     }
     
     // 3. Test DateFormatterCache and ByteCountFormatterCache thread-safe formatting

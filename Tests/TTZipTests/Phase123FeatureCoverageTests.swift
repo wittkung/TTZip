@@ -131,9 +131,9 @@ final class Phase123FeatureCoverageTests: XCTestCase {
         try dummyDylib.write(to: URL(fileURLWithPath: dylibPath))
         
         let solidArchivePath = (tempDirPath as NSString).appendingPathComponent("solid_binary.7z")
-        let solidEngine = SolidArchiveEngine()
+        let writer = ArchiveWriter()
         
-        try await solidEngine.createSolidArchive(outputPath: solidArchivePath, inputPaths: [dylibPath])
+        try await writer.createArchive(outputPath: solidArchivePath, format: .sevenZip, level: .normal, inputPaths: [dylibPath])
         
         let extractDir = (tempDirPath as NSString).appendingPathComponent("extracted_solid")
         let extractor = ArchiveExtractor()

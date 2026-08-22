@@ -47,10 +47,8 @@ public final class BatchArchiveEngine: @unchecked Sendable {
     ) -> ArchiveWorkItem {
         let facade = self.engineFacade
         return ArchiveWorkItem(itemID: task.id.uuidString, priority: priority) {
-            let sm = ArchiveBatchFacade.shared.registerStateMachine(id: task.id, taskName: "BatchCompress:\(task.outputPath)")
             let start = Date()
             do {
-                try sm.start()
                 let res = try await facade.quickCompress(
                     inputs: task.inputs,
                     outputPath: task.outputPath,
@@ -60,7 +58,6 @@ public final class BatchArchiveEngine: @unchecked Sendable {
                     splitSize: task.splitSize,
                     progress: nil
                 )
-                try sm.complete()
 
                 let cur = progressCounter.increment()
                 progress?(cur, total)
@@ -73,7 +70,6 @@ public final class BatchArchiveEngine: @unchecked Sendable {
                     errorMessage: nil
                 )
             } catch {
-                try? sm.fail(error: error)
                 let elapsed = Date().timeIntervalSince(start)
 
                 let cur = progressCounter.increment()
@@ -101,10 +97,8 @@ public final class BatchArchiveEngine: @unchecked Sendable {
     ) -> ArchiveWorkItem {
         let facade = self.engineFacade
         return ArchiveWorkItem(itemID: task.id.uuidString, priority: priority) {
-            let sm = ArchiveBatchFacade.shared.registerStateMachine(id: task.id, taskName: "BatchExtract:\(task.archivePath)")
             let start = Date()
             do {
-                try sm.start()
                 let res = try await facade.quickExtract(
                     archivePath: task.archivePath,
                     destinationDir: task.destinationDir,
@@ -112,7 +106,6 @@ public final class BatchArchiveEngine: @unchecked Sendable {
                     autoVaultUnlock: autoVaultUnlock,
                     progress: nil
                 )
-                try sm.complete()
 
                 let cur = progressCounter.increment()
                 progress?(cur, total)
@@ -125,7 +118,6 @@ public final class BatchArchiveEngine: @unchecked Sendable {
                     errorMessage: nil
                 )
             } catch {
-                try? sm.fail(error: error)
                 let elapsed = Date().timeIntervalSince(start)
 
                 let cur = progressCounter.increment()

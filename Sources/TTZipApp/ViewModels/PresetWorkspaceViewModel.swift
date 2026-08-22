@@ -8,17 +8,20 @@
 import SwiftUI
 import TTZipCore
 
+public struct PresetDraftState: Sendable, Equatable {
+    public let presetID: UUID
+    public let name: String
+    public let format: ArchiveCompressionFormat
+    public let level: ArchiveCompressionLevel
+    public let splitVolumeSizeBytes: Int64?
+    public let skipMacJunk: Bool
+    public let skipGitDirectory: Bool
+    public let defaultPassword: String
+}
+
 @MainActor
-public final class PresetWorkspaceViewModel: ObservableObject, ArchiveMediatorComponentProtocol {
-    public typealias Memento = PresetEditorMemento
-    
-    @Injected public var manager: PresetManager
-    @Injected public var appMediator: ArchiveMediatorProtocol
-    
-    nonisolated public var mediator: ArchiveMediatorProtocol? {
-        get { ArchiveAppMediator.shared }
-        set {}
-    }
+public final class PresetWorkspaceViewModel: ObservableObject {
+    public var manager: PresetManager
 
     @Published public var presets: [CompressionPreset] = []
     @Published public var selectedPresetID: UUID? = nil
@@ -35,36 +38,13 @@ public final class PresetWorkspaceViewModel: ObservableObject, ArchiveMediatorCo
     @Published public var activeEditingPrototype: CompressionPreset? = nil
     @Published public var statusMessage: String = ""
     
-    public let caretaker = PresetEditorCaretaker()
+    private var undoStack: [PresetDraftState] = []
+    private var redoStack: [PresetDraftState] = []
     
     public init(manager: PresetManager = .shared) {
-        appMediator.register(component: self)
+        self.manager = manager
         loadPresets()
     }
-    
-    nonisolated public func receive(event: AppMediatorEvent) {
-        if Thread.isMainThread {
-            MainActor.assumeIsolated {
-                if case .presetSelected(let presetIdStr) = event, let uuid = UUID(uuidString: presetIdStr) {
-                    if self.selectedPresetID != uuid, let preset = self.presets.first(where: { $0.id == uuid }) {
-                        self.selectedPresetID = uuid
-                        self.loadPresetIntoEditor(preset)
-                    }
-                }
-            }
-        } else {
-            Task { @MainActor in
-                if case .presetSelected(let presetIdStr) = event, let uuid = UUID(uuidString: presetIdStr) {
-                    if self.selectedPresetID != uuid, let preset = self.presets.first(where: { $0.id == uuid }) {
-                        self.selectedPresetID = uuid
-                        self.loadPresetIntoEditor(preset)
-                    }
-                }
-            }
-        }
-    }
-    
-    nonisolated public func receive(event: CoreEngineMediatorEvent) {}
     
     public func loadPresets() {
         self.presets = manager.presets
@@ -99,61 +79,55 @@ public final class PresetWorkspaceViewModel: ObservableObject, ArchiveMediatorCo
         editorDefaultPassword = prototype.defaultPassword ?? ""
         statusMessage = ""
         
-        caretaker.clear()
+        undoStack.removeAll()
+        redoStack.removeAll()
         saveDraftSnapshot()
-        
-        mediator?.send(event: .presetSelected(presetId: preset.id.uuidString), from: self)
-    }
-}
-
-extension PresetWorkspaceViewModel: ArchiveOriginatorProtocol {
-    nonisolated public func createMemento() -> PresetEditorMemento {
-        MainActor.assumeIsolated {
-            PresetEditorMemento(
-                presetID: self.selectedPresetID ?? UUID(),
-                name: self.editorName,
-                format: self.editorFormat,
-                level: self.editorLevel,
-                splitVolumeSizeBytes: self.editorSplitVolumeOption,
-                skipMacJunk: self.editorSkipMacJunk,
-                skipGitDirectory: self.editorSkipGitDirectory,
-                defaultPassword: self.editorDefaultPassword
-            )
-        }
     }
     
-    nonisolated public func restoreMemento(_ memento: PresetEditorMemento) {
-        MainActor.assumeIsolated {
-            self.selectedPresetID = memento.presetID
-            self.editorName = memento.name
-            self.editorFormat = memento.format
-            self.editorLevel = memento.level
-            self.editorSplitVolumeOption = memento.splitVolumeSizeBytes
-            self.editorSkipMacJunk = memento.skipMacJunk
-            self.editorSkipGitDirectory = memento.skipGitDirectory
-            self.editorDefaultPassword = memento.defaultPassword
-        }
+    public func currentDraftState() -> PresetDraftState {
+        PresetDraftState(
+            presetID: self.selectedPresetID ?? UUID(),
+            name: self.editorName,
+            format: self.editorFormat,
+            level: self.editorLevel,
+            splitVolumeSizeBytes: self.editorSplitVolumeOption,
+            skipMacJunk: self.editorSkipMacJunk,
+            skipGitDirectory: self.editorSkipGitDirectory,
+            defaultPassword: self.editorDefaultPassword
+        )
     }
-}
-
-extension PresetWorkspaceViewModel {
+    
+    public func restoreDraftState(_ draft: PresetDraftState) {
+        self.selectedPresetID = draft.presetID
+        self.editorName = draft.name
+        self.editorFormat = draft.format
+        self.editorLevel = draft.level
+        self.editorSplitVolumeOption = draft.splitVolumeSizeBytes
+        self.editorSkipMacJunk = draft.skipMacJunk
+        self.editorSkipGitDirectory = draft.skipGitDirectory
+        self.editorDefaultPassword = draft.defaultPassword
+    }
     
     public func saveDraftSnapshot() {
-        caretaker.saveMemento(createMemento())
+        undoStack.append(currentDraftState())
+        redoStack.removeAll()
     }
     
     public func undoDraft() {
-        if let previous = caretaker.undo() {
-            restoreMemento(previous)
+        guard undoStack.count > 1 else { return }
+        let current = undoStack.removeLast()
+        redoStack.append(current)
+        if let previous = undoStack.last {
+            restoreDraftState(previous)
             statusMessage = "Draft undone (⌘Z)"
         }
     }
     
     public func redoDraft() {
-        if let next = caretaker.redo() {
-            restoreMemento(next)
-            statusMessage = "Draft redone (⇧⌘Z)"
-        }
+        guard let next = redoStack.popLast() else { return }
+        undoStack.append(next)
+        restoreDraftState(next)
+        statusMessage = "Draft redone (⇧⌘Z)"
     }
     
     public func discardDraft() {
@@ -163,11 +137,11 @@ extension PresetWorkspaceViewModel {
     }
     
     public var canUndoDraft: Bool {
-        caretaker.canUndo
+        undoStack.count > 1
     }
     
     public var canRedoDraft: Bool {
-        caretaker.canRedo
+        !redoStack.isEmpty
     }
     
     public func saveActivePreset() {

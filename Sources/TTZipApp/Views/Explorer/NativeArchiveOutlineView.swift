@@ -81,11 +81,19 @@ public struct NativeArchiveOutlineView: NSViewRepresentable {
     }
     
     public func traverseAllNodesDFS() -> [ArchiveEntry] {
-        let rootComposite = ArchiveCompositeDirectory(name: "root", path: "", children: nodes.map { $0.toComponent() })
-        let iterator = DepthFirstTreeIterator(root: rootComposite, order: .preOrder)
         var results: [ArchiveEntry] = []
-        while let entry = iterator.next() {
-            results.append(entry)
+        func collect(node: ArchiveTreeNode) {
+            if let entry = node.entry {
+                results.append(entry)
+            }
+            if let children = node.children {
+                for child in children {
+                    collect(node: child)
+                }
+            }
+        }
+        for node in nodes {
+            collect(node: node)
         }
         return results
     }

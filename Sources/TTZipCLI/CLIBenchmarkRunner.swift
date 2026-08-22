@@ -220,7 +220,20 @@ public enum CLIBenchmarkRunner {
         // 1. 快速场景推荐分支 (--recommend)
         if options.recommend {
             print("🧠 Running Smart Codec Scenario Selector (< 10ms micro-probe)...")
-            let scenario = SmartCodecSelector.Scenario.from(string: options.scenario ?? "balanced")
+            let scStr = options.scenario ?? "balanced"
+            let lower = scStr.lowercased()
+            let scenarioName: String
+            let scenarioCode: Int32
+            if lower.contains("airdrop") || lower.contains("instant") || lower.contains("lan") || lower.contains("fast") {
+                scenarioName = "Instant Transfer (AirDrop/10G LAN)"
+                scenarioCode = Int32(TTZIP_SCENARIO_INSTANT_TRANSFER.rawValue)
+            } else if lower.contains("cold") || lower.contains("max") || lower.contains("backup") || lower.contains("archive") {
+                scenarioName = "Cold Storage / Maximum Ratio"
+                scenarioCode = Int32(TTZIP_SCENARIO_COLD_STORAGE.rawValue)
+            } else {
+                scenarioName = "Balanced Daily Archive"
+                scenarioCode = Int32(TTZIP_SCENARIO_BALANCED_DAILY.rawValue)
+            }
             
             var sampleData: Data
             if let inPath = options.inputPath, let loaded = try? Data(contentsOf: URL(fileURLWithPath: inPath)) {
@@ -231,9 +244,52 @@ public enum CLIBenchmarkRunner {
 
             let recommendation = sampleData.withUnsafeBytes { rawPtr -> ScenarioRecommendation in
                 guard let base = rawPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-                    return SmartCodecSelector.shared.recommend(for: [0], length: 1, scenario: scenario)
+                    return ScenarioRecommendation(
+                        scenario: scenarioName,
+                        measuredEntropy: 0.0,
+                        trialCompressibilityRatio: 1.0,
+                        recommendedAlgorithm: "ZIP-Deflate",
+                        recommendedLevel: 6,
+                        rationale: "Default fallback recommendation.",
+                        projectedThroughputMBs: 1200.0,
+                        projectedSpaceSavingsPct: 0.0,
+                        probeDurationMs: 0.0
+                    )
                 }
-                return SmartCodecSelector.shared.recommend(for: base, length: sampleData.count, scenario: scenario)
+                var rawResult = TTZipRecommendationResult()
+                let status = ttzip_rust_recommend_codec(base, sampleData.count, scenarioCode, &rawResult)
+                if status == TTZIP_STATUS_OK {
+                    let algo = withUnsafeBytes(of: &rawResult.recommended_algorithm) { ptr -> String in
+                        guard let base = ptr.baseAddress?.assumingMemoryBound(to: CChar.self) else { return "ZIP-Deflate" }
+                        return String(cString: base)
+                    }
+                    let rationale = withUnsafeBytes(of: &rawResult.rationale) { ptr -> String in
+                        guard let base = ptr.baseAddress?.assumingMemoryBound(to: CChar.self) else { return "" }
+                        return String(cString: base)
+                    }
+                    return ScenarioRecommendation(
+                        scenario: scenarioName,
+                        measuredEntropy: rawResult.measured_entropy,
+                        trialCompressibilityRatio: rawResult.trial_compressibility_ratio,
+                        recommendedAlgorithm: algo,
+                        recommendedLevel: Int(rawResult.recommended_level),
+                        rationale: rationale,
+                        projectedThroughputMBs: rawResult.projected_throughput_mbs,
+                        projectedSpaceSavingsPct: rawResult.projected_space_savings_pct,
+                        probeDurationMs: rawResult.probe_duration_ms
+                    )
+                }
+                return ScenarioRecommendation(
+                    scenario: scenarioName,
+                    measuredEntropy: 0.0,
+                    trialCompressibilityRatio: 1.0,
+                    recommendedAlgorithm: "ZIP-Deflate",
+                    recommendedLevel: 6,
+                    rationale: "Default fallback recommendation.",
+                    projectedThroughputMBs: 1200.0,
+                    projectedSpaceSavingsPct: 0.0,
+                    probeDurationMs: 0.0
+                )
             }
 
             print("\n╔═ 🎯 TTZip Smart Codec Scenario Recommendation ═════════════════════════════════════╗")

@@ -56,8 +56,7 @@ extension CLICommandRouter {
             let res = try await SmartLoggingProxy.shared.inspectArchive(archivePath: path, password: password)
             if options.jsonOutput {
                 var entriesJSON: [[String: Any]] = []
-                let iter = res.makeIterator()
-                while let e = iter.next() {
+                for e in res.entries {
                     entriesJSON.append([
                         "path": e.path,
                         "size": e.uncompressedSize,
@@ -74,8 +73,7 @@ extension CLICommandRouter {
                 var outText = "=================================================================\n"
                 outText += "TTZip Archive Inspector: \(path)\n"
                 outText += "=================================================================\n"
-                let iterator = res.makeIterator()
-                while let entry = iterator.next() {
+                for entry in res.entries {
                     let sizeStr = entry.isDirectory ? "<DIR>" : "\(entry.uncompressedSize) B"
                     let p = entry.path.padding(toLength: 45, withPad: " ", startingAt: 0)
                     let s = sizeStr.padding(toLength: 12, withPad: " ", startingAt: 0)

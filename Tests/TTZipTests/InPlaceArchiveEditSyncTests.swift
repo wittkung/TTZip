@@ -116,7 +116,7 @@ final class InPlaceArchiveEditSyncTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: archiveURL.path))
         
         // 3. Begin In-Place Editing Session for fileA.txt
-        let mutationEngine = InPlaceArchiveMutationEngine.shared
+        let mutationEngine = InPlaceEditEngine.shared
         let session = try await mutationEngine.beginEditingSession(
             archivePath: archiveURL.path,
             entryPath: "fileA.txt"
@@ -223,15 +223,12 @@ final class InPlaceArchiveEditSyncTests: XCTestCase {
         )
         
         // Extract and verify
-        let reader = ArchiveReader()
-        let entries = try await reader.inspect(archivePath: archiveURL.path)
-        XCTAssertFalse(entries.isEmpty)
-        
-        let dataAlpha = SevenZipSeekTable.extractSingleEntryData(archivePath: archiveURL.path, entryPath: "alpha.txt")
-        XCTAssertNotNil(dataAlpha)
-        if let data = dataAlpha, let str = String(data: data, encoding: .utf8) {
-            XCTAssertEqual(str, "Alpha Replaced Content")
-        }
+        let extractDest = tempWorkDir.appendingPathComponent("extracted_7z", isDirectory: true)
+        try FileManager.default.createDirectory(at: extractDest, withIntermediateDirectories: true)
+        let extractor = ArchiveExtractor()
+        _ = try await extractor.extract(archivePath: archiveURL.path, destinationDir: extractDest.path)
+        let readBack = try String(contentsOf: extractDest.appendingPathComponent("alpha.txt"), encoding: .utf8)
+        XCTAssertEqual(readBack, "Alpha Replaced Content")
     }
     
     func testInPlaceTransactionalRollbackOnUnsavedClose() async throws {

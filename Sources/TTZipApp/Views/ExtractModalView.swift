@@ -7,26 +7,20 @@
 
 import SwiftUI
 import TTZipCore
-import AppKit
+import Combine
 
 @MainActor
-private final class ExtractModalEventObserver: ObservableObject, ArchiveEventObserverProtocol {
+private final class ExtractModalEventObserver: ObservableObject {
     @Published var vaultUpdateTrigger: Int = 0
+    private var cancellables = Set<AnyCancellable>()
     
     init() {
-        ArchiveEventCenter.shared.addObserver(self)
-    }
-    
-    deinit {
-        ArchiveEventCenter.shared.removeObserver(self)
-    }
-    
-    nonisolated func onArchiveEvent(_ event: ArchiveEvent) {
-        if case .passwordVaultUnlocked = event {
-            Task { @MainActor in
-                self.vaultUpdateTrigger += 1
+        NotificationCenter.default.publisher(for: PasswordVaultManager.vaultDidChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.vaultUpdateTrigger += 1
             }
-        }
+            .store(in: &cancellables)
     }
 }
 
@@ -234,20 +228,13 @@ public struct ExtractModalView: View {
     }
     
     private func startExtraction() {
-        let valCtx = ArchiveValidationContext.forExtract(
-            archivePath: archivePath,
-            destinationDir: destinationDir,
-            password: password.isEmpty ? nil : password
-        )
-        let valResult = (try? ArchiveValidationPipeline.buildDefaultExtractPipeline().validate(context: valCtx)) ?? .success
-        if case .failure(let err) = valResult {
-            self.statusMessage = err.localizedDescription
+        guard FileManager.default.fileExists(atPath: archivePath) else {
+            self.statusMessage = "Archive file not found."
             return
         }
         
         isExtracting = true
         statusMessage = "Extracting archive files..."
-        ArchiveAppMediator.shared.send(event: .requestExtraction(archivePath: archivePath, destinationPath: destinationDir))
         
         Task {
             do {
@@ -270,7 +257,6 @@ public struct ExtractModalView: View {
                     }
                 }
             } catch {
-                ArchiveAppMediator.shared.send(event: .extractionFailed(archivePath: archivePath, error: error.localizedDescription))
                 await MainActor.run {
                     self.statusMessage = "Extraction failed: \(error.localizedDescription)"
                     self.isExtracting = false

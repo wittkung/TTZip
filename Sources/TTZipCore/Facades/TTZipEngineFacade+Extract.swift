@@ -17,64 +17,29 @@ extension TTZipEngineFacade {
         autoVaultUnlock: Bool = true,
         progress: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) async throws -> ExtractResult {
-        guard !archivePath.isEmpty, !destinationDir.isEmpty else {
-            ArchiveEventCenter.shared.postExtractionFailed(archivePath: archivePath, error: "File not found")
+        guard !archivePath.isEmpty, !destinationDir.isEmpty, FileManager.default.fileExists(atPath: archivePath) else {
             throw ArchiveError.fileNotFound
-        }
-        
-        let valCtx = ArchiveValidationContext.forExtract(
-            archivePath: archivePath,
-            destinationDir: destinationDir,
-            password: password
-        )
-        do {
-            try ArchiveValidationPipeline.buildDefaultExtractPipeline().validateOrThrow(context: valCtx)
-        } catch let valErr as ArchiveValidationError {
-            ArchiveEventCenter.shared.postExtractionFailed(archivePath: archivePath, error: valErr.localizedDescription)
-            throw valErr.asArchiveError
         }
         
         let combinedProgress: @Sendable (ArchiveProgress) -> Void = { p in
             progress?(p)
-            let info = ArchiveProgressInfo(
-                state: p.state,
-                bytesProcessed: p.bytesProcessed,
-                totalBytes: p.totalBytes,
-                currentFileName: p.currentFileName,
-                throughputMBs: p.throughputMBs,
-                estimatedTimeRemaining: ArchiveProgressInfo.calculateETA(bytesProcessed: p.bytesProcessed, totalBytes: p.totalBytes, throughputMBs: p.throughputMBs),
-                operationType: .extract
-            )
-            ArchiveProgressBroadcaster.shared.broadcastProgress(info)
         }
         
         if let explicitPwd = password, !explicitPwd.isEmpty {
-            do {
-                let elapsed = try await executePipelineExtract(
-                    archivePath: archivePath,
-                    destinationDir: destinationDir,
-                    password: explicitPwd,
-                    progress: combinedProgress
-                )
-                ArchivePasswordStore.shared.setPassword(explicitPwd, for: archivePath)
-                let res = ExtractResult(
-                    archivePath: archivePath,
-                    destinationDir: destinationDir,
-                    durationSeconds: elapsed,
-                    unlockedPassword: explicitPwd,
-                    isVaultUnlocked: false
-                )
-                ArchiveEventCenter.shared.postArchiveCompleted(
-                    archivePath: archivePath,
-                    operationType: .extract,
-                    duration: elapsed,
-                    totalBytes: 0
-                )
-                return res
-            } catch {
-                ArchiveEventCenter.shared.postExtractionFailed(archivePath: archivePath, error: error.localizedDescription)
-                throw error
-            }
+            let elapsed = try await executePipelineExtract(
+                archivePath: archivePath,
+                destinationDir: destinationDir,
+                password: explicitPwd,
+                progress: combinedProgress
+            )
+            ArchivePasswordStore.shared.setPassword(explicitPwd, for: archivePath)
+            return ExtractResult(
+                archivePath: archivePath,
+                destinationDir: destinationDir,
+                durationSeconds: elapsed,
+                unlockedPassword: explicitPwd,
+                isVaultUnlocked: false
+            )
         } else {
             do {
                 let elapsed = try await executePipelineExtract(
@@ -83,20 +48,13 @@ extension TTZipEngineFacade {
                     password: nil,
                     progress: combinedProgress
                 )
-                let res = ExtractResult(
+                return ExtractResult(
                     archivePath: archivePath,
                     destinationDir: destinationDir,
                     durationSeconds: elapsed,
                     unlockedPassword: nil,
                     isVaultUnlocked: false
                 )
-                ArchiveEventCenter.shared.postArchiveCompleted(
-                    archivePath: archivePath,
-                    operationType: .extract,
-                    duration: elapsed,
-                    totalBytes: 0
-                )
-                return res
             } catch {
                 // 无密码解压失败，进入密码库自动解锁
             }
@@ -114,17 +72,6 @@ extension TTZipEngineFacade {
                     )
                     passwordVault.recordUsage(id: entry.id)
                     ArchivePasswordStore.shared.setPassword(entry.password, for: archivePath)
-                    ArchiveEventCenter.shared.postPasswordVaultUnlocked(
-                        archivePath: archivePath,
-                        password: entry.password,
-                        isVaultUnlocked: true
-                    )
-                    ArchiveEventCenter.shared.postArchiveCompleted(
-                        archivePath: archivePath,
-                        operationType: .extract,
-                        duration: elapsed,
-                        totalBytes: 0
-                    )
                     return ExtractResult(
                         archivePath: archivePath,
                         destinationDir: destinationDir,
@@ -138,7 +85,6 @@ extension TTZipEngineFacade {
             }
         }
         
-        ArchiveEventCenter.shared.postExtractionFailed(archivePath: archivePath, error: "Password required")
         throw ArchiveError.passwordRequired
     }
     

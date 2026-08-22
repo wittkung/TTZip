@@ -8,7 +8,7 @@
 import Foundation
 import CTTZipBridge
 
-/// Disaster recovery and damaged archive repair engine with NEON-accelerated TOC reconstruction.
+/// Disaster recovery and damaged archive repair engine with NEON-accelerated TOC reconstruction (Ultra-Thin Rust C-ABI Facade).
 public final class ArchiveRepairEngine: @unchecked Sendable {
     public init() {}
     
@@ -24,47 +24,12 @@ public final class ArchiveRepairEngine: @unchecked Sendable {
             throw ArchiveError.fileNotFound
         }
         
-        ArchiveProgressBroadcaster.shared.broadcastProgress(ArchiveProgressInfo(
-            state: .processing,
-            bytesProcessed: 0,
-            totalBytes: 100,
-            currentFileName: (damagedArchivePath as NSString).lastPathComponent,
-            throughputMBs: 0,
-            estimatedTimeRemaining: nil,
-            operationType: .repair
-        ))
-        
-        var count = 0
-        if let nativeSalvaged = repairArchiveNative(
-            damagedArchivePath: damagedArchivePath,
-            repairedOutputPath: repairedOutputPath
-        ) {
-            count = nativeSalvaged
-        } else {
-            count = try await ArchiveRepairStrategyContext.shared.repairArchive(
+        return try await Task.detached(priority: .userInitiated) {
+            return self.repairArchiveNative(
                 damagedArchivePath: damagedArchivePath,
                 repairedOutputPath: repairedOutputPath
-            )
-        }
-        
-        ArchiveProgressBroadcaster.shared.broadcastProgress(ArchiveProgressInfo(
-            state: .completed,
-            bytesProcessed: Int64(count),
-            totalBytes: Int64(count),
-            currentFileName: (repairedOutputPath as NSString).lastPathComponent,
-            throughputMBs: 0,
-            estimatedTimeRemaining: 0,
-            operationType: .repair
-        ))
-        
-        ArchiveEventCenter.shared.postArchiveCompleted(
-            archivePath: repairedOutputPath,
-            operationType: .repair,
-            duration: 0.1,
-            totalBytes: Int64(count)
-        )
-        
-        return count
+            ) ?? 0
+        }.value
     }
     
     /// Fast hardware NEON-accelerated direct archive repair via Rust FFI.
@@ -98,9 +63,15 @@ public final class ArchiveRepairEngine: @unchecked Sendable {
             CUnsafeBufferAdapter.withCString(repairedOutputPath) { cDst in
                 guard let cSrc = cSrc, let cDst = cDst else { return nil }
                 var salvaged: Int = 0
-                let status = ttzip_rust_archive_repair_auto(cSrc, cDst, &salvaged)
+                let status = ttzip_rust_archive_repair_unified(cSrc, cDst, &salvaged)
                 if status == TTZIP_STATUS_OK && salvaged > 0 {
                     return salvaged
+                }
+                
+                var autoSalvaged: Int = 0
+                let autoStatus = ttzip_rust_archive_repair_auto(cSrc, cDst, &autoSalvaged)
+                if autoStatus == TTZIP_STATUS_OK && autoSalvaged > 0 {
+                    return autoSalvaged
                 }
                 return nil
             }

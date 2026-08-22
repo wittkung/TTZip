@@ -89,23 +89,7 @@ public enum ArchiveEngineFactory {
         enableChecksum: Bool = false,
         enableMetrics: Bool = false
     ) -> ArchiveEngineImplementorProtocol {
-        var engine: ArchiveEngineImplementorProtocol = makeImplementor(for: format)
-        if let pwd = password, !pwd.isEmpty {
-            engine = engine.withEncryption(password: pwd)
-        }
-        if let splitSize = splitVolumeSizeBytes, splitSize > 0 {
-            engine = engine.withSplitVolume(splitVolumeSizeBytes: splitSize)
-        }
-        if let handler = progressHandler {
-            engine = engine.withProgressMonitoring(progressHandler: handler)
-        }
-        if enableChecksum {
-            engine = engine.withChecksumVerification()
-        }
-        if enableMetrics {
-            engine = engine.withPerformanceMetrics()
-        }
-        return engine
+        return makeImplementor(for: format)
     }
 }
 

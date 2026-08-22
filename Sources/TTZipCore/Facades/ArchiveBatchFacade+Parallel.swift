@@ -41,15 +41,6 @@ extension ArchiveBatchFacade {
                 results.append(res)
                 completed += 1
                 progress?(completed, total)
-                ArchiveProgressBroadcaster.shared.broadcastBatchProgress(BatchProgressInfo(
-                    completedTasks: completed,
-                    totalTasks: total,
-                    currentTaskPath: res.targetPath,
-                    totalBytesProcessed: Int64(completed),
-                    totalBytesCount: Int64(total),
-                    throughputMBs: 0.0,
-                    estimatedTimeRemaining: nil
-                ))
                 
                 if Task.isCancelled {
                     group.cancelAll()
@@ -70,9 +61,7 @@ extension ArchiveBatchFacade {
     }
     
     internal func executeSingleCompressTask(_ task: BatchCompressTask) async -> BatchTaskResult {
-        let sm = registerStateMachine(id: task.id, taskName: "BatchCompress:\(task.outputPath)")
         if Task.isCancelled {
-            try? sm.cancel()
             return BatchTaskResult(
                 id: task.id,
                 success: false,
@@ -83,7 +72,6 @@ extension ArchiveBatchFacade {
         }
         let start = Date()
         do {
-            try sm.start()
             let res = try await engineFacade.quickCompress(
                 inputs: task.inputs,
                 outputPath: task.outputPath,
@@ -93,7 +81,6 @@ extension ArchiveBatchFacade {
                 splitSize: task.splitSize,
                 progress: nil
             )
-            try sm.complete()
             return BatchTaskResult(
                 id: task.id,
                 success: true,
@@ -102,7 +89,6 @@ extension ArchiveBatchFacade {
                 errorMessage: nil
             )
         } catch {
-            try? sm.fail(error: error)
             let elapsed = Date().timeIntervalSince(start)
             return BatchTaskResult(
                 id: task.id,
@@ -145,15 +131,6 @@ extension ArchiveBatchFacade {
                 results.append(res)
                 completed += 1
                 progress?(completed, total)
-                ArchiveProgressBroadcaster.shared.broadcastBatchProgress(BatchProgressInfo(
-                    completedTasks: completed,
-                    totalTasks: total,
-                    currentTaskPath: res.targetPath,
-                    totalBytesProcessed: Int64(completed),
-                    totalBytesCount: Int64(total),
-                    throughputMBs: 0.0,
-                    estimatedTimeRemaining: nil
-                ))
                 
                 if Task.isCancelled {
                     group.cancelAll()
@@ -174,9 +151,7 @@ extension ArchiveBatchFacade {
     }
     
     internal func executeSingleExtractTask(_ task: BatchExtractTask, autoVaultUnlock: Bool) async -> BatchTaskResult {
-        let sm = registerStateMachine(id: task.id, taskName: "BatchExtract:\(task.archivePath)")
         if Task.isCancelled {
-            try? sm.cancel()
             return BatchTaskResult(
                 id: task.id,
                 success: false,
@@ -187,7 +162,6 @@ extension ArchiveBatchFacade {
         }
         let start = Date()
         do {
-            try sm.start()
             let res = try await engineFacade.quickExtract(
                 archivePath: task.archivePath,
                 destinationDir: task.destinationDir,
@@ -195,7 +169,6 @@ extension ArchiveBatchFacade {
                 autoVaultUnlock: autoVaultUnlock,
                 progress: nil
             )
-            try sm.complete()
             return BatchTaskResult(
                 id: task.id,
                 success: true,
@@ -204,7 +177,6 @@ extension ArchiveBatchFacade {
                 errorMessage: nil
             )
         } catch {
-            try? sm.fail(error: error)
             let elapsed = Date().timeIntervalSince(start)
             return BatchTaskResult(
                 id: task.id,

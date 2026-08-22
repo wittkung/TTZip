@@ -260,12 +260,13 @@ final class VisitorPatternTests: XCTestCase {
     
     func testFolderStatsCalculatorIntegrationWithCore() {
         let tree = createSampleArchiveTree()
-        let (size, subfolders, files, dist) = FolderStatsCalculator.calculateStats(for: tree)
+        let visitor = FolderStatsVisitor()
+        let res = tree.accept(visitor: visitor)
         
-        XCTAssertEqual(files, 5)
-        XCTAssertEqual(subfolders, 3)
-        XCTAssertEqual(size, 1024 + 2048 + 4096 + 8192 + 1_048_576)
-        XCTAssertFalse(dist.isEmpty)
+        XCTAssertEqual(res.totalFiles, 5)
+        XCTAssertEqual(res.totalDirectories, 3)
+        XCTAssertEqual(res.totalSizeBytes, 1024 + 2048 + 4096 + 8192 + 1_048_576)
+        XCTAssertFalse(res.categoryDistribution.isEmpty)
     }
     
     @MainActor

@@ -7,16 +7,13 @@
 
 import Foundation
 
-/// Strategy Pattern & Bridge Pattern: Unified interface for format-specific compression and extraction strategies.
+/// Strategy Pattern: Unified interface for format-specific compression and extraction strategies.
 public protocol ArchiveFormatEngineStrategy: Sendable {
     /// Format supported by this strategy.
     var format: ArchiveCompressionFormat { get }
     
     /// Associated Bridge Pattern implementor.
     var bridgeImplementor: ArchiveEngineImplementorProtocol { get }
-
-    /// Associated Template Method Pattern workflow engine.
-    var engineTemplate: BaseArchiveEngineTemplate { get }
     
     /// Checks whether this strategy can process the given filesystem path.
     func canHandle(path: String) -> Bool
@@ -81,46 +78,28 @@ public final class ArchiveEngineRegistry: @unchecked Sendable {
 public final class ZipFormatEngineStrategy: ArchiveFormatEngineStrategy {
     public let format: ArchiveCompressionFormat = .zip
     public let bridgeImplementor: ArchiveEngineImplementorProtocol
-    public let engineTemplate: BaseArchiveEngineTemplate
     
     public init(
-        bridgeImplementor: ArchiveEngineImplementorProtocol = ArchiveEngineFactory.makeImplementor(for: .zip),
-        engineTemplate: BaseArchiveEngineTemplate = ZipArchiveEngineTemplate()
+        bridgeImplementor: ArchiveEngineImplementorProtocol = ArchiveEngineFactory.makeImplementor(for: .zip)
     ) {
         self.bridgeImplementor = bridgeImplementor
-        self.engineTemplate = engineTemplate
     }
     
     public func canHandle(path: String) -> Bool {
         let lower = path.lowercased()
-        return lower.hasSuffix(".zip") || lower.hasSuffix(".jar") || lower.hasSuffix(".apk") || lower.hasSuffix(".epub") || lower.hasSuffix(".docx") || lower.hasSuffix(".xlsx")
+        return lower.hasSuffix(".zip") || lower.hasSuffix(".zipx") || lower.hasSuffix(".aar") || lower.hasSuffix(".epub") || lower.hasSuffix(".docx") || lower.hasSuffix(".xlsx")
     }
     
     public func extract(archivePath: String, destinationDir: String, options: ArchiveFilterOptions, password: String?) throws -> Bool {
-        let context = ArchiveTemplateContext(
-            operation: ArchiveOperationType.extract,
-            archivePath: archivePath,
-            destinationDir: destinationDir,
-            format: ArchiveCompressionFormat.zip,
-            password: password,
-            options: options
-        )
-        let res = try engineTemplate.performWorkflow(context: context)
-        return res.isSuccess
+        let extractor = ArchiveExtractor()
+        try extractor.extractSync(archivePath: archivePath, destinationDir: destinationDir, options: options, password: password)
+        return true
     }
     
     public func compress(outputPath: String, inputPaths: [String], level: ArchiveCompressionLevel, options: ArchiveFilterOptions, password: String?) throws -> Bool {
-        let context = ArchiveTemplateContext(
-            operation: ArchiveOperationType.compress,
-            archivePath: outputPath,
-            inputPaths: inputPaths,
-            format: ArchiveCompressionFormat.zip,
-            level: level,
-            password: password,
-            options: options
-        )
-        let res = try engineTemplate.performWorkflow(context: context)
-        return res.isSuccess
+        let writer = ArchiveWriter()
+        try writer.createArchiveSync(outputPath: outputPath, format: .zip, level: level, inputPaths: inputPaths, options: options, password: password)
+        return true
     }
 }
 
@@ -128,14 +107,11 @@ public final class ZipFormatEngineStrategy: ArchiveFormatEngineStrategy {
 public final class SevenZipFormatEngineStrategy: ArchiveFormatEngineStrategy {
     public let format: ArchiveCompressionFormat = .sevenZip
     public let bridgeImplementor: ArchiveEngineImplementorProtocol
-    public let engineTemplate: BaseArchiveEngineTemplate
     
     public init(
-        bridgeImplementor: ArchiveEngineImplementorProtocol = ArchiveEngineFactory.makeImplementor(for: .sevenZip),
-        engineTemplate: BaseArchiveEngineTemplate = SevenZipArchiveEngineTemplate()
+        bridgeImplementor: ArchiveEngineImplementorProtocol = ArchiveEngineFactory.makeImplementor(for: .sevenZip)
     ) {
         self.bridgeImplementor = bridgeImplementor
-        self.engineTemplate = engineTemplate
     }
     
     public func canHandle(path: String) -> Bool {
@@ -144,30 +120,15 @@ public final class SevenZipFormatEngineStrategy: ArchiveFormatEngineStrategy {
     }
     
     public func extract(archivePath: String, destinationDir: String, options: ArchiveFilterOptions, password: String?) throws -> Bool {
-        let context = ArchiveTemplateContext(
-            operation: ArchiveOperationType.extract,
-            archivePath: archivePath,
-            destinationDir: destinationDir,
-            format: ArchiveCompressionFormat.sevenZip,
-            password: password,
-            options: options
-        )
-        let res = try engineTemplate.performWorkflow(context: context)
-        return res.isSuccess
+        let extractor = ArchiveExtractor()
+        try extractor.extractSync(archivePath: archivePath, destinationDir: destinationDir, options: options, password: password)
+        return true
     }
     
     public func compress(outputPath: String, inputPaths: [String], level: ArchiveCompressionLevel, options: ArchiveFilterOptions, password: String?) throws -> Bool {
-        let context = ArchiveTemplateContext(
-            operation: ArchiveOperationType.compress,
-            archivePath: outputPath,
-            inputPaths: inputPaths,
-            format: ArchiveCompressionFormat.sevenZip,
-            level: level,
-            password: password,
-            options: options
-        )
-        let res = try engineTemplate.performWorkflow(context: context)
-        return res.isSuccess
+        let writer = ArchiveWriter()
+        try writer.createArchiveSync(outputPath: outputPath, format: .sevenZip, level: level, inputPaths: inputPaths, options: options, password: password)
+        return true
     }
 }
 
@@ -175,16 +136,13 @@ public final class SevenZipFormatEngineStrategy: ArchiveFormatEngineStrategy {
 public final class TarFormatEngineStrategy: ArchiveFormatEngineStrategy {
     public let format: ArchiveCompressionFormat
     public let bridgeImplementor: ArchiveEngineImplementorProtocol
-    public let engineTemplate: BaseArchiveEngineTemplate
     
     public init(
         format: ArchiveCompressionFormat = .tar,
-        bridgeImplementor: ArchiveEngineImplementorProtocol = ArchiveEngineFactory.makeImplementor(for: .tar),
-        engineTemplate: BaseArchiveEngineTemplate = TarArchiveEngineTemplate()
+        bridgeImplementor: ArchiveEngineImplementorProtocol = ArchiveEngineFactory.makeImplementor(for: .tar)
     ) {
         self.format = format
         self.bridgeImplementor = bridgeImplementor
-        self.engineTemplate = engineTemplate
     }
     
     public func canHandle(path: String) -> Bool {
@@ -193,30 +151,15 @@ public final class TarFormatEngineStrategy: ArchiveFormatEngineStrategy {
     }
     
     public func extract(archivePath: String, destinationDir: String, options: ArchiveFilterOptions, password: String?) throws -> Bool {
-        let context = ArchiveTemplateContext(
-            operation: ArchiveOperationType.extract,
-            archivePath: archivePath,
-            destinationDir: destinationDir,
-            format: format,
-            password: password,
-            options: options
-        )
-        let res = try engineTemplate.performWorkflow(context: context)
-        return res.isSuccess
+        let extractor = ArchiveExtractor()
+        try extractor.extractSync(archivePath: archivePath, destinationDir: destinationDir, options: options, password: password)
+        return true
     }
     
     public func compress(outputPath: String, inputPaths: [String], level: ArchiveCompressionLevel, options: ArchiveFilterOptions, password: String?) throws -> Bool {
-        let context = ArchiveTemplateContext(
-            operation: ArchiveOperationType.compress,
-            archivePath: outputPath,
-            inputPaths: inputPaths,
-            format: format,
-            level: level,
-            password: password,
-            options: options
-        )
-        let res = try engineTemplate.performWorkflow(context: context)
-        return res.isSuccess
+        let writer = ArchiveWriter()
+        try writer.createArchiveSync(outputPath: outputPath, format: format, level: level, inputPaths: inputPaths, options: options, password: password)
+        return true
     }
 }
 
@@ -224,14 +167,11 @@ public final class TarFormatEngineStrategy: ArchiveFormatEngineStrategy {
 public final class ZstdFormatEngineStrategy: ArchiveFormatEngineStrategy {
     public let format: ArchiveCompressionFormat = .zst
     public let bridgeImplementor: ArchiveEngineImplementorProtocol
-    public let engineTemplate: BaseArchiveEngineTemplate
     
     public init(
-        bridgeImplementor: ArchiveEngineImplementorProtocol = ArchiveEngineFactory.makeImplementor(for: .zst),
-        engineTemplate: BaseArchiveEngineTemplate = TarArchiveEngineTemplate()
+        bridgeImplementor: ArchiveEngineImplementorProtocol = ArchiveEngineFactory.makeImplementor(for: .zst)
     ) {
         self.bridgeImplementor = bridgeImplementor
-        self.engineTemplate = engineTemplate
     }
     
     public func canHandle(path: String) -> Bool {
@@ -239,29 +179,14 @@ public final class ZstdFormatEngineStrategy: ArchiveFormatEngineStrategy {
     }
     
     public func extract(archivePath: String, destinationDir: String, options: ArchiveFilterOptions, password: String?) throws -> Bool {
-        let context = ArchiveTemplateContext(
-            operation: ArchiveOperationType.extract,
-            archivePath: archivePath,
-            destinationDir: destinationDir,
-            format: ArchiveCompressionFormat.zst,
-            password: password,
-            options: options
-        )
-        let res = try engineTemplate.performWorkflow(context: context)
-        return res.isSuccess
+        let extractor = ArchiveExtractor()
+        try extractor.extractSync(archivePath: archivePath, destinationDir: destinationDir, options: options, password: password)
+        return true
     }
     
     public func compress(outputPath: String, inputPaths: [String], level: ArchiveCompressionLevel, options: ArchiveFilterOptions, password: String?) throws -> Bool {
-        let context = ArchiveTemplateContext(
-            operation: ArchiveOperationType.compress,
-            archivePath: outputPath,
-            inputPaths: inputPaths,
-            format: ArchiveCompressionFormat.zst,
-            level: level,
-            password: password,
-            options: options
-        )
-        let res = try engineTemplate.performWorkflow(context: context)
-        return res.isSuccess
+        let writer = ArchiveWriter()
+        try writer.createArchiveSync(outputPath: outputPath, format: .zst, level: level, inputPaths: inputPaths, options: options, password: password)
+        return true
     }
 }

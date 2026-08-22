@@ -71,21 +71,6 @@ final class CoreEngineExhaustiveCoverageTests: XCTestCase {
         let hashCalculator: HashCalculating = ArchiveEngineFactory.makeHashCalculator()
         XCTAssertNotNil(hashCalculator)
 
-        let zipCrypto: ZipCryptoEngineProtocol = ZipCryptoEngine.shared
-        XCTAssertNotNil(zipCrypto)
-
-        let sevenZipCrypto: SevenZipCryptoEngineProtocol = SevenZipCryptoEngine.shared
-        XCTAssertNotNil(sevenZipCrypto)
-
-        let zipEngine: ZipEngineProtocol = NativeZipEngine.shared
-        XCTAssertNotNil(zipEngine)
-
-        let sevenZipEngine: SevenZipEngineProtocol = SevenZipCAdapter.shared
-        XCTAssertNotNil(sevenZipEngine)
-
-        let zstdEngine: ZstdEngineProtocol = ZstdCAdapter.shared
-        XCTAssertNotNil(zstdEngine)
-
         let vaultRepo: any PasswordVaultRepositoryProtocol = PasswordVaultManager.shared
         XCTAssertNotNil(vaultRepo)
 

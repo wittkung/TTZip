@@ -47,17 +47,27 @@ extension ArchiveWriter {
         }
     }
     
-    /// Splits an archive file into numbered or spanned volumes when split volume size is specified.
+    /// Splits an archive file into numbered or spanned volumes via Rust C-ABI when split volume size is specified.
     public static func sliceArchiveIfNeeded(
         archivePath: String,
         splitSizeBytes: Int64,
         namingPattern: VolumeNamingPattern = .numberedExtension
     ) throws {
-        try SplitVolumeEngine.shared.sliceArchive(
-            archivePath: archivePath,
-            splitSizeBytes: splitSizeBytes,
-            namingPattern: namingPattern
-        )
+        let scheme: TTZipVolumeNamingScheme
+        switch namingPattern {
+        case .numberedExtension:
+            scheme = TTZIP_VOLUME_NAMING_NUMBERED
+        case .pkzipSpanned:
+            scheme = TTZIP_VOLUME_NAMING_PKZIP
+        case .rawSplit:
+            scheme = TTZIP_VOLUME_NAMING_RAW
+        }
+        let status = CUnsafeBufferAdapter.withCString(archivePath) { cPath in
+            guard let cPath = cPath else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+            return ttzip_rust_split_file(cPath, cPath, UInt64(splitSizeBytes), Int32(scheme.rawValue), true)
+        }
+        if status != TTZIP_STATUS_OK {
+            throw ArchiveError.readFailed(code: status.rawValue)
+        }
     }
 }
-

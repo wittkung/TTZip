@@ -15,14 +15,8 @@ extension TTZipEngineFacade {
         password: String? = nil,
         autoVaultUnlock: Bool = true
     ) async throws -> ArchiveInspectionResult {
-        let valCtx = ArchiveValidationContext.forInspect(
-            archivePath: archivePath,
-            password: password
-        )
-        do {
-            try ArchiveValidationPipeline.buildDefaultInspectPipeline().validateOrThrow(context: valCtx)
-        } catch let valErr as ArchiveValidationError {
-            throw valErr.asArchiveError
+        guard !archivePath.isEmpty, FileManager.default.fileExists(atPath: archivePath) else {
+            throw ArchiveError.fileNotFound
         }
         
         let explicitPwd = password ?? ArchivePasswordStore.shared.getPassword(for: archivePath)
@@ -80,23 +74,16 @@ extension TTZipEngineFacade {
     }
     
     public func repairArchive(damagedPath: String, outputPath: String) async throws -> Int {
-        let valCtx = ArchiveValidationContext.forRepair(
-            damagedPath: damagedPath,
-            outputPath: outputPath
-        )
-        do {
-            try ArchiveValidationPipeline.buildDefaultRepairPipeline().validateOrThrow(context: valCtx)
-        } catch let valErr as ArchiveValidationError {
-            throw valErr.asArchiveError
+        guard !damagedPath.isEmpty, !outputPath.isEmpty, FileManager.default.fileExists(atPath: damagedPath) else {
+            throw ArchiveError.fileNotFound
         }
         return try await repairEngine.repairArchive(damagedArchivePath: damagedPath, repairedOutputPath: outputPath)
     }
     
     public func recoverPassword(
         archivePath: String,
-        dictionary: [String],
-        stateMachine: ArchiveTaskStateMachine? = nil
+        dictionary: [String]
     ) async throws -> PasswordRecoveryResult {
-        return try await recoveryEngine.recoverPassword(archivePath: archivePath, dictionary: dictionary, stateMachine: stateMachine)
+        return try await recoveryEngine.recoverPassword(archivePath: archivePath, dictionary: dictionary)
     }
 }

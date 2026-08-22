@@ -32,17 +32,12 @@ public final class ArchiveExplorerState: ObservableObject {
     
     public init() {}
     
-    /// Sequence iterator for filtered entries.
-    public var filteredEntriesIterator: ArrayArchiveIterator {
-        let pattern = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        return ArrayArchiveIterator(
-            entries: currentEntries,
-            namePattern: pattern.isEmpty ? nil : pattern
-        )
-    }
-    
     public var filteredEntries: [ArchiveEntry] {
-        return Array(filteredEntriesIterator)
+        let pattern = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if pattern.isEmpty {
+            return currentEntries
+        }
+        return currentEntries.filter { $0.path.lowercased().contains(pattern) }
     }
 }
 
@@ -52,7 +47,6 @@ public final class TaskExecutionState: ObservableObject {
     @Published public var isLoading: Bool = false
     @Published public var statusMessage: String = "Ready"
     @Published public var progressValue: Double = 0.0
-    @Published public var activeTaskStateMachine: ArchiveTaskStateMachine? = nil
     @Published public var taskStateName: String = "Idle"
     @Published public var canPauseTask: Bool = false
     @Published public var canResumeTask: Bool = false

@@ -328,9 +328,7 @@ public struct PasswordPromptSheetView: View {
         Task { @MainActor in
             let success = await onSubmitPassword(passwordInput)
             isVerifying = false
-            if success {
-                ArchiveAppMediator.shared.send(event: .passwordUnlocked(archivePath: archivePath, password: passwordInput))
-            } else {
+            if !success {
                 errorMessage = "Decryption failed: Incorrect password or corrupted archive"
             }
         }

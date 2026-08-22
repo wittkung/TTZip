@@ -37,11 +37,6 @@ public protocol ArchiveBatchFacading: Sendable {
         tasks: [BatchExtractTask],
         autoVaultUnlock: Bool
     ) async throws -> CommandResult
-    
-    func getTaskStateMachine(id: UUID) -> ArchiveTaskStateMachine?
-    func pauseAllTasks()
-    func resumeAllTasks()
-    func cancelAllTasks()
 }
 
 extension ArchiveBatchFacading {
@@ -81,33 +76,15 @@ extension ArchiveBatchFacading {
     ) async throws -> CommandResult {
         return try await batchExtractTransactional(tasks: tasks, autoVaultUnlock: autoVaultUnlock)
     }
-    
-    public func getTaskStateMachine(id: UUID) -> ArchiveTaskStateMachine? {
-        return ArchiveBatchFacade.shared.getTaskStateMachine(id: id)
-    }
-    
-    public func pauseAllTasks() {
-        ArchiveBatchFacade.shared.pauseAllTasks()
-    }
-    
-    public func resumeAllTasks() {
-        ArchiveBatchFacade.shared.resumeAllTasks()
-    }
-    
-    public func cancelAllTasks() {
-        ArchiveBatchFacade.shared.cancelAllTasks()
-    }
 }
 
 // MARK: - Archive Batch Facade Implementation
 
-/// Unified batch operations facade orchestrating parallel TaskGroups, transactional macro commands, and state machines.
+/// Unified batch operations facade orchestrating parallel TaskGroups and transactional macro commands.
 public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable {
     public static let shared = ArchiveBatchFacade()
     
     internal let engineFacade: TTZipEngineFacading
-    private var activeStateMachines: [UUID: ArchiveTaskStateMachine] = [:]
-    private let batchLock = NSLock()
     
     private convenience init() {
         self.init(engineFacade: TTZipEngineFacade.shared)
@@ -115,50 +92,6 @@ public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable
     
     internal init(engineFacade: TTZipEngineFacading = TTZipEngineFacade.shared) {
         self.engineFacade = engineFacade
-    }
-    
-    // MARK: - State Machine and Batch Control
-    
-    public func getTaskStateMachine(id: UUID) -> ArchiveTaskStateMachine? {
-        batchLock.lock()
-        defer { batchLock.unlock() }
-        return activeStateMachines[id]
-    }
-    
-    public func pauseAllTasks() {
-        batchLock.lock()
-        let sms = Array(activeStateMachines.values)
-        batchLock.unlock()
-        for sm in sms where sm.canPause {
-            try? sm.pause()
-        }
-    }
-    
-    public func resumeAllTasks() {
-        batchLock.lock()
-        let sms = Array(activeStateMachines.values)
-        batchLock.unlock()
-        for sm in sms where sm.canResume {
-            try? sm.resume()
-        }
-    }
-    
-    public func cancelAllTasks() {
-        batchLock.lock()
-        let sms = Array(activeStateMachines.values)
-        batchLock.unlock()
-        for sm in sms where sm.canCancel {
-            try? sm.cancel()
-        }
-    }
-    
-    @discardableResult
-    internal func registerStateMachine(id: UUID, taskName: String) -> ArchiveTaskStateMachine {
-        let sm = ArchiveTaskStateMachine(id: id, taskName: taskName)
-        batchLock.lock()
-        activeStateMachines[id] = sm
-        batchLock.unlock()
-        return sm
     }
     
     // MARK: - Transactional Macro Batch Operations

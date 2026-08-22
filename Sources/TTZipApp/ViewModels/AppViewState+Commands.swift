@@ -9,18 +9,6 @@ import Foundation
 import TTZipCore
 
 extension AppViewState {
-    // MARK: - Workspace Memento Management
-    
-    public func saveWorkspaceSnapshot() {
-        workspaceCaretaker.saveMemento(createMemento())
-    }
-    
-    public func restoreWorkspaceSnapshot() {
-        if let previous = workspaceCaretaker.undo() {
-            restoreMemento(previous)
-        }
-    }
-    
     // MARK: - Command Undo / Redo
     
     public func updateUndoRedoState() {
@@ -35,15 +23,12 @@ extension AppViewState {
             throw CommandError.invalidState(reason: "Another task is in progress.")
         }
         self.isLoading = true
-        let stateMachine = createAndBindTaskStateMachine(taskName: command.description)
-        try? stateMachine.start()
         defer {
             self.isLoading = false
             updateUndoRedoState()
         }
         do {
             let result = try await historyManager.execute(command: command)
-            try? stateMachine.complete()
             self.statusMessage = "Command succeeded: [\(command.description)]"
             return result
         } catch {
@@ -85,28 +70,6 @@ extension AppViewState {
             } catch {
                 self.statusMessage = "Redo failed: \(error.localizedDescription)"
             }
-        }
-    }
-}
-
-extension AppViewState: ArchiveOriginatorProtocol {
-    nonisolated public func createMemento() -> AppViewStateMemento {
-        MainActor.assumeIsolated {
-            AppViewStateMemento(
-                activeTab: self.activeTab,
-                currentArchivePath: self.currentArchivePath,
-                selectedPresetID: nil,
-                searchQuery: self.searchQuery,
-                isSidebarExpanded: true
-            )
-        }
-    }
-    
-    nonisolated public func restoreMemento(_ memento: AppViewStateMemento) {
-        MainActor.assumeIsolated {
-            self.activeTab = memento.activeTab
-            self.currentArchivePath = memento.currentArchivePath
-            self.searchQuery = memento.searchQuery
         }
     }
 }
