@@ -75,33 +75,57 @@ impl AlignedBuffer {
 
 
     #[inline]
+    #[must_use]
     pub fn as_ptr(&self) -> *const u8 {
         self.ptr.as_ptr()
     }
 
     #[inline]
+    #[must_use]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         self.ptr.as_ptr()
     }
 
     #[inline]
+    #[must_use]
     pub fn capacity(&self) -> usize {
         self.capacity
     }
 
     #[inline]
+    #[must_use]
     pub fn as_slice(&self) -> &[u8] {
+        // SAFETY: self.ptr is non-null, valid, and aligned for self.capacity bytes allocated with Layout
         unsafe { std::slice::from_raw_parts(self.ptr.as_ptr(), self.capacity) }
     }
 
     #[inline]
+    #[must_use]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        // SAFETY: self.ptr is non-null, valid, and aligned for self.capacity bytes allocated with Layout
         unsafe { std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.capacity) }
+    }
+}
+
+impl std::ops::Deref for AlignedBuffer {
+    type Target = [u8];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl std::ops::DerefMut for AlignedBuffer {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
     }
 }
 
 impl Drop for AlignedBuffer {
     fn drop(&mut self) {
+        // SAFETY: self.ptr was allocated with self.layout and has exclusive ownership
         unsafe {
             dealloc(self.ptr.as_ptr(), self.layout);
         }

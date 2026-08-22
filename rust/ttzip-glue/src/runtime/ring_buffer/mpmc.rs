@@ -77,6 +77,7 @@ impl<T> MpmcRingBuffer<T> {
                     Ordering::Relaxed,
                 ) {
                     Ok(_) => {
+                        // SAFETY: Successful CAS guarantees exclusive write access to this cell at pos
                         unsafe {
                             let slot = cell.value.get();
                             (*slot).write(item);
@@ -111,6 +112,7 @@ impl<T> MpmcRingBuffer<T> {
                     Ordering::Relaxed,
                 ) {
                     Ok(_) => {
+                        // SAFETY: Successful CAS guarantees exclusive read access to initialized value
                         let val = unsafe {
                             let slot = cell.value.get();
                             (*slot).assume_init_read()

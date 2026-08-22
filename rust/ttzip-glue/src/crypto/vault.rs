@@ -41,6 +41,7 @@ fn xtime(b: u8) -> u8 {
 #[inline]
 pub fn aes256_encrypt_block(ctx: &Aes256Context, input: &[u8; 16], output: &mut [u8; 16]) {
     #[cfg(target_arch = "aarch64")]
+    // SAFETY: input and output are fixed 16-byte arrays, and ctx.round_keys_enc contains 15 valid 16-byte round keys
     unsafe {
         use core::arch::aarch64::*;
         let mut b = vld1q_u8(input.as_ptr());

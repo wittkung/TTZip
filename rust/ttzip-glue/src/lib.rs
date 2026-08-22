@@ -58,12 +58,10 @@ pub use zip::{create_zip_archive, ZipArchive, ZipEntry, ZipInputItem};
 use libc::c_char;
 use std::panic::catch_unwind;
 
-static VERSION_C_STR: &[u8] = b"1.0.0-rust-glue\0";
-
 /// Returns static version string for TTZip Rust Glue layer.
 #[no_mangle]
 pub extern "C" fn ttzip_rust_version() -> *const c_char {
-    VERSION_C_STR.as_ptr() as *const c_char
+    c"1.0.0-rust-glue".as_ptr()
 }
 
 /// Initializes TTZip Rust runtime and subsystem states.

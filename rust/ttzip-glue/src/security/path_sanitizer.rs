@@ -43,6 +43,7 @@ pub struct PathSanitizationResult {
 impl PathSanitizationResult {
     /// Returns true if the path is safe to extract into a sandbox root.
     #[inline]
+    #[must_use]
     pub fn is_safe(&self) -> bool {
         !self.has_traversal_attack
             && !self.is_absolute
@@ -54,7 +55,8 @@ impl PathSanitizationResult {
 }
 
 /// Checks if a path segment or name matches a Windows DOS reserved device.
-#[inline]
+    #[inline]
+    #[must_use]
 pub fn is_windows_reserved_device_name(segment: &str) -> bool {
     if segment.is_empty() {
         return false;
@@ -82,6 +84,7 @@ pub fn is_windows_reserved_device_name(segment: &str) -> bool {
 
 /// Normalizes Unicode string to NFC form with zero-allocation fast-paths for ASCII and pre-normalized inputs.
 #[inline]
+#[must_use]
 pub fn normalize_to_nfc(input: &str) -> Cow<'_, str> {
     if input.is_ascii() || is_nfc_quick(input.chars()) == IsNormalized::Yes {
         Cow::Borrowed(input)
@@ -91,6 +94,7 @@ pub fn normalize_to_nfc(input: &str) -> Cow<'_, str> {
 }
 
 /// Sanitizes and canonicalizes a relative or absolute filesystem path.
+#[must_use]
 pub fn sanitize_path(raw_path: &str) -> PathSanitizationResult {
     if raw_path.is_empty() {
         return PathSanitizationResult {

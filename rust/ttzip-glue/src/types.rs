@@ -34,11 +34,28 @@ pub enum TTZipStatus {
 
 impl TTZipStatus {
     #[inline]
-    pub fn to_i32(self) -> i32 {
+    #[must_use]
+    pub const fn to_i32(self) -> i32 {
         self as i32
     }
 
-    pub fn as_str(self) -> &'static str {
+    /// Returns `true` if the status represents a successful operation (`Ok`).
+    #[inline]
+    #[must_use]
+    pub const fn is_ok(self) -> bool {
+        matches!(self, Self::Ok)
+    }
+
+    /// Returns `true` if the status indicates an error condition.
+    #[inline]
+    #[must_use]
+    pub const fn is_err(self) -> bool {
+        (self as i32) < 0
+    }
+
+    /// Returns a static English string description of the status code.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
             TTZipStatus::Ok => "Operation completed successfully",
             TTZipStatus::Eof => "End of archive / stream reached",
@@ -60,6 +77,14 @@ impl TTZipStatus {
         }
     }
 }
+
+impl core::fmt::Display for TTZipStatus {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl std::error::Error for TTZipStatus {}
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

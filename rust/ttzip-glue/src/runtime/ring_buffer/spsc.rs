@@ -114,16 +114,19 @@ impl<T> SpscRingBuffer<T> {
     pub fn push(&self, item: T) -> Result<(), T> {
         let head = self.inner.head.load(Ordering::Relaxed);
         let shadow_tail_ptr = self.inner.shadow_tail.get();
+        // SAFETY: Only the single producer accesses shadow_tail
         let cached_tail = unsafe { *shadow_tail_ptr };
 
         if head.wrapping_sub(cached_tail) >= self.inner.capacity {
             let tail = self.inner.tail.load(Ordering::Acquire);
+            // SAFETY: Only the single producer updates shadow_tail
             unsafe { *shadow_tail_ptr = tail };
             if head.wrapping_sub(tail) >= self.inner.capacity {
                 return Err(item);
             }
         }
 
+        // SAFETY: Slot is free as verified by head/tail bounds check, head index is masked to power-of-two buffer length
         unsafe {
             let slot = self.inner.buffer[head & self.inner.mask].get();
             (*slot).write(item);
@@ -137,16 +140,19 @@ impl<T> SpscRingBuffer<T> {
     pub fn pop(&self) -> Option<T> {
         let tail = self.inner.tail.load(Ordering::Relaxed);
         let shadow_head_ptr = self.inner.shadow_head.get();
+        // SAFETY: Only the single consumer accesses shadow_head
         let cached_head = unsafe { *shadow_head_ptr };
 
         if tail == cached_head {
             let head = self.inner.head.load(Ordering::Acquire);
+            // SAFETY: Only the single consumer updates shadow_head
             unsafe { *shadow_head_ptr = head };
             if tail == head {
                 return None;
             }
         }
 
+        // SAFETY: Slot contains initialized value as verified by head/tail bounds check
         let item = unsafe {
             let slot = self.inner.buffer[tail & self.inner.mask].get();
             (*slot).assume_init_read()
