@@ -102,14 +102,24 @@ assemble_app_bundle() {
     local macos_dir="${contents_dir}/MacOS"
     local frameworks_dir="${contents_dir}/Frameworks"
     local resources_dir="${contents_dir}/Resources"
+    local helpers_dir="${contents_dir}/Helpers"
     
     rm -rf "${APP_BUNDLE}"
-    mkdir -p "${macos_dir}" "${frameworks_dir}" "${resources_dir}"
+    mkdir -p "${macos_dir}" "${frameworks_dir}" "${resources_dir}" "${helpers_dir}"
     
     cp "${app_bin}" "${macos_dir}/TTZip"
     [ "${STRIP_SYMBOLS}" = true ] && strip -x "${macos_dir}/TTZip" 2>/dev/null || true
     chmod +x "${macos_dir}/TTZip"
     install_name_tool -add_rpath @executable_path/../Frameworks "${macos_dir}/TTZip" 2>/dev/null || true
+    
+    local rust_cli="${WORKSPACE_ROOT}/bin/ttzip"
+    [ ! -f "${rust_cli}" ] && rust_cli="${WORKSPACE_ROOT}/rust/target/release/ttzip"
+    if [ -f "${rust_cli}" ]; then
+        cp "${rust_cli}" "${helpers_dir}/ttzip"
+        [ "${STRIP_SYMBOLS}" = true ] && strip -x "${helpers_dir}/ttzip" 2>/dev/null || true
+        chmod +x "${helpers_dir}/ttzip"
+        codesign --force --deep --sign - "${helpers_dir}/ttzip" 2>/dev/null || true
+    fi
     
     local sparkle_src
     sparkle_src="$(find "${WORKSPACE_ROOT}/.build" -name "Sparkle.framework" -type d 2>/dev/null | grep -E "xcframework.*macos|release/Sparkle.framework" | head -n 1 || true)"
@@ -215,8 +225,8 @@ generate_single_formula() {
 class ${class_name} < Formula
   desc "High-performance native archive and compression CLI utility for macOS"
   homepage "https://github.com/wittkung/TTZip"
-  url "https://github.com/wittkung/TTZip/releases/download/v\${VERSION}/\${TARBALL_NAME}"
-  sha256 "\${CLI_SHA256}"
+  url "https://github.com/wittkung/TTZip/releases/download/v${VERSION}/${TARBALL_NAME}"
+  sha256 "${CLI_SHA256}"
   license :cannot_be_redistributed
 
   depends_on :macos => :sonoma
@@ -231,11 +241,12 @@ class ${class_name} < Formula
   end
 
   test do
-    assert_match "ttzip", shell_output("#{bin}/ttzip-cli --version")
+    assert_match "ttzip", shell_output("#{bin}/ttzip --version")
+    assert_match "platform", shell_output("#{bin}/ttzip doctor --json")
     (testpath/"hello.txt").write("TTZip Homebrew Test Verification")
-    system "#{bin}/ttzip-cli", "archive", "test.zip", "hello.txt"
+    system "#{bin}/ttzip", "a", "test.zip", "hello.txt"
     assert_predicate testpath/"test.zip", :exist?
-    system "#{bin}/ttzip-cli", "test", "test.zip"
+    system "#{bin}/ttzip", "t", "test.zip"
   end
 end
 EOF

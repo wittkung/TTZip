@@ -12,7 +12,7 @@ class TtzipCli < Formula
   desc "High-performance native archive and compression CLI utility for macOS"
   homepage "https://github.com/wittkung/TTZip"
   url "https://github.com/wittkung/TTZip/releases/download/v1.0.0/ttzip-cli-v1.0.0-darwin-universal.tar.gz"
-  sha256 "974bdf2c0d35ae560174015f82c4bc9e27afd207a8a4dc88e67760e1637f167a"
+  sha256 "d0a4c45b66be0484f9a7b37b083eb7434337daa3113baa37dc597d156519b520"
   license :cannot_be_redistributed
 
   depends_on :macos => :sonoma
@@ -27,10 +27,11 @@ class TtzipCli < Formula
   end
 
   test do
-    assert_match "ttzip", shell_output("#{bin}/ttzip-cli --version")
+    assert_match "ttzip", shell_output("#{bin}/ttzip --version")
+    assert_match "platform", shell_output("#{bin}/ttzip doctor --json")
     (testpath/"hello.txt").write("TTZip Homebrew Test Verification")
-    system "#{bin}/ttzip-cli", "archive", "test.zip", "hello.txt"
+    system "#{bin}/ttzip", "a", "test.zip", "hello.txt"
     assert_predicate testpath/"test.zip", :exist?
-    system "#{bin}/ttzip-cli", "test", "test.zip"
+    system "#{bin}/ttzip", "t", "test.zip"
   end
 end
