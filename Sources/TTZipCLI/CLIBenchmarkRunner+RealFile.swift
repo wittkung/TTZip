@@ -32,7 +32,7 @@ extension CLIBenchmarkRunner {
         
         let totalOriginalBytes: Int64
         if isDirectory {
-            totalOriginalBytes = (try? CompetitorBenchmarkRunner.folderSize(expandedPath)) ?? 0
+            totalOriginalBytes = (try? folderSize(expandedPath)) ?? 0
         } else {
             let attrs = try? fm.attributesOfItem(atPath: expandedPath)
             totalOriginalBytes = (attrs?[.size] as? Int64) ?? 0
@@ -176,7 +176,7 @@ extension CLIBenchmarkRunner {
                     compArgs.append(expandedPath)
 
                     let cs = PlatformMonotonicTimer.nowSeconds()
-                    _ = CompetitorBenchmarkRunner.runCLI(p7z, compArgs)
+                    _ = runCLI(p7z, compArgs)
                     cTime = max(0.001, PlatformMonotonicTimer.nowSeconds() - cs)
                     aSize = (try? fm.attributesOfItem(atPath: arc7z)[.size] as? Int64) ?? 0
 
@@ -186,7 +186,7 @@ extension CLIBenchmarkRunner {
                         extArgs.append("-p\(pwd)")
                     }
                     let es = PlatformMonotonicTimer.nowSeconds()
-                    _ = CompetitorBenchmarkRunner.runCLI(p7z, extArgs)
+                    _ = runCLI(p7z, extArgs)
                     eTime = max(0.001, PlatformMonotonicTimer.nowSeconds() - es)
 
                     let vRes = checker.verifyExtractedDirectory(
@@ -216,7 +216,6 @@ extension CLIBenchmarkRunner {
                 let rc6 = padColumn(ttValid ? "✅ Matched (\(ttCrcStr))" : "❌ Mismatch", 14)
                 let rc7 = padColumn("Baseline (1.0x / 1.0x)", 22)
                 print("\(rc1) | \(rc2) | \(rc3) | \(rc4) | \(rc5) | \(rc6) | \(rc7)")
-
 
                 for comp in competitorRows {
                     let kc1 = padColumn(comp.name, 24)

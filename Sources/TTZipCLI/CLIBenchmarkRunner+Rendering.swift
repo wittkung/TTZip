@@ -8,6 +8,7 @@
 import Foundation
 import QuartzCore
 import TTZipCore
+import CTTZipBridge
 
 extension CLIBenchmarkRunner {
     
@@ -50,7 +51,7 @@ extension CLIBenchmarkRunner {
         print("╚════════════════════════════════════════════════════════════════════════════════════╝\n")
     }
 
-    // MARK: - In-Memory & TurboBench / lzbench Benchmark Suite
+    // MARK: - In-Memory & Recommendation Benchmark Suite
 
     public static func runInMemoryBenchmark(options: CLIOptions) async {
         // 1. 快速场景推荐分支 (--recommend)
@@ -132,81 +133,12 @@ extension CLIBenchmarkRunner {
             return
         }
 
-        print("⚡ Initializing in-memory benchmark engine (TurboBench / lzbench calibrated clock)...")
-
-        let formats: [String]
-        if let fmtRaw = options.format, !fmtRaw.isEmpty {
-            if fmtRaw.uppercased() == "ALL" {
-                formats = ["zip", "7z", "zstd", "lz4"]
-            } else {
-                formats = fmtRaw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-            }
-        } else {
-            formats = ["zip", "7z", "zstd", "lz4"]
+        print("⚡ In-memory multidimensional matrix benchmark is available via 'ttzip-bench matrix'.")
+        if let pngPath = options.pngOutPath {
+            print("🖼️  High-resolution PNG Pareto chart generation is available via 'ttzip-bench plot --png-out \(pngPath)'.")
         }
-
-        let levels: [Int]
-        if let lvlRaw = options.level, !lvlRaw.isEmpty {
-            levels = lvlRaw.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
-        } else {
-            levels = [1, 6]
-        }
-
-        let bufSize = parseSizeBytes(options.hugeSize ?? "10MB")
-        let config = InMemoryBenchmarkConfig(
-            selectedFormats: formats,
-            selectedLevels: levels.isEmpty ? [1, 6] : levels,
-            bufferSizeBytes: bufSize,
-            warmupPasses: options.warmupPasses,
-            minDurationMs: options.minDurationMs,
-            useBinaryUnits: options.binaryUnits,
-            turboBenchOutput: options.turboBenchCompat,
-            enableThermalGuard: options.thermalGuard,
-            customInputPath: options.inputPath
-        )
-
-        do {
-            let engine = InMemoryBenchmarkEngine.shared
-            let report = try await engine.runInMemoryBenchmark(config: config) { msg in
-                if msg.hasPrefix("ROW:") {
-                    print(String(msg.dropFirst(4)))
-                    fflush(stdout)
-                } else {
-                    print(msg)
-                    fflush(stdout)
-                }
-            }
-
-            print("\n" + engine.generateTurboBenchTable(report: report))
-
-            // 2. 帕累托最优前沿分析 (绘图已收敛至 ttzip-bench)
-            let _ = ParetoFrontierCalculator.shared.calculateFrontier(from: report.results)
-
-            if let pngPath = options.pngOutPath {
-                print("🖼️  High-resolution PNG Pareto chart generation is available via 'ttzip-bench plot --png-out \(pngPath)'.")
-            }
-
-            if let svgPath = options.svgOutPath {
-                print("📈 Interactive SVG Pareto chart generation is available via 'ttzip-bench plot --svg-out \(svgPath)'.")
-            }
-
-            if (options.pareto || options.plot) && options.pngOutPath == nil && options.svgOutPath == nil {
-                print("📈 Interactive Pareto charts are generated via 'ttzip-bench plot'.")
-            }
-
-            // 3. 物理传输介质端到端耗时投影表
-            if options.transferSheet {
-                let transferReports = TransferSpeedSheetCalculator.shared.calculateMatrixReports(results: report.results)
-                let sheetTable = TransferSpeedSheetCalculator.shared.formatTable(reports: transferReports)
-                print("\n" + sheetTable)
-            }
-
-            if let jsonPath = options.jsonReportPath {
-                try engine.exportJSONReport(report: report, to: jsonPath)
-                print("📄 JSON benchmark report exported: \(jsonPath)")
-            }
-        } catch {
-            print("❌ In-memory benchmark failed: \(error.localizedDescription)")
+        if let svgPath = options.svgOutPath {
+            print("📈 Interactive SVG Pareto chart generation is available via 'ttzip-bench plot --svg-out \(svgPath)'.")
         }
     }
 }

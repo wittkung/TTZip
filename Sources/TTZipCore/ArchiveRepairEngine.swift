@@ -24,7 +24,7 @@ public final class ArchiveRepairEngine: @unchecked Sendable {
             throw ArchiveError.fileNotFound
         }
         
-        return try await Task.detached(priority: .userInitiated) {
+        return await Task.detached(priority: .userInitiated) {
             return self.repairArchiveNative(
                 damagedArchivePath: damagedArchivePath,
                 repairedOutputPath: repairedOutputPath

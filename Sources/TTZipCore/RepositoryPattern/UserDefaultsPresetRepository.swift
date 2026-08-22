@@ -16,7 +16,7 @@ public final class UserDefaultsPresetRepository: ArchivePresetRepositoryProtocol
     private let userDefaults: UserDefaults
     private let storageKey: String
     private let mapper: PresetDataMapper
-    private let rwLock = POSIXReadWriteLock()
+    private let lock = NSLock()
     private var cachedDTOs: [PresetStorageDTO] = []
     
     public init(
@@ -31,7 +31,7 @@ public final class UserDefaultsPresetRepository: ArchivePresetRepositoryProtocol
     }
     
     private func loadFromStorageLocked() {
-        rwLock.withWriteLock {
+        lock.withLock {
             guard let data = userDefaults.data(forKey: storageKey) else {
                 let defaults = PresetManager.defaultBuiltInPresets.map { mapper.toStorage(domain: $0) }
                 self.cachedDTOs = defaults
@@ -63,20 +63,20 @@ public final class UserDefaultsPresetRepository: ArchivePresetRepositoryProtocol
     }
     
     public func fetch(id: UUID) throws -> CompressionPreset? {
-        return rwLock.withReadLock {
+        return lock.withLock {
             guard let dto = cachedDTOs.first(where: { $0.presetId == id.uuidString }) else { return nil }
             return mapper.toDomain(storage: dto)
         }
     }
     
     public func fetchAll() throws -> [CompressionPreset] {
-        return rwLock.withReadLock {
+        return lock.withLock {
             cachedDTOs.map { mapper.toDomain(storage: $0) }
         }
     }
     
     public func save(_ entity: CompressionPreset) throws {
-        rwLock.withWriteLock {
+        lock.withLock {
             let dto = mapper.toStorage(domain: entity)
             if let index = cachedDTOs.firstIndex(where: { $0.presetId == dto.presetId }) {
                 cachedDTOs[index] = dto
@@ -88,28 +88,28 @@ public final class UserDefaultsPresetRepository: ArchivePresetRepositoryProtocol
     }
     
     public func delete(id: UUID) throws {
-        rwLock.withWriteLock {
+        lock.withLock {
             cachedDTOs.removeAll { $0.presetId == id.uuidString }
             saveToStorageLocked()
         }
     }
     
     public func deleteAll() throws {
-        rwLock.withWriteLock {
+        lock.withLock {
             cachedDTOs.removeAll()
             userDefaults.removeObject(forKey: storageKey)
         }
     }
     
     public func fetchByName(_ name: String) throws -> CompressionPreset? {
-        return rwLock.withReadLock {
+        return lock.withLock {
             guard let dto = cachedDTOs.first(where: { $0.titleName == name }) else { return nil }
             return mapper.toDomain(storage: dto)
         }
     }
     
     public func resetToDefaults() throws {
-        rwLock.withWriteLock {
+        lock.withLock {
             let defaults = PresetManager.defaultBuiltInPresets.map { mapper.toStorage(domain: $0) }
             self.cachedDTOs = defaults
             saveToStorageLocked()
@@ -117,7 +117,7 @@ public final class UserDefaultsPresetRepository: ArchivePresetRepositoryProtocol
     }
     
     public func duplicate(id: UUID, newName: String?) throws -> CompressionPreset? {
-        return rwLock.withWriteLock { () -> CompressionPreset? in
+        return lock.withLock { () -> CompressionPreset? in
             guard let targetIndex = cachedDTOs.firstIndex(where: { $0.presetId == id.uuidString }) else {
                 return nil
             }

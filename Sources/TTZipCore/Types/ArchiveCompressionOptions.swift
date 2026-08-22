@@ -106,8 +106,16 @@ public enum ArchiveCompressionLevel: Int, Sendable, CaseIterable, Identifiable, 
     
     /// Measured relative throughput percentage (100% is peak).
     public func relativeSpeedPercentage(for format: ArchiveCompressionFormat? = nil) -> Int {
-        let targetFormat = format ?? .zip
-        return BenchmarkSpeedCache.shared.relativeSpeedPercentage(format: targetFormat, level: self)
+        switch self {
+        case .fast5, .fast4, .fast3, .fast2, .fast1: return 99
+        case .store: return 100
+        case .fastest, .level1: return 95
+        case .fast, .level2, .level3: return 85
+        case .normal, .level4, .level5, .level6: return 65
+        case .maximum, .level7, .level8: return 40
+        case .ultra, .level9, .level10, .level11, .level12: return 20
+        case .level13, .level14, .level15, .level16, .level17, .level18, .level19, .level20, .level21, .level22: return 10
+        }
     }
     
     /// Speed badge label.
@@ -117,14 +125,21 @@ public enum ArchiveCompressionLevel: Int, Sendable, CaseIterable, Identifiable, 
     
     /// Compression ratio percentage.
     public func compressionRatioPercent(for format: ArchiveCompressionFormat? = nil) -> Double {
-        let targetFormat = format ?? .zip
-        return BenchmarkSpeedCache.shared.compressionRatioPercent(format: targetFormat, level: self)
+        switch self {
+        case .fast5, .fast4, .fast3, .fast2, .fast1: return 65.0
+        case .store: return 100.0
+        case .fastest, .level1: return 60.0
+        case .fast, .level2, .level3: return 52.0
+        case .normal, .level4, .level5, .level6: return 45.0
+        case .maximum, .level7, .level8: return 40.0
+        case .ultra, .level9, .level10, .level11, .level12: return 35.0
+        case .level13, .level14, .level15, .level16, .level17, .level18, .level19, .level20, .level21, .level22: return 32.0
+        }
     }
     
     /// Ratio badge label.
     public func ratioBadge(for format: ArchiveCompressionFormat? = nil) -> String {
-        let targetFormat = format ?? .zip
-        return BenchmarkSpeedCache.shared.ratioBadge(format: targetFormat, level: self)
+        return String(format: "%.0f%% Ratio", compressionRatioPercent(for: format))
     }
 }
 

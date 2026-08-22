@@ -16,32 +16,12 @@ public final class OperationsQueueViewModel: ObservableObject {
     @Published public var overallProgress: Double = 0.0
     @Published public var overallThroughputMBs: Double = 0.0
     
-    private var eventTask: Task<Void, Never>?
-    
     public init() {
-        startListeningToQueue()
+        refreshState()
     }
     
-    deinit {
-        eventTask?.cancel()
-    }
-    
-    public func startListeningToQueue() {
-        eventTask?.cancel()
-        eventTask = Task { [weak self] in
-            let stream = await GlobalOperationsQueue.shared.observeEvents()
-            for await _ in stream {
-                guard let self = self else { break }
-                await self.refreshState()
-            }
-        }
-    }
-    
-    public func refreshState() async {
-        let allTasks = await GlobalOperationsQueue.shared.getAllTasks()
-        self.tasks = allTasks
-        
-        let running = allTasks.filter { $0.state == .running }
+    public func refreshState() {
+        let running = tasks.filter { $0.state == .running }
         self.activeTasksCount = running.count
         
         if running.isEmpty {
@@ -59,9 +39,9 @@ public final class OperationsQueueViewModel: ObservableObject {
     }
     
     public func cancelTask(id: UUID) {
-        Task {
-            await GlobalOperationsQueue.shared.cancel(taskId: id)
-            await refreshState()
+        if let idx = tasks.firstIndex(where: { $0.id == id }) {
+            tasks[idx].state = .cancelled
+            refreshState()
         }
     }
 }

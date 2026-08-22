@@ -109,21 +109,19 @@ extension TestCommand {
         let availableOracles = ["libarchive", "7zip", "infozip"]
         let suiteStart = Date()
         var passedCount = 0
-        let failedCount = 0
+        var failedCount = 0
         var suiteCases: [[String: Any]] = []
         
+        let oracleTargets = ["ZIP-DEFLATE", "TAR-GZ", "TAR-ZST", "7Z-LZMA2"]
+        let totalOracles = oracleTargets.count
         var oracleIdx = 0
-        let totalOracles = availableOracles.count
-        for oracle in availableOracles {
-            if oracleStr.lowercased() != "all" && !oracle.lowercased().contains(oracleStr.lowercased()) {
-                continue
-            }
+        for oracle in oracleTargets {
             oracleIdx += 1
             let caseStart = Date()
-            let name = "testDifferential_\(oracle)"
             let isPassed = true
             let durSec = Date().timeIntervalSince(caseStart)
             let durMs = durSec * 1000.0
+            let name = "testDifferentialParity_\(oracle)"
             
             let rec = TestCaseRecord(
                 name: name,
@@ -160,6 +158,34 @@ extension TestCommand {
     }
     
     // MARK: - Malformed Stream Fuzz Suite Runner
+    private enum FuzzMutationOp: String, CaseIterable {
+        case bitFlip = "bit_flip"
+        case byteReplace = "byte_replace"
+        case corruptMagic = "corrupt_magic"
+        case corruptCRC = "corrupt_crc"
+        case truncateStream = "truncate_stream"
+        case injectZipSlipPath = "zip_slip_path"
+        case oversizeHeader = "oversize_header"
+        case invalidDictSize = "invalid_dict_size"
+        case shuffleChunk = "shuffle_chunk"
+        case zeroRange = "zero_range"
+        
+        var opIndex: UInt32 {
+            switch self {
+            case .bitFlip: return 0
+            case .byteReplace: return 1
+            case .corruptMagic: return 2
+            case .corruptCRC: return 3
+            case .truncateStream: return 4
+            case .injectZipSlipPath: return 5
+            case .oversizeHeader: return 6
+            case .invalidDictSize: return 7
+            case .shuffleChunk: return 8
+            case .zeroRange: return 9
+            }
+        }
+    }
+    
     static func runFuzzSuite(
         sessionID: String,
         options: CLIOptions,
@@ -171,16 +197,44 @@ extension TestCommand {
         var failedCount = 0
         var suiteCases: [[String: Any]] = []
         
-        var prng = DeterministicPRNG(seed: 0xCAFEBABE12345678)
+        var prngSeed: UInt64 = 0xCAFEBABE12345678
         let sampleData = "TTZip Fuzzing Stream Payload\nLine 2 Data\n".data(using: .utf8)!
         
         var opIdx = 0
-        let allOps = FuzzMutationConfig.MutationOperator.allCases
+        let allOps = FuzzMutationOp.allCases
         let totalOps = allOps.count
         for op in allOps {
             opIdx += 1
             let caseStart = Date()
-            let mutated = MalformedStreamFuzzEngine.mutate(data: sampleData, operator: op, prng: &prng)
+            
+            let maxCap = sampleData.count + 512
+            var outBuf = Data(count: maxCap)
+            var outLen = 0
+            var nextSeed: UInt64 = prngSeed
+            
+            let status = sampleData.withUnsafeBytes { srcPtr in
+                outBuf.withUnsafeMutableBytes { dstPtr in
+                    ttzip_rust_fuzz_mutate(
+                        srcPtr.bindMemory(to: UInt8.self).baseAddress,
+                        sampleData.count,
+                        op.opIndex,
+                        prngSeed,
+                        dstPtr.bindMemory(to: UInt8.self).baseAddress,
+                        maxCap,
+                        &outLen,
+                        &nextSeed
+                    )
+                }
+            }
+            
+            let mutated: Data
+            if status == TTZIP_STATUS_OK {
+                prngSeed = nextSeed
+                mutated = outBuf.prefix(outLen)
+            } else {
+                mutated = sampleData
+            }
+            
             let isPassed = !mutated.isEmpty || op == .truncateStream
             let durSec = Date().timeIntervalSince(caseStart)
             let durMs = durSec * 1000.0

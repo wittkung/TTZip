@@ -8,6 +8,38 @@
 import Foundation
 import CTTZipBridge
 
+/// Hardware timer calibration and resolution metadata.
+public struct PlatformTimerCalibrationInfo: Sendable, Codable {
+    public let platformOS: String
+    public let architecture: String
+    public let timerBackend: String
+    public let frequencyHz: UInt64
+    public let timebaseNumer: UInt32
+    public let timebaseDenom: UInt32
+    public let resolutionNanos: UInt64
+    public let overheadNanos: UInt64
+
+    public init(
+        platformOS: String,
+        architecture: String,
+        timerBackend: String,
+        frequencyHz: UInt64,
+        timebaseNumer: UInt32,
+        timebaseDenom: UInt32,
+        resolutionNanos: UInt64,
+        overheadNanos: UInt64
+    ) {
+        self.platformOS = platformOS
+        self.architecture = architecture
+        self.timerBackend = timerBackend
+        self.frequencyHz = frequencyHz
+        self.timebaseNumer = timebaseNumer
+        self.timebaseDenom = timebaseDenom
+        self.resolutionNanos = resolutionNanos
+        self.overheadNanos = overheadNanos
+    }
+}
+
 /// High-precision cross-platform monotonic timer and clock calibration service.
 /// Conforms to TurboBench / lzbench nanosecond lock-free monotonic clock semantics.
 public final class PlatformMonotonicTimer: Sendable {

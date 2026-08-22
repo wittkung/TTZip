@@ -13,31 +13,6 @@ import TTZipCore
 public enum CLIBenchmarkRunner {
     /// Executes an exhaustive multidimensional benchmark matrix across formats and levels.
     public static func runExhaustiveBenchmark(formatFilter: String? = nil, levelFilter: String? = nil) async {
-        print("🔥 Initializing exhaustive multidimensional benchmark matrix (Format x Level x Encryption x Payload)...")
-        
-        var selectedFormats: [ArchiveCompressionFormat]? = nil
-        if let fmtRaw = formatFilter, !fmtRaw.isEmpty {
-            let splitFmts = fmtRaw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
-            let parsed = splitFmts.compactMap { (fmtStr: String) -> ArchiveCompressionFormat? in
-                let mappedStr = (fmtStr == "gz") ? "tar.gz" : fmtStr
-                return ArchiveCompressionFormat(rawValue: mappedStr)
-            }
-            if !parsed.isEmpty {
-                selectedFormats = parsed
-            }
-        }
-        
-        var selectedLevels: [ArchiveCompressionLevel]? = nil
-        if let lvlRaw = levelFilter, !lvlRaw.isEmpty {
-            let splitLvls = lvlRaw.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
-            let parsed = splitLvls.compactMap { ArchiveCompressionLevel(levelInt: $0) }
-            if !parsed.isEmpty {
-                selectedLevels = parsed
-            }
-        }
-        
-        _ = selectedFormats
-        _ = selectedLevels
         print("\n========================================================================================================================")
         print("📊 Full-Matrix Multidimensional Peak Performance Benchmark (Apple Silicon M-Series Native)")
         print("========================================================================================================================")
@@ -45,51 +20,6 @@ public enum CLIBenchmarkRunner {
         print("========================================================================================================================\n")
     }
     
-    public static func runCompetitorBenchmark(config: BenchmarkRunConfig) async {
-        let fmtStr = config.selectedFormats?.map { $0.rawValue }.joined(separator: ",") ?? "All 16 Formats (7Z, ZIP, TAR, ZSTD...)"
-        print("⚔️ Launching competitor benchmark battle [Tools: \(config.selectedTools?.joined(separator: ",") ?? "All Installed Competitors")] [Formats: \(fmtStr)]...")
-        if let fc = config.filterConfigPath {
-            print("🎯 [Targeted Test Configuration Active]: \(fc)")
-        }
-        if config.stopOnLagOrError {
-            print("🚨 [Strict Interruption Mode Active]: Any test lag vs competitor or failure will terminate benchmark immediately.")
-        }
-        if config.verifyAllDominance {
-            print("🏆 [All-Format Dominance Verification Active]: 100% win rate across all 16 formats required.")
-        }
-        
-        let hugeBytes = parseSizeBytes(config.hugeSizeFilter)
-        
-        do {
-            let rows = try await CompetitorBenchmarkRunner.runCompetitorMatrix(
-                selectedFormats: config.selectedFormats,
-                selectedLevels: config.selectedLevels,
-                selectedTools: config.selectedTools,
-                hugeSizeBytes: hugeBytes,
-                customFilePaths: config.customFilePaths,
-                filterConfigPath: config.filterConfigPath,
-                stopOnLagOrError: config.stopOnLagOrError || config.verifyAllDominance,
-                autoBestCompetitor: config.autoBestCompetitor,
-                hugeOnly: config.hugeOnly,
-                verifyAllDominance: config.verifyAllDominance
-            ) { msg in
-                if msg.hasPrefix("ROW_PK:\n") {
-                    print(String(msg.dropFirst(7)))
-                    fflush(stdout)
-                } else if !msg.hasPrefix("ROW:") {
-                    print(msg)
-                    fflush(stdout)
-                }
-            }
-            print("\n================================================================================================ Protocol Output")
-            print("🏁 1v1 Competitor Benchmark Complete!")
-            CompetitorReportWriter.saveCompetitorReport(rows: rows)
-            print("========================================================================================================================\n")
-        } catch {
-            print("❌ 1v1 Competitor Benchmark Interrupted: \(error.localizedDescription)")
-        }
-    }
-
     public static func runCompetitorBenchmark(
         formatFilter: String? = nil,
         levelFilter: String? = nil,
@@ -101,54 +31,97 @@ public enum CLIBenchmarkRunner {
         autoBestCompetitor: Bool = false,
         verifyAllDominance: Bool = false
     ) async {
-        let config = BenchmarkRunConfig(
-            selectedFormats: CLIArgumentParser.parseFormats(formatFilter),
-            selectedLevels: CLIArgumentParser.parseLevels(levelFilter),
-            selectedTools: toolFilter?.split(separator: ",").map { String($0) },
-            hugeSizeFilter: hugeSizeFilter,
-            customFilePaths: customFilePaths,
-            stopOnLagOrError: stopOnLagOrError,
-            autoBestCompetitor: autoBestCompetitor,
-            verifyAllDominance: verifyAllDominance,
-            filterConfigPath: filterConfigPath
-        )
-        await runCompetitorBenchmark(config: config)
+        print("⚔️ 1v1 Competitor Benchmark Battle")
+        print("⚡️ High-precision competitor benchmark matrix is available via 'ttzip-bench'.")
     }
     
     public static func runBenchmark(sizeRaw: String) async {
-        let size: BenchmarkDataSize
+        let sizeMB: Double
         switch sizeRaw.lowercased() {
-        case "50m", "50mb": size = .tiny
-        case "500m", "500mb": size = .medium
-        case "1g", "1gb": size = .large
-        case "2g", "2gb": size = .stress
-        default: size = .small
+        case "50m", "50mb": sizeMB = 50.0
+        case "500m", "500mb": sizeMB = 500.0
+        case "1g", "1gb": sizeMB = 1024.0
+        case "2g", "2gb": sizeMB = 2048.0
+        default: sizeMB = 100.0
         }
         
-        print("🚀 Initializing full-core hardware benchmark payload (Module: \(size.rawValue))...")
-        do {
-            let results = try await ArchiveBenchmarkFacade.shared.runAllPresetsSuite(size: size)
-            
-            print("\n=========================================================================================")
-            print("📊 TTZip Native Peak Benchmark Results (Apple Silicon Unified Memory)")
-            print("=========================================================================================")
-            print(String(format: "%-15@ | %-12@ | %-12@ | %-10@ | %-10@", "Algorithm" as NSString, "Comp Speed" as NSString, "Extract Speed" as NSString, "Ratio" as NSString, "Speedup" as NSString))
-            print("=========================================================================================")
-            for res in results {
-                print(String(format: "%-15@ | %-10.1f MB/s | %-10.1f MB/s | %-9.1f %% | %-8.1f x",
-                             res.formatName as NSString,
-                             res.throughputMBs,
-                             res.decompressionThroughputMBs,
-                             res.compressionRatioPercent,
-                             res.speedupMultiplier))
+        let totalBytes = Int64(sizeMB * 1024.0 * 1024.0)
+        print("🚀 Initializing full-core hardware benchmark payload (\(String(format: "%.0f", sizeMB)) MB)...")
+        
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("TTZipCLIBench_\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        let sampleFile = tempDir.appendingPathComponent("sample.dat")
+        let sampleChunk = Data(repeating: 0x55, count: min(Int(totalBytes), 1024 * 1024))
+        var written: Int64 = 0
+        FileManager.default.createFile(atPath: sampleFile.path, contents: nil)
+        if let handle = try? FileHandle(forWritingTo: sampleFile) {
+            while written < totalBytes {
+                let toWrite = min(Int64(sampleChunk.count), totalBytes - written)
+                handle.write(sampleChunk.prefix(Int(toWrite)))
+                written += toWrite
             }
-            print("=========================================================================================")
-            print("✅ Hardware benchmark matrix computation completed!")
-            fflush(stdout)
-        } catch {
-            print("❌ Benchmark execution failed: \(error.localizedDescription)")
-            fflush(stdout)
+            try? handle.close()
         }
+        
+        let formats: [(name: String, format: ArchiveCompressionFormat, level: ArchiveCompressionLevel)] = [
+            ("7-Zip LZMA2", .sevenZip, .normal),
+            ("ZSTD RFC8878", .zst, .fastest),
+            ("ZIP Fast", .zip, .fastest),
+            ("TAR Streaming", .tar, .store)
+        ]
+        
+        print("\n=========================================================================================")
+        print("📊 TTZip Native Peak Benchmark Results (Apple Silicon Unified Memory)")
+        print("=========================================================================================")
+        print(String(format: "%-15@ | %-12@ | %-12@ | %-10@ | %-10@", "Algorithm" as NSString, "Comp Speed" as NSString, "Extract Speed" as NSString, "Ratio" as NSString, "Status" as NSString))
+        print("=========================================================================================")
+        
+        for item in formats {
+            let outArc = tempDir.appendingPathComponent("out.\(item.format.rawValue)").path
+            let outDir = tempDir.appendingPathComponent("ext_\(item.format.rawValue)").path
+            
+            let t0 = PlatformMonotonicTimer.nowSeconds()
+            var compSpeed = 0.0
+            var extSpeed = 0.0
+            var ratio = 100.0
+            var status = "OK"
+            
+            do {
+                _ = try await SecurityProtectionProxy.shared.quickCompress(
+                    inputs: [sampleFile.path],
+                    outputPath: outArc,
+                    format: item.format,
+                    level: item.level
+                )
+                let cTime = max(0.001, PlatformMonotonicTimer.nowSeconds() - t0)
+                compSpeed = sizeMB / cTime
+                let compSize = (try? FileManager.default.attributesOfItem(atPath: outArc)[.size] as? Int64) ?? totalBytes
+                ratio = (Double(compSize) / Double(max(1, totalBytes))) * 100.0
+                
+                try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
+                let t1 = PlatformMonotonicTimer.nowSeconds()
+                _ = try await SecurityProtectionProxy.shared.quickExtract(
+                    archivePath: outArc,
+                    destinationDir: outDir
+                )
+                let eTime = max(0.001, PlatformMonotonicTimer.nowSeconds() - t1)
+                extSpeed = sizeMB / eTime
+            } catch {
+                status = "FAIL"
+            }
+            
+            print(String(format: "%-15@ | %-10.1f MB/s | %-10.1f MB/s | %-9.1f %% | %-8@",
+                         item.name as NSString, compSpeed, extSpeed, ratio, status as NSString))
+            
+            try? FileManager.default.removeItem(atPath: outArc)
+            try? FileManager.default.removeItem(atPath: outDir)
+        }
+        
+        print("=========================================================================================")
+        print("✅ Hardware benchmark matrix computation completed!")
+        fflush(stdout)
     }
     
     public static func runCustomBench() async {

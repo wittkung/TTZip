@@ -22,7 +22,6 @@ import Glibc
 public enum CLICommandRouter {
     public static var facade: TTZipEngineFacading = TTZipEngineFacade.shared
     public static var securityProxy: SecurityProtectionProxy = SecurityProtectionProxy.shared
-    public static var taskDispatcher: ArchiveTaskDispatcher = ArchiveTaskDispatcher()
     
     /// Routes and executes a parsed CLI command with the specified options.
     /// - Parameters:
@@ -99,13 +98,25 @@ public enum CLICommandRouter {
                 passwordFile: options.passwordFile,
                 archiveName: path
             )
-            let explorer = InteractiveTUIExplorer(archivePath: path, password: pwd)
-            do {
-                let code = try await explorer.run()
-                return code == 0 ? .ok : .software
-            } catch {
-                TerminalRenderEngine.shared.logError("ttzip-cli: error: \(error.localizedDescription)")
-                return .software
+            let process = Process()
+            if let ttzipPath = SystemBinaryResolver.shared.resolve(name: "ttzip") {
+                process.executableURL = URL(fileURLWithPath: ttzipPath)
+                var args = [path]
+                if let pwd = pwd {
+                    args.append(contentsOf: ["--password", pwd])
+                }
+                process.arguments = args
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+                    return process.terminationStatus == 0 ? .ok : .software
+                } catch {
+                    TerminalRenderEngine.shared.logError("ttzip-cli: error executing native TUI explorer: \(error.localizedDescription)")
+                    return .software
+                }
+            } else {
+                TerminalRenderEngine.shared.logError("ttzip-cli: interactive TUI explorer is powered by native Rust 'ttzip'. Please ensure 'ttzip' binary is installed in PATH.")
+                return .unavailable
             }
             
         case .list, .inspect:

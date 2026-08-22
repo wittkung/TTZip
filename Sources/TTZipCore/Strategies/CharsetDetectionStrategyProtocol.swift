@@ -89,14 +89,15 @@ public final class CharsetDetectionStrategyContext: @unchecked Sendable {
         CJKLegacyCharsetStrategy()
     ]
     
-    private let charsetCache = ReadWriteLockCache<Data, String>(policy: .lru(maxEntries: 500))
-    private let sanitizeCache = ReadWriteLockCache<Data, String>(policy: .lru(maxEntries: 500))
+    private let lock = NSLock()
+    private var charsetCache: [Data: String] = [:]
+    private var sanitizeCache: [Data: String] = [:]
     
     public func detectCharset(data: Data) -> String {
         if data.isEmpty {
             return "ASCII"
         }
-        if let cached = charsetCache.value(forKey: data) {
+        if let cached = lock.withLock({ charsetCache[data] }) {
             return cached
         }
         
@@ -118,13 +119,18 @@ public final class CharsetDetectionStrategyContext: @unchecked Sendable {
             detected = "UTF-8"
         }
         
-        charsetCache.setValue(detected, forKey: data)
+        lock.withLock {
+            if charsetCache.count >= 500 {
+                charsetCache.removeAll()
+            }
+            charsetCache[data] = detected
+        }
         return detected
     }
     
     public func sanitizeFilename(bytes: Data) -> String {
         if bytes.isEmpty { return "" }
-        if let cached = sanitizeCache.value(forKey: bytes) {
+        if let cached = lock.withLock({ sanitizeCache[bytes] }) {
             return cached
         }
         
@@ -146,12 +152,19 @@ public final class CharsetDetectionStrategyContext: @unchecked Sendable {
             result = String(decoding: bytes, as: UTF8.self)
         }
         
-        sanitizeCache.setValue(result, forKey: bytes)
+        lock.withLock {
+            if sanitizeCache.count >= 500 {
+                sanitizeCache.removeAll()
+            }
+            sanitizeCache[bytes] = result
+        }
         return result
     }
     
     public func clearCache() {
-        charsetCache.removeAll()
-        sanitizeCache.removeAll()
+        lock.withLock {
+            charsetCache.removeAll()
+            sanitizeCache.removeAll()
+        }
     }
 }

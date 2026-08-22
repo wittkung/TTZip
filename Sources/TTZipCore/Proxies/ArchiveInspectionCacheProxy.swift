@@ -22,27 +22,34 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
     public static let shared = ArchiveInspectionCacheProxy()
     
     private let targetEngine: TTZipEngineFacading
-    private let cache: ReadWriteLockCache<InspectionCacheKey, ArchiveInspectionResult>
-    private let statsLock = POSIXReadWriteLock()
+    private let lock = NSLock()
+    private var cacheStorage: [InspectionCacheKey: ArchiveInspectionResult] = [:]
+    private var cacheOrder: [InspectionCacheKey] = []
+    private var _maxEntries: Int
     
     private var _hitCount: Int = 0
     private var _missCount: Int = 0
     
     public var maxCacheEntries: Int {
-        get { cache.maxEntries ?? 100 }
-        set { cache.maxEntries = newValue }
+        get { lock.withLock { _maxEntries } }
+        set {
+            lock.withLock {
+                _maxEntries = newValue
+                trimCacheLocked()
+            }
+        }
     }
     
     public var hitCount: Int {
-        statsLock.withReadLock { _hitCount }
+        lock.withLock { _hitCount }
     }
     
     public var missCount: Int {
-        statsLock.withReadLock { _missCount }
+        lock.withLock { _missCount }
     }
     
     public var hitRatio: Double {
-        statsLock.withReadLock {
+        lock.withLock {
             let total = _hitCount + _missCount
             guard total > 0 else { return 0.0 }
             return Double(_hitCount) / Double(total)
@@ -50,7 +57,7 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
     }
     
     public var cachedItemCount: Int {
-        cache.count
+        lock.withLock { cacheStorage.count }
     }
     
     private convenience init() {
@@ -59,7 +66,14 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
     
     internal init(targetEngine: TTZipEngineFacading = TTZipEngineFacade.shared, maxEntries: Int = 100) {
         self.targetEngine = targetEngine
-        self.cache = ReadWriteLockCache(policy: .lru(maxEntries: maxEntries))
+        self._maxEntries = maxEntries
+    }
+    
+    private func trimCacheLocked() {
+        while cacheStorage.count > _maxEntries && !cacheOrder.isEmpty {
+            let oldest = cacheOrder.removeFirst()
+            cacheStorage.removeValue(forKey: oldest)
+        }
     }
     
     private func makeCacheKey(archivePath: String, password: String?, autoVaultUnlock: Bool) -> InspectionCacheKey {
@@ -85,12 +99,22 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
     ) async throws -> ArchiveInspectionResult {
         let keyBefore = makeCacheKey(archivePath: archivePath, password: password, autoVaultUnlock: autoVaultUnlock)
         
-        if let cached = cache.value(forKey: keyBefore) {
-            statsLock.withWriteLock { _hitCount += 1 }
-            return cached
+        let cachedResult: ArchiveInspectionResult? = lock.withLock {
+            if let cached = cacheStorage[keyBefore] {
+                _hitCount += 1
+                if let idx = cacheOrder.firstIndex(of: keyBefore) {
+                    cacheOrder.remove(at: idx)
+                    cacheOrder.append(keyBefore)
+                }
+                return cached
+            }
+            _missCount += 1
+            return nil
         }
         
-        statsLock.withWriteLock { _missCount += 1 }
+        if let cachedResult = cachedResult {
+            return cachedResult
+        }
         
         let result = try await targetEngine.inspectArchive(
             archivePath: archivePath,
@@ -101,8 +125,12 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
         let keyAfter = makeCacheKey(archivePath: archivePath, password: password, autoVaultUnlock: autoVaultUnlock)
         
         if keyBefore == keyAfter {
-            invalidate(archivePath: archivePath)
-            cache.setValue(result, forKey: keyAfter)
+            lock.withLock {
+                invalidateLocked(archivePath: archivePath)
+                cacheStorage[keyAfter] = result
+                cacheOrder.append(keyAfter)
+                trimCacheLocked()
+            }
         }
         
         return result
@@ -125,15 +153,26 @@ public final class ArchiveInspectionCacheProxy: ArchiveReading, TTZipEngineFacad
     
     // MARK: - Cache Invalidation
     
+    private func invalidateLocked(archivePath: String) {
+        let keysToRemove = cacheStorage.keys.filter { $0.archivePath == archivePath }
+        for k in keysToRemove {
+            cacheStorage.removeValue(forKey: k)
+            cacheOrder.removeAll(where: { $0 == k })
+        }
+    }
+    
     /// Invalidates cache entries matching specified archive path.
     public func invalidate(archivePath: String) {
-        cache.removeAll { $0.archivePath == archivePath }
+        lock.withLock {
+            invalidateLocked(archivePath: archivePath)
+        }
     }
     
     /// Clears all cached inspection metadata.
     public func clearCache() {
-        cache.removeAll()
-        statsLock.withWriteLock {
+        lock.withLock {
+            cacheStorage.removeAll()
+            cacheOrder.removeAll()
             _hitCount = 0
             _missCount = 0
         }

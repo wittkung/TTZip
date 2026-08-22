@@ -27,9 +27,40 @@ extension CLIBenchmarkRunner {
         return 500 * 1024 * 1024
     }
 
+    public static func folderSize(_ path: String) throws -> Int64 {
+        var size: Int64 = 0
+        let fm = FileManager.default
+        if let enumerator = fm.enumerator(at: URL(fileURLWithPath: path), includingPropertiesForKeys: [.fileSizeKey]) {
+            while let fileURL = enumerator.nextObject() as? URL {
+                if let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey]) {
+                    size += Int64(resourceValues.fileSize ?? 0)
+                }
+            }
+        }
+        return size
+    }
+
+    public static func runCLI(_ executable: String, _ arguments: [String]) -> (status: Int32, stdout: String, stderr: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            return (process.terminationStatus, String(data: outData, encoding: .utf8) ?? "", String(data: errData, encoding: .utf8) ?? "")
+        } catch {
+            return (-1, "", error.localizedDescription)
+        }
+    }
+
     /// Purge all benchmark datasets, test residues, and temporary caches to reclaim disk space
     public static func cleanBenchmarkCache() {
-        ArchiveBenchmarkFacade.shared.cleanCache()
         let fm = FileManager.default
         let docsUrl = fm.urls(for: .documentDirectory, in: .userDomainMask).first ?? fm.temporaryDirectory
         let docsCacheDir = docsUrl.appendingPathComponent("TTZipExhaustiveDatasetCache")

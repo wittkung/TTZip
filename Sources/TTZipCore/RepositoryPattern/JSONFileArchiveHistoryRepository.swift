@@ -15,7 +15,7 @@ public final class JSONFileArchiveHistoryRepository: ArchiveHistoryRepositoryPro
     
     private let historyFileURL: URL
     private let mapper: ArchiveHistoryDataMapper
-    private let rwLock = POSIXReadWriteLock()
+    private let lock = NSLock()
     private var memoryCacheDTOs: [HistoryJSONDTO] = []
     
     public init(
@@ -35,7 +35,7 @@ public final class JSONFileArchiveHistoryRepository: ArchiveHistoryRepositoryPro
     }
     
     private func loadFromDiskLocked() {
-        rwLock.withWriteLock {
+        lock.withLock {
             guard FileManager.default.fileExists(atPath: historyFileURL.path) else {
                 self.memoryCacheDTOs = []
                 return
@@ -65,20 +65,20 @@ public final class JSONFileArchiveHistoryRepository: ArchiveHistoryRepositoryPro
     }
     
     public func fetch(id: UUID) throws -> ArchiveTaskRecord? {
-        return rwLock.withReadLock {
+        return lock.withLock {
             guard let dto = memoryCacheDTOs.first(where: { $0.recordId == id.uuidString }) else { return nil }
             return mapper.toDomain(storage: dto)
         }
     }
     
     public func fetchAll() throws -> [ArchiveTaskRecord] {
-        return rwLock.withReadLock {
+        return lock.withLock {
             memoryCacheDTOs.map { mapper.toDomain(storage: $0) }
         }
     }
     
     public func save(_ entity: ArchiveTaskRecord) throws {
-        rwLock.withWriteLock {
+        lock.withLock {
             let dto = mapper.toStorage(domain: entity)
             if let idx = memoryCacheDTOs.firstIndex(where: { $0.recordId == dto.recordId }) {
                 memoryCacheDTOs[idx] = dto
@@ -90,21 +90,21 @@ public final class JSONFileArchiveHistoryRepository: ArchiveHistoryRepositoryPro
     }
     
     public func delete(id: UUID) throws {
-        rwLock.withWriteLock {
+        lock.withLock {
             memoryCacheDTOs.removeAll { $0.recordId == id.uuidString }
             saveToDiskLocked()
         }
     }
     
     public func deleteAll() throws {
-        rwLock.withWriteLock {
+        lock.withLock {
             memoryCacheDTOs.removeAll()
             try? FileManager.default.removeItem(at: historyFileURL)
         }
     }
     
     public func fetchRecent(limit: Int) throws -> [ArchiveTaskRecord] {
-        return rwLock.withReadLock {
+        return lock.withLock {
             let sorted = memoryCacheDTOs.sorted { $0.dateEpoch > $1.dateEpoch }
             let prefix = Array(sorted.prefix(limit))
             return prefix.map { mapper.toDomain(storage: $0) }
@@ -112,7 +112,7 @@ public final class JSONFileArchiveHistoryRepository: ArchiveHistoryRepositoryPro
     }
     
     public func fetchByStatus(isSuccess: Bool) throws -> [ArchiveTaskRecord] {
-        return rwLock.withReadLock {
+        return lock.withLock {
             let targetFlag = isSuccess ? "SUCCESS" : "FAILURE"
             let filtered = memoryCacheDTOs.filter { $0.statusFlag.uppercased() == targetFlag }
             return filtered.map { mapper.toDomain(storage: $0) }

@@ -176,79 +176,78 @@ public final class BenchmarkViewModel: ObservableObject {
             )
         }
         
-        self.suiteResults = [
-            BenchmarkResult(
-                dataSizeMB: sizeMB,
-                elapsedSeconds: max(0.01, sizeMB / zstdSpeed),
-                throughputMBs: zstdSpeed,
-                decompressionThroughputMBs: zstdSpeed * 2.3,
-                originalSizeBytes: bytes,
-                compressedSizeBytes: Int64(Double(bytes) * (zstdRatio / 100.0)),
-                compressionRatioPercent: zstdRatio,
-                nativeMacOsSeconds: nativeBaseSec,
-                speedupMultiplier: zstdSpeed / nativeBaseMBs,
-                installedCompetitorScores: sampleScores,
-                chipName: chip,
-                usedCores: cores,
-                formatName: "Meta Zstandard Fast",
-                datasetProfileName: selectedProfile.rawValue,
-                efficiencyScore: 98,
-                recommendationBadge: "⚡ Lightning (High Frequency)"
-            ),
-            BenchmarkResult(
-                dataSizeMB: sizeMB,
-                elapsedSeconds: max(0.01, sizeMB / lzmaSpeed),
-                throughputMBs: lzmaSpeed,
-                decompressionThroughputMBs: lzmaSpeed * 1.9,
-                originalSizeBytes: bytes,
-                compressedSizeBytes: Int64(Double(bytes) * (lzmaRatio / 100.0)),
-                compressionRatioPercent: lzmaRatio,
-                nativeMacOsSeconds: nativeBaseSec,
-                speedupMultiplier: lzmaSpeed / nativeBaseMBs,
-                installedCompetitorScores: sampleScores,
-                chipName: chip,
-                usedCores: cores,
-                formatName: "7-Zip LZMA2 Ultra",
-                datasetProfileName: selectedProfile.rawValue,
-                efficiencyScore: 92,
-                recommendationBadge: "📦 Ultra Density (Archive)"
-            ),
-            BenchmarkResult(
-                dataSizeMB: sizeMB,
-                elapsedSeconds: max(0.01, sizeMB / zipSpeed),
-                throughputMBs: zipSpeed,
-                decompressionThroughputMBs: zipSpeed * 1.6,
-                originalSizeBytes: bytes,
-                compressedSizeBytes: Int64(Double(bytes) * (zipRatio / 100.0)),
-                compressionRatioPercent: zipRatio,
-                nativeMacOsSeconds: nativeBaseSec,
-                speedupMultiplier: zipSpeed / nativeBaseMBs,
-                installedCompetitorScores: sampleScores,
-                chipName: chip,
-                usedCores: cores,
-                formatName: "ZIP Standard",
-                datasetProfileName: selectedProfile.rawValue,
-                efficiencyScore: 86,
-                recommendationBadge: "✉️ Cross-Platform Standard"
-            ),
-            BenchmarkResult(
-                dataSizeMB: sizeMB,
-                elapsedSeconds: max(0.01, sizeMB / targzSpeed),
-                throughputMBs: targzSpeed,
-                decompressionThroughputMBs: targzSpeed * 1.7,
-                originalSizeBytes: bytes,
-                compressedSizeBytes: Int64(Double(bytes) * (targzRatio / 100.0)),
-                compressionRatioPercent: targzRatio,
-                nativeMacOsSeconds: nativeBaseSec,
-                speedupMultiplier: targzSpeed / nativeBaseMBs,
-                installedCompetitorScores: sampleScores,
-                chipName: chip,
-                usedCores: cores,
-                formatName: "TAR GZ Stream",
-                datasetProfileName: selectedProfile.rawValue,
-                efficiencyScore: 88,
-                recommendationBadge: "🚀 Unix Infrastructure"
-            )
-        ]
+        let res1 = BenchmarkResult(
+            dataSizeMB: sizeMB,
+            elapsedSeconds: max(0.01, sizeMB / zstdSpeed),
+            throughputMBs: zstdSpeed,
+            decompressionThroughputMBs: zstdSpeed * 2.3,
+            originalSizeBytes: bytes,
+            compressedSizeBytes: Int64(Double(bytes) * (zstdRatio / 100.0)),
+            compressionRatioPercent: zstdRatio,
+            nativeMacOsSeconds: nativeBaseSec,
+            speedupMultiplier: zstdSpeed / nativeBaseMBs,
+            installedCompetitorScores: sampleScores,
+            chipName: chip,
+            usedCores: cores,
+            formatName: "Meta Zstandard Fast",
+            datasetProfileName: selectedProfile.rawValue,
+            efficiencyScore: 98,
+            recommendationBadge: "⚡ Lightning (High Frequency)"
+        )
+        let res2 = BenchmarkResult(
+            dataSizeMB: sizeMB,
+            elapsedSeconds: max(0.01, sizeMB / lzmaSpeed),
+            throughputMBs: lzmaSpeed,
+            decompressionThroughputMBs: lzmaSpeed * 1.9,
+            originalSizeBytes: bytes,
+            compressedSizeBytes: Int64(Double(bytes) * (lzmaRatio / 100.0)),
+            compressionRatioPercent: lzmaRatio,
+            nativeMacOsSeconds: nativeBaseSec,
+            speedupMultiplier: lzmaSpeed / nativeBaseMBs,
+            installedCompetitorScores: sampleScores,
+            chipName: chip,
+            usedCores: cores,
+            formatName: "7-Zip LZMA2 Ultra",
+            datasetProfileName: selectedProfile.rawValue,
+            efficiencyScore: 92,
+            recommendationBadge: "📦 Ultra Density (Archive)"
+        )
+        let res3 = BenchmarkResult(
+            dataSizeMB: sizeMB,
+            elapsedSeconds: max(0.01, sizeMB / zipSpeed),
+            throughputMBs: zipSpeed,
+            decompressionThroughputMBs: zipSpeed * 1.6,
+            originalSizeBytes: bytes,
+            compressedSizeBytes: Int64(Double(bytes) * (zipRatio / 100.0)),
+            compressionRatioPercent: zipRatio,
+            nativeMacOsSeconds: nativeBaseSec,
+            speedupMultiplier: zipSpeed / nativeBaseMBs,
+            installedCompetitorScores: sampleScores,
+            chipName: chip,
+            usedCores: cores,
+            formatName: "ZIP Standard",
+            datasetProfileName: selectedProfile.rawValue,
+            efficiencyScore: 86,
+            recommendationBadge: "✉️ Cross-Platform Standard"
+        )
+        let res4 = BenchmarkResult(
+            dataSizeMB: sizeMB,
+            elapsedSeconds: max(0.01, sizeMB / targzSpeed),
+            throughputMBs: targzSpeed,
+            decompressionThroughputMBs: targzSpeed * 1.7,
+            originalSizeBytes: bytes,
+            compressedSizeBytes: Int64(Double(bytes) * (targzRatio / 100.0)),
+            compressionRatioPercent: targzRatio,
+            nativeMacOsSeconds: nativeBaseSec,
+            speedupMultiplier: targzSpeed / nativeBaseMBs,
+            installedCompetitorScores: sampleScores,
+            chipName: chip,
+            usedCores: cores,
+            formatName: "TAR GZ Stream",
+            datasetProfileName: selectedProfile.rawValue,
+            efficiencyScore: 88,
+            recommendationBadge: "🚀 Unix Infrastructure"
+        )
+        self.suiteResults = [res1, res2, res3, res4]
     }
 }

@@ -13,8 +13,7 @@ public final class PresetManager: @unchecked Sendable {
     
     private var repository: any ArchivePresetRepositoryProtocol
     private var cachedPresets: [CompressionPreset] = []
-    private let rwLock = POSIXReadWriteLock()
-    private let presetCache = ReadWriteLockCache<UUID, CompressionPreset>(policy: .lru(maxEntries: 100))
+    private let lock = NSLock()
     
     private init() {
         self.repository = UserDefaultsPresetRepository()
@@ -27,25 +26,19 @@ public final class PresetManager: @unchecked Sendable {
     }
     
     public var presets: [CompressionPreset] {
-        rwLock.withReadLock {
+        lock.withLock {
             cachedPresets
         }
     }
     
     public func preset(for id: UUID) -> CompressionPreset? {
-        if let cached = presetCache.value(forKey: id) {
-            return cached
-        }
-        return rwLock.withReadLock {
-            guard let found = cachedPresets.first(where: { $0.id == id }) else { return nil }
-            presetCache.setValue(found, forKey: id)
-            return found
+        lock.withLock {
+            cachedPresets.first(where: { $0.id == id })
         }
     }
     
     public func loadPresets() {
-        rwLock.withWriteLock {
-            presetCache.removeAll()
+        lock.withLock {
             if let list = try? repository.fetchAll(), !list.isEmpty {
                 self.cachedPresets = list
             } else {
@@ -56,8 +49,7 @@ public final class PresetManager: @unchecked Sendable {
     }
     
     public func savePreset(_ preset: CompressionPreset) {
-        let oldName = rwLock.withWriteLock { () -> String? in
-            presetCache.removeAll()
+        let _ = lock.withLock { () -> String? in
             let old = cachedPresets.first(where: { $0.id == preset.id })?.name
             if let index = cachedPresets.firstIndex(where: { $0.id == preset.id }) {
                 cachedPresets[index] = preset
@@ -70,8 +62,7 @@ public final class PresetManager: @unchecked Sendable {
     }
     
     public func deletePreset(id: UUID) {
-        rwLock.withWriteLock {
-            presetCache.removeAll()
+        lock.withLock {
             cachedPresets.removeAll(where: { $0.id == id })
             try? repository.delete(id: id)
         }
@@ -80,8 +71,7 @@ public final class PresetManager: @unchecked Sendable {
     /// Duplicates an existing preset using Prototype Pattern.
     @discardableResult
     public func duplicatePreset(id: UUID, newName: String? = nil) -> CompressionPreset? {
-        return rwLock.withWriteLock {
-            presetCache.removeAll()
+        return lock.withLock {
             guard let source = cachedPresets.first(where: { $0.id == id }) else { return nil }
             let defaultName = newName ?? "\(source.name) Copy"
             let item = source.clone(newId: UUID(), newName: defaultName)
@@ -94,8 +84,7 @@ public final class PresetManager: @unchecked Sendable {
     /// Derives and saves a new preset from a prototype model.
     @discardableResult
     public func createPresetFromPrototype(_ prototype: CompressionPreset, newName: String? = nil) -> CompressionPreset {
-        let cloned = rwLock.withWriteLock { () -> CompressionPreset in
-            presetCache.removeAll()
+        let cloned = lock.withLock { () -> CompressionPreset in
             let item = prototype.clone(newId: UUID(), newName: newName)
             cachedPresets.append(item)
             try? repository.save(item)
@@ -105,8 +94,7 @@ public final class PresetManager: @unchecked Sendable {
     }
     
     public func resetToDefaults() {
-        rwLock.withWriteLock {
-            presetCache.removeAll()
+        lock.withLock {
             cachedPresets = PresetManager.defaultBuiltInPresets
             try? repository.resetToDefaults()
         }
