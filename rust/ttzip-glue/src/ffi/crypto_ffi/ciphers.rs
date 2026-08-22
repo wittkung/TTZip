@@ -8,10 +8,10 @@
 //! C-ABI / FFI export functions for AES-256, 7z KDF, and ZipCrypto.
 
 use crate::crypto::{aes256, sha256, zipcrypto};
+use crate::ffi::helpers::{safe_cstr, safe_slice, safe_slice_mut};
 use crate::types::TTZipStatus;
 use std::ffi::CStr;
 use std::panic::catch_unwind;
-use std::slice;
 
 /// C-ABI exported hardware AES-256-CTR encrypt / decrypt.
 ///
@@ -28,16 +28,23 @@ pub unsafe extern "C" fn ttzip_rust_aes256_ctr(
     dst: *mut u8,
 ) -> i32 {
     let result = catch_unwind(|| {
-        if key.is_null() || src.is_null() || dst.is_null() {
+        if key.is_null() {
             return TTZipStatus::ErrInvalidParam.to_i32();
         }
+        let src_slice = match unsafe { safe_slice(src, len) } {
+            Ok(s) => s,
+            Err(st) => return st.to_i32(),
+        };
+        let dst_slice = match unsafe { safe_slice_mut(dst, len) } {
+            Ok(s) => s,
+            Err(st) => return st.to_i32(),
+        };
         if len == 0 {
             return TTZipStatus::Ok.to_i32();
         }
 
+        // SAFETY: key is non-null and valid for 32 bytes
         let key_ref = unsafe { &*(key as *const [u8; 32]) };
-        let src_slice = unsafe { slice::from_raw_parts(src, len) };
-        let dst_slice = unsafe { slice::from_raw_parts_mut(dst, len) };
 
         match aes256::aes256_ctr_crypt(key_ref, initial_counter, src_slice, dst_slice) {
             Ok(()) => TTZipStatus::Ok.to_i32(),
@@ -64,17 +71,24 @@ pub unsafe extern "C" fn ttzip_rust_aes256_cbc_decrypt(
     dst: *mut u8,
 ) -> i32 {
     let result = catch_unwind(|| {
-        if key.is_null() || iv.is_null() || src.is_null() || dst.is_null() || !len.is_multiple_of(16) {
+        if key.is_null() || iv.is_null() || !len.is_multiple_of(16) {
             return TTZipStatus::ErrInvalidParam.to_i32();
         }
+        let src_slice = match unsafe { safe_slice(src, len) } {
+            Ok(s) => s,
+            Err(st) => return st.to_i32(),
+        };
+        let dst_slice = match unsafe { safe_slice_mut(dst, len) } {
+            Ok(s) => s,
+            Err(st) => return st.to_i32(),
+        };
         if len == 0 {
             return TTZipStatus::Ok.to_i32();
         }
 
+        // SAFETY: key and iv are non-null and point to 32 and 16 valid bytes
         let key_ref = unsafe { &*(key as *const [u8; 32]) };
         let iv_ref = unsafe { &*(iv as *const [u8; 16]) };
-        let src_slice = unsafe { slice::from_raw_parts(src, len) };
-        let dst_slice = unsafe { slice::from_raw_parts_mut(dst, len) };
 
         match aes256::aes256_cbc_decrypt(key_ref, iv_ref, src_slice, dst_slice) {
             Ok(()) => TTZipStatus::Ok.to_i32(),
@@ -100,23 +114,20 @@ pub unsafe extern "C" fn ttzip_rust_7z_kdf_sha256(
     out_key: *mut u8,
 ) -> i32 {
     let result = catch_unwind(|| {
-        if password.is_null() || out_key.is_null() {
+        if out_key.is_null() {
             return TTZipStatus::ErrInvalidParam.to_i32();
         }
-
-        let c_str = unsafe { CStr::from_ptr(password) };
-        let pass_str = match c_str.to_str() {
+        let pass_str = match unsafe { safe_cstr(password) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam.to_i32(),
+            Err(st) => return st.to_i32(),
         };
-
-        let salt_slice = if salt.is_null() || salt_len == 0 {
-            &[][..]
-        } else {
-            unsafe { slice::from_raw_parts(salt, salt_len) }
+        let salt_slice = match unsafe { safe_slice(salt, salt_len) } {
+            Ok(s) => s,
+            Err(st) => return st.to_i32(),
         };
 
         let derived = sha256::sha256_7z_kdf(pass_str, salt_slice, num_cycles_power);
+        // SAFETY: out_key points to at least 32 valid writable bytes
         unsafe {
             std::ptr::copy_nonoverlapping(derived.as_ptr(), out_key, 32);
         }
@@ -143,12 +154,15 @@ pub unsafe extern "C" fn ttzip_rust_zipcrypto_init_keys(
         if password.is_null() || key0.is_null() || key1.is_null() || key2.is_null() {
             return TTZipStatus::ErrInvalidParam.to_i32();
         }
-        let c_str = CStr::from_ptr(password);
+        // SAFETY: password is non-null
+        let c_str = unsafe { CStr::from_ptr(password) };
         let bytes = c_str.to_bytes();
         let keys = zipcrypto::ZipCryptoKeys::from_password(bytes);
-        *key0 = keys.key0;
-        *key1 = keys.key1;
-        *key2 = keys.key2;
+        unsafe {
+            *key0 = keys.key0;
+            *key1 = keys.key1;
+            *key2 = keys.key2;
+        }
         TTZipStatus::Ok.to_i32()
     });
 
@@ -171,18 +185,29 @@ pub unsafe extern "C" fn ttzip_rust_zipcrypto_decrypt_stream(
     dst: *mut u8,
 ) -> i32 {
     let result = catch_unwind(|| {
-        if key0.is_null() || key1.is_null() || key2.is_null() || src.is_null() || dst.is_null() {
+        if key0.is_null() || key1.is_null() || key2.is_null() {
             return TTZipStatus::ErrInvalidParam.to_i32();
         }
         if len == 0 {
             return TTZipStatus::Ok.to_i32();
         }
+        let src_slice = match unsafe { safe_slice(src, len) } {
+            Ok(s) => s,
+            Err(st) => return st.to_i32(),
+        };
+        let dst_slice = match unsafe { safe_slice_mut(dst, len) } {
+            Ok(s) => s,
+            Err(st) => return st.to_i32(),
+        };
 
-        let src_slice = slice::from_raw_parts(src, len);
-        let dst_slice = slice::from_raw_parts_mut(dst, len);
-        dst_slice.copy_from_slice(src_slice);
+        if !std::ptr::eq(src, dst) {
+            dst_slice.copy_from_slice(src_slice);
+        }
 
-        zipcrypto::decrypt_stream_fast(&mut *key0, &mut *key1, &mut *key2, dst_slice);
+        // SAFETY: key pointers are non-null and valid for mutation
+        unsafe {
+            zipcrypto::decrypt_stream_fast(&mut *key0, &mut *key1, &mut *key2, dst_slice);
+        }
         TTZipStatus::Ok.to_i32()
     });
 
@@ -205,18 +230,29 @@ pub unsafe extern "C" fn ttzip_rust_zipcrypto_encrypt_stream(
     dst: *mut u8,
 ) -> i32 {
     let result = catch_unwind(|| {
-        if key0.is_null() || key1.is_null() || key2.is_null() || src.is_null() || dst.is_null() {
+        if key0.is_null() || key1.is_null() || key2.is_null() {
             return TTZipStatus::ErrInvalidParam.to_i32();
         }
         if len == 0 {
             return TTZipStatus::Ok.to_i32();
         }
+        let src_slice = match unsafe { safe_slice(src, len) } {
+            Ok(s) => s,
+            Err(st) => return st.to_i32(),
+        };
+        let dst_slice = match unsafe { safe_slice_mut(dst, len) } {
+            Ok(s) => s,
+            Err(st) => return st.to_i32(),
+        };
 
-        let src_slice = slice::from_raw_parts(src, len);
-        let dst_slice = slice::from_raw_parts_mut(dst, len);
-        dst_slice.copy_from_slice(src_slice);
+        if !std::ptr::eq(src, dst) {
+            dst_slice.copy_from_slice(src_slice);
+        }
 
-        zipcrypto::encrypt_stream_fast(&mut *key0, &mut *key1, &mut *key2, dst_slice);
+        // SAFETY: key pointers are non-null and valid for mutation
+        unsafe {
+            zipcrypto::encrypt_stream_fast(&mut *key0, &mut *key1, &mut *key2, dst_slice);
+        }
         TTZipStatus::Ok.to_i32()
     });
 

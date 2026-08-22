@@ -7,10 +7,10 @@
 
 //! C-ABI FFI bindings for path sanitization and security defenses.
 
+use crate::ffi::helpers::safe_cstr;
 use crate::security::path_sanitizer::sanitize_path;
 use crate::types::TTZipStatus;
 use libc::c_char;
-use std::ffi::CStr;
 use std::panic::catch_unwind;
 
 /// C-ABI representation of path sanitization and audit results.
@@ -49,8 +49,15 @@ fn copy_str_to_c_buffer(src: &str, dest: &mut [c_char]) {
     let bytes = src.as_bytes();
     let max_len = dest.len().saturating_sub(1);
     let copy_len = bytes.len().min(max_len);
-    for i in 0..copy_len {
-        dest[i] = bytes[i] as c_char;
+    if copy_len > 0 {
+        // SAFETY: dest is a valid mutable slice of c_char, bytes is copy_len initialized bytes
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                bytes.as_ptr() as *const c_char,
+                dest.as_mut_ptr(),
+                copy_len,
+            );
+        }
     }
     dest[copy_len] = 0;
 }
@@ -63,18 +70,19 @@ pub unsafe extern "C" fn ttzip_rust_sanitize_path(
     out_result: *mut TTZipPathSanitizationResult,
 ) -> TTZipStatus {
     let result = catch_unwind(|| {
-        if raw_path.is_null() || out_result.is_null() {
+        if out_result.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
 
-        let path_str = match CStr::from_ptr(raw_path).to_str() {
+        let path_str = match unsafe { safe_cstr(raw_path) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
 
         let res = sanitize_path(path_str);
 
-        let out = &mut *out_result;
+        // SAFETY: out_result verified non-null
+        let out = unsafe { &mut *out_result };
         *out = TTZipPathSanitizationResult::default();
 
         copy_str_to_c_buffer(&res.normalized_path, &mut out.normalized_path);

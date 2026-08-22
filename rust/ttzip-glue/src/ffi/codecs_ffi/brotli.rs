@@ -11,6 +11,7 @@ use crate::codecs::brotli::{
     brotli_compress, brotli_compress_bound, brotli_compress_file, brotli_decompress,
     brotli_decompress_file,
 };
+use crate::ffi::helpers::{safe_slice, safe_slice_mut};
 use crate::types::{TTZipProgressCallback, TTZipStatus};
 use libc::{c_char, c_void, size_t};
 use std::ffi::CStr;
@@ -31,22 +32,13 @@ pub extern "C" fn ttzip_rust_brotli_compress(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match brotli_compress(in_slice, out_slice, quality, lgwin) {
@@ -72,22 +64,13 @@ pub extern "C" fn ttzip_rust_brotli_decompress(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match brotli_decompress(in_slice, out_slice) {

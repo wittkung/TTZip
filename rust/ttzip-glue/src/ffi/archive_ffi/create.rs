@@ -9,11 +9,13 @@
 
 use super::guards::{ArchiveEntryGuard, ArchiveWriteGuard};
 use super::sys::*;
+use crate::ffi::helpers::safe_cstr;
+use crate::fs::apfs::AlignedBuffer;
 use crate::types::{
     TTZipArchiveFormat, TTZipCreateOptions, TTZipEncryptionMethod, TTZipStatus,
 };
 use libc::{c_char, c_void, mode_t, time_t};
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::fs::{self, File};
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
@@ -54,17 +56,13 @@ pub unsafe extern "C" fn ttzip_rust_create_archive(
     options: *const TTZipCreateOptions,
 ) -> TTZipStatus {
     let result = catch_unwind(|| {
-        if source_paths.is_null()
-            || source_count == 0
-            || destination_path.is_null()
-            || options.is_null()
-        {
+        if source_paths.is_null() || source_count == 0 || options.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
 
-        let dest_str = match CStr::from_ptr(destination_path).to_str() {
+        let dest_str = match unsafe { safe_cstr(destination_path) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
         let dest_p = Path::new(dest_str);
         if let Some(parent) = dest_p.parent() {
@@ -73,7 +71,7 @@ pub unsafe extern "C" fn ttzip_rust_create_archive(
             }
         }
 
-        let opt = &*options;
+        let opt = unsafe { &*options };
         let a = archive_write_new();
         if a.is_null() {
             return TTZipStatus::ErrOutOfMemory;
@@ -130,11 +128,9 @@ pub unsafe extern "C" fn ttzip_rust_create_archive(
         // Collect all entries to compress
         let mut entries_to_write: Vec<(PathBuf, String)> = Vec::new();
         for i in 0..source_count {
-            let src_c = *source_paths.add(i);
-            if src_c.is_null() {
-                continue;
-            }
-            let src_str = match CStr::from_ptr(src_c).to_str() {
+            // SAFETY: i is bounded by source_count and source_paths is verified non-null
+            let src_c = unsafe { *source_paths.add(i) };
+            let src_str = match unsafe { safe_cstr(src_c) } {
                 Ok(s) => s,
                 Err(_) => continue,
             };
@@ -148,7 +144,10 @@ pub unsafe extern "C" fn ttzip_rust_create_archive(
         }
 
         let mut processed_bytes: u64 = 0;
-        let mut buf = vec![0u8; 64 * 1024];
+        let mut buf = match AlignedBuffer::new(64 * 1024) {
+            Ok(b) => b,
+            Err(st) => return st,
+        };
 
         for (abs_path, rel_name) in entries_to_write {
             let meta = match fs::symlink_metadata(&abs_path) {

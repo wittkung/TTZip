@@ -8,9 +8,10 @@
 //! C-ABI FFI entries for Pure Rust TAR scanning and zero-copy entry extraction.
 
 use crate::archive::tar::reader::TarArchive;
+use crate::ffi::helpers::safe_cstr;
 use crate::types::{TTZipEntryMetadata, TTZipInspectCallback, TTZipStatus};
 use libc::{c_char, c_void};
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::fs;
 use std::panic::catch_unwind;
 use std::path::Path;
@@ -26,17 +27,14 @@ pub unsafe extern "C" fn ttzip_rust_tar_scan_entries(
     user_data: *mut c_void,
 ) -> TTZipStatus {
     let result = catch_unwind(|| {
-        if archive_path.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
         let cb = match callback {
             Some(f) => f,
             None => return TTZipStatus::ErrInvalidParam,
         };
 
-        let path_str = match CStr::from_ptr(archive_path).to_str() {
+        let path_str = match unsafe { safe_cstr(archive_path) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
 
         let p = Path::new(path_str);
@@ -94,13 +92,9 @@ pub unsafe extern "C" fn ttzip_rust_tar_extract_entry(
     out_extracted_len: *mut usize,
 ) -> TTZipStatus {
     let result = catch_unwind(|| {
-        if archive_path.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let path_str = match CStr::from_ptr(archive_path).to_str() {
+        let path_str = match unsafe { safe_cstr(archive_path) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
 
         let p = Path::new(path_str);
@@ -124,7 +118,8 @@ pub unsafe extern "C" fn ttzip_rust_tar_extract_entry(
         };
 
         if !out_extracted_len.is_null() {
-            *out_extracted_len = payload.len();
+            // SAFETY: out_extracted_len verified non-null
+            unsafe { *out_extracted_len = payload.len() };
         }
 
         if !out_buffer.is_null() {
@@ -132,7 +127,10 @@ pub unsafe extern "C" fn ttzip_rust_tar_extract_entry(
                 return TTZipStatus::ErrOutOfMemory;
             }
             if !payload.is_empty() {
-                std::ptr::copy_nonoverlapping(payload.as_ptr(), out_buffer, payload.len());
+                // SAFETY: out_buffer has capacity >= payload.len() and payload is valid
+                unsafe {
+                    std::ptr::copy_nonoverlapping(payload.as_ptr(), out_buffer, payload.len());
+                }
             }
         }
 

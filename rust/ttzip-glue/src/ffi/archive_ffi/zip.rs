@@ -7,10 +7,11 @@
 
 //! C-ABI FFI entries for Pure Rust ZIP scanning.
 
+use crate::ffi::helpers::safe_cstr;
 use crate::types::{TTZipEntryMetadata, TTZipInspectCallback, TTZipStatus};
 use crate::zip::reader::ZipArchive;
 use libc::{c_char, c_void};
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::fs;
 use std::panic::catch_unwind;
 use std::path::Path;
@@ -26,17 +27,14 @@ pub unsafe extern "C" fn ttzip_rust_zip_scan_entries(
     user_data: *mut c_void,
 ) -> TTZipStatus {
     let result = catch_unwind(|| {
-        if archive_path.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
         let cb = match callback {
             Some(f) => f,
             None => return TTZipStatus::ErrInvalidParam,
         };
 
-        let path_str = match CStr::from_ptr(archive_path).to_str() {
+        let path_str = match unsafe { safe_cstr(archive_path) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
 
         let p = Path::new(path_str);

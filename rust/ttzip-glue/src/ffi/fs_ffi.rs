@@ -7,6 +7,7 @@
 
 //! C-ABI FFI exports for filesystem security, APFS optimizations, and VFS hierarchical tree & search.
 
+use crate::ffi::helpers::safe_cstr;
 use crate::fs::apfs::{
     apfs_clone_file, apfs_fcopyfile_clone, apfs_preallocate, is_mac_junk_file, ttzip_remove_path_fast,
 };
@@ -15,7 +16,7 @@ use crate::fs::scanner::{scan_directory_parallel, ScanOptions};
 use crate::fs::vfs::{VfsEntry, VfsTree};
 use crate::types::{TTZipEntryMetadata, TTZipStatus};
 use libc::{c_char, c_void};
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::panic::catch_unwind;
 use std::path::Path;
 
@@ -28,17 +29,15 @@ pub unsafe extern "C" fn ttzip_rust_validate_path(
     out_capacity: usize,
 ) -> TTZipStatus {
     let result = catch_unwind(|| {
-        if dest_dir.is_null() || entry_path.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        let dest_str = match CStr::from_ptr(dest_dir).to_str() {
+        let dest_str = match unsafe { safe_cstr(dest_dir) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
-        let entry_str = match CStr::from_ptr(entry_path).to_str() {
+        let entry_str = match unsafe { safe_cstr(entry_path) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
+
         match sanitize_and_validate_path(Path::new(dest_str), entry_str) {
             Ok(valid_path) => {
                 if !out_sanitized.is_null() && out_capacity > 0 {
@@ -47,8 +46,11 @@ pub unsafe extern "C" fn ttzip_rust_validate_path(
                     if bytes.len() + 1 > out_capacity {
                         return TTZipStatus::ErrPathTooLong;
                     }
-                    std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, out_sanitized, bytes.len());
-                    *out_sanitized.add(bytes.len()) = 0;
+                    // SAFETY: out_sanitized is verified non-null and capacity >= bytes.len() + 1
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, out_sanitized, bytes.len());
+                        *out_sanitized.add(bytes.len()) = 0;
+                    }
                 }
                 TTZipStatus::Ok
             }
@@ -71,9 +73,8 @@ pub extern "C" fn ttzip_rust_apfs_preallocate(fd: i32, target_size: i64) -> i32 
 #[no_mangle]
 pub unsafe extern "C" fn ttzip_rust_apfs_clone_file(src: *const c_char, dst: *const c_char, overwrite: bool) -> i32 {
     catch_unwind(|| {
-        if src.is_null() || dst.is_null() { return -1; }
-        let src_s = match CStr::from_ptr(src).to_str() { Ok(s) => s, Err(_) => return -1 };
-        let dst_s = match CStr::from_ptr(dst).to_str() { Ok(s) => s, Err(_) => return -1 };
+        let src_s = match unsafe { safe_cstr(src) } { Ok(s) => s, Err(_) => return -1 };
+        let dst_s = match unsafe { safe_cstr(dst) } { Ok(s) => s, Err(_) => return -1 };
         match apfs_clone_file(Path::new(src_s), Path::new(dst_s), overwrite) {
             Ok(()) => 0,
             Err(_) => -1,
@@ -94,8 +95,7 @@ pub extern "C" fn ttzip_rust_apfs_clone_range(in_fd: i32, out_fd: i32) -> i32 {
 #[no_mangle]
 pub unsafe extern "C" fn ttzip_rust_is_mac_junk(path: *const c_char) -> bool {
     catch_unwind(|| {
-        if path.is_null() { return false; }
-        let s = match CStr::from_ptr(path).to_str() { Ok(s) => s, Err(_) => return false };
+        let s = match unsafe { safe_cstr(path) } { Ok(s) => s, Err(_) => return false };
         is_mac_junk_file(s)
     }).unwrap_or(false)
 }
@@ -104,8 +104,7 @@ pub unsafe extern "C" fn ttzip_rust_is_mac_junk(path: *const c_char) -> bool {
 #[no_mangle]
 pub unsafe extern "C" fn ttzip_rust_remove_path_fast(path: *const c_char) -> i32 {
     catch_unwind(|| {
-        if path.is_null() { return -1; }
-        let s = match CStr::from_ptr(path).to_str() { Ok(s) => s, Err(_) => return -1 };
+        let s = match unsafe { safe_cstr(path) } { Ok(s) => s, Err(_) => return -1 };
         match ttzip_remove_path_fast(Path::new(s)) {
             Ok(()) => 0,
             Err(_) => -1,
@@ -145,13 +144,13 @@ pub unsafe extern "C" fn ttzip_rust_scan_directory_parallel(
     user_data: *mut c_void,
 ) -> TTZipStatus {
     let result = catch_unwind(|| {
-        if root_path.is_null() { return TTZipStatus::ErrInvalidParam; }
-        let path_str = match CStr::from_ptr(root_path).to_str() {
+        let path_str = match unsafe { safe_cstr(root_path) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
         let options = if !config.is_null() {
-            let cfg = &*config;
+            // SAFETY: config verified non-null
+            let cfg = unsafe { &*config };
             ScanOptions {
                 include_hidden: cfg.include_hidden,
                 skip_mac_junk: cfg.skip_mac_junk,
@@ -175,7 +174,8 @@ pub unsafe extern "C" fn ttzip_rust_scan_directory_parallel(
                     mode: item.mode,
                     is_directory: item.is_directory,
                 };
-                if !cb(&raw_item, user_data) {
+                // SAFETY: cb called with valid pointers
+                if !unsafe { cb(&raw_item, user_data) } {
                     return TTZipStatus::Cancelled;
                 }
             }
@@ -199,18 +199,14 @@ pub unsafe extern "C" fn ttzip_rust_vfs_tree_build(
     root_name: *const c_char,
 ) -> *mut TTZipVfsTreeHandle {
     catch_unwind(|| {
-        let r_name = if root_name.is_null() {
-            ""
-        } else {
-            CStr::from_ptr(root_name).to_str().unwrap_or("")
-        };
+        let r_name = unsafe { safe_cstr(root_name) }.unwrap_or("");
 
         let mut vfs_entries = Vec::with_capacity(count);
         if !entries.is_null() && count > 0 {
             for i in 0..count {
-                let meta = &*entries.add(i);
-                if meta.path.is_null() { continue; }
-                let path_str = match CStr::from_ptr(meta.path).to_str() {
+                // SAFETY: i < count and entries is verified non-null
+                let meta = unsafe { &*entries.add(i) };
+                let path_str = match unsafe { safe_cstr(meta.path) } {
                     Ok(s) => s,
                     Err(_) => continue,
                 };
@@ -241,13 +237,15 @@ pub unsafe extern "C" fn ttzip_rust_vfs_tree_render(
         if handle.is_null() || out_rendered.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        let tree = &(*handle).inner;
+        // SAFETY: handle is verified non-null
+        let tree = unsafe { &(*handle).inner };
         let rendered = tree.render_tree();
         let c_str = match CString::new(rendered) {
             Ok(s) => s,
             Err(_) => return TTZipStatus::ErrInvalidParam,
         };
-        *out_rendered = c_str.into_raw();
+        // SAFETY: out_rendered is verified non-null
+        unsafe { *out_rendered = c_str.into_raw() };
         TTZipStatus::Ok
     }).unwrap_or(TTZipStatus::ErrPanicCaught)
 }
@@ -276,11 +274,12 @@ pub unsafe extern "C" fn ttzip_rust_vfs_fuzzy_search(
     user_data: *mut c_void,
 ) -> TTZipStatus {
     catch_unwind(|| {
-        if handle.is_null() || query.is_null() { return TTZipStatus::ErrInvalidParam; }
+        if handle.is_null() { return TTZipStatus::ErrInvalidParam; }
         let cb = match callback { Some(f) => f, None => return TTZipStatus::ErrInvalidParam };
-        let q_str = match CStr::from_ptr(query).to_str() { Ok(s) => s, Err(_) => return TTZipStatus::ErrInvalidParam };
+        let q_str = match unsafe { safe_cstr(query) } { Ok(s) => s, Err(st) => return st };
 
-        let tree = &(*handle).inner;
+        // SAFETY: handle is verified non-null
+        let tree = unsafe { &(*handle).inner };
         let search_results = tree.fuzzy_search(q_str);
 
         for res in &search_results {
@@ -296,7 +295,8 @@ pub unsafe extern "C" fn ttzip_rust_vfs_fuzzy_search(
                 is_encrypted: res.is_encrypted,
                 score: res.score,
             };
-            if !cb(&raw_res, user_data) {
+            // SAFETY: cb called with valid raw_res reference
+            if !unsafe { cb(&raw_res, user_data) } {
                 break;
             }
         }

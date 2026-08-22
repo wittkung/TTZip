@@ -12,6 +12,7 @@ use crate::codecs::snappy::{
     snappy_decompress, snappy_decompress_file, snappy_frame_decode, snappy_frame_encode,
     snappy_frame_max_encoded_length, snappy_uncompressed_length, snappy_validate,
 };
+use crate::ffi::helpers::{safe_slice, safe_slice_mut};
 use crate::types::{TTZipProgressCallback, TTZipStatus};
 use libc::{c_char, c_void, size_t};
 use std::ffi::CStr;
@@ -30,22 +31,13 @@ pub extern "C" fn ttzip_rust_snappy_compress(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match snappy_compress(in_slice, out_slice) {
@@ -71,22 +63,13 @@ pub extern "C" fn ttzip_rust_snappy_decompress(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match snappy_decompress(in_slice, out_slice) {
@@ -112,13 +95,12 @@ pub extern "C" fn ttzip_rust_snappy_uncompressed_length(
     out_len: *mut size_t,
 ) -> TTZipStatus {
     let result = catch_unwind(|| {
-        if out_len.is_null() || (src_len > 0 && src.is_null()) {
+        if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
         match snappy_uncompressed_length(in_slice) {
             Ok(len) => {
@@ -133,15 +115,10 @@ pub extern "C" fn ttzip_rust_snappy_uncompressed_length(
 
 #[no_mangle]
 pub extern "C" fn ttzip_rust_snappy_validate(src: *const u8, src_len: size_t) -> bool {
-    if src.is_null() && src_len > 0 {
-        return false;
+    match unsafe { safe_slice(src, src_len) } {
+        Ok(in_slice) => snappy_validate(in_slice),
+        Err(_) => false,
     }
-    let in_slice = if src_len == 0 {
-        &[]
-    } else {
-        unsafe { std::slice::from_raw_parts(src, src_len) }
-    };
-    snappy_validate(in_slice)
 }
 
 #[no_mangle]
@@ -156,22 +133,13 @@ pub extern "C" fn ttzip_rust_snappy_frame_encode(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match snappy_frame_encode(in_slice, out_slice) {
@@ -197,22 +165,13 @@ pub extern "C" fn ttzip_rust_snappy_frame_decode(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match snappy_frame_decode(in_slice, out_slice) {
@@ -233,11 +192,10 @@ pub extern "C" fn ttzip_rust_snappy_frame_max_encoded_length(src_len: size_t) ->
 
 #[no_mangle]
 pub extern "C" fn ttzip_rust_snappy_is_framed(src: *const u8, src_len: size_t) -> bool {
-    if src.is_null() || src_len == 0 {
-        return false;
+    match unsafe { safe_slice(src, src_len) } {
+        Ok(slice) => is_framed_snappy(slice),
+        Err(_) => false,
     }
-    let slice = unsafe { std::slice::from_raw_parts(src, src_len) };
-    is_framed_snappy(slice)
 }
 
 #[no_mangle]

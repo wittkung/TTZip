@@ -9,7 +9,8 @@
 
 use super::guards::ArchiveReadGuard;
 use super::sys::*;
-use crate::fs::apfs::apfs_preallocate;
+use crate::ffi::helpers::safe_cstr;
+use crate::fs::apfs::{apfs_preallocate, AlignedBuffer};
 use crate::fs::safe_extract::{sanitize_and_validate_path, SafeExtractEngine};
 use crate::types::{TTZipExtractOptions, TTZipStatus};
 use libc::{c_char, c_void, mode_t};
@@ -31,10 +32,6 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
     options: *const TTZipExtractOptions,
 ) -> TTZipStatus {
     let result = catch_unwind(|| {
-        if archive_path.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
         let dest_c = if !destination_path.is_null() {
             destination_path
         } else if !options.is_null() && !(*options).destination_path.is_null() {
@@ -43,13 +40,13 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
             return TTZipStatus::ErrInvalidParam;
         };
 
-        let archive_str = match CStr::from_ptr(archive_path).to_str() {
+        let archive_str = match unsafe { safe_cstr(archive_path) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
-        let dest_str = match CStr::from_ptr(dest_c).to_str() {
+        let dest_str = match unsafe { safe_cstr(dest_c) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
 
         let archive_p = Path::new(archive_str);
@@ -110,7 +107,10 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
         let mut engine = SafeExtractEngine::new();
         let mut entry: *mut c_void = std::ptr::null_mut();
         let mut total_processed: u64 = 0;
-        let mut buf = vec![0u8; 64 * 1024];
+        let mut buf = match AlignedBuffer::new(64 * 1024) {
+            Ok(b) => b,
+            Err(st) => return st,
+        };
 
         while archive_read_next_header(a, &mut entry) == 0 {
             if entry.is_null() {

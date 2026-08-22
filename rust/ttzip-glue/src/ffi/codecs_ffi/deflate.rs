@@ -11,6 +11,7 @@ use crate::codecs::deflate::{
     deflate_compress, deflate_compress_bound, deflate_decompress, gzip_compress, gzip_decompress,
     zlib_compress, zlib_decompress,
 };
+use crate::ffi::helpers::{safe_slice, safe_slice_mut};
 use crate::types::TTZipStatus;
 use libc::size_t;
 use std::panic::catch_unwind;
@@ -30,22 +31,13 @@ pub extern "C" fn ttzip_rust_deflate_compress(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match deflate_compress(in_slice, out_slice, level) {
@@ -71,22 +63,13 @@ pub extern "C" fn ttzip_rust_deflate_decompress(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match deflate_decompress(in_slice, out_slice) {
@@ -113,22 +96,13 @@ pub extern "C" fn ttzip_rust_zlib_compress(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match zlib_compress(in_slice, out_slice, level) {
@@ -154,22 +128,13 @@ pub extern "C" fn ttzip_rust_zlib_decompress(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match zlib_decompress(in_slice, out_slice) {
@@ -196,22 +161,13 @@ pub extern "C" fn ttzip_rust_gzip_compress(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match gzip_compress(in_slice, out_slice, level) {
@@ -237,22 +193,13 @@ pub extern "C" fn ttzip_rust_gzip_decompress(
         if out_len.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && src.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if dst_capacity > 0 && dst.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
-
-        let in_slice = if src_len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(src, src_len) }
+        let in_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
-        let out_slice = if dst_capacity == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(dst, dst_capacity) }
+        let out_slice = match unsafe { safe_slice_mut(dst, dst_capacity) } {
+            Ok(s) => s,
+            Err(st) => return st,
         };
 
         match gzip_decompress(in_slice, out_slice) {

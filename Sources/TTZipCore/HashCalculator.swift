@@ -66,7 +66,8 @@ public final class HashCalculator: HashCalculating, @unchecked Sendable {
             }
             if let data = try? Data(contentsOf: URL(fileURLWithPath: filePath)) {
                 let crc = data.withUnsafeBytes { raw in
-                    ttzip_rust_crc32(0, raw.bindMemory(to: UInt8.self).baseAddress, raw.count)
+                    guard let base = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return UInt32(0) }
+                    return ttzip_rust_crc32(0, base, raw.count)
                 }
                 return String(format: "%08X", crc)
             }

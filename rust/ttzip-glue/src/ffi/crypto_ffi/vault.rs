@@ -8,9 +8,9 @@
 //! C-ABI / FFI export functions for Secure Password Vault with AES-256-GCM and memory zeroization.
 
 use crate::crypto::vault;
+use crate::ffi::helpers::{safe_slice, safe_slice_mut};
 use crate::types::TTZipStatus;
 use std::panic::catch_unwind;
-use std::slice;
 
 /// C-ABI exported AES-256-GCM vault encryption.
 ///
@@ -36,30 +36,23 @@ pub unsafe extern "C" fn ttzip_rust_vault_encrypt_key(
         if key.is_null() || iv.is_null() || out_tag.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if src_len > 0 && (src.is_null() || out_cipher.is_null()) {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if aad_len > 0 && aad.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
 
+        let src_slice = match unsafe { safe_slice(src, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
+        };
+        let aad_slice = match unsafe { safe_slice(aad, aad_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
+        };
+        let cipher_slice = match unsafe { safe_slice_mut(out_cipher, src_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
+        };
+
+        // SAFETY: key, iv, and out_tag are verified non-null and correctly sized
         let key_ref = unsafe { &*(key as *const [u8; 32]) };
         let iv_ref = unsafe { &*(iv as *const [u8; 12]) };
-        let src_slice = if src_len > 0 {
-            unsafe { slice::from_raw_parts(src, src_len) }
-        } else {
-            &[]
-        };
-        let aad_slice = if aad_len > 0 {
-            unsafe { slice::from_raw_parts(aad, aad_len) }
-        } else {
-            &[]
-        };
-        let cipher_slice = if src_len > 0 {
-            unsafe { slice::from_raw_parts_mut(out_cipher, src_len) }
-        } else {
-            &mut []
-        };
         let tag_ref = unsafe { &mut *(out_tag as *mut [u8; 16]) };
 
         match vault::aes256_gcm_encrypt(key_ref, iv_ref, src_slice, aad_slice, cipher_slice, tag_ref) {
@@ -95,31 +88,24 @@ pub unsafe extern "C" fn ttzip_rust_vault_decrypt_key(
         if key.is_null() || iv.is_null() || tag.is_null() {
             return TTZipStatus::ErrInvalidParam;
         }
-        if cipher_len > 0 && (cipher.is_null() || out_plain.is_null()) {
-            return TTZipStatus::ErrInvalidParam;
-        }
-        if aad_len > 0 && aad.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
 
+        let cipher_slice = match unsafe { safe_slice(cipher, cipher_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
+        };
+        let aad_slice = match unsafe { safe_slice(aad, aad_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
+        };
+        let plain_slice = match unsafe { safe_slice_mut(out_plain, cipher_len) } {
+            Ok(s) => s,
+            Err(st) => return st,
+        };
+
+        // SAFETY: key, iv, and tag are verified non-null and correctly sized
         let key_ref = unsafe { &*(key as *const [u8; 32]) };
         let iv_ref = unsafe { &*(iv as *const [u8; 12]) };
-        let cipher_slice = if cipher_len > 0 {
-            unsafe { slice::from_raw_parts(cipher, cipher_len) }
-        } else {
-            &[]
-        };
-        let aad_slice = if aad_len > 0 {
-            unsafe { slice::from_raw_parts(aad, aad_len) }
-        } else {
-            &[]
-        };
         let tag_ref = unsafe { &*(tag as *const [u8; 16]) };
-        let plain_slice = if cipher_len > 0 {
-            unsafe { slice::from_raw_parts_mut(out_plain, cipher_len) }
-        } else {
-            &mut []
-        };
 
         match vault::aes256_gcm_decrypt(key_ref, iv_ref, cipher_slice, aad_slice, tag_ref, plain_slice) {
             Ok(()) => TTZipStatus::Ok,

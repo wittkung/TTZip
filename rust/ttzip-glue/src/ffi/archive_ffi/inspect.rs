@@ -9,6 +9,7 @@
 
 use super::guards::ArchiveReadGuard;
 use super::sys::*;
+use crate::ffi::helpers::safe_cstr;
 use crate::types::{TTZipEntryMetadata, TTZipInspectCallback, TTZipStatus};
 use libc::{c_char, c_void, mode_t};
 use std::ffi::CStr;
@@ -28,17 +29,14 @@ pub unsafe extern "C" fn ttzip_rust_inspect_archive(
     user_data: *mut c_void,
 ) -> TTZipStatus {
     let result = catch_unwind(|| {
-        if archive_path.is_null() {
-            return TTZipStatus::ErrInvalidParam;
-        }
         let cb = match callback {
             Some(f) => f,
             None => return TTZipStatus::ErrInvalidParam,
         };
 
-        let path_str = match CStr::from_ptr(archive_path).to_str() {
+        let path_str = match unsafe { safe_cstr(archive_path) } {
             Ok(s) => s,
-            Err(_) => return TTZipStatus::ErrInvalidParam,
+            Err(st) => return st,
         };
 
         if !Path::new(path_str).exists() {
