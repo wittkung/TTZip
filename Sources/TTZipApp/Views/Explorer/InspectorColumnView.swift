@@ -15,10 +15,10 @@ public struct InspectorColumnView: View {
     public let onCompressPath: (String) -> Void
     public let onPreviewFile: (String) -> Void
     
-    @State private var asyncDimensions: String? = nil
-    @State private var localPreviewURL: URL? = nil
-    @State private var deepMetadataDict: [String: String] = [:]
-    @State private var showDetailedMetadataPopover: Bool = false
+    @State var asyncDimensions: String? = nil
+    @State var localPreviewURL: URL? = nil
+    @State var deepMetadataDict: [String: String] = [:]
+    @State var showDetailedMetadataPopover: Bool = false
     
     public init(
         item: DiskItemInfo,
@@ -32,14 +32,14 @@ public struct InspectorColumnView: View {
         self.onPreviewFile = onPreviewFile
     }
     
-    private var isVirtualItem: Bool {
+    var isVirtualItem: Bool {
         if let u = URL(string: item.path), let q = u.query, q.contains("subpath=") {
             return true
         }
         return false
     }
     
-    private var effectivePreviewURL: URL? {
+    var effectivePreviewURL: URL? {
         if let local = localPreviewURL {
             return local
         }
@@ -52,7 +52,7 @@ public struct InspectorColumnView: View {
         return URL(fileURLWithPath: item.path)
     }
     
-    private var effectiveModificationDate: Date? {
+    var effectiveModificationDate: Date? {
         if let d = item.modificationDate {
             return d
         }
@@ -302,11 +302,11 @@ public struct InspectorColumnView: View {
                                 }
                             } else if let contents = try? fm.contentsOfDirectory(atPath: tempDir),
                                       let firstFile = contents.first(where: { !$0.hasPrefix(".") }) {
-                                let matchURL = URL(fileURLWithPath: (tempDir as NSString).appendingPathComponent(firstFile))
-                                await MainActor.run {
-                                    PreviewLRUCacheManager.shared.register(key: hash, fileURL: matchURL)
-                                    self.localPreviewURL = matchURL
-                                }
+                                 let matchURL = URL(fileURLWithPath: (tempDir as NSString).appendingPathComponent(firstFile))
+                                 await MainActor.run {
+                                     PreviewLRUCacheManager.shared.register(key: hash, fileURL: matchURL)
+                                     self.localPreviewURL = matchURL
+                                 }
                             }
                         }
                     }
@@ -327,137 +327,5 @@ public struct InspectorColumnView: View {
                 self.asyncDimensions = nil
             }
         }
-    }
-    
-    private func itemIconName(for item: DiskItemInfo) -> String {
-        if item.isArchive { return "archivebox.fill" }
-        let ext = (item.name as NSString).pathExtension.lowercased()
-        if ["jpg", "jpeg", "png", "gif", "webp", "heic"].contains(ext) { return "photo.fill" }
-        if ["mp4", "mov", "m4v", "mkv", "avi", "webm"].contains(ext) { return "film.fill" }
-        if ["mp3", "wav", "flac", "m4a", "aac"].contains(ext) { return "music.note" }
-        if ext == "pdf" { return "doc.richtext.fill" }
-        if ["swift", "js", "ts", "py", "json", "html", "css", "cpp", "c", "h"].contains(ext) { return "code" }
-        return "doc.fill"
-    }
-    
-    private func itemIconGradient(for item: DiskItemInfo) -> LinearGradient {
-        if item.isArchive {
-            return LinearGradient(colors: [TTZipTheme.bambooGreen, TTZipTheme.bambooGreen.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
-        let ext = (item.name as NSString).pathExtension.lowercased()
-        if ["jpg", "jpeg", "png", "gif", "webp", "heic"].contains(ext) {
-            return LinearGradient(colors: [Color.purple, Color.indigo], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
-        if ["mp4", "mov", "m4v", "mkv", "avi", "webm"].contains(ext) {
-            return LinearGradient(colors: [Color.pink, Color.orange], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
-        if ["mp3", "wav", "flac", "m4a", "aac"].contains(ext) {
-            return LinearGradient(colors: [Color.teal, Color.blue], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
-        if ext == "pdf" {
-            return LinearGradient(colors: [Color.red, Color.orange], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
-        return LinearGradient(colors: [Color.blue, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-    
-    private func formatDate(_ date: Date?) -> String {
-        guard let date = date else { return "Unknown" }
-        return date.formatted(.dateTime.year().month().day().hour().minute())
-    }
-    
-    private var detailedMetadataPopoverContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(itemIconGradient(for: item))
-                        .frame(width: 24, height: 24)
-                    Image(systemName: itemIconName(for: item))
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(item.name)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text("EXIF & Hardware Properties")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                Text("\(deepMetadataDict.count) Properties")
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(TTZipTheme.bambooGreen)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(TTZipTheme.bambooGreen.opacity(0.12))
-                    .clipShape(Capsule())
-            }
-            
-            Divider()
-            
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 6) {
-                    detailPopoverRow(icon: "doc", label: "File Name", value: item.name)
-                    detailPopoverRow(icon: "internaldrive", label: "File Size", value: item.sizeText)
-                    detailPopoverRow(icon: "folder", label: "Kind", value: item.kindText)
-                    detailPopoverRow(icon: "calendar", label: "Modified", value: formatDate(effectiveModificationDate))
-                    if let dims = asyncDimensions {
-                        detailPopoverRow(icon: "aspectratio", label: "Dimensions", value: dims)
-                    }
-                    
-                    if !deepMetadataDict.isEmpty {
-                        Divider()
-                            .padding(.vertical, 4)
-                        
-                        ForEach(Array(deepMetadataDict.keys.sorted()), id: \.self) { key in
-                            detailPopoverRow(icon: metadataIcon(for: key), label: key, value: deepMetadataDict[key] ?? "")
-                        }
-                    }
-                }
-            }
-            .frame(maxHeight: 300)
-        }
-        .padding(14)
-        .frame(width: 330)
-    }
-    
-    private func metadataIcon(for key: String) -> String {
-        if key.contains("Camera") || key.contains("Device") || key.contains("相机") || key.contains("设备") { return "camera" }
-        if key.contains("Exposure") || key.contains("ISO") || key.contains("曝光") { return "sparkles" }
-        if key.contains("Aperture") || key.contains("Focal") || key.contains("光圈") || key.contains("焦距") { return "camera.aperture" }
-        if key.contains("Resolution") || key.contains("Dimension") || key.contains("分辨率") || key.contains("尺寸") { return "ruler" }
-        if key.contains("Color") || key.contains("Profile") || key.contains("色彩") { return "paintpalette" }
-        if key.contains("Bitrate") || key.contains("Frame") || key.contains("码率") || key.contains("帧率") { return "waveform.path.badge.plus" }
-        if key.contains("Permission") || key.contains("POSIX") || key.contains("权限") { return "lock.shield" }
-        return "info.circle"
-    }
-    
-    private func detailPopoverRow(icon: String, label: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-                .frame(width: 14)
-            
-            Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(width: 95, alignment: .leading)
-            
-            Spacer()
-            
-            Text(value)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .multilineTextAlignment(.trailing)
-        }
-        .padding(.vertical, 2)
     }
 }

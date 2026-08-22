@@ -10,57 +10,57 @@ import TTZipCore
 import AppKit
 
 public struct CompressModalView: View {
-    @ObservedObject private var l10n = AppLocalizationState.shared
+    @ObservedObject var l10n = AppLocalizationState.shared
     @Binding public var isPresented: Bool
     public let initialInputPaths: [String]
     public var onCompleteOpenArchive: ((String) -> Void)? = nil
     
-    @State private var itemsList: [CompressFileItem] = []
-    @State private var selectedItemIDs: Set<CompressFileItem.ID> = []
-    @State private var outputName: String = "Archive"
-    @State private var targetDirectory: String = NSHomeDirectory()
-    @State private var selectedFormat: ArchiveCompressionFormat = .sevenZip
-    @State private var compressionLevel: ArchiveCompressionLevel = .normal
-    @State private var splitVolumeOption: Int64? = nil
-    @State private var isCustomVolumeSelected: Bool = false
-    @State private var customVolumeValueString: String = "100"
-    @State private var customVolumeUnit: String = "MB"
-    @State private var enableEncryption: Bool = false
-    @State private var password: String = ""
-    @State private var createSeparateArchives: Bool = false
-    @State private var deleteSourceAfterCompress: Bool = false
-    @State private var openFinderAfterCompress: Bool = true
-    @State private var skipMacJunk: Bool = true
-    @State private var selectedPresetID: UUID? = nil
+    @State var itemsList: [CompressFileItem] = []
+    @State var selectedItemIDs: Set<CompressFileItem.ID> = []
+    @State var outputName: String = "Archive"
+    @State var targetDirectory: String = NSHomeDirectory()
+    @State var selectedFormat: ArchiveCompressionFormat = .sevenZip
+    @State var compressionLevel: ArchiveCompressionLevel = .normal
+    @State var splitVolumeOption: Int64? = nil
+    @State var isCustomVolumeSelected: Bool = false
+    @State var customVolumeValueString: String = "100"
+    @State var customVolumeUnit: String = "MB"
+    @State var enableEncryption: Bool = false
+    @State var password: String = ""
+    @State var createSeparateArchives: Bool = false
+    @State var deleteSourceAfterCompress: Bool = false
+    @State var openFinderAfterCompress: Bool = true
+    @State var skipMacJunk: Bool = true
+    @State var selectedPresetID: UUID? = nil
     
-    @State private var isAlgorithmMatrixPresented: Bool = false
-    @State private var isCompressionGuidePresented: Bool = false
-    @State private var isPasswordVaultPresented: Bool = false
+    @State var isAlgorithmMatrixPresented: Bool = false
+    @State var isCompressionGuidePresented: Bool = false
+    @State var isPasswordVaultPresented: Bool = false
     
-    @State private var cpuThreadsOption: String = "All Cores"
-    @State private var dictionarySizeMB: Int = 32
-    @State private var compressionAlgorithm: String = "LZMA2"
-    @State private var zipEncryptionMethod: String = "AES-256"
-    @State private var zipEncodingUTF8: Bool = true
-    @State private var zstdLevel: Int = 3
-    @State private var zstdEnableLDM: Bool = false
-    @State private var preservePosixAttributes: Bool = true
-    @State private var enableSolidArchive: Bool = true
-    @State private var encryptFileNames: Bool = true
+    @State var cpuThreadsOption: String = "All Cores"
+    @State var dictionarySizeMB: Int = 32
+    @State var compressionAlgorithm: String = "LZMA2"
+    @State var zipEncryptionMethod: String = "AES-256"
+    @State var zipEncodingUTF8: Bool = true
+    @State var zstdLevel: Int = 3
+    @State var zstdEnableLDM: Bool = false
+    @State var preservePosixAttributes: Bool = true
+    @State var enableSolidArchive: Bool = true
+    @State var encryptFileNames: Bool = true
     
-    @State private var isProcessing: Bool = false
-    @State private var isProgressModalPresented: Bool = false
-    @State private var currentProgress: ArchiveProgress = .zero
-    @State private var activeCompressionTask: Task<Void, Never>? = nil
+    @State var isProcessing: Bool = false
+    @State var isProgressModalPresented: Bool = false
+    @State var currentProgress: ArchiveProgress = .zero
+    @State var activeCompressionTask: Task<Void, Never>? = nil
     
-    @State private var isSummarySheetPresented: Bool = false
-    @State private var completedArchivePath: String = ""
-    @State private var completedOriginalBytes: Int64 = 0
-    @State private var completedCompressedBytes: Int64 = 0
-    @State private var completedElapsedSeconds: Double = 0.0
-    @State private var completedThroughputMBs: Double = 0.0
+    @State var isSummarySheetPresented: Bool = false
+    @State var completedArchivePath: String = ""
+    @State var completedOriginalBytes: Int64 = 0
+    @State var completedCompressedBytes: Int64 = 0
+    @State var completedElapsedSeconds: Double = 0.0
+    @State var completedThroughputMBs: Double = 0.0
     
-    private let cachedTotalCores = AppleSiliconTuner.shared.topology.totalCores
+    let cachedTotalCores = AppleSiliconTuner.shared.topology.totalCores
     
     public init(isPresented: Binding<Bool>, initialInputPaths: [String], onCompleteOpenArchive: ((String) -> Void)? = nil) {
         self._isPresented = isPresented
@@ -68,7 +68,7 @@ public struct CompressModalView: View {
         self.onCompleteOpenArchive = onCompleteOpenArchive
     }
     
-    private var totalSizeBytes: Int64 {
+    var totalSizeBytes: Int64 {
         itemsList.reduce(0) { $0 + $1.size }
     }
     
@@ -239,129 +239,6 @@ public struct CompressModalView: View {
                     password = pwd
                 }
                 skipMacJunk = snapshot.skipMacJunk
-            }
-        }
-    }
-    
-    private func pickFiles() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowsMultipleSelection = true
-        if panel.runModal() == .OK {
-            for url in panel.urls {
-                if !itemsList.contains(where: { $0.path == url.path }) {
-                    itemsList.append(CompressFileItem(path: url.path))
-                }
-            }
-        }
-    }
-    
-    private func pickFolders() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = true
-        if panel.runModal() == .OK {
-            for url in panel.urls {
-                if !itemsList.contains(where: { $0.path == url.path }) {
-                    itemsList.append(CompressFileItem(path: url.path))
-                }
-            }
-        }
-    }
-    
-    private func removeSelectedItems() {
-        itemsList.removeAll { selectedItemIDs.contains($0.id) }
-        selectedItemIDs.removeAll()
-    }
-    
-    private func pickDirectory() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        if panel.runModal() == .OK, let url = panel.url {
-            targetDirectory = url.path
-        }
-    }
-    
-    private func startCompression() {
-        guard !isProcessing && !itemsList.isEmpty && !outputName.isEmpty else { return }
-        let ext = selectedFormat.fileExtension.trimmingCharacters(in: CharacterSet(charactersIn: "."))
-        let inputPaths = itemsList.map { $0.path }
-        guard !inputPaths.isEmpty else { return }
-        let fullOutputPath = (targetDirectory as NSString).appendingPathComponent("\(outputName).\(ext)")
-        
-        isProcessing = true
-        isProgressModalPresented = true
-        
-        let throttler = ThrottledProgressPublisher(maxFrequencyHz: 60.0)
-        activeCompressionTask = Task {
-            defer {
-                Task { @MainActor in
-                    self.isProcessing = false
-                }
-            }
-            do {
-                let advOpts = ArchiveAdvancedOptions.builder()
-                    .withAlgorithm(compressionAlgorithm)
-                    .withDictionarySizeMB(dictionarySizeMB)
-                    .withCpuThreads(cachedTotalCores)
-                    .withSolidArchive(enableSolidArchive)
-                    .withEncryptFileNames(encryptFileNames)
-                    .withZipEncryption(zipEncryptionMethod)
-                    .withZipEncodingUTF8(zipEncodingUTF8)
-                    .withZstdLevel(zstdLevel)
-                    .withZstdEnableLDM(zstdEnableLDM)
-                    .withPreservePosixAttributes(preservePosixAttributes)
-                    .build()
-                
-                let cmdResult = try await TTZipEngineFacade.shared.compressWithCommand(
-                    inputs: inputPaths,
-                    outputPath: fullOutputPath,
-                    format: selectedFormat,
-                    level: compressionLevel,
-                    password: enableEncryption ? password : nil,
-                    splitSize: splitVolumeOption,
-                    filterOptions: ArchiveFilterOptions(skipMacJunk: skipMacJunk),
-                    advancedOptions: advOpts,
-                    progress: { prog in
-                        let isTerminal: Bool
-                        switch prog.state {
-                        case .completed, .failed: isTerminal = true
-                        default: isTerminal = false
-                        }
-                        if isTerminal || throttler.shouldEmit() {
-                            Task { @MainActor in
-                                self.currentProgress = prog
-                            }
-                        }
-                    },
-                    engineFacade: SecurityProtectionProxy.shared
-                )
-                
-                if openFinderAfterCompress {
-                    NSWorkspace.shared.selectFile(fullOutputPath, inFileViewerRootedAtPath: targetDirectory)
-                }
-                
-                let compressedSize = (cmdResult.metadata["compressedSize"] as NSString?)?.longLongValue ?? 0
-                let originalSize = (cmdResult.metadata["originalSize"] as NSString?)?.longLongValue ?? 0
-                let elapsed = cmdResult.executionDuration
-                let throughput = elapsed > 0 ? (Double(originalSize) / 1024.0 / 1024.0) / elapsed : 0.0
-                
-                Task { @MainActor in
-                    self.completedArchivePath = fullOutputPath
-                    self.completedOriginalBytes = originalSize
-                    self.completedCompressedBytes = compressedSize
-                    self.completedElapsedSeconds = elapsed
-                    self.completedThroughputMBs = throughput
-                    self.isProgressModalPresented = false
-                    self.isSummarySheetPresented = true
-                }
-            } catch {
-                Task { @MainActor in
-                    self.isProgressModalPresented = false
-                }
             }
         }
     }

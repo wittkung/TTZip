@@ -48,6 +48,12 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
         let vaultPasswords = PasswordVaultManager.shared.candidatePasswordsForAutoUnlock()
         return try await inspect(archivePath: archivePath, password: nil, candidatePasswords: vaultPasswords)
     }
+
+    /// Convenience facade method to list entries of an archive.
+    @inline(__always)
+    public func listEntries(archivePath: String, password: String? = nil) async throws -> [ArchiveEntry] {
+        return try await inspect(archivePath: archivePath, password: password, candidatePasswords: nil)
+    }
     
     public func inspect(
         archivePath: String,

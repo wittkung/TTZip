@@ -13,27 +13,27 @@ public struct UnifiedAudioPlayerView: View {
     public let url: URL
     public let fileName: String
     
-    @State private var player: AVPlayer? = nil
-    @State private var isPlaying = false
-    @State private var currentTime: Double = 0
-    @State private var duration: Double = 0
-    @State private var isEditingSlider = false
-    @State private var timeObserverToken: Any? = nil
-    @State private var rotationAngle: Double = 0
-    @State private var volume: Double = 1.0
-    @State private var isMuted: Bool = false
+    @State var player: AVPlayer? = nil
+    @State var isPlaying = false
+    @State var currentTime: Double = 0
+    @State var duration: Double = 0
+    @State var isEditingSlider = false
+    @State var timeObserverToken: Any? = nil
+    @State var rotationAngle: Double = 0
+    @State var volume: Double = 1.0
+    @State var isMuted: Bool = false
     
-    @State private var audioBitrate: String = "Analyzing..."
-    @State private var audioSampleRate: String = "44.1 kHz"
-    @State private var audioChannels: String = "Stereo"
-    @State private var fileSizeFormatted: String = ""
+    @State var audioBitrate: String = "Analyzing..."
+    @State var audioSampleRate: String = "44.1 kHz"
+    @State var audioChannels: String = "Stereo"
+    @State var fileSizeFormatted: String = ""
     
     public init(url: URL, fileName: String) {
         self.url = url
         self.fileName = fileName
     }
     
-    private var formatBadge: String {
+    var formatBadge: String {
         url.pathExtension.uppercased()
     }
     
@@ -269,134 +269,5 @@ public struct UnifiedAudioPlayerView: View {
         .onDisappear {
             cleanUpPlayer()
         }
-    }
-    
-    private func audioMetaTag(title: String, value: String) -> some View {
-        HStack(spacing: 4) {
-            Text(title)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(Color.primary.opacity(0.025))
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-    }
-    
-    private func setupPlayer() {
-        cleanUpPlayer()
-        let newPlayer = AVPlayer(url: url)
-        self.player = newPlayer
-        
-        let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
-        timeObserverToken = newPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
-            Task { @MainActor in
-                if !self.isEditingSlider {
-                    self.currentTime = time.seconds
-                }
-                if let item = newPlayer.currentItem, item.duration.seconds.isFinite {
-                    self.duration = item.duration.seconds
-                }
-            }
-        }
-        
-        if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-           let s = attrs[.size] as? Int64 {
-            let formatter = ByteCountFormatter()
-            formatter.allowedUnits = [.useAll]
-            formatter.countStyle = .file
-            self.fileSizeFormatted = formatter.string(fromByteCount: s)
-        }
-        
-        let asset = AVURLAsset(url: url)
-        Task.detached(priority: .userInitiated) {
-            var br = "256 kbps"
-            var sr = "44.1 kHz"
-            var ch = "Stereo"
-            
-            if let tracks = try? await asset.load(.tracks) {
-                for track in tracks {
-                    if track.mediaType == .audio {
-                        if let rate = try? await track.load(.estimatedDataRate), rate > 0 {
-                            br = String(format: "%.0f kbps", Double(rate) / 1000.0)
-                        }
-                        if let descs = try? await track.load(.formatDescriptions),
-                           let desc = descs.first,
-                           let basic = CMAudioFormatDescriptionGetStreamBasicDescription(desc) {
-                            let freq = basic.pointee.mSampleRate
-                            if freq > 0 {
-                                sr = String(format: "%.1f kHz", freq / 1000.0)
-                            }
-                            let channels = basic.pointee.mChannelsPerFrame
-                            if channels == 1 {
-                                ch = "Mono"
-                            } else if channels == 2 {
-                                ch = "Stereo"
-                            } else if channels > 2 {
-                                ch = "\(channels) Channels Surround"
-                            }
-                        }
-                    }
-                }
-            }
-            
-            await MainActor.run {
-                self.audioBitrate = br
-                self.audioSampleRate = sr
-                self.audioChannels = ch
-            }
-        }
-        
-        self.isPlaying = false
-        startRotation()
-    }
-    
-    private func cleanUpPlayer() {
-        if let token = timeObserverToken {
-            player?.removeTimeObserver(token)
-            timeObserverToken = nil
-        }
-        player?.pause()
-        player?.rate = 0
-        player?.replaceCurrentItem(with: nil)
-        player = nil
-        isPlaying = false
-    }
-    
-    private func togglePlayPause() {
-        guard let p = player else { return }
-        if isPlaying {
-            p.pause()
-            isPlaying = false
-        } else {
-            p.play()
-            isPlaying = true
-        }
-    }
-    
-    private func seekBy(_ seconds: Double) {
-        let newTime = min(max(currentTime + seconds, 0), max(duration, 0.01))
-        currentTime = newTime
-        let targetTime = CMTime(seconds: newTime, preferredTimescale: 600)
-        player?.seek(to: targetTime)
-    }
-    
-    private func startRotation() {
-        withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
-            rotationAngle = 360
-        }
-    }
-    
-    private func formatTime(_ seconds: Double) -> String {
-        guard seconds.isFinite && seconds >= 0 else { return "00:00" }
-        let secs = Int(seconds)
-        let m = secs / 60
-        let s = secs % 60
-        return String(format: "%02d:%02d", m, s)
     }
 }

@@ -34,6 +34,14 @@ public protocol ArchiveReading: Sendable {
     func probeEncryption(archivePath: String) async throws -> ArchiveEncryptionTier
 }
 
+extension ArchiveReading {
+    /// Convenience facade method to list entries of an archive.
+    @inline(__always)
+    public func listEntries(archivePath: String, password: String? = nil) async throws -> [ArchiveEntry] {
+        return try await inspect(archivePath: archivePath, password: password, candidatePasswords: nil)
+    }
+}
+
 /// Core archive creation and compression engine interface.
 public protocol ArchiveWriting: Sendable {
     func createArchive(
@@ -87,6 +95,26 @@ public protocol ArchiveExtracting: Sendable {
     ) throws
 
     func joinSplitVolumes(firstVolumePath: String, outputPath: String) -> Bool
+}
+
+extension ArchiveExtracting {
+    /// Convenience facade method to extract an archive.
+    @inline(__always)
+    public func extractArchive(
+        archivePath: String,
+        destinationDir: String,
+        options: ArchiveFilterOptions = .defaultClean,
+        password: String? = nil,
+        advancedOptions: ArchiveAdvancedOptions? = nil
+    ) async throws {
+        try await extract(
+            archivePath: archivePath,
+            destinationDir: destinationDir,
+            options: options,
+            password: password,
+            advancedOptions: advancedOptions
+        )
+    }
 }
 
 /// Archive data integrity and checksum verification interface.

@@ -68,31 +68,19 @@ echo ""
 
 # Stage Definitions
 declare -a STAGE_NAMES=(
-    "Unit & CLI Streaming Suite"
-    "Standards Compliance Suite"
-    "Differential System Oracle"
-    "Malformed Stream Fuzzing"
-    "Libarchive Golden Corpus"
+    "Swift High-Level Facade & CLI Suite"
     "Deflate-Bench 50-Point Matrix Gate"
     "Rust Industrial Suite (Props, Fuzz, Differential)"
 )
 
 declare -a STAGE_KEYS=(
-    "unit-streaming"
-    "standards"
-    "differential"
-    "fuzzing"
-    "golden-corpus"
+    "swift-facade"
     "performance"
     "rust-industrial"
 )
 
 declare -a STAGE_COMMANDS=(
-    "swift test --filter PipeStreamingTests,ShellCompletionTests,ManPageGenerationTests,ArchiveFormatStandardTests,CLIPackagingTests,ArchiveInspectorViewTests,InteractiveTUITests,MediaPreviewAuditTests,QuickLookPreviewTests,GUILocalizationTests,AppStorePackageAuditTests"
-    "swift test --filter ArchiveStandardsComplianceTests"
-    "swift test --filter DifferentialOracleTests"
-    "swift test --filter ArchiveMutationFuzzTests"
-    "swift test --filter LibarchiveGoldenCorpusTests"
+    "swift test"
     "swift run ttzip-bench gate"
     "./scripts/run_rust_tests.sh --unit --props --fuzz"
 )

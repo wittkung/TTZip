@@ -23,8 +23,8 @@ public enum AppLogoCache {
 }
 
 public struct MainView: View {
-    @ObservedObject private var l10n = AppLocalizationState.shared
-    @StateObject private var viewModel = AppViewState()
+    @ObservedObject var l10n = AppLocalizationState.shared
+    @StateObject var viewModel = AppViewState()
     @State private var isSidebarVisible: Bool = true
     @State private var isRightSidebarVisible: Bool = true
     @State private var isDropTargeted: Bool = false
@@ -155,32 +155,7 @@ public struct MainView: View {
             .onChange(of: viewModel.currentDirectory) { _, _ in NSApp.keyWindow?.makeFirstResponder(nil) }
         }
         .toolbar {
-            ToolbarItemGroup(placement: .automatic) {
-                if viewModel.currentArchivePath != nil {
-                    Button { pickAndOpenArchive() } label: { Label(l10n.t(L10n.Menu.openArchive), systemImage: "folder.badge.plus") }
-                        .keyboardShortcut("o", modifiers: [.command])
-                    
-                    Button { withAnimation { viewModel.openCompressWorkspace() } } label: { Label(l10n.t(L10n.Menu.newArchiveMenu), systemImage: "archivebox.circle") }
-                        .keyboardShortcut("n", modifiers: [.command])
-                    
-                    if viewModel.activeTab == .home {
-                        Button {
-                            if let targetPath = viewModel.selectedDiskItem?.path ?? viewModel.currentArchivePath {
-                                Task { await viewModel.quickExtractArchive(archivePath: targetPath) }
-                            } else {
-                                viewModel.statusMessage = l10n.t(L10n.Explorer.extractToPrompt)
-                            }
-                        } label: { Label(l10n.t(L10n.Extract.action), systemImage: "arrow.down.circle.fill") }
-                        .keyboardShortcut("e", modifiers: [.command])
-                        
-                        Button { viewModel.showExtractModal = true } label: { Label(l10n.t(L10n.Explorer.extractToPrompt), systemImage: "slider.horizontal.3") }
-                        .keyboardShortcut("e", modifiers: [.option, .command])
-                        
-                        Button { withAnimation { viewModel.reset() } } label: { Label(l10n.t(L10n.Common.close), systemImage: "xmark.circle") }
-                        .keyboardShortcut("w", modifiers: [.command])
-                    }
-                }
-            }
+            mainToolbarContent
         }
         .sheet(isPresented: $viewModel.showExtractModal) {
             let targetPath = viewModel.selectedDiskItem?.path ?? viewModel.currentArchivePath ?? ""
@@ -336,17 +311,5 @@ public struct MainView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(TTZipTheme.hairlineBorder, lineWidth: 0.5))
         .padding(.top, 42)
-    }
-    
-    private func openArchiveFromURL(_ url: URL) {
-        let path = url.path
-        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return }
-        viewModel.openArchiveAsFolder(url: url)
-    }
-    
-    private func pickAndOpenArchive() {
-        if let firstPath = SystemDialogHelper.pickFiles(prompt: l10n.t(L10n.Menu.openArchive), canChooseDirectories: false, allowsMultipleSelection: false).first {
-            viewModel.openArchiveAsFolder(url: URL(fileURLWithPath: firstPath))
-        }
     }
 }

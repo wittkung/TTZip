@@ -110,6 +110,24 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
         Self.cleanupQuarantineAttributes(at: destinationDir)
     }
 
+    /// Unified facade method to extract an archive to the destination directory.
+    @inline(__always)
+    public func extractArchive(
+        archivePath: String,
+        destinationDir: String,
+        options: ArchiveFilterOptions = .defaultClean,
+        password: String? = nil,
+        advancedOptions: ArchiveAdvancedOptions? = nil
+    ) async throws {
+        try await extract(
+            archivePath: archivePath,
+            destinationDir: destinationDir,
+            options: options,
+            password: password,
+            advancedOptions: advancedOptions
+        )
+    }
+
     /// Synchronously extracts a single file from the archive without processing other entries.
     public func extractSingleFile(
         archivePath: String,
