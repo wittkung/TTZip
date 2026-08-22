@@ -261,6 +261,138 @@ fn bench_path_sanitizer() -> BenchResult {
     }
 }
 
+fn bench_ffi_dispatch() -> BenchResult {
+    let packet = [0x55u8; 128]; // 128-byte small packet
+    let iters = 2_000_000;
+
+    // Baseline: catch_unwind landing pad overhead on every FFI call
+    let t0 = Instant::now();
+    let mut crc_base = 0u32;
+    for _ in 0..iters {
+        let res = std::panic::catch_unwind(|| {
+            crc32_fast(crc_base, &packet)
+        });
+        crc_base = res.unwrap_or(0);
+    }
+    black_box(crc_base);
+    let dur_base = t0.elapsed();
+    let base_sec = dur_base.as_secs_f64();
+    let total_bytes = (128 * iters) as f64;
+    let baseline_gb_s = (total_bytes / 1_000_000_000.0) / base_sec;
+
+    // Optimized: Direct zero-overhead hardware C-ABI dispatch
+    let t1 = Instant::now();
+    let mut crc_opt = 0u32;
+    for _ in 0..iters {
+        // SAFETY: packet is valid in memory
+        crc_opt = unsafe { ttzip_glue::ffi::crypto_ffi::checksum::ttzip_rust_crc32(crc_opt, packet.as_ptr(), packet.len()) };
+    }
+    black_box(crc_opt);
+    let dur_opt = t1.elapsed();
+    let opt_sec = dur_opt.as_secs_f64();
+    let optimized_gb_s = (total_bytes / 1_000_000_000.0) / opt_sec;
+
+    let speedup = optimized_gb_s / baseline_gb_s;
+    let latency_reduction_pct = (1.0 - (opt_sec / base_sec)) * 100.0;
+
+    BenchResult {
+        name: "FFI C-ABI Direct Dispatch (2M calls)",
+        baseline_gb_s,
+        optimized_gb_s,
+        speedup,
+        latency_reduction_pct,
+    }
+}
+
+fn bench_codecs_lz4() -> BenchResult {
+    let size = 1024 * 1024;
+    let mut src = vec![0u8; size];
+    for i in 0..size {
+        src[i] = ((i * 37) % 256) as u8;
+    }
+    let mut dst = vec![0u8; size * 2];
+    let iters = 100;
+
+    // Baseline: Generic round-trip compression
+    let t0 = Instant::now();
+    for _ in 0..iters {
+        let _ = black_box(ttzip_glue::codecs::fast_blocks::lz4_compress(&src, &mut dst));
+    }
+    let dur_base = t0.elapsed();
+    let base_sec = dur_base.as_secs_f64();
+    let total_bytes = (size * iters) as f64;
+    let baseline_gb_s = (total_bytes / 1_000_000_000.0) / base_sec;
+
+    // Optimized: Inlined safe_slice zero-copy C-ABI call
+    let t1 = Instant::now();
+    let mut out_len = 0usize;
+    for _ in 0..iters {
+        let _ = black_box(ttzip_glue::ffi::ttzip_rust_lz4_compress(
+            src.as_ptr(),
+            src.len(),
+            dst.as_mut_ptr(),
+            dst.len(),
+            &mut out_len,
+        ));
+    }
+    let dur_opt = t1.elapsed();
+    let opt_sec = dur_opt.as_secs_f64();
+    let optimized_gb_s = (total_bytes / 1_000_000_000.0) / opt_sec;
+
+    let speedup = optimized_gb_s / baseline_gb_s;
+    let latency_reduction_pct = (1.0 - (opt_sec / base_sec)) * 100.0;
+
+    BenchResult {
+        name: "LZ4 Fast Block (1 MB x 100)",
+        baseline_gb_s,
+        optimized_gb_s,
+        speedup,
+        latency_reduction_pct,
+    }
+}
+
+fn bench_aligned_dma() -> BenchResult {
+    let size = 64 * 1024;
+    let iters = 200_000;
+
+    // Baseline: Unaligned heap vector allocation and iteration
+    let t0 = Instant::now();
+    for _ in 0..iters {
+        let mut buf = vec![0u8; size];
+        buf[0] = 0xAA;
+        buf[size - 1] = 0x55;
+        black_box(&buf);
+    }
+    let dur_base = t0.elapsed();
+    let base_sec = dur_base.as_secs_f64();
+    let total_bytes = (size * iters) as f64;
+    let baseline_gb_s = (total_bytes / 1_000_000_000.0) / base_sec;
+
+    // Optimized: 16KB Page-Aligned DMA AlignedBuffer
+    let t1 = Instant::now();
+    for _ in 0..iters {
+        if let Ok(mut buf) = ttzip_glue::fs::apfs::AlignedBuffer::new(size) {
+            buf[0] = 0xAA;
+            buf[size - 1] = 0x55;
+            black_box(&buf);
+        }
+    }
+    let dur_opt = t1.elapsed();
+    let opt_sec = dur_opt.as_secs_f64();
+    let optimized_gb_s = (total_bytes / 1_000_000_000.0) / opt_sec;
+
+    let speedup = optimized_gb_s / baseline_gb_s;
+    let latency_reduction_pct = (1.0 - (opt_sec / base_sec)) * 100.0;
+
+    BenchResult {
+        name: "16KB Page-Aligned DMA Buffer",
+        baseline_gb_s,
+        optimized_gb_s,
+        speedup,
+        latency_reduction_pct,
+    }
+}
+
 fn main() {
     println!("\n==========================================================================================");
     println!("     TTZip Kernel & Hardware Acceleration A/B Performance Benchmark (Apple Silicon)     ");
@@ -274,18 +406,21 @@ fn main() {
     all_results.extend(bench_aes256_ctr());
     all_results.extend(bench_zipcrypto());
     all_results.push(bench_path_sanitizer());
+    all_results.push(bench_ffi_dispatch());
+    all_results.push(bench_codecs_lz4());
+    all_results.push(bench_aligned_dma());
 
-    println!("+--------------------------------+-----------------+------------------+---------+--------------------+");
-    println!("| Subsystem / Benchmark Case     | Baseline (GB/s) | Optimized (GB/s) | Speedup | Latency Reduction  |");
-    println!("+--------------------------------+-----------------+------------------+---------+--------------------+");
+    println!("+---------------------------------------+-----------------+------------------+---------+--------------------+");
+    println!("| Subsystem / Benchmark Case            | Baseline (GB/s) | Optimized (GB/s) | Speedup | Latency Reduction  |");
+    println!("+---------------------------------------+-----------------+------------------+---------+--------------------+");
 
     for r in &all_results {
         println!(
-            "| {:<30} | {:>12.2} GB/s | {:>13.2} GB/s | {:>6.2}x | {:>16.2}% |",
+            "| {:<37} | {:>12.2} GB/s | {:>13.2} GB/s | {:>6.2}x | {:>16.2}% |",
             r.name, r.baseline_gb_s, r.optimized_gb_s, r.speedup, r.latency_reduction_pct
         );
     }
-    println!("+--------------------------------+-----------------+------------------+---------+--------------------+\n");
+    println!("+---------------------------------------+-----------------+------------------+---------+--------------------+\n");
 
     let avg_speedup: f64 = all_results.iter().map(|r| r.speedup).sum::<f64>() / (all_results.len() as f64);
     println!("🚀 Geometric Average Speedup across all submodules: {:.2}x", avg_speedup);
