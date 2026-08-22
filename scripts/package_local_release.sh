@@ -8,7 +8,7 @@
 # ==============================================================================
 # scripts/package_local_release.sh
 # 100% 本地全自动化发布打包流水线 (0 云端 CI / GitHub Actions 额度消耗)
-# 产物：TTZip.app、ttzip-cli 发布 tar.gz、TTZip.dmg、Formula/ttzip-cli.rb、checksums.txt
+# 产物：TTZip.app、ttzip-cli 发布 tar.gz、TTZip.dmg、Formula/ttzip-cli.rb & ttzip.rb、checksums.txt
 # ==============================================================================
 
 set -euo pipefail
@@ -197,12 +197,11 @@ generate_dmg() {
     echo "  ✓ SHA-256   : ${DMG_SHA256}"
 }
 
-generate_formula_and_checksums() {
-    echo "==> [6/6] Generating Homebrew Formula & Checksums Manifest..."
-    mkdir -p "${WORKSPACE_ROOT}/Formula"
-    local formula_path="${WORKSPACE_ROOT}/Formula/ttzip-cli.rb"
+generate_single_formula() {
+    local class_name="$1"
+    local output_path="$2"
     
-    cat <<EOF > "${formula_path}"
+    cat <<EOF > "${output_path}"
 # typed: false
 # frozen_string_literal: true
 
@@ -213,11 +212,11 @@ generate_formula_and_checksums() {
 #
 # TTZip: High-performance native archiving and compression CLI utility for macOS.
 
-class TtzipCli < Formula
+class ${class_name} < Formula
   desc "High-performance native archive and compression CLI utility for macOS"
   homepage "https://github.com/wittkung/TTZip"
-  url "https://github.com/wittkung/TTZip/releases/download/v${VERSION}/${TARBALL_NAME}"
-  sha256 "${CLI_SHA256}"
+  url "https://github.com/wittkung/TTZip/releases/download/v\${VERSION}/\${TARBALL_NAME}"
+  sha256 "\${CLI_SHA256}"
   license :cannot_be_redistributed
 
   depends_on :macos => :sonoma
@@ -240,7 +239,15 @@ class TtzipCli < Formula
   end
 end
 EOF
-    echo "  ✓ Homebrew Formula: ${formula_path}"
+    echo "  ✓ Homebrew Formula: ${output_path}"
+}
+
+generate_formula_and_checksums() {
+    echo "==> [6/6] Generating Homebrew Formulas & Checksums Manifest..."
+    mkdir -p "${WORKSPACE_ROOT}/Formula"
+    
+    generate_single_formula "TtzipCli" "${WORKSPACE_ROOT}/Formula/ttzip-cli.rb"
+    generate_single_formula "Ttzip" "${WORKSPACE_ROOT}/Formula/ttzip.rb"
     
     local checksums_file="${OUTPUT_DIR}/checksums.txt"
     rm -f "${checksums_file}"

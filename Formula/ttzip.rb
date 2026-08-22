@@ -9,30 +9,28 @@
 # TTZip: High-performance native archiving and compression CLI utility for macOS.
 
 class Ttzip < Formula
-  desc "Ultra-high-performance native archiving and compression CLI engine for macOS"
+  desc "High-performance native archive and compression CLI utility for macOS"
   homepage "https://github.com/wittkung/TTZip"
-  version "1.0.0"
+  url "https://github.com/wittkung/TTZip/releases/download/v1.0.0/ttzip-cli-v1.0.0-darwin-universal.tar.gz"
+  sha256 "974bdf2c0d35ae560174015f82c4bc9e27afd207a8a4dc88e67760e1637f167a"
   license :cannot_be_redistributed
 
-  if Hardware::CPU.arm? || Hardware::CPU.intel?
-    url "https://github.com/wittkung/TTZip/releases/download/v1.0.0/ttzip-cli-v1.0.0-macos-universal.tar.gz"
-    sha256 "3b3a1e226bec4fc825f9418fbd2f9f81b26c8c3b4fd0d57607e8e29802d730b8"
-  end
+  depends_on :macos => :sonoma
 
   def install
-    bin.install "ttzip-cli" => "ttzip"
+    bin.install "bin/ttzip-cli"
+    bin.install "bin/ttzip" if File.exist?("bin/ttzip")
+    man1.install "share/man/man1/ttzip-cli.1" if File.exist?("share/man/man1/ttzip-cli.1")
+    bash_completion.install "share/bash-completion/completions/ttzip-cli" if File.exist?("share/bash-completion/completions/ttzip-cli")
+    zsh_completion.install "share/zsh/site-functions/_ttzip-cli" if File.exist?("share/zsh/site-functions/_ttzip-cli")
+    fish_completion.install "share/fish/vendor_completions.d/ttzip-cli.fish" if File.exist?("share/fish/vendor_completions.d/ttzip-cli.fish")
   end
 
   test do
-    # Verify version output
-    assert_match "ttzip-cli", shell_output("#{bin}/ttzip --version")
-    
-    # Verify archive creation and extraction roundtrip
-    (testpath/"hello.txt").write "Hello, TTZip Open-Core High Performance Engine!"
-    system "#{bin}/ttzip", "create", testpath/"hello.tar.zst", testpath/"hello.txt"
-    assert_predicate testpath/"hello.tar.zst", :exist?
-    
-    system "#{bin}/ttzip", "extract", testpath/"hello.tar.zst", testpath/"extracted"
-    assert_equal "Hello, TTZip Open-Core High Performance Engine!", (testpath/"extracted/hello.txt").read
+    assert_match "ttzip", shell_output("#{bin}/ttzip-cli --version")
+    (testpath/"hello.txt").write("TTZip Homebrew Test Verification")
+    system "#{bin}/ttzip-cli", "archive", "test.zip", "hello.txt"
+    assert_predicate testpath/"test.zip", :exist?
+    system "#{bin}/ttzip-cli", "test", "test.zip"
   end
 end

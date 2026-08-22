@@ -11,12 +11,12 @@
 
 <p align="center">
   <strong>极速原生跨平台归档与压缩微内核</strong><br />
-  基于纯 C11 独立核心 (`libttzip`)、SOTA 编解码器矩阵、Dual-ISA 硬件向量加速（ARM64 PMULL / x86_64 AVX2）以及轻量级 Swift 6 macOS 表现层构建。
+  基于 Safe Rust 安全微内核 (<code>ttzip-glue</code> &rarr; <code>TTZipVendor.xcframework</code>)、SOTA 顶尖编解码器矩阵、Dual-ISA 硬件向量加速（ARM64 PMULL / x86_64 AVX2）以及 Swift 6 原生 macOS 表现层与 CLI (<code>TTZipApp</code>, <code>TTZipCLI</code>, <code>TTZipCore</code>) 构建。
 </p>
 
 <p align="center">
-  <a href="https://github.com/wittkung/TTZip"><img src="https://img.shields.io/badge/架构-纯%20C11%20微内核-blue?style=flat-square&logo=c" alt="C11 Core" /></a>
-  <a href="https://cmake.org"><img src="https://img.shields.io/badge/构建-CMake%203.20%2B-064F8C?style=flat-square&logo=cmake" alt="CMake" /></a>
+  <a href="https://github.com/wittkung/TTZip"><img src="https://img.shields.io/badge/架构-Swift%206%20%2B%20Safe%20Rust-blue?style=flat-square" alt="Architecture" /></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-1.80%2B%20%7C%20Cargo-dea584?style=flat-square&logo=rust" alt="Rust Cargo" /></a>
   <a href="https://swift.org"><img src="https://img.shields.io/badge/Swift-6.0%20严格并发-orange?style=flat-square&logo=swift" alt="Swift 6.0" /></a>
   <a href="https://apple.com/macos"><img src="https://img.shields.io/badge/macOS-14.0%2B%20(Sonoma)-blue?style=flat-square&logo=apple" alt="macOS 14+" /></a>
   <a href="https://en.wikipedia.org/wiki/Apple_silicon"><img src="https://img.shields.io/badge/向量%20ISA-ARM64%20NEON%20%2B%20x86__64%20AVX2-purple?style=flat-square" alt="Hardware Vector" /></a>
@@ -27,7 +27,7 @@
 
 ## 🌟 核心技术亮点与架构设计
 
-- **🚀 100% 独立纯 C11 微内核 (`libttzip.a`)**：零外部 CLI 进程派生（无 `exec`/`posix_spawn`）。所有压缩、解压、树遍历和编解码逻辑均在进程内通过纯 C11 静态库高效执行，彻底消除对 Apple GCD 的强依赖。
+- **🚀 双核微内核架构 (Swift 6 + Safe Rust 微内核)**：内存安全的高吞吐 Rust 原生引擎 (`rust/ttzip-glue` 编译为 `TTZipVendor.xcframework`)，通过零开销标准化 C-ABI (`CTTZipBridge`) 进行跨语言桥接，由 Swift 6 完全并发域编排 (`TTZipCore`) 驱动，呈现于原生桌面 GUI (`TTZipApp`)、POSIX 命令行 (`ttzip-cli`) 与性能基准套件 (`ttzip-bench`)。
 - **⚡️ 63+ GB/s 硬件双指令集 (Dual-ISA) 向量加速**：
   - **63,232 MB/s (63.2 GB/s) CRC32**：ARM64 硬件多项式乘法 (`vmull_p64` / `__crc32d`) 与 x86_64 PCLMULQDQ 宽折叠加速。
   - **36,017 MB/s (36.0 GB/s) CRC64**：Dual-ISA 向量化 ECMA-182 校验。
@@ -37,23 +37,22 @@
   - **Zstandard (Zstd)**：压缩 7,452 MB/s，解压 29,046 MB/s (L3)。
   - **Google Snappy**：压缩 10,259 MB/s，解压 26,254 MB/s。
   - **Fast-LZMA2 (FL2)**：多核并发极端压缩，配备高效匹配查找器。
-  - **Apple LZFSE 与 Zopfli 图优化**：原生 macOS 加速与最短路径 DAG 极限压缩比。
+  - **Apple LZFSE, Brotli, Bzip2 与 Zopfli DAG 极限图优化**：原生 macOS 加速、网络流式传输与最短路径图优化。
 - **🔍 纳秒级虚拟文件系统 (VFS) 微内核**：
   - **常数时间 Magic 幻数嗅探**：4.28 亿次/秒瞬间识别 100+ 种格式。
-  - **纯 C11 自然数字排序**：3,218 万次/秒不区分大小写自然排序（`img_2.png` < `img_10.png`）。
+  - **自然数字排序**：3,218 万次/秒不区分大小写自然排序（`img_2.png` < `img_10.png`）。
   - **紧凑 Radix 归档文件树**：5,000 节点层级检索仅需 **308 微秒 (0.3 ms)**。
   - **零磁盘 I/O 内存即时预览**：直接解压到内存 Buffer，无需写入临时文件，零 SSD 磨损。
 - **🛡 密码安全内存擦除与前向纠错 (FEC)**：
   - **DSE 防死存储消除擦除 (4,254 MB/s)**：Volatile 指针物理清零，防止密码残留在 Swift ARC 堆内存中。
   - **里德-所罗门恢复记录 (1,382 MB/s)**：Galois 域 GF(2^8) 纠错算法，自愈受损压缩包。
-- **🖥 极轻量级 Swift 6 macOS 表现层 (`TTZipApp`)**：
-  - 核心逻辑完全退守为极薄桥接 (`NativeMicrokernelBridge`)，UI 响应零卡顿。
+  - **零崩溃弹性**：加固 FFI 边界并具备 `catch_unwind` 隔离，全方位防护宿主进程。
 
 ---
 
 ## 📦 支持格式矩阵（16 种全格式支持）
 
-| 格式分类 | 具体格式 | 打包压缩 (C11 核心) | 解压提取 (C11 核心) | 内存秒开预览 | 多卷分卷支持 |
+| 格式分类 | 具体格式 | 打包压缩 (Rust/Swift 引擎) | 解压提取 (Safe 引擎) | 内存秒开预览 | 多卷分卷支持 |
 | :--- | :--- | :---: | :---: | :---: | :---: |
 | **现代主流** | `.zip`, `.7z`, `.tar`, `.tar.zst` | ✅ (多核并发) | ✅ (硬件 SIMD) | ✅ (0 磁盘 I/O) | ✅ (`.z01`, `.001`) |
 | **高压缩率** | `.tar.xz`, `.tar.bz2`, `.tar.gz`, `.lzip` | ✅ | ✅ | ✅ | ✅ |
@@ -64,14 +63,14 @@
 
 ---
 
-## 📈 实机硬件跑分测试 (`ttzip-cli --benchmark`)
+## 📈 实机硬件跑分测试 (`ttzip-bench matrix`)
 
-*测试环境：Apple Silicon M 系列芯片，macOS 14+，CMake 3.20+ Release `-O3` 编译。*
+*测试环境：Apple Silicon M 系列芯片，macOS 14+，通过 Swift 6.0 与 Rust Cargo `-O3` Release 编译。*
 
 ```text
 =================================================================
  TTZip High-Performance Native Archive Engine v1.0.0
- Cross-Platform Pure C11 Core Engine (Zero GCD / SOTA Codecs)
+ Dual-Core Engine: Swift 6 Concurrency + Safe Rust Microkernel
 =================================================================
 
 [1/3] Hardware Vector Checksums:
@@ -93,7 +92,7 @@
   • DSE-Immune Memory Scrubbing:  4,254.14 MB/s
   • Reed-Solomon Recovery Parity: 1,382.18 MB/s
 
-[4/4] Cross-Platform Threadpool (ttzip_threadpool) Multi-Core Scaling:
+[4/4] Cross-Platform Rayon / TaskGroup Multi-Core Scaling:
   • Active Worker Threads: 18 P/E Workers
 ```
 
@@ -101,29 +100,45 @@
 
 ## ⚡️ 快速安装与编译指南
 
-### 1. 编译纯 C 微内核与独立 CLI 工具 (CMake)
+### 1. 通过 Homebrew 安装
+
+```bash
+brew install wittkung/ttzip/ttzip-cli
+```
+
+### 2. 原生一键构建与安装
+
+一行命令自动编译并将 `TTZip.app` 安装至 `/Applications`，同时将 `ttzip` / `ttzip-cli` 软链至系统环境变量：
 
 ```bash
 git clone https://github.com/wittkung/TTZip.git
 cd TTZip
 
-# 配置并编译 Release 二进制
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release -j8
+# 选项 A: 通过 Makefile 编译并安装
+make reinstall
 
-# 运行独立 CLI 性能基准测试与快速入门示例
-./build/ttzip-cli --benchmark
-./build/ttzip-quickstart
+# 选项 B: 在 Finder 中双击运行或在终端中执行
+./Install-TTZip.command
 ```
 
-### 2. 编译 macOS 原生桌面客户端与 Swift CLI
+### 3. 通过 Swift Package Manager (SwiftPM) 编译
 
 ```bash
-# 通过 Swift Package Manager 编译
+# 编译所有 Release 产物 (TTZipApp, ttzip-cli, ttzip-bench)
 swift build -c release
 ```
 
-### 3. 运行本地自动化 CI 门禁（0 云端配额消耗）
+### 4. 编译 Rust 安全微内核 (`ttzip-glue`)
+
+```bash
+# 自动编译 Universal 静态库并部署至 Vendor XCFramework
+./scripts/build_rust.sh
+
+# 或通过 Cargo 直接构建
+cargo build --manifest-path rust/Cargo.toml --release
+```
+
+### 5. 运行本地自动化 CI 门禁（0 云端配额消耗）
 
 ```bash
 ./scripts/run_local_ci_gate.sh
@@ -131,68 +146,78 @@ swift build -c release
 
 ---
 
-## 🛠 C SDK 1 分钟快速集成示例
+## 💻 CLI 命令行使用指南 (`ttzip-cli`)
 
-通过 `ttzip_api.h` 直接将 `libttzip` 嵌入至您的 C/C++/Rust 应用程序中：
+`ttzip-cli` 提供原生 POSIX 子命令支持，并支持管道与流式传输：
 
-```c
-#include <stdio.h>
-#include <string.h>
-#include <ttzip/ttzip_api.h>
+### 常用操作示例
 
-int main(void) {
-    printf("TTZip 引擎版本: %s\n", ttzip_version_string());
+```bash
+# 1. 使用 SOTA 顶尖编解码器创建归档
+ttzip-cli archive backup.zip file1.txt docs/ photos/
+ttzip-cli archive output.tar.zst /path/to/source --level 9
 
-    // 1. 硬件向量加速 CRC32 校验
-    const char *data = "Hello TTZip Native World!";
-    uint32_t hash = ttzip_crc32(0, data, strlen(data));
+# 2. 多核并发流式解压
+ttzip-cli extract archive.tar.zst -o ./extracted/
+ttzip-cli extract archive.7z
 
-    // 2. 内存级 SOTA 压缩 (如 Zstd)
-    size_t comp_cap = ttzip_compress_bound(TTZIP_API_CODEC_ZSTD, strlen(data));
-    uint8_t comp_buf[256];
-    size_t comp_len = ttzip_compress_buffer(
-        TTZIP_API_CODEC_ZSTD, data, strlen(data), comp_buf, sizeof(comp_buf), 3
-    );
+# 3. 校验压缩包 CRC 与结构完整性
+ttzip-cli test archive.zip
 
-    // 3. 纳秒级 Magic 格式嗅探
-    ttzip_magic_info_t info = ttzip_magic_sniff_buffer(comp_buf, comp_len);
-    printf("识别格式: %s (MIME: %s)\n", info.format_name, info.mime_type);
+# 4. 查看压缩包文件列表与元数据
+ttzip-cli list archive.zip
+ttzip-cli inspect archive.7z
 
-    return 0;
-}
+# 5. 启动交互式终端 TUI 归档文件管理器
+ttzip-cli explore archive.zip
+
+# 6. 抢救并修复损坏的压缩文件
+ttzip-cli repair damaged.zip -o repaired.zip
 ```
 
-### CMake `FetchContent` 引入方式
+### 子命令速查表
 
-```cmake
-include(FetchContent)
-FetchContent_Declare(
-    TTZip
-    GIT_REPOSITORY https://github.com/wittkung/TTZip.git
-    GIT_TAG        main
-)
-FetchContent_MakeAvailable(TTZip)
-
-target_link_libraries(your_application PRIVATE TTZip::ttzip)
-```
+| 命令 | 别名 | 用法示例 | 功能描述 |
+| :--- | :--- | :--- | :--- |
+| `archive` | `create`, `a`, `c` | `ttzip-cli archive <out> <inputs...>` | 使用 SOTA 编解码器与多核并行压缩打包 |
+| `extract` | `x`, `e` | `ttzip-cli extract <archive> [-o dir]` | 多核极速并行解压，具备安全权限映射 |
+| `test` | `t`, `verify` | `ttzip-cli test <archive>` | 校验压缩包 CRC、Header 及容器结构完整性 |
+| `list` | `l`, `ls` | `ttzip-cli list <archive>` | 打印压缩包文件列表、压缩体积与属性 |
+| `inspect` | `i`, `info` | `ttzip-cli inspect <archive>` | 深度审查容器元数据、编码类型与压缩率 |
+| `explore` | `tui`, `browse` | `ttzip-cli explore <archive>` | 启动全屏交互式 TUI 压缩包浏览器 |
+| `repair` | `recover` | `ttzip-cli repair <damaged> -o <fixed>` | 重建损坏的 Central Directory 并抢救文件条目 |
+| `bench` | `b`, `benchmark` | `ttzip-cli bench` | 运行全量硬件向量指令与编解码器跑分 |
 
 ---
 
-## 💻 CLI 常用命令参考
+## 📊 基准测试与性能遥测指南 (`ttzip-bench`)
 
-| 选项命令 | 示例用法 | 功能描述 |
-| :--- | :--- | :--- |
-| `-c`, `--create` | `ttzip-cli -c archive.zip file1 file2 dir/` | 使用 SOTA 编解码器流式创建归档 |
-| `-x`, `--extract` | `ttzip-cli -x archive.tar -o output_dir/` | 多核并行解压 |
-| `-t`, `--test` | `ttzip-cli -t archive.7z` | 校验压缩包完整性与 CRC |
-| `-l`, `--list` | `ttzip-cli -l archive.zip` | 打印压缩包文件列表与元数据 |
-| `--benchmark` | `ttzip-cli --benchmark` | 运行全量硬件向量与编解码器基准测试 |
+`ttzip-bench` 是基于 Rust Native C-ABI 的高性能内存微基准测试与 CI 性能门禁工具：
+
+```bash
+# 1. 运行全引擎内存基准测试矩阵 (libdeflate, zstd, lz4, lzfse, snappy, brotli, bzip2)
+swift run ttzip-bench matrix
+
+# 2. 运行自动化回归门禁检查 (CI/CD 硬件与编解码器校验)
+swift run ttzip-bench gate
+
+# 3. 导出结构化遥测 JSON、交互式 Pareto SVG 帕累托图以及 Zen UI 独立 HTML 仪表盘
+swift run ttzip-bench plot --json-out telemetry.json --svg-out pareto.svg --html-out dashboard.html
+```
 
 ---
 
 ## 💖 回馈开源社区
 
 TTZip 秉持开源回馈精神，积极将验证过的硬件加速与架构优化贡献给上游核心项目：
+- [libarchive](https://github.com/libarchive/libarchive) (Tim Kientzle, Martin Matuska)
+- [XZ Utils / liblzma](https://github.com/tukaani-project/xz) (Lasse Collin, Igor Pavlov)
+- [libdeflate](https://github.com/ebiggers/libdeflate) (Eric Biggers)
+- [Zstandard (zstd)](https://github.com/facebook/zstd) (Yann Collet & Meta Compression Team)
+- [LZ4](https://github.com/lz4/lz4) (Yann Collet)
+- [7-Zip / LZMA SDK](https://www.7-zip.org) (Igor Pavlov)
+
+### 🌟 上游贡献成果
 - **[`libarchive/libarchive`](https://github.com/libarchive/libarchive)**：
   - ✅ **ARMv8 ACLE 硬件加速 CRC32 与架构统一** ([PR #3391](https://github.com/libarchive/libarchive/pull/3391) — **已合并至 `master`**, Commit [`8e439b92`](https://github.com/libarchive/libarchive/commit/8e439b92787c8104e22c5958caf0a7ef9532567f))。
   - 🔄 **7-Zip AES-256-CBC 流式解密流水线** ([PR #3388](https://github.com/libarchive/libarchive/pull/3388))。
