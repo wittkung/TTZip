@@ -134,6 +134,7 @@ const char *ttzip_rust_status_string(TTZipStatus status);
 bool ttzip_rust_is_hardware_accelerated(void);
 uint32_t ttzip_rust_crc32(uint32_t crc, const uint8_t *data, size_t len);
 uint32_t ttzip_rust_adler32(uint32_t adler, const uint8_t *data, size_t len);
+uint64_t ttzip_rust_crc64(uint64_t seed, const uint8_t *data, size_t len);
 
 // AES-256 & ZipCrypto Operations
 int32_t ttzip_rust_aes256_ctr(const uint8_t *key, uint64_t initial_counter, const uint8_t *src, size_t len, uint8_t *dst);

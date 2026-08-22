@@ -44,3 +44,20 @@ pub unsafe extern "C" fn ttzip_rust_adler32(adler: u32, data: *const u8, len: us
 
     result.unwrap_or(adler)
 }
+
+/// C-ABI exported fast CRC-64 ECMA calculator.
+///
+/// # Safety
+/// If `data` is not null and `len > 0`, `data` must point to at least `len` valid readable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_crc64(seed: u64, data: *const u8, len: usize) -> u64 {
+    let result = catch_unwind(|| {
+        if data.is_null() || len == 0 {
+            return seed;
+        }
+        let slice = unsafe { slice::from_raw_parts(data, len) };
+        crate::crypto::crc64::crc64(slice, seed)
+    });
+
+    result.unwrap_or(seed)
+}
