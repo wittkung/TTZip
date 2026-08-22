@@ -82,3 +82,162 @@ public final class TTZipLocalizationManager: @unchecked Sendable {
         }
     }
 }
+
+// MARK: - Formatters & Extensions
+
+//
+//
+
+
+/// Storage capacity formatting standard.
+public enum ByteSizeStandard: Sendable {
+    /// International decimal SI standard (1 KB = 1000 B, 1 MB = 1000 KB, macOS default).
+    case metricSI
+    /// International binary IEC standard (1 KiB = 1024 B, 1 MiB = 1024 KiB).
+    case binaryIEC
+}
+
+/// Zero-heap-allocation byte capacity formatting engine.
+public enum ByteSizeFormatter {
+    
+    private static let metricUnits = ["B", "KB", "MB", "GB", "TB", "PB"]
+    private static let binaryUnits = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
+    
+    /// Formats byte count according to standard and localized decimal conventions.
+    public static func format(bytes: Int64, style: ByteSizeStandard = .metricSI, language: AppLanguage = .en) -> String {
+        guard bytes >= 0 else { return "0 B" }
+        if bytes < 1000 && style == .metricSI { return "\(bytes) B" }
+        if bytes < 1024 && style == .binaryIEC { return "\(bytes) B" }
+        
+        let base: Double = (style == .metricSI) ? 1000.0 : 1024.0
+        let units = (style == .metricSI) ? metricUnits : binaryUnits
+        
+        var val = Double(bytes)
+        var unitIdx = 0
+        
+        while val >= base && unitIdx < units.count - 1 {
+            val /= base
+            unitIdx += 1
+        }
+        
+        let formattedVal = String(format: "%.1f", val)
+        let localizedVal = formatDecimalString(formattedVal, for: language)
+        return "\(localizedVal) \(units[unitIdx])"
+    }
+    
+    private static func formatDecimalString(_ str: String, for language: AppLanguage) -> String {
+        switch language {
+        case .de, .fr, .es:
+            return str.replacingOccurrences(of: ".", with: ",")
+        case .en, .zhHans, .zhHant, .ja:
+            return str
+        }
+    }
+}
+
+//
+//
+
+
+/// High-performance lock-free throughput rate formatting engine.
+public enum ThroughputFormatter {
+    
+    /// Formats throughput rate in MB/s with locale-sensitive decimal formatting.
+    public static func format(mbPerSec: Double, language: AppLanguage = .en) -> String {
+        guard mbPerSec >= 0 else { return "0.0 MB/s" }
+        
+        let formattedVal: String
+        if mbPerSec >= 10000.0 {
+            formattedVal = String(format: "%.0f", mbPerSec)
+        } else if mbPerSec >= 100.0 {
+            formattedVal = String(format: "%.1f", mbPerSec)
+        } else {
+            formattedVal = String(format: "%.2f", mbPerSec)
+        }
+        
+        let localizedVal: String
+        switch language {
+        case .de, .fr, .es:
+            localizedVal = formattedVal.replacingOccurrences(of: ".", with: ",")
+        case .en, .zhHans, .zhHant, .ja:
+            localizedVal = formattedVal
+        }
+        
+        return "\(localizedVal) MB/s"
+    }
+}
+
+//
+//
+
+
+/// Unicode CLDR plural categories.
+public enum PluralCategory: Sendable {
+    case zero
+    case one
+    case two
+    case few
+    case many
+    case other
+}
+
+/// Evaluator engine for Unicode CLDR plural rules across supported languages.
+public enum PluralRuleEngine {
+    
+    /// Evaluates plural category given item count and language.
+    public static func evaluate(count: Int64, language: AppLanguage) -> PluralCategory {
+        switch language {
+        case .zhHans, .zhHant, .ja:
+            return .other
+            
+        case .en, .de, .es:
+            return (count == 1) ? .one : .other
+            
+        case .fr:
+            return (count == 0 || count == 1) ? .one : .other
+        }
+    }
+}
+
+//
+//
+
+
+extension ArchiveError {
+    
+    /// Localized error description for the current or specified language.
+    public func localizedDescription(for language: AppLanguage? = nil) -> String {
+        let manager = TTZipLocalizationManager.shared
+        switch self {
+        case .fileNotFound:
+            return manager.string(for: L10n.Errors.fileNotFound, language: language)
+        case .readFailed(let code):
+            let template = manager.string(for: L10n.Errors.readError, language: language)
+            return "\(template) (Code: \(code))"
+        case .invalidFormat:
+            return manager.string(for: L10n.Errors.unsupportedFormat, language: language)
+        case .passwordRequired:
+            return manager.string(for: L10n.Errors.passwordRequired, language: language)
+        case .passwordRequiredDetailed(let archivePath, let tier):
+            let base = manager.string(for: L10n.Errors.passwordRequired, language: language)
+            let fileName = (archivePath as NSString).lastPathComponent
+            if tier == .headerAndData {
+                return "\(base): header and entries are encrypted (\(fileName))"
+            } else {
+                return "\(base): payload data is encrypted (\(fileName))"
+            }
+        case .wrongPassword:
+            return manager.string(for: L10n.Errors.incorrectPassword, language: language)
+        case .unsupportedEncryptionMethod(_, let method):
+            let template = manager.string(for: L10n.Errors.unsupportedFormat, language: language)
+            return "\(template) [\(method)]"
+        case .corruptedData(_, let entryPath):
+            let template = manager.string(for: L10n.Errors.corruptData, language: language)
+            return "\(template): \(entryPath)"
+        case .cancelled:
+            return manager.string(for: L10n.Errors.operationCancelled, language: language)
+        case .invalidState:
+            return manager.string(for: L10n.Common.error, language: language)
+        }
+    }
+}

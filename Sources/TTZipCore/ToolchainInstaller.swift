@@ -298,3 +298,200 @@ public final class ToolchainInstaller: @unchecked Sendable {
     }
     #endif
 }
+
+// MARK: - SevenZip Resolver
+
+//
+//
+
+
+/// 7-Zip native executable binary resolver supporting embedded bundle extraction and PATH fallback.
+public final class SevenZipBinaryResolver: @unchecked Sendable {
+    public static let shared = SevenZipBinaryResolver()
+
+    private let lock = NSLock()
+    private var cachedPath: String?
+
+    private init() {}
+
+    public static func resolveBinaryPath() -> String? {
+        return shared.resolve()
+    }
+
+    public func resolve() -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        if let path = cachedPath {
+            return path
+        }
+        
+        if let bundlePath = Bundle.main.path(forResource: "7zz", ofType: nil),
+           FileManager.default.isExecutableFile(atPath: bundlePath) {
+            cachedPath = bundlePath
+            return bundlePath
+        }
+        
+        let candidates = [
+            "/opt/homebrew/bin/7zz",
+            "/opt/homebrew/bin/7z",
+            "/usr/local/bin/7zz",
+            "/usr/local/bin/7z",
+            "/usr/bin/7zz",
+            "/usr/bin/7z"
+        ]
+        for candidate in candidates {
+            if FileManager.default.isExecutableFile(atPath: candidate) || FileManager.default.fileExists(atPath: candidate) {
+                cachedPath = candidate
+                return candidate
+            }
+        }
+        
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        proc.arguments = ["7zz"]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        if (try? proc.run()) != nil {
+            proc.waitUntilExit()
+            if proc.terminationStatus == 0 {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !str.isEmpty {
+                    cachedPath = str
+                    return str
+                }
+            }
+        }
+        
+        return nil
+    }
+}
+
+// MARK: - Subprocess Executor
+
+//
+//
+
+
+/// Safe asynchronous subprocess execution and pipe draining service.
+public final class SubprocessExecutor: Sendable {
+    public static let shared = SubprocessExecutor()
+    private init() {}
+    
+    /// Synchronously executes a subprocess streaming stdout/stderr line-by-line.
+    public func executeProcess(
+        executablePath: String,
+        arguments: [String],
+        currentDirectory: String? = nil,
+        progressRegexPattern: String? = nil,
+        onOutput: (@Sendable (String) -> Void)? = nil
+    ) throws -> Int32 {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executablePath)
+        process.arguments = arguments
+        if let dir = currentDirectory {
+            process.currentDirectoryURL = URL(fileURLWithPath: dir)
+        }
+        
+        let pipe = Pipe()
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = pipe
+        process.standardError = pipe
+        
+        let fileHandle = pipe.fileHandleForReading
+        defer { try? fileHandle.close() }
+        
+        fileHandle.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+            onOutput?(text)
+        }
+        
+        try process.run()
+        process.waitUntilExit()
+        fileHandle.readabilityHandler = nil
+        
+        return process.terminationStatus
+    }
+    
+    /// Asynchronously executes a subprocess and returns exit code and captured text output.
+    public func executeAsync(
+        executablePath: String,
+        arguments: [String],
+        currentDirectory: String? = nil
+    ) async throws -> (exitCode: Int32, output: String) {
+        return try await Task.detached(priority: .userInitiated) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: executablePath)
+            process.arguments = arguments
+            if let dir = currentDirectory {
+                process.currentDirectoryURL = URL(fileURLWithPath: dir)
+            }
+            let pipe = Pipe()
+            process.standardInput = FileHandle.nullDevice
+            process.standardOutput = pipe
+            process.standardError = pipe
+
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            let text = String(data: data, encoding: .utf8) ?? ""
+            return (process.terminationStatus, text)
+        }.value
+    }
+}
+
+// MARK: - Temp CleanUp Manager
+
+//
+//
+
+
+/// Centralized temporary directory cleanup manager.
+public final class TempDirectoryCleanUpManager: Sendable {
+    public static let shared = TempDirectoryCleanUpManager()
+    
+    private init() {}
+    
+    /// Cleans up transient temporary directories generated across operations (`ttzip_*`, `pwd_test_*`, `measure_*`).
+    public func cleanupAllTemporaryDirectories() {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory
+        
+        guard let items = try? fileManager.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) else {
+            return
+        }
+        
+        for item in items {
+            let lowerName = item.lastPathComponent.lowercased()
+            if lowerName.hasPrefix("ttzip") ||
+               lowerName.hasPrefix("ttzipedit_") ||
+               lowerName.hasPrefix("ttzip_edit_") ||
+               lowerName.hasPrefix("pwd_test") ||
+               lowerName.hasPrefix("tt_") ||
+               lowerName.hasPrefix("measure_") ||
+               lowerName.hasPrefix("dest_") ||
+               lowerName.hasPrefix("joined_") ||
+               lowerName.hasPrefix("warmup_") ||
+               lowerName.hasPrefix("iter_") ||
+               lowerName.hasPrefix("arc_") ||
+               lowerName.hasPrefix("sample_") ||
+               lowerName.hasPrefix("huge_") ||
+               lowerName.hasPrefix("ditto_") ||
+               lowerName.hasPrefix("7zz_") ||
+               lowerName.hasPrefix("pigz_") ||
+               lowerName.hasPrefix("libdeflate_") ||
+               lowerName.hasPrefix("zstd_") ||
+               lowerName.hasPrefix("bz2_") ||
+               lowerName.hasPrefix("xz_") ||
+               lowerName.hasPrefix("lz_") ||
+               lowerName.hasPrefix("lz4_") ||
+               lowerName.hasPrefix("br_") ||
+               lowerName.hasPrefix("lrz_") ||
+               lowerName.hasPrefix("inspect_") ||
+               lowerName.hasPrefix("repair_") ||
+               lowerName.contains("exhaustivedatasetcache") {
+                try? fileManager.removeItem(at: item)
+            }
+        }
+    }
+}

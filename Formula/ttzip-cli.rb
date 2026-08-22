@@ -12,7 +12,7 @@ class TtzipCli < Formula
   desc "High-performance native archive and compression CLI utility for macOS"
   homepage "https://github.com/wittkung/TTZip"
   url "https://github.com/wittkung/TTZip/releases/download/v1.0.0/ttzip-cli-v1.0.0-darwin-universal.tar.gz"
-  sha256 "d0a4c45b66be0484f9a7b37b083eb7434337daa3113baa37dc597d156519b520"
+  sha256 "977f6d9abc289d2a080a8d6848f07e4ed00d3965fc9bbdeada725cc334f9cafd"
   license :cannot_be_redistributed
 
   depends_on :macos => :sonoma

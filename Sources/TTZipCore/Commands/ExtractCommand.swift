@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-TTZip-Source-Available-1.0
-//
-// Copyright (c) 2026 Witt Kung <witt.w.kung@gmail.com>
-// All rights reserved.
-//
-// TTZip: High-performance native archiving and compression engine for macOS.
+// TTZip
 
 import Foundation
+
+//
+//
+
 
 /// Concrete command encapsulating archive extraction with undoable directory rollback.
 public final class ExtractCommand: ArchiveCommandProtocol, @unchecked Sendable {
@@ -211,5 +211,334 @@ public final class ExtractCommand: ArchiveCommandProtocol, @unchecked Sendable {
             }
         }
         return result
+    }
+}
+
+// MARK: - Repair Command
+
+//
+//
+
+
+/// Concrete command encapsulating archive scanning and recovery with transactional rollback.
+public final class RepairCommand: ArchiveCommandProtocol, @unchecked Sendable {
+    public let commandId: String
+    public let description: String
+    public var isUndoable: Bool { true }
+    
+    public let damagedPath: String
+    public let outputPath: String
+    private let engineFacade: TTZipEngineFacading
+    private let lock = NSLock()
+    
+    private var createdArtifacts: [String] = []
+    private var backupFilePath: String? = nil
+    private var isExecutedState: Bool = false
+    
+    public init(
+        commandId: String = UUID().uuidString,
+        description: String? = nil,
+        damagedPath: String,
+        outputPath: String,
+        engineFacade: TTZipEngineFacading = TTZipEngineFacade.shared
+    ) {
+        self.commandId = commandId
+        self.damagedPath = damagedPath
+        self.outputPath = outputPath
+        self.engineFacade = engineFacade
+        
+        let file = (damagedPath as NSString).lastPathComponent
+        self.description = description ?? "Repair damaged archive [\(file)]"
+    }
+    
+    deinit {
+        purgeBackupResources()
+    }
+    
+    public func execute() async throws -> CommandResult {
+        let startTime = CFAbsoluteTimeGetCurrent()
+        let fm = FileManager.default
+        
+        let backupPathCandidate = "\(outputPath).bak_\(UUID().uuidString)"
+        var backupMade: String? = nil
+        if fm.fileExists(atPath: outputPath) {
+            try? fm.copyItem(atPath: outputPath, toPath: backupPathCandidate)
+            backupMade = backupPathCandidate
+        }
+        
+        let recoveredCount: Int
+        do {
+            recoveredCount = try await engineFacade.repairArchive(damagedPath: damagedPath, outputPath: outputPath)
+        } catch {
+            if let b = backupMade, fm.fileExists(atPath: b) {
+                try? fm.removeItem(atPath: b)
+            }
+            throw error
+        }
+        
+        let endTime = CFAbsoluteTimeGetCurrent()
+        let duration = endTime - startTime
+        
+        var artifacts: [String] = []
+        if fm.fileExists(atPath: outputPath) {
+            artifacts.append(outputPath)
+        }
+        
+        saveExecutionState(artifacts: artifacts, backupPath: backupMade)
+        
+        var backupDict: [String: String] = [:]
+        if let b = backupMade {
+            backupDict[outputPath] = b
+        }
+        
+        return CommandResult(
+            commandId: commandId,
+            success: true,
+            message: "Archive repaired successfully, recovered \(recoveredCount) data blocks",
+            artifactsCreated: artifacts,
+            backupPaths: backupDict,
+            executionDuration: duration,
+            metadata: ["recoveredCount": "\(recoveredCount)"]
+        )
+    }
+    
+    public func undo() async throws {
+        let (executed, artifacts, backup) = getUndoStateSnapshot()
+        guard executed else {
+            throw CommandError.invalidState(reason: "Repair command has not been executed; cannot undo.")
+        }
+        
+        let fm = FileManager.default
+        
+        for path in artifacts {
+            if fm.fileExists(atPath: path) {
+                try? fm.removeItem(atPath: path)
+            }
+        }
+        
+        if let backup = backup, fm.fileExists(atPath: backup) {
+            if fm.fileExists(atPath: outputPath) {
+                try? fm.removeItem(atPath: outputPath)
+            }
+            do {
+                try fm.moveItem(atPath: backup, toPath: outputPath)
+            } catch {
+                throw CommandError.undoFailed(reason: "Failed to restore original backup during repair undo: \(error.localizedDescription)")
+            }
+        }
+        
+        resetExecutionStateOnUndoSuccess()
+    }
+    
+    public func purgeBackupResources() {
+        lock.lock()
+        let b = self.backupFilePath
+        self.backupFilePath = nil
+        lock.unlock()
+        
+        if let b = b, FileManager.default.fileExists(atPath: b) {
+            try? FileManager.default.removeItem(atPath: b)
+        }
+    }
+    
+    // MARK: - Internal Synchronization Helpers
+    
+    private func saveExecutionState(artifacts: [String], backupPath: String?) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.createdArtifacts = artifacts
+        self.backupFilePath = backupPath
+        self.isExecutedState = true
+    }
+    
+    private func getUndoStateSnapshot() -> (executed: Bool, artifacts: [String], backup: String?) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (self.isExecutedState, self.createdArtifacts, self.backupFilePath)
+    }
+    
+    private func resetExecutionStateOnUndoSuccess() {
+        lock.lock()
+        defer { lock.unlock() }
+        self.isExecutedState = false
+        self.createdArtifacts.removeAll()
+        self.backupFilePath = nil
+    }
+}
+
+// MARK: - Macro Command
+
+//
+//
+
+
+/// Composite / macro command orchestrating a sequence of archive operations with automated reverse rollback.
+public final class MacroArchiveCommand: ArchiveCommandProtocol, @unchecked Sendable {
+    public let commandId: String
+    public let description: String
+    public var isUndoable: Bool {
+        commands.allSatisfy { $0.isUndoable }
+    }
+    
+    public let commands: [ArchiveCommandProtocol]
+    private let lock = NSLock()
+    
+    private var executedSubCommands: [ArchiveCommandProtocol] = []
+    private var isExecutedState: Bool = false
+    
+    public init(
+        commandId: String = UUID().uuidString,
+        description: String? = nil,
+        commands: [ArchiveCommandProtocol]
+    ) {
+        self.commandId = commandId
+        self.commands = commands
+        self.description = description ?? "Macro command (\(commands.count) atomic steps)"
+    }
+    
+    deinit {
+        purgeBackupResources()
+    }
+    
+    public func execute() async throws -> CommandResult {
+        let startTime = CFAbsoluteTimeGetCurrent()
+        
+        clearExecutedList()
+        
+        var combinedArtifacts: [String] = []
+        var combinedBackups: [String: String] = [:]
+        
+        for (index, command) in commands.enumerated() {
+            do {
+                let subResult = try await command.execute()
+                
+                appendExecutedCommand(command)
+                
+                combinedArtifacts.append(contentsOf: subResult.artifactsCreated)
+                for (k, v) in subResult.backupPaths {
+                    combinedBackups[k] = v
+                }
+            } catch {
+                let rollbackErrors = await performRollback()
+                
+                throw CommandError.macroExecutionFailed(
+                    failedIndex: index,
+                    underlyingError: error.localizedDescription,
+                    rollbackErrors: rollbackErrors
+                )
+            }
+        }
+        
+        let endTime = CFAbsoluteTimeGetCurrent()
+        let duration = endTime - startTime
+        
+        markAsExecuted()
+        
+        return CommandResult(
+            commandId: commandId,
+            success: true,
+            message: "Macro command executed successfully (\(commands.count) sub-steps)",
+            artifactsCreated: combinedArtifacts,
+            backupPaths: combinedBackups,
+            executionDuration: duration
+        )
+    }
+    
+    public func undo() async throws {
+        let (executed, toUndo) = getUndoStateAndReset()
+        guard executed || !toUndo.isEmpty else {
+            throw CommandError.invalidState(reason: "Macro command has not been executed; cannot undo.")
+        }
+        
+        var undoErrors: [String] = []
+        var remainingCommands = toUndo
+        
+        for command in toUndo.reversed() {
+            do {
+                if command.isUndoable {
+                    try await command.undo()
+                }
+                _ = remainingCommands.popLast()
+            } catch {
+                undoErrors.append("Undo failed for [\(command.description)]: \(error.localizedDescription)")
+            }
+        }
+        
+        if !undoErrors.isEmpty {
+            restoreUnfinishedState(remainingCommands)
+            throw CommandError.undoFailed(reason: undoErrors.joined(separator: "; "))
+        }
+    }
+    
+    public func purgeBackupResources() {
+        for command in commands {
+            command.purgeBackupResources()
+        }
+    }
+    
+    // MARK: - Rollback Helpers
+    
+    private func performRollback() async -> [String] {
+        let toRollback = getExecutedListAndReset()
+        
+        var rollbackErrors: [String] = []
+        for command in toRollback.reversed() {
+            do {
+                if command.isUndoable {
+                    try await command.undo()
+                }
+            } catch {
+                rollbackErrors.append("Rollback failed for [\(command.description)]: \(error.localizedDescription)")
+            }
+        }
+        
+        return rollbackErrors
+    }
+    
+    // MARK: - Internal Synchronization Helpers
+    
+    private func clearExecutedList() {
+        lock.lock()
+        defer { lock.unlock() }
+        executedSubCommands.removeAll()
+        isExecutedState = false
+    }
+    
+    private func appendExecutedCommand(_ command: ArchiveCommandProtocol) {
+        lock.lock()
+        defer { lock.unlock() }
+        executedSubCommands.append(command)
+    }
+    
+    private func markAsExecuted() {
+        lock.lock()
+        defer { lock.unlock() }
+        isExecutedState = true
+    }
+    
+    private func restoreUnfinishedState(_ unfinished: [ArchiveCommandProtocol]) {
+        lock.lock()
+        defer { lock.unlock() }
+        executedSubCommands = unfinished
+        isExecutedState = !unfinished.isEmpty
+    }
+    
+    private func getExecutedListAndReset() -> [ArchiveCommandProtocol] {
+        lock.lock()
+        defer { lock.unlock() }
+        let list = executedSubCommands
+        executedSubCommands.removeAll()
+        isExecutedState = false
+        return list
+    }
+    
+    private func getUndoStateAndReset() -> (executed: Bool, list: [ArchiveCommandProtocol]) {
+        lock.lock()
+        defer { lock.unlock() }
+        let wasExecuted = isExecutedState
+        let list = executedSubCommands
+        isExecutedState = false
+        executedSubCommands.removeAll()
+        return (wasExecuted, list)
     }
 }

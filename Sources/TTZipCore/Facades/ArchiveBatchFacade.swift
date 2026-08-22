@@ -140,3 +140,271 @@ public final class ArchiveBatchFacade: ArchiveBatchFacading, @unchecked Sendable
         return try await batchExecuteMacro(commands: commands, description: "Transactional batch extraction (\(tasks.count) tasks)")
     }
 }
+
+// MARK: - Batch Models
+
+//
+//
+
+
+// MARK: - Batch Task Models
+
+/// Batch compression task specification.
+public struct BatchCompressTask: Identifiable, Sendable {
+    public let id: UUID
+    public let inputs: [String]
+    public let outputPath: String
+    public let format: ArchiveCompressionFormat
+    public let level: ArchiveCompressionLevel
+    public let password: String?
+    public let splitSize: Int64?
+    
+    public init(
+        id: UUID = UUID(),
+        inputs: [String],
+        outputPath: String,
+        format: ArchiveCompressionFormat = .zip,
+        level: ArchiveCompressionLevel = .normal,
+        password: String? = nil,
+        splitSize: Int64? = nil
+    ) {
+        self.id = id
+        self.inputs = inputs
+        self.outputPath = outputPath
+        self.format = format
+        self.level = level
+        self.password = password
+        self.splitSize = splitSize
+    }
+}
+
+/// Batch extraction task specification.
+public struct BatchExtractTask: Identifiable, Sendable {
+    public let id: UUID
+    public let archivePath: String
+    public let destinationDir: String
+    public let password: String?
+    
+    public init(
+        id: UUID = UUID(),
+        archivePath: String,
+        destinationDir: String,
+        password: String? = nil
+    ) {
+        self.id = id
+        self.archivePath = archivePath
+        self.destinationDir = destinationDir
+        self.password = password
+    }
+}
+
+/// Outcome payload for a batch task execution.
+public struct BatchTaskResult: Identifiable, Sendable, Equatable {
+    public let id: UUID
+    public let success: Bool
+    public let targetPath: String
+    public let durationSeconds: Double
+    public let errorMessage: String?
+    
+    public init(
+        id: UUID,
+        success: Bool,
+        targetPath: String,
+        durationSeconds: Double,
+        errorMessage: String? = nil
+    ) {
+        self.id = id
+        self.success = success
+        self.targetPath = targetPath
+        self.durationSeconds = durationSeconds
+        self.errorMessage = errorMessage
+    }
+}
+
+// MARK: - Parallel Processing
+
+//
+//
+
+
+// MARK: - Parallel Batch Compression & Extraction
+
+extension ArchiveBatchFacade {
+    
+    // MARK: - Batch Parallel Compression
+    
+    public func batchCompress(
+        tasks: [BatchCompressTask],
+        maxConcurrent: Int = 4,
+        progress: (@Sendable (Int, Int) -> Void)? = nil
+    ) async -> [BatchTaskResult] {
+        guard !tasks.isEmpty else { return [] }
+        
+        let total = tasks.count
+        let concurrency = max(1, min(maxConcurrent, 16))
+        
+        return await withTaskGroup(of: BatchTaskResult.self) { group in
+            var results: [BatchTaskResult] = []
+            var submitted = 0
+            var completed = 0
+            
+            for _ in 0..<min(concurrency, total) {
+                if Task.isCancelled { break }
+                let task = tasks[submitted]
+                submitted += 1
+                group.addTask {
+                    await self.executeSingleCompressTask(task)
+                }
+            }
+            
+            for await res in group {
+                results.append(res)
+                completed += 1
+                progress?(completed, total)
+                
+                if Task.isCancelled {
+                    group.cancelAll()
+                    break
+                }
+                
+                if submitted < total {
+                    let nextTask = tasks[submitted]
+                    submitted += 1
+                    group.addTask {
+                        await self.executeSingleCompressTask(nextTask)
+                    }
+                }
+            }
+            
+            return results
+        }
+    }
+    
+    internal func executeSingleCompressTask(_ task: BatchCompressTask) async -> BatchTaskResult {
+        if Task.isCancelled {
+            return BatchTaskResult(
+                id: task.id,
+                success: false,
+                targetPath: task.outputPath,
+                durationSeconds: 0,
+                errorMessage: "Task cancelled"
+            )
+        }
+        let start = Date()
+        do {
+            let res = try await engineFacade.quickCompress(
+                inputs: task.inputs,
+                outputPath: task.outputPath,
+                format: task.format,
+                level: task.level,
+                password: task.password,
+                splitSize: task.splitSize,
+                progress: nil
+            )
+            return BatchTaskResult(
+                id: task.id,
+                success: true,
+                targetPath: res.outputPath,
+                durationSeconds: res.durationSeconds,
+                errorMessage: nil
+            )
+        } catch {
+            let elapsed = Date().timeIntervalSince(start)
+            return BatchTaskResult(
+                id: task.id,
+                success: false,
+                targetPath: task.outputPath,
+                durationSeconds: elapsed,
+                errorMessage: error.localizedDescription
+            )
+        }
+    }
+    
+    // MARK: - Batch Parallel Extraction
+    
+    public func batchExtract(
+        tasks: [BatchExtractTask],
+        maxConcurrent: Int = 4,
+        autoVaultUnlock: Bool = true,
+        progress: (@Sendable (Int, Int) -> Void)? = nil
+    ) async -> [BatchTaskResult] {
+        guard !tasks.isEmpty else { return [] }
+        
+        let total = tasks.count
+        let concurrency = max(1, min(maxConcurrent, 16))
+        
+        return await withTaskGroup(of: BatchTaskResult.self) { group in
+            var results: [BatchTaskResult] = []
+            var submitted = 0
+            var completed = 0
+            
+            for _ in 0..<min(concurrency, total) {
+                if Task.isCancelled { break }
+                let task = tasks[submitted]
+                submitted += 1
+                group.addTask {
+                    await self.executeSingleExtractTask(task, autoVaultUnlock: autoVaultUnlock)
+                }
+            }
+            
+            for await res in group {
+                results.append(res)
+                completed += 1
+                progress?(completed, total)
+                
+                if Task.isCancelled {
+                    group.cancelAll()
+                    break
+                }
+                
+                if submitted < total {
+                    let nextTask = tasks[submitted]
+                    submitted += 1
+                    group.addTask {
+                        await self.executeSingleExtractTask(nextTask, autoVaultUnlock: autoVaultUnlock)
+                    }
+                }
+            }
+            
+            return results
+        }
+    }
+    
+    internal func executeSingleExtractTask(_ task: BatchExtractTask, autoVaultUnlock: Bool) async -> BatchTaskResult {
+        if Task.isCancelled {
+            return BatchTaskResult(
+                id: task.id,
+                success: false,
+                targetPath: task.destinationDir,
+                durationSeconds: 0,
+                errorMessage: "Task cancelled"
+            )
+        }
+        let start = Date()
+        do {
+            let res = try await engineFacade.quickExtract(
+                archivePath: task.archivePath,
+                destinationDir: task.destinationDir,
+                password: task.password,
+                autoVaultUnlock: autoVaultUnlock,
+                progress: nil
+            )
+            return BatchTaskResult(
+                id: task.id,
+                success: true,
+                targetPath: res.destinationDir,
+                durationSeconds: res.durationSeconds,
+                errorMessage: nil
+            )
+        } catch {
+            let elapsed = Date().timeIntervalSince(start)
+            return BatchTaskResult(
+                id: task.id,
+                success: false,
+                targetPath: task.destinationDir,
+                durationSeconds: elapsed,
+                errorMessage: error.localizedDescription
+            )
+        }
+    }
+}
