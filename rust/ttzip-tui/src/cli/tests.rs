@@ -237,3 +237,56 @@ fn test_headless_create_list_extract_roundtrip_7z() {
     let extracted_bytes = fs::read(&extracted_file).expect("read extracted 7z failed");
     assert_eq!(extracted_bytes, b"# 7z Compression Test in TTZip TUI");
 }
+
+#[test]
+fn test_headless_new_subcommands_e2e() {
+    let temp_dir = tempdir().expect("tempdir failed");
+    let source_file = temp_dir.path().join("data.txt");
+    fs::write(&source_file, b"Sample test data for all TTZip CLI subcommands").expect("write failed");
+
+    let archive_file = temp_dir.path().join("suite_test.zip");
+    let sources = vec![source_file.clone()];
+
+    // Create archive
+    execute_create(&archive_file, &sources, Some("zip"), 6, None, 2, None).expect("create failed");
+
+    // 1. Info (text & json)
+    assert!(execute_info(&archive_file, false).is_ok());
+    assert!(execute_info(&archive_file, true).is_ok());
+
+    // 2. Check (text & json)
+    assert!(execute_check(&archive_file, None, false).is_ok());
+    assert!(execute_check(&archive_file, None, true).is_ok());
+
+    // 3. Hash (text & json)
+    assert!(execute_hash(&archive_file, "all", false).is_ok());
+    assert!(execute_hash(&archive_file, "crc32", true).is_ok());
+    assert!(execute_hash(&archive_file, "crc64", true).is_ok());
+
+    // 4. Tree (text & json)
+    assert!(execute_tree(&archive_file, None, false).is_ok());
+    assert!(execute_tree(&archive_file, Some(2), true).is_ok());
+
+    // 5. Doctor (text & json)
+    assert!(execute_doctor(false).is_ok());
+    assert!(execute_doctor(true).is_ok());
+
+    // 6. Comment & Lock (text & json)
+    assert!(execute_comment(&archive_file, Some("Test comment"), false).is_ok());
+    assert!(execute_comment(&archive_file, None, true).is_ok());
+    assert!(execute_lock(&archive_file, false).is_ok());
+    assert!(execute_lock(&archive_file, true).is_ok());
+
+    // 7. Cat
+    assert!(execute_cat(&archive_file, "data.txt", None).is_ok());
+
+    // 8. Diff
+    let archive_file2 = temp_dir.path().join("suite_test2.zip");
+    execute_create(&archive_file2, &sources, Some("zip"), 6, None, 2, None).expect("create failed");
+    assert!(execute_diff(&archive_file, &archive_file2, false).is_ok());
+    assert!(execute_diff(&archive_file, &archive_file2, true).is_ok());
+
+    // 9. Convert
+    let converted_tar = temp_dir.path().join("converted.zip");
+    assert!(execute_convert(&archive_file, &converted_tar, Some("zip"), 1).is_ok());
+}

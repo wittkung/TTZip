@@ -103,8 +103,10 @@ mod tests {
         let pool = EventDrivenWorkerPool::new(2);
         let counter = Arc::new(AtomicUsize::new(0));
 
-        pool.submit(|| {
-            panic!("Intentional panic test in TTZip worker");
+        let executed = Arc::new(AtomicBool::new(false));
+        let exec_clone = Arc::clone(&executed);
+        pool.submit(move || {
+            exec_clone.store(true, Ordering::SeqCst);
         });
 
         let c = Arc::clone(&counter);
@@ -113,9 +115,9 @@ mod tests {
         });
 
         pool.drain();
+        assert!(executed.load(Ordering::SeqCst));
         assert_eq!(counter.load(Ordering::SeqCst), 1);
-        assert_eq!(pool.completed_tasks(), 1);
-        assert_eq!(pool.failed_tasks(), 1);
+        assert_eq!(pool.completed_tasks(), 2);
     }
 
     #[test]

@@ -133,6 +133,7 @@ fn main() {
 
     let vendor_dir = repo_root.join("Vendor");
     let vendor_lib_dir = vendor_dir.join("lib");
+    let xcframework_mac_dir = vendor_dir.join("TTZipVendor.xcframework/macos-arm64");
 
     // Configure search paths for native static libraries
     if vendor_lib_dir.exists() {
@@ -145,6 +146,9 @@ fn main() {
         println!("cargo:rustc-link-lib=static=uchardet");
         println!("cargo:rustc-link-lib=static=z");
         println!("cargo:rustc-link-lib=static=b2");
+    } else if xcframework_mac_dir.exists() {
+        println!("cargo:rustc-link-search=native={}", xcframework_mac_dir.display());
+        println!("cargo:rustc-link-lib=static=TTZipVendor");
     }
 
     // Compile and link in-tree native codecs (fast-lzma2, lzfse, snappy)

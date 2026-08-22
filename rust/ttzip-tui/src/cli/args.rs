@@ -203,6 +203,190 @@ pub enum Commands {
         #[arg(short = 'i', long = "iterations", default_value_t = 3)]
         iterations: u32,
     },
+
+    /// View or dump entry content directly to standard output without extraction (aliases: cat, view)
+    #[command(name = "cat", alias = "view")]
+    Cat {
+        /// Path to the archive file
+        #[arg(value_name = "ARCHIVE")]
+        archive: PathBuf,
+
+        /// Path of the file entry inside the archive to display
+        #[arg(value_name = "ENTRY_PATH")]
+        entry_path: String,
+
+        /// Optional password for encrypted archives
+        #[arg(short, long)]
+        password: Option<String>,
+    },
+
+    /// Check integrity and container format compliance of an archive (aliases: check, test, t, verify)
+    #[command(name = "check", alias = "test")]
+    Check {
+        /// Path to the archive file
+        #[arg(value_name = "ARCHIVE")]
+        archive: PathBuf,
+
+        /// Optional password for encrypted archives
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Inspect and modify archive comments (alias: comment)
+    #[command(name = "comment")]
+    Comment {
+        /// Path to the archive file
+        #[arg(value_name = "ARCHIVE")]
+        archive: PathBuf,
+
+        /// New comment text to set (if omitted, prints current comment)
+        #[arg(short, long)]
+        comment: Option<String>,
+
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Convert an archive into another format with recompression (alias: convert)
+    #[command(name = "convert")]
+    Convert {
+        /// Source archive path
+        #[arg(value_name = "SOURCE_ARCHIVE")]
+        source_archive: PathBuf,
+
+        /// Destination archive path
+        #[arg(value_name = "DESTINATION_ARCHIVE")]
+        destination_archive: PathBuf,
+
+        /// Target format (zip, 7z, tar, brotli, snappy)
+        #[arg(short = 'f', long = "format")]
+        format: Option<String>,
+
+        /// Compression level (0-12)
+        #[arg(short = 'l', long = "level", default_value_t = 6)]
+        level: u8,
+    },
+
+    /// Delete files/directories from inside an existing archive (aliases: delete, d, remove, rm)
+    #[command(name = "delete", alias = "d")]
+    Delete {
+        /// Path to the archive file
+        #[arg(value_name = "ARCHIVE")]
+        archive: PathBuf,
+
+        /// Entry paths inside the archive to delete
+        #[arg(value_name = "ENTRIES", required = true)]
+        entries: Vec<String>,
+
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Compare structure and content differences between two archives (alias: diff)
+    #[command(name = "diff")]
+    Diff {
+        /// First archive path
+        #[arg(value_name = "ARCHIVE_A")]
+        archive_a: PathBuf,
+
+        /// Second archive path
+        #[arg(value_name = "ARCHIVE_B")]
+        archive_b: PathBuf,
+
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Calculate streaming cryptographic checksums of an archive or file (aliases: hash, checksum)
+    #[command(name = "hash", alias = "checksum")]
+    Hash {
+        /// Target file or archive path
+        #[arg(value_name = "PATH")]
+        path: PathBuf,
+
+        /// Algorithm to compute (crc32, crc64, sha256, adler32, all; default: all)
+        #[arg(short = 'a', long = "algorithm", default_value = "all")]
+        algorithm: String,
+
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Inspect detailed archive headers, compression ratio, and metadata (aliases: info, inspect, i)
+    #[command(name = "info", alias = "inspect")]
+    Info {
+        /// Path to the archive file
+        #[arg(value_name = "ARCHIVE")]
+        archive: PathBuf,
+
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Lock or unlock an archive to prevent accidental modifications (alias: lock)
+    #[command(name = "lock")]
+    Lock {
+        /// Path to the archive file
+        #[arg(value_name = "ARCHIVE")]
+        archive: PathBuf,
+
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Render visual hierarchical ASCII/Unicode directory tree (alias: tree)
+    #[command(name = "tree")]
+    Tree {
+        /// Path to the archive file
+        #[arg(value_name = "ARCHIVE")]
+        archive: PathBuf,
+
+        /// Maximum tree depth to display
+        #[arg(short = 'd', long = "depth")]
+        depth: Option<usize>,
+
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Incrementally update modified files inside an archive (aliases: update, u)
+    #[command(name = "update", alias = "u")]
+    Update {
+        /// Path to the archive file
+        #[arg(value_name = "ARCHIVE")]
+        archive: PathBuf,
+
+        /// Source files or directories to synchronize/update
+        #[arg(value_name = "SOURCES", required = true)]
+        sources: Vec<PathBuf>,
+
+        /// Compression level (0-12)
+        #[arg(short = 'l', long = "level", default_value_t = 6)]
+        level: u8,
+
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Diagnose host environment, CPU SIMD extensions, and format engines (aliases: doctor, diag)
+    #[command(name = "doctor", alias = "diag")]
+    Doctor {
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 /// JSON Contract representation matching `contracts/tui_vfs_tree_contract.json`.
@@ -273,5 +457,87 @@ pub struct JoinResultDto {
     pub volume_count: usize,
     pub total_bytes: u64,
     pub volumes: Vec<String>,
+    pub elapsed_ms: u64,
+}
+
+/// JSON DTO for check/verify command result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckResultDto {
+    pub archive: String,
+    pub format: String,
+    pub is_valid: bool,
+    pub total_entries: usize,
+    pub corrupted_entries: usize,
+    pub errors: Vec<String>,
+    pub elapsed_ms: u64,
+}
+
+/// JSON DTO for hash calculation result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HashResultDto {
+    pub target: String,
+    pub size_bytes: u64,
+    pub crc32: Option<String>,
+    pub crc64: Option<String>,
+    pub sha256: Option<String>,
+    pub adler32: Option<String>,
+    pub elapsed_ms: u64,
+}
+
+/// JSON DTO for archive info inspection result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InfoResultDto {
+    pub archive: String,
+    pub format: String,
+    pub total_entries: usize,
+    pub uncompressed_size: u64,
+    pub compressed_size: u64,
+    pub compression_ratio: f64,
+    pub is_encrypted: bool,
+    pub is_multi_volume: bool,
+    pub volumes_count: usize,
+    pub comment: Option<String>,
+}
+
+/// JSON DTO for archive diff comparison result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffResultDto {
+    pub archive_a: String,
+    pub archive_b: String,
+    pub entries_a_only: Vec<String>,
+    pub entries_b_only: Vec<String>,
+    pub modified_entries: Vec<String>,
+    pub identical_count: usize,
+    pub is_identical: bool,
+}
+
+/// JSON DTO for host environment doctor diagnosis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DoctorResultDto {
+    pub platform: String,
+    pub arch: String,
+    pub cpu_cores: usize,
+    pub arm_neon_available: bool,
+    pub arm_pmull_available: bool,
+    pub aes_ni_available: bool,
+    pub avx2_available: bool,
+    pub supported_formats: Vec<String>,
+    pub memory_page_pool_ready: bool,
+    pub version: String,
+}
+
+/// Generic success response DTO.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenericResultDto {
+    pub command: String,
+    pub archive: String,
+    pub success: bool,
+    pub message: String,
     pub elapsed_ms: u64,
 }

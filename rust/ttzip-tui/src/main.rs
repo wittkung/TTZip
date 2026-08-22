@@ -9,8 +9,10 @@
 
 use clap::{CommandFactory, Parser};
 use ttzip_tui::cli::{
-    execute_bench, execute_create, execute_extract, execute_join, execute_list, execute_recover,
-    execute_repair, execute_split, run_interactive_tui, Cli, Commands,
+    execute_bench, execute_cat, execute_check, execute_comment, execute_convert, execute_create,
+    execute_delete, execute_diff, execute_doctor, execute_extract, execute_hash, execute_info,
+    execute_join, execute_list, execute_lock, execute_recover, execute_repair, execute_split,
+    execute_tree, execute_update, run_interactive_tui, Cli, Commands,
 };
 
 fn main() {
@@ -54,6 +56,66 @@ fn main() {
             volume_size.as_deref(),
         )
         .map_err(|e| e.into()),
+        Some(Commands::Cat {
+            archive,
+            entry_path,
+            password,
+        }) => execute_cat(&archive, &entry_path, password.as_deref()).map_err(|e| e.into()),
+        Some(Commands::Check {
+            archive,
+            password,
+            json,
+        }) => execute_check(&archive, password.as_deref(), json).map_err(|e| e.into()),
+        Some(Commands::Comment {
+            archive,
+            comment,
+            json,
+        }) => execute_comment(&archive, comment.as_deref(), json).map_err(|e| e.into()),
+        Some(Commands::Convert {
+            source_archive,
+            destination_archive,
+            format,
+            level,
+        }) => execute_convert(
+            &source_archive,
+            &destination_archive,
+            format.as_deref(),
+            level,
+        )
+        .map_err(|e| e.into()),
+        Some(Commands::Delete {
+            archive,
+            entries,
+            json,
+        }) => execute_delete(&archive, &entries, json).map_err(|e| e.into()),
+        Some(Commands::Diff {
+            archive_a,
+            archive_b,
+            json,
+        }) => execute_diff(&archive_a, &archive_b, json).map_err(|e| e.into()),
+        Some(Commands::Hash {
+            path,
+            algorithm,
+            json,
+        }) => execute_hash(&path, &algorithm, json).map_err(|e| e.into()),
+        Some(Commands::Info { archive, json }) => {
+            execute_info(&archive, json).map_err(|e| e.into())
+        }
+        Some(Commands::Lock { archive, json }) => {
+            execute_lock(&archive, json).map_err(|e| e.into())
+        }
+        Some(Commands::Tree {
+            archive,
+            depth,
+            json,
+        }) => execute_tree(&archive, depth, json).map_err(|e| e.into()),
+        Some(Commands::Update {
+            archive,
+            sources,
+            level,
+            json,
+        }) => execute_update(&archive, &sources, level, json).map_err(|e| e.into()),
+        Some(Commands::Doctor { json }) => execute_doctor(json).map_err(|e| e.into()),
         Some(Commands::Recover {
             archive,
             dictionary,
