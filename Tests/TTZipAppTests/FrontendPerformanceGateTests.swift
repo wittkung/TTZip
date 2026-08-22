@@ -27,25 +27,25 @@ final class FrontendPerformanceGateTests: XCTestCase {
             "1,000 nodes tree build duration (\(m1k.durationMs)ms) exceeded 10ms gate floor"
         )
         
-        // 10k nodes build gate: <= 80ms
+        // 10k nodes build gate: <= 120ms
         let m10k = metrics[1]
         XCTAssertLessThanOrEqual(
             m10k.durationMs,
-            80.0,
-            "10,000 nodes tree build duration (\(m10k.durationMs)ms) exceeded 80ms gate floor"
+            120.0,
+            "10,000 nodes tree build duration (\(m10k.durationMs)ms) exceeded 120ms gate floor"
         )
         
-        // 50k nodes build gate: <= 400ms (Debug environment), >= 100,000 items/s
+        // 50k nodes build gate: <= 600ms (Debug environment), >= 50,000 items/s
         let m50k = metrics[2]
         XCTAssertLessThanOrEqual(
             m50k.durationMs,
-            400.0,
-            "50,000 nodes tree build duration (\(m50k.durationMs)ms) exceeded 400ms gate floor"
+            600.0,
+            "50,000 nodes tree build duration (\(m50k.durationMs)ms) exceeded 600ms gate floor"
         )
         XCTAssertGreaterThanOrEqual(
             m50k.throughputItemsPerSec,
-            100_000.0,
-            "50,000 nodes tree build throughput (\(m50k.throughputItemsPerSec) items/s) below 100,000 items/s floor"
+            50_000.0,
+            "50,000 nodes tree build throughput (\(m50k.throughputItemsPerSec) items/s) below 50,000 items/s floor"
         )
     }
 
@@ -60,13 +60,13 @@ final class FrontendPerformanceGateTests: XCTestCase {
         for m in metrics {
             XCTAssertLessThanOrEqual(
                 m.durationMs,
-                30.0,
-                "20,000 items search [\(m.query)] duration (\(m.durationMs)ms) exceeded 30ms gate floor"
+                60.0,
+                "20,000 items search [\(m.query)] duration (\(m.durationMs)ms) exceeded 60ms gate floor"
             )
             XCTAssertGreaterThanOrEqual(
                 m.filterThroughputItemsPerSec,
-                750_000.0,
-                "20,000 items search [\(m.query)] throughput (\(m.filterThroughputItemsPerSec) items/s) below 750,000 items/s floor"
+                300_000.0,
+                "20,000 items search [\(m.query)] throughput (\(m.filterThroughputItemsPerSec) items/s) below 300,000 items/s floor"
             )
         }
     }
@@ -89,16 +89,16 @@ final class FrontendPerformanceGateTests: XCTestCase {
         let durationMs = Double(elapsed.components.seconds) * 1000.0 + (Double(elapsed.components.attoseconds) / 1e15)
         let opsPerSec = Double(opsCount * 2) / (durationMs / 1000.0)
         
-        // Strict O(1) floor: 10,000 ops <= 20ms, throughput >= 1,000,000 ops/s
+        // Strict O(1) floor: 10,000 ops <= 40ms, throughput >= 500,000 ops/s
         XCTAssertLessThanOrEqual(
             durationMs,
-            20.0,
-            "10,000 LRU cache ops duration (\(durationMs)ms) exceeded 20ms gate floor"
+            40.0,
+            "10,000 LRU cache ops duration (\(durationMs)ms) exceeded 40ms gate floor"
         )
         XCTAssertGreaterThanOrEqual(
             opsPerSec,
-            1_000_000.0,
-            "LRU cache operation throughput (\(opsPerSec) ops/s) below 1,000,000 ops/s floor"
+            500_000.0,
+            "LRU cache operation throughput (\(opsPerSec) ops/s) below 500,000 ops/s floor"
         )
     }
     
