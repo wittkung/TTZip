@@ -120,7 +120,7 @@ extension AppViewState {
         activeTab = .home
         
         do {
-            let res = try await TTZipEngineFacade.shared.inspectArchiveCached(
+            let res = try await TTZipEngineFacade.shared.inspectArchive(
                 archivePath: path,
                 password: password,
                 autoVaultUnlock: self.passwordVault.autoUnlockArchives

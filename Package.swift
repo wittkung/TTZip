@@ -43,8 +43,6 @@ let package = Package(
             linkerSettings: [
                 .linkedLibrary("bz2"),
                 .linkedLibrary("iconv"),
-                .linkedLibrary("xml2"),
-                .linkedLibrary("expat"),
                 .linkedLibrary("c++"),
                 .linkedLibrary("compression"),
                 .linkedFramework("Security")

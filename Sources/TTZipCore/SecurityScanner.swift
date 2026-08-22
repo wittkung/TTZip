@@ -14,6 +14,48 @@ public struct SecurityScanResult: Sendable {
     public let detailMessage: String
 }
 
+/// Security risk classification levels.
+public enum SecurityRiskLevel: String, Sendable, Codable, Comparable {
+    case safe = "SAFE"
+    case warning = "WARNING"
+    case critical = "CRITICAL"
+    
+    private var severity: Int {
+        switch self {
+        case .safe: return 0
+        case .warning: return 1
+        case .critical: return 2
+        }
+    }
+    
+    public static func < (lhs: SecurityRiskLevel, rhs: SecurityRiskLevel) -> Bool {
+        return lhs.severity < rhs.severity
+    }
+}
+
+/// Unified archive security audit report.
+public struct SecurityReport: Sendable, Equatable {
+    public let isSafe: Bool
+    public let suspiciousFileNames: [String]
+    public let hasZipSlipRisk: Bool
+    public let detailMessage: String
+    public let riskLevel: SecurityRiskLevel
+    
+    public init(
+        isSafe: Bool,
+        suspiciousFileNames: [String],
+        hasZipSlipRisk: Bool,
+        detailMessage: String,
+        riskLevel: SecurityRiskLevel
+    ) {
+        self.isSafe = isSafe
+        self.suspiciousFileNames = suspiciousFileNames
+        self.hasZipSlipRisk = hasZipSlipRisk
+        self.detailMessage = detailMessage
+        self.riskLevel = riskLevel
+    }
+}
+
 /// In-memory threat and vulnerability scanning engine (Zip Slip, dangerous extensions, and traversal checks).
 public final class SecurityScanner: @unchecked Sendable {
     public static let shared = SecurityScanner()
@@ -75,6 +117,42 @@ public final class SecurityScanner: @unchecked Sendable {
                 detailMessage: "Security warning: Detected \(suspicious.count) potentially suspicious files or paths"
             )
         }
+    }
+
+    /// Scans entries and constructs a unified `SecurityReport`.
+    public func scanEntriesForReport(_ entries: [ArchiveEntry]) -> SecurityReport {
+        let rawScan = scanArchiveEntries(entries)
+        var hasZipSlip = false
+        
+        for entry in entries {
+            let p = entry.path.lowercased()
+            if p.contains("..") || p.hasPrefix("/") || p.contains(":\\") || !Self.isPathSafe(entry.path) {
+                hasZipSlip = true
+                break
+            }
+        }
+        
+        let riskLevel: SecurityRiskLevel
+        if hasZipSlip {
+            riskLevel = .critical
+        } else if !rawScan.isSafe {
+            riskLevel = .warning
+        } else {
+            riskLevel = .safe
+        }
+        
+        var message = rawScan.detailMessage
+        if hasZipSlip {
+            message = "Critical security alert: Zip Slip path traversal vulnerability detected!"
+        }
+        
+        return SecurityReport(
+            isSafe: rawScan.isSafe && !hasZipSlip,
+            suspiciousFileNames: rawScan.suspiciousFileNames,
+            hasZipSlipRisk: hasZipSlip,
+            detailMessage: message,
+            riskLevel: riskLevel
+        )
     }
 
     /// Scans a composite component tree.

@@ -16,7 +16,7 @@ public final class TTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
     public let historyManager: CommandHistoryManager
     internal let pipelineBuilderProvider: @Sendable () -> ArchivePipelineBuilder
     internal let reader: ArchiveReading
-    internal let securityFacade: ArchiveSecurityFacading
+    internal let securityScanner: SecurityScanner
     internal let passwordVault: PasswordVaultManaging
     internal let integrityChecker: ArchiveIntegrityChecking
     internal let repairEngine: ArchiveRepairEngine
@@ -28,7 +28,7 @@ public final class TTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
             historyManager: CommandHistoryManager.shared,
             pipelineBuilderProvider: { ArchivePipelineBuilder() },
             reader: ArchiveEngineFactory.makeReader(),
-            securityFacade: ArchiveSecurityFacade.shared,
+            securityScanner: SecurityScanner.shared,
             passwordVault: PasswordVaultManager.shared,
             integrityChecker: ArchiveEngineFactory.makeIntegrityChecker(),
             repairEngine: ArchiveRepairEngine(),
@@ -41,7 +41,7 @@ public final class TTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
         historyManager: CommandHistoryManager = CommandHistoryManager.shared,
         pipelineBuilderProvider: @Sendable @escaping () -> ArchivePipelineBuilder = { ArchivePipelineBuilder() },
         reader: ArchiveReading = ArchiveEngineFactory.makeReader(),
-        securityFacade: ArchiveSecurityFacading = ArchiveSecurityFacade.shared,
+        securityScanner: SecurityScanner = SecurityScanner.shared,
         passwordVault: PasswordVaultManaging = PasswordVaultManager.shared,
         integrityChecker: ArchiveIntegrityChecking = ArchiveEngineFactory.makeIntegrityChecker(),
         repairEngine: ArchiveRepairEngine = ArchiveRepairEngine(),
@@ -51,7 +51,7 @@ public final class TTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
         self.historyManager = historyManager
         self.pipelineBuilderProvider = pipelineBuilderProvider
         self.reader = reader
-        self.securityFacade = securityFacade
+        self.securityScanner = securityScanner
         self.passwordVault = passwordVault
         self.integrityChecker = integrityChecker
         self.repairEngine = repairEngine

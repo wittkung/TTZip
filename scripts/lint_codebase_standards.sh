@@ -30,14 +30,6 @@ done < <(find Sources Tests scripts -name "*.swift" -o -name "*.c" -o -name "*.h
     | grep -v "Sources/CTTZipBridge/snappy/" \
     | grep -v "Sources/CTTZipBridge/fast-lzma2/" \
     | grep -v "Sources/CTTZipBridge/lzfse/" \
-    | grep -v "Sources/CTTZipBridge/include/archive" \
-    | grep -v "Sources/CTTZipBridge/include/lz4" \
-    | grep -v "Sources/CTTZipBridge/include/lzma" \
-    | grep -v "Sources/CTTZipBridge/include/zstd" \
-    | grep -v "Sources/CTTZipBridge/include/lzfse" \
-    | grep -v "Sources/CTTZipBridge/include/libdeflate" \
-    | grep -v "Sources/CTTZipBridge/include/blake2" \
-    | grep -v "Sources/CTTZipBridge/include/uchardet" \
 )
 
 if [ "$SPDX_MISSING" -gt 0 ]; then

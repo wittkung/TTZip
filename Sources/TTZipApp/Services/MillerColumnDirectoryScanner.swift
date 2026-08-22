@@ -44,7 +44,7 @@ public enum MillerColumnDirectoryScanner {
         guard FileManager.default.fileExists(atPath: archivePath) else { return [] }
         
         let targetPassword = ArchivePasswordStore.shared.getPassword(for: archivePath)
-        let inspectionResult = try? await TTZipEngineFacade.shared.inspectArchiveCached(
+        let inspectionResult = try? await TTZipEngineFacade.shared.inspectArchive(
             archivePath: archivePath,
             password: targetPassword,
             autoVaultUnlock: PasswordVaultManager.shared.autoUnlockArchives

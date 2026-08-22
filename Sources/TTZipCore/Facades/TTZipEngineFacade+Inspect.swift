@@ -24,7 +24,7 @@ extension TTZipEngineFacade {
         do {
             let entries = try await reader.inspect(archivePath: archivePath, password: explicitPwd)
             let treeNode = ArchiveComponentTreeBuilder.buildTree(from: entries)
-            let securityReport = securityFacade.scanEntries(entries)
+            let securityReport = securityScanner.scanEntriesForReport(entries)
             if let p = explicitPwd, !p.isEmpty {
                 ArchivePasswordStore.shared.setPassword(p, for: archivePath)
             }
@@ -50,7 +50,7 @@ extension TTZipEngineFacade {
                     passwordVault.recordUsage(id: entry.id)
                     ArchivePasswordStore.shared.setPassword(entry.password, for: archivePath)
                     let treeNode = ArchiveComponentTreeBuilder.buildTree(from: entries)
-                    let securityReport = securityFacade.scanEntries(entries)
+                    let securityReport = securityScanner.scanEntriesForReport(entries)
                     return ArchiveInspectionResult(
                         archivePath: archivePath,
                         entries: entries,
