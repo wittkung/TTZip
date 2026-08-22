@@ -6,7 +6,7 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
-import CTTZipBridge
+@_exported import CTTZipBridge
 
 /// High-performance thin Swift bridge for format sniffing and natural string sorting.
 public enum NativeMicrokernelBridge {
