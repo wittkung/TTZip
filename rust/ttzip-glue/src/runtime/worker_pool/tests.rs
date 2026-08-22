@@ -5,13 +5,11 @@
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
-#[cfg(test)]
-mod tests {
-    use crate::runtime::worker_pool::pool::{EventDrivenWorkerPool, WorkerPoolState};
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-    use std::sync::Arc;
-    use std::thread;
-    use std::time::Duration;
+use crate::runtime::worker_pool::pool::{EventDrivenWorkerPool, WorkerPoolState};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
     #[test]
     fn test_worker_pool_basic_execution_and_drain() {
@@ -138,4 +136,3 @@ mod tests {
         }
         assert!(flag.load(Ordering::SeqCst));
     }
-}

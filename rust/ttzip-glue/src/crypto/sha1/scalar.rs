@@ -15,7 +15,7 @@ pub const SHA1_INITIAL_H: [u32; 5] = [
 
 #[inline(always)]
 pub fn rol(val: u32, bits: u32) -> u32 {
-    (val << bits) | (val >> (32 - bits))
+    val.rotate_left(bits)
 }
 
 #[inline(always)]

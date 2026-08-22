@@ -47,7 +47,7 @@ pub fn parse_size(raw: &str) -> Option<u64> {
 }
 
 pub fn parse_civil_date(s: &str) -> Option<i64> {
-    let parts: Vec<&str> = s.trim().split(|c| c == 'T' || c == ' ').collect();
+    let parts: Vec<&str> = s.trim().split(['T', ' ']).collect();
     let dsegs: Vec<&str> = parts.first()?.split('-').collect();
     if dsegs.len() != 3 { return None; }
     let y: i64 = dsegs[0].parse().ok()?;

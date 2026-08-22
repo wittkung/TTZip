@@ -88,12 +88,10 @@ fn test_crypto_password_recovery_ffi_zipcrypto_and_winzip() {
         enc_header[i] = keys.encrypt_byte(plain_hdr[i]);
     }
 
-    let dict = vec![
-        CString::new("123456").unwrap(),
+    let dict = [CString::new("123456").unwrap(),
         CString::new("admin").unwrap(),
         CString::new("ZipPassword2026").unwrap(),
-        CString::new("guest").unwrap(),
-    ];
+        CString::new("guest").unwrap()];
     let dict_ptrs: Vec<*const libc::c_char> = dict.iter().map(|s| s.as_ptr()).collect();
 
     let mut out_found = vec![0u8; 64];
@@ -118,10 +116,8 @@ fn test_crypto_password_recovery_ffi_zipcrypto_and_winzip() {
     let salt = [0x55u8; 16];
     let aes_keys = winzip_aes256_derive_keys(correct_aes_pwd, &salt).unwrap();
 
-    let dict_aes = vec![
-        CString::new("password").unwrap(),
-        CString::new("AesVaultPass2026").unwrap(),
-    ];
+    let dict_aes = [CString::new("password").unwrap(),
+        CString::new("AesVaultPass2026").unwrap()];
     let dict_aes_ptrs: Vec<*const libc::c_char> = dict_aes.iter().map(|s| s.as_ptr()).collect();
 
     let mut out_aes = vec![0u8; 64];

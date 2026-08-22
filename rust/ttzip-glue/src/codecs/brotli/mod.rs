@@ -52,7 +52,7 @@ mod tests {
         let (read_bytes, _) = brotli_compress_stream_pipe(&mut reader, &mut compressed, 4, 20, None)
             .expect("brotli compress pipe failed");
         assert_eq!(read_bytes, payload.len() as u64);
-        assert!(compressed.len() > 0);
+        assert!(!compressed.is_empty());
 
         let mut comp_reader = Cursor::new(&compressed);
         let mut decompressed = Vec::new();

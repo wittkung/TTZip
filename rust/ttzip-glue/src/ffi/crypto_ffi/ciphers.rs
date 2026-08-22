@@ -64,7 +64,7 @@ pub unsafe extern "C" fn ttzip_rust_aes256_cbc_decrypt(
     dst: *mut u8,
 ) -> i32 {
     let result = catch_unwind(|| {
-        if key.is_null() || iv.is_null() || src.is_null() || dst.is_null() || len % 16 != 0 {
+        if key.is_null() || iv.is_null() || src.is_null() || dst.is_null() || !len.is_multiple_of(16) {
             return TTZipStatus::ErrInvalidParam.to_i32();
         }
         if len == 0 {

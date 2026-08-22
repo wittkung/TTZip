@@ -51,14 +51,22 @@ impl EntryType {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
-        match s {
+    pub fn parse_type(s: &str) -> Self {
+        s.parse().unwrap_or(EntryType::RegularFile)
+    }
+}
+
+impl std::str::FromStr for EntryType {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
             "regular" | "regularFile" => EntryType::RegularFile,
             "directory" => EntryType::Directory,
             "symlink" | "symbolicLink" => EntryType::SymbolicLink,
             "hardlink" | "hardLink" => EntryType::HardLink,
             _ => EntryType::RegularFile,
-        }
+        })
     }
 }
 
@@ -429,8 +437,8 @@ pub fn compare_manifests(
         }
 
         // Dimension 3: Symlink target
-        if ttzip_entry.entry_type == EntryType::SymbolicLink {
-            if ttzip_entry.symlink_target != oracle_entry.symlink_target {
+        if ttzip_entry.entry_type == EntryType::SymbolicLink
+            && ttzip_entry.symlink_target != oracle_entry.symlink_target {
                 divergence_errors.push(format!(
                     "Entry '{}' symlink target mismatch: TTZip target='{}', Oracle target='{}'",
                     common_key,
@@ -438,7 +446,6 @@ pub fn compare_manifests(
                     oracle_entry.symlink_target.as_deref().unwrap_or("nil")
                 ));
             }
-        }
 
         // Dimension 4: POSIX permissions
         if is_tar_format {

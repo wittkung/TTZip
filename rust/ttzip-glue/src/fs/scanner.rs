@@ -240,13 +240,17 @@ mod tests {
         assert!(items.iter().any(|i| i.rel_path.ends_with("file2.txt")));
         assert!(items.iter().any(|i| i.rel_path.ends_with("file3.txt")));
 
-        let mut hidden_opts = ScanOptions::default();
-        hidden_opts.include_hidden = true;
+        let hidden_opts = ScanOptions {
+            include_hidden: true,
+            ..Default::default()
+        };
         let items_hidden = scan_directory_parallel(root, &hidden_opts);
         assert!(items_hidden.iter().any(|i| i.rel_path.ends_with(".hidden")));
 
-        let mut depth_opts = ScanOptions::default();
-        depth_opts.max_depth = 1;
+        let depth_opts = ScanOptions {
+            max_depth: 1,
+            ..Default::default()
+        };
         let items_depth = scan_directory_parallel(root, &depth_opts);
         assert!(!items_depth.iter().any(|i| i.rel_path.ends_with("file3.txt")));
     }

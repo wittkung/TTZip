@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Witt Kung <witt.w.kung@gmail.com>"]
 description = "TTZip core native glue layer implemented in Safe Rust with hardware acceleration"
-license = "LicenseRef-TTZip-Source-Available-1.0"
+[lints]
+workspace = true
 
 [lib]
 name = "ttzip_glue"

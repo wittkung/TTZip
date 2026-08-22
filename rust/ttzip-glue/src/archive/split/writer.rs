@@ -187,8 +187,7 @@ impl SplitVolumeWriter {
 impl Write for SplitVolumeWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.is_closed {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "Cannot write to a closed SplitVolumeWriter",
             ));
         }

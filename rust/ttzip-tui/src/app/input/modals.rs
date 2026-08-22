@@ -142,11 +142,10 @@ impl AppState {
             KeyCode::Char('g') | KeyCode::Home => {
                 pareto.selected_index = 0;
             }
-            KeyCode::Char('G') | KeyCode::End => {
-                if filtered_count > 0 {
+            KeyCode::Char('G') | KeyCode::End
+                if filtered_count > 0 => {
                     pareto.selected_index = filtered_count - 1;
                 }
-            }
             _ => {}
         }
     }

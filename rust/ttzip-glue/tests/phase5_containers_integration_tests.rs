@@ -174,7 +174,7 @@ fn test_phase5_zip_e2e_disk_extraction_and_safe_landing() {
         user_data: std::ptr::null_mut(),
     };
 
-    let report = create_zip_archive(&out_zip, &[src_dir.clone()], &options).expect("create zip failed");
+    let report = create_zip_archive(&out_zip, std::slice::from_ref(&src_dir), &options).expect("create zip failed");
     assert!(report.total_entries >= 2);
     assert!(out_zip.exists());
 

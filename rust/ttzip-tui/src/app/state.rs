@@ -73,7 +73,7 @@ impl AppState {
                     uncompressed_size: e.uncompressed_size,
                     compressed_size: e.compressed_size,
                     crc32: e.crc32,
-                    mtime_epoch_secs: e.mtime_epoch_secs as i64,
+                    mtime_epoch_secs: e.mtime_epoch_secs,
                     mode: e.mode,
                     is_directory: e.is_directory,
                     is_encrypted: e.is_encrypted,

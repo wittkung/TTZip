@@ -68,7 +68,7 @@ impl Anchor {
 
     /// Attempts to extract a slice matching this anchor from `buffer`.
     #[inline]
-    pub fn slice_buffer<'a>(self, buffer: &'a [u8], match_len: usize) -> Option<&'a [u8]> {
+    pub fn slice_buffer(self, buffer: &[u8], match_len: usize) -> Option<&[u8]> {
         let offset = self.resolve_offset(buffer.len(), match_len)?;
         buffer.get(offset..offset + match_len)
     }

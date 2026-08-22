@@ -45,10 +45,7 @@ pub unsafe extern "C" fn archive_skip_callback_trampoline<R: Read + Seek>(
             return ARCHIVE_FATAL as i64;
         }
         let state = &mut *(client_data as *mut StreamReaderState<R>);
-        match state.skip(request) {
-            Ok(skipped) => skipped,
-            Err(_) => 0, // Libarchive falls back to reading and discarding
-        }
+        state.skip(request).unwrap_or_default()
     });
     result.unwrap_or(0)
 }

@@ -134,7 +134,7 @@ pub fn create_zip_store_parallel(
     // Calculate Central Directory Size
     let mut cd_size: u64 = 0;
     for item in &plan_items {
-        let name_len = item.rel_path.as_bytes().len();
+        let name_len = item.rel_path.len();
         let use_zip64 = item.size >= 0xFFFFFFFF || item.lfh_offset >= 0xFFFFFFFF;
         let mut extra_len = 9; // timestamp
         if use_zip64 {

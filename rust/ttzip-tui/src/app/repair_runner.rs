@@ -152,7 +152,7 @@ pub fn scan_salvageable_zip_entries(raw_data: &[u8]) -> Vec<SalvagedEntry> {
                 let yr = ((mdate_dos >> 9) & 0x7F) as u32 + 1980;
                 let mo = ((mdate_dos >> 5) & 0x0F) as u32;
                 let dy = (mdate_dos & 0x1F) as u32;
-                if yr >= 1980 && mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31 {
+                if yr >= 1980 && (1..=12).contains(&mo) && (1..=31).contains(&dy) {
                     epoch_secs = (yr - 1970) * 31536000 + mo * 2592000 + dy * 86400;
                 }
 
@@ -210,7 +210,7 @@ pub fn scan_salvageable_tar_entries(raw_data: &[u8]) -> Vec<SalvagedEntry> {
             let size_bytes = &block[124..136];
             let size_str = std::str::from_utf8(size_bytes).unwrap_or("").trim_matches(&['\0', ' '][..]);
             let file_size = usize::from_str_radix(size_str, 8).unwrap_or(0);
-            let payload_blocks = (file_size + 511) / 512;
+            let payload_blocks = file_size.div_ceil(512);
 
             if !name_str.is_empty() {
                 let is_dir = name_str.ends_with('/') || block[156] == b'5';

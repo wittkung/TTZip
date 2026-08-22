@@ -139,7 +139,7 @@ extern "C" {
 const LZFSE_SCRATCH_MIN_CAPACITY: usize = 2 * 1024 * 1024; // 2MB Scratch buffer
 
 thread_local! {
-    static LZFSE_SCRATCH_BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::new());
+    static LZFSE_SCRATCH_BUFFER: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
 }
 
 fn with_lzfse_scratch<F, R>(min_size: usize, f: F) -> R

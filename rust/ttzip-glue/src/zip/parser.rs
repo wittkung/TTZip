@@ -141,8 +141,8 @@ pub fn dos_to_unix_time(dos_time: u16, dos_date: u16) -> i64 {
 
     days_since_1970 += (day.saturating_sub(1)) as i64;
 
-    let total_secs = days_since_1970 * 86400 + (hour as i64 * 3600) + (min as i64 * 60) + sec as i64;
-    total_secs
+    
+    days_since_1970 * 86400 + (hour as i64 * 3600) + (min as i64 * 60) + sec as i64
 }
 
 /// Parses a single Central Directory File Header (CDFH) entry.

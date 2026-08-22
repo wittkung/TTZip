@@ -24,20 +24,20 @@ pub const SNAPPY_MAX_CHUNK_SIZE: usize = 65536;
 #[inline]
 pub fn is_framed_snappy(data: &[u8]) -> bool {
     data.len() >= SNAPPY_STREAM_IDENTIFIER.len()
-        && &data[..SNAPPY_STREAM_IDENTIFIER.len()] == SNAPPY_STREAM_IDENTIFIER
+        && data[..SNAPPY_STREAM_IDENTIFIER.len()] == SNAPPY_STREAM_IDENTIFIER
 }
 
 /// Masks CRC32C per Snappy specification: `((crc >> 15) | (crc << 17)) + 0xa282ead8`.
 #[inline]
 pub fn mask_crc32c(crc: u32) -> u32 {
-    ((crc >> 15) | (crc << 17)).wrapping_add(0xa282ead8)
+    crc.rotate_right(15).wrapping_add(0xa282ead8)
 }
 
 /// Unmasks CRC32C per Snappy specification.
 #[inline]
 pub fn unmask_crc32c(masked: u32) -> u32 {
     let rot = masked.wrapping_sub(0xa282ead8);
-    (rot >> 17) | (rot << 15)
+    rot.rotate_left(15)
 }
 
 /// Encodes raw buffer into Snappy framing format (.sz) in memory.
@@ -107,6 +107,6 @@ pub fn snappy_frame_max_encoded_length(src_len: usize) -> usize {
     if src_len == 0 {
         return SNAPPY_STREAM_IDENTIFIER.len();
     }
-    let num_chunks = (src_len + SNAPPY_MAX_CHUNK_SIZE - 1) / SNAPPY_MAX_CHUNK_SIZE;
+    let num_chunks = src_len.div_ceil(SNAPPY_MAX_CHUNK_SIZE);
     SNAPPY_STREAM_IDENTIFIER.len() + num_chunks * (8 + crate::codecs::snappy::block::snappy_compress_bound(SNAPPY_MAX_CHUNK_SIZE))
 }

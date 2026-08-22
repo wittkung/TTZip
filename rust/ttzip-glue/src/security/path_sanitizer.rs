@@ -83,9 +83,7 @@ pub fn is_windows_reserved_device_name(segment: &str) -> bool {
 /// Normalizes Unicode string to NFC form with zero-allocation fast-paths for ASCII and pre-normalized inputs.
 #[inline]
 pub fn normalize_to_nfc(input: &str) -> Cow<'_, str> {
-    if input.is_ascii() {
-        Cow::Borrowed(input)
-    } else if is_nfc_quick(input.chars()) == IsNormalized::Yes {
+    if input.is_ascii() || is_nfc_quick(input.chars()) == IsNormalized::Yes {
         Cow::Borrowed(input)
     } else {
         Cow::Owned(input.nfc().collect::<String>())
@@ -145,7 +143,7 @@ pub fn sanitize_path(raw_path: &str) -> PathSanitizationResult {
     let mut stripped_ads: Option<String> = None;
 
     // Split segments by '/' or '\\'
-    let raw_segments = nfc_path.split(|c| c == '/' || c == '\\');
+    let raw_segments = nfc_path.split(['/', '\\']);
 
     for (seg_idx, mut seg) in raw_segments.enumerate() {
         if seg.is_empty() {

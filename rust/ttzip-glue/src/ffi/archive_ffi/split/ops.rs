@@ -67,13 +67,13 @@ pub unsafe extern "C" fn ttzip_rust_split_file(
             if n == 0 {
                 break;
             }
-            if let Err(_) = writer.write_all(&buffer[..n]) {
+            if writer.write_all(&buffer[..n]).is_err() {
                 writer.cancel_and_cleanup();
                 return TTZipStatus::ErrCompressionFailed;
             }
         }
 
-        if let Err(_) = writer.close() {
+        if writer.close().is_err() {
             return TTZipStatus::ErrCompressionFailed;
         }
 
@@ -125,7 +125,7 @@ pub unsafe extern "C" fn ttzip_rust_join_split_volumes(
             if n == 0 {
                 break;
             }
-            if let Err(_) = out_file.write_all(&buffer[..n]) {
+            if out_file.write_all(&buffer[..n]).is_err() {
                 return TTZipStatus::ErrCompressionFailed;
             }
             total_copied += n as u64;

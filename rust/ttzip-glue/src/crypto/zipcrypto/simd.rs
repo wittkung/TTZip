@@ -92,6 +92,12 @@ pub struct ZipCryptoBatch4 {
     pub key2: [u32; 4],
 }
 
+impl Default for ZipCryptoBatch4 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ZipCryptoBatch4 {
     /// Creates a new batch initialized with default PKZIP keys for all 4 slots.
     pub fn new() -> Self {

@@ -31,9 +31,11 @@ pub fn brotli_compress(
     if src.is_empty() {
         return Ok(0);
     }
-    let mut params = BrotliEncoderParams::default();
-    params.quality = quality.clamp(0, 11) as i32;
-    params.lgwin = if lgwin == 0 { 22 } else { lgwin.clamp(10, 24) as i32 };
+    let params = BrotliEncoderParams {
+        quality: quality.clamp(0, 11) as i32,
+        lgwin: if lgwin == 0 { 22 } else { lgwin.clamp(10, 24) as i32 },
+        ..Default::default()
+    };
 
     let mut cursor_in = Cursor::new(src);
     let mut cursor_out = Cursor::new(dst);

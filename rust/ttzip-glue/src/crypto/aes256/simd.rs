@@ -26,11 +26,11 @@ pub unsafe fn aes256_ctr_crypt_neon(
         rk[i] = vld1q_u8(ctx.round_keys_enc[i].as_ptr());
     }
 
-    let num_blocks = (len + 15) / 16;
+    let num_blocks = len.div_ceil(16);
     let mut i = 0;
 
     while i + 8 <= num_blocks {
-        let c0 = initial_counter + (i as u64) + 0;
+        let c0 = initial_counter + (i as u64);
         let c1 = initial_counter + (i as u64) + 1;
         let c2 = initial_counter + (i as u64) + 2;
         let c3 = initial_counter + (i as u64) + 3;

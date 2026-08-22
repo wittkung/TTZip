@@ -63,7 +63,7 @@ impl SevenZSignatureHeader {
             return Err(TTZipStatus::ErrCorruptHeader);
         }
 
-        if &mapped[0..6] != SEVENZ_SIGNATURE {
+        if mapped[0..6] != SEVENZ_SIGNATURE {
             return Err(TTZipStatus::ErrCorruptHeader);
         }
 

@@ -176,7 +176,7 @@ impl ParetoPlotCoordinateEngine {
         };
 
         let dot_x = ((norm_x * ((self.width_dots - 1) as f64)).round() as usize).min(self.width_dots - 1);
-        let dot_y = ((((1.0 - norm_y) * ((self.height_dots - 1) as f64)).round() as usize)).min(self.height_dots - 1);
+        let dot_y = (((1.0 - norm_y) * ((self.height_dots - 1) as f64)).round() as usize).min(self.height_dots - 1);
         (dot_x, dot_y)
     }
 }

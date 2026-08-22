@@ -104,7 +104,7 @@ mod tests {
             };
 
             UnifiedArchiveOrchestrator::create_archive(
-                &[src_file.clone()],
+                std::slice::from_ref(&src_file),
                 &out_archive,
                 &create_opt,
                 0,

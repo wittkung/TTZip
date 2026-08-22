@@ -5,14 +5,12 @@
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
-#[cfg(test)]
-mod tests {
-    use crate::crypto::crc32::crc32_fast;
-    use crate::crypto::rs_fec::cauchy::*;
-    use crate::crypto::rs_fec::gf8::*;
-    use crate::crypto::rs_fec::recovery_record::*;
-    use crate::crypto::sha256::FastSha256;
-    use tempfile::NamedTempFile;
+use crate::crypto::crc32::crc32_fast;
+use crate::crypto::rs_fec::cauchy::*;
+use crate::crypto::rs_fec::gf8::*;
+use crate::crypto::rs_fec::recovery_record::*;
+use crate::crypto::sha256::FastSha256;
+use tempfile::NamedTempFile;
 
     #[test]
     fn test_gf8_arithmetic_invariants() {
@@ -215,7 +213,7 @@ mod tests {
         // Corrupt shard 1 and shard 6 on disk
         let mut file_bytes = std::fs::read(&path).unwrap();
         for i in 0..500 {
-            file_bytes[1 * slice_size + 10 + i] ^= 0xEF;
+            file_bytes[slice_size + 10 + i] ^= 0xEF;
             file_bytes[6 * slice_size + 20 + i] ^= 0xBE;
         }
         std::fs::write(&path, &file_bytes).unwrap();
@@ -255,4 +253,3 @@ mod tests {
         let res = repair_archive_file_streaming(&path).unwrap();
         assert!(!res, "Repair should return false when corruption exceeds M");
     }
-}

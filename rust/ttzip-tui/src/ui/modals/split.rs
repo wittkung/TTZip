@@ -41,7 +41,7 @@ pub fn derive_split_volumes(
     }
 
     let mut volumes = Vec::new();
-    let count = ((total_bytes + chunk_size_bytes - 1) / chunk_size_bytes) as usize;
+    let count = total_bytes.div_ceil(chunk_size_bytes) as usize;
     let mut remaining = total_bytes;
     let mut offset = 0u64;
 

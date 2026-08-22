@@ -58,7 +58,7 @@ fn sub_word(w: u32) -> u32 {
 
 #[inline(always)]
 fn rot_word(w: u32) -> u32 {
-    (w >> 8) | (w << 24)
+    w.rotate_right(8)
 }
 
 /// AES-256 Context holding expanded round keys for encryption and decryption.

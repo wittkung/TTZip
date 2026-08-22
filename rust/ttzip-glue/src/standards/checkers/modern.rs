@@ -83,7 +83,7 @@ pub fn check_snappy_compliance(buffer: &[u8]) -> ComplianceReport {
     }
 
     // Must start with Stream Identifier: 0xFF, [0x06, 0x00, 0x00], "sNaPpY"
-    if buffer[0] == 0xFF && &buffer[1..4] == &[0x06, 0x00, 0x00] && &buffer[4..10] == b"sNaPpY" {
+    if buffer[0] == 0xFF && buffer[1..4] == [0x06, 0x00, 0x00] && &buffer[4..10] == b"sNaPpY" {
         report.add_validated_header("Snappy: Stream Identifier Chunk (0xFF 0x060000 sNaPpY)");
     } else {
         let citation = StandardCitation::new(ComplianceStandard::SnappySpec, "1.1", "Identifier Chunk Magic");

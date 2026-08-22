@@ -90,7 +90,7 @@ pub fn mutate_stream(data: &[u8], op: MutationOperator, prng: &mut SplitMix64) -
         }
         MutationOperator::ByteReplace => {
             let byte_idx = prng.next_range(0, out.len());
-            let val = if prng.next_u64() % 2 == 0 { 0x00 } else { 0xFF };
+            let val = if prng.next_u64().is_multiple_of(2) { 0x00 } else { 0xFF };
             out[byte_idx] = val;
         }
         MutationOperator::CorruptMagic => {
@@ -168,10 +168,9 @@ pub fn mutate_stream(data: &[u8], op: MutationOperator, prng: &mut SplitMix64) -
             let sz = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
             let xz = [0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00];
             let zstd = [0x28, 0xB5, 0x2F, 0xFD];
-            if find_signature(&out, &sz).is_some() && out.len() > 10 {
-                out[6] = 0xFF;
-                out[7] = 0xFF;
-            } else if find_signature(&out, &xz).is_some() && out.len() > 8 {
+            let is_sz = find_signature(&out, &sz).is_some() && out.len() > 10;
+            let is_xz = find_signature(&out, &xz).is_some() && out.len() > 8;
+            if is_sz || is_xz {
                 out[6] = 0xFF;
                 out[7] = 0xFF;
             } else if find_signature(&out, &zstd).is_some() && out.len() > 5 {

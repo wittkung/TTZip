@@ -17,7 +17,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 /// Verifies and performs self-healing restoration on damaged archive data in memory.
-pub fn repair_archive_data(archive_data: &mut Vec<u8>) -> Result<bool, TTZipStatus> {
+pub fn repair_archive_data(archive_data: &mut [u8]) -> Result<bool, TTZipStatus> {
     let info = match inspect_recovery_record(archive_data)? {
         Some(info) => info,
         None => return Ok(false),
@@ -192,11 +192,10 @@ pub fn repair_archive_file_streaming(file_path: &Path) -> Result<bool, TTZipStat
         }
     }
 
-    if missing_indices.is_empty() {
-        if hasher.finalize() == info.root_hash {
+    if missing_indices.is_empty()
+        && hasher.finalize() == info.root_hash {
             return Ok(true); // 100% Intact
         }
-    }
 
     if missing_indices.len() > m {
         return Ok(false); // Damage exceeds parity capacity

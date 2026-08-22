@@ -65,7 +65,7 @@ fn test_fuzz_sevenz_header_and_varint() {
         mutate_bit_flip(&mut mutated, &mut rng);
 
         let res = catch_unwind(AssertUnwindSafe(|| {
-            let _ = SevenZSignatureHeader::parse(&mut mutated);
+            let _ = SevenZSignatureHeader::parse(&mutated);
         }));
 
         if res.is_err() {

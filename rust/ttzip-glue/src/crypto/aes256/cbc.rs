@@ -16,7 +16,7 @@ pub fn aes256_cbc_decrypt(
     src: &[u8],
     dst: &mut [u8],
 ) -> Result<(), &'static str> {
-    if src.len() % 16 != 0 {
+    if !src.len().is_multiple_of(16) {
         return Err("Input length must be a multiple of 16 bytes for CBC mode");
     }
     if src.len() > dst.len() {
@@ -61,7 +61,7 @@ pub fn aes256_cbc_encrypt(
     src: &[u8],
     dst: &mut [u8],
 ) -> Result<(), &'static str> {
-    if src.len() % 16 != 0 {
+    if !src.len().is_multiple_of(16) {
         return Err("Input length must be a multiple of 16 bytes for CBC mode");
     }
     if src.len() > dst.len() {

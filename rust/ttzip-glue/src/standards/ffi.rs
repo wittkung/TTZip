@@ -208,13 +208,14 @@ mod tests {
 
     #[test]
     fn test_ffi_detect_format_buffer() {
-        let mut zip_header = vec![0u8; 30];
+        let mut zip_header = [0u8; 30];
         zip_header[0..4].copy_from_slice(b"PK\x03\x04");
 
         let mut format: i32 = 0;
         let mut is_sfx: bool = false;
         let mut sfx_offset: usize = 0;
 
+        // SAFETY: Stack array pointer with correct length
         let status = unsafe {
             ttzip_rust_detect_format_buffer(
                 zip_header.as_ptr(),
@@ -228,12 +229,12 @@ mod tests {
 
         assert_eq!(status, TTZipStatus::Ok);
         assert_eq!(format, DetectedFormat::Zip as i32);
-        assert_eq!(is_sfx, false);
+        assert!(!is_sfx);
     }
 
     #[test]
     fn test_ffi_check_compliance_buffer_and_free() {
-        let mut gz_buf = vec![0u8; 18];
+        let mut gz_buf = [0u8; 18];
         gz_buf[0] = 0x1F;
         gz_buf[1] = 0x8B;
         gz_buf[2] = 8;

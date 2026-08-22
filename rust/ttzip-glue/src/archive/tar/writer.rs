@@ -63,6 +63,7 @@ impl<W: Write> TarWriter<W> {
     }
 
     /// Appends an entry with custom typeflag, link target, and optional PAX extra records.
+    #[allow(clippy::too_many_arguments)]
     pub fn append_custom_entry(
         &mut self,
         rel_path: &str,

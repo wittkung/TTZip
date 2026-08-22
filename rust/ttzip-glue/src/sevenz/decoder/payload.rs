@@ -43,7 +43,7 @@ pub fn decode_7z_solid_payload(
 
         let key = sha256_7z_kdf(pass, &info.aes_salt[..info.aes_salt_len], info.aes_num_cycles_power);
 
-        if raw_payload.len() % 16 != 0 {
+        if !raw_payload.len().is_multiple_of(16) {
             return Err(TTZipStatus::ErrCorruptHeader);
         }
 

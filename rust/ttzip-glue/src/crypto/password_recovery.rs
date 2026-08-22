@@ -187,11 +187,11 @@ pub fn recover_dictionary_rayon(
     }
     let chunk_sz = 512.max(dictionary.len() / (rayon::current_num_threads() * 8).max(1)).min(4096);
     dictionary.par_chunks(chunk_sz).find_map_any(|chunk| {
-        if cancel_token.map_or(false, |t| t.is_cancelled()) {
+        if cancel_token.is_some_and(|t| t.is_cancelled()) {
             return None;
         }
         for (idx, &pwd) in chunk.iter().enumerate() {
-            if idx % 64 == 0 && cancel_token.map_or(false, |t| t.is_cancelled()) {
+            if idx % 64 == 0 && cancel_token.is_some_and(|t| t.is_cancelled()) {
                 return None;
             }
             if let Some(counter) = attempts {
@@ -219,12 +219,12 @@ pub fn recover_brute_force_rayon(
         return None;
     }
     for len in min_len..=max_len {
-        if cancel_token.map_or(false, |t| t.is_cancelled()) {
+        if cancel_token.is_some_and(|t| t.is_cancelled()) {
             return None;
         }
         if len == 1 {
             let found = chars.par_iter().find_map_any(|&c| {
-                if cancel_token.map_or(false, |t| t.is_cancelled()) {
+                if cancel_token.is_some_and(|t| t.is_cancelled()) {
                     return None;
                 }
                 attempts.map(|cnt| cnt.fetch_add(1, Ordering::Relaxed));
@@ -241,7 +241,7 @@ pub fn recover_brute_force_rayon(
                 let mut indices = vec![0usize; len - 1];
                 let num_chars = chars.len();
                 loop {
-                    if cancel_token.map_or(false, |t| t.is_cancelled()) {
+                    if cancel_token.is_some_and(|t| t.is_cancelled()) {
                         return None;
                     }
                     candidate.truncate(1);

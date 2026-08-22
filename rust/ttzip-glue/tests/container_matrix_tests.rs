@@ -149,7 +149,7 @@ fn test_container_creation_and_extraction_matrix() {
             user_data: std::ptr::null_mut(),
         };
 
-        UnifiedArchiveOrchestrator::create_archive(&[src_dir.clone()], &arch_path, &create_opt, 0)
+        UnifiedArchiveOrchestrator::create_archive(std::slice::from_ref(&src_dir), &arch_path, &create_opt, 0)
             .expect("Unified create archive failed");
         assert!(arch_path.exists());
 
@@ -334,7 +334,7 @@ fn test_multivolume_split_and_merge_matrix() {
     };
 
     // Split size: 2000 bytes (8000 bytes payload will generate 4 volumes)
-    UnifiedArchiveOrchestrator::create_archive(&[u_src_dir.clone()], &u_dest_zip, &create_opt, 2000)
+    UnifiedArchiveOrchestrator::create_archive(std::slice::from_ref(&u_src_dir), &u_dest_zip, &create_opt, 2000)
         .expect("Create split volume archive failed");
 
     let chain = detect_volume_chain(&u_dest_zip).unwrap();

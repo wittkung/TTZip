@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Witt Kung <witt.w.kung@gmail.com>"]
 description = "TTZip Modern Interactive Terminal UI and Standalone CLI Engine"
-license = "LicenseRef-TTZip-Source-Available-1.0"
+[lints]
+workspace = true
 
 [[bin]]
 name = "ttzip"

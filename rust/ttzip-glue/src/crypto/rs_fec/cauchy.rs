@@ -53,9 +53,7 @@ pub fn invert_matrix(matrix: &[u8], n: usize) -> Result<Vec<u8>, TTZipStatus> {
 
         if pivot_row != col {
             for k in 0..width {
-                let tmp = aug[col * width + k];
-                aug[col * width + k] = aug[pivot_row * width + k];
-                aug[pivot_row * width + k] = tmp;
+                aug.swap(col * width + k, pivot_row * width + k);
             }
         }
 

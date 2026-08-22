@@ -118,7 +118,7 @@ pub fn build_7z_metadata_header(
     let has_empty = items.iter().any(|it| it.is_directory || it.data.is_empty());
     if has_empty {
         h.push(K_EMPTY_STREAM);
-        let num_bytes = (items.len() + 7) / 8;
+        let num_bytes = items.len().div_ceil(8);
         write_varint(num_bytes as u64, &mut h);
 
         for chunk in items.chunks(8) {

@@ -191,7 +191,7 @@ fn gcm_ctr_crypt(ctx: &Aes256Context, iv: &[u8; 12], src: &[u8], dst: &mut [u8])
     let mut ctr_block = [0u8; 16];
     ctr_block[..12].copy_from_slice(iv);
 
-    let num_blocks = (src.len() + 15) / 16;
+    let num_blocks = src.len().div_ceil(16);
     for i in 0..num_blocks {
         let counter_val = (i as u32).wrapping_add(2);
         ctr_block[12..16].copy_from_slice(&counter_val.to_be_bytes());

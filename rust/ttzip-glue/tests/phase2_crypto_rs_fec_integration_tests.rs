@@ -120,7 +120,7 @@ fn test_rs_encode_decode_ffi_roundtrip() {
         parity_bufs[0].as_ptr(),
         parity_bufs[2].as_ptr(),
     ];
-    let available_indices: Vec<i32> = vec![0, 2, 3, 5, (k_data + 0) as i32, (k_data + 2) as i32];
+    let available_indices: Vec<i32> = vec![0, 2, 3, 5, k_data as i32, (k_data + 2) as i32];
     let missing_indices: Vec<i32> = vec![1, 4];
 
     let mut recon1 = vec![0u8; block_size];

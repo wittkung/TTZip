@@ -91,7 +91,7 @@ pub fn pbkdf2_sha1(
     base_outer.update(&k_opad);
 
     let key_len = out_key.len();
-    let blocks_needed = (key_len + 19) / 20;
+    let blocks_needed = key_len.div_ceil(20);
 
     let mut u_digest = [0u8; 20];
     let mut t_digest = [0u8; 20];

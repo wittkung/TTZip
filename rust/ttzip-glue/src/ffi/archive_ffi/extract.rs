@@ -73,11 +73,10 @@ pub unsafe extern "C" fn ttzip_rust_extract_archive(
                 (std::ptr::null(), true, true, false, None, std::ptr::null_mut())
             };
 
-        if !dry_run {
-            if fs::create_dir_all(dest_p).is_err() {
+        if !dry_run
+            && fs::create_dir_all(dest_p).is_err() {
                 return TTZipStatus::ErrExtractionFailed;
             }
-        }
 
         let a = archive_read_new();
         if a.is_null() {

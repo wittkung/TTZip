@@ -134,6 +134,6 @@ pub fn fuzzy_search_tree(root_node: &VfsNode, query: &str) -> Vec<VfsSearchResul
     for child in &root_node.children {
         traverse(child, query, &mut results);
     }
-    results.sort_by(|a, b| b.score.cmp(&a.score));
+    results.sort_by_key(|b| std::cmp::Reverse(b.score));
     results
 }

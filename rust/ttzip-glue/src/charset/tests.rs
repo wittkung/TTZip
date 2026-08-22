@@ -5,15 +5,13 @@
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
-#[cfg(test)]
-mod tests {
-    use crate::charset::{
-        detect_charset, detect_charset_with_confidence, sanitize_filename,
-        sanitize_filename_to_slice, transcode_to_utf8, ttzip_rust_detect_charset,
-        ttzip_rust_sanitize_filename,
-    };
-    use crate::types::TTZipStatus;
-    use std::ffi::CStr;
+use crate::charset::{
+    detect_charset, detect_charset_with_confidence, sanitize_filename,
+    sanitize_filename_to_slice, transcode_to_utf8, ttzip_rust_detect_charset,
+    ttzip_rust_sanitize_filename,
+};
+use crate::types::TTZipStatus;
+use std::ffi::CStr;
 
     #[test]
     fn test_ascii_fast_path() {
@@ -184,4 +182,3 @@ mod tests {
         );
         assert_eq!(err, TTZipStatus::ErrInvalidParam);
     }
-}

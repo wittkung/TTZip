@@ -250,7 +250,7 @@ fn reference_7z_kdf(password: &str, salt: &[u8], num_cycles_power: u32) -> [u8; 
         if !utf16_pass.is_empty() {
             hasher.update(&utf16_pass);
         }
-        hasher.update(&i.to_le_bytes());
+        hasher.update(i.to_le_bytes());
     }
 
     let result = hasher.finalize();

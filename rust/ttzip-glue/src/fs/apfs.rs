@@ -46,7 +46,7 @@ pub fn align_up_16k(size: usize) -> usize {
 /// Returns true if the pointer is aligned to a 16KB Apple Silicon page boundary.
 #[inline]
 pub fn is_16k_aligned(ptr: *const u8) -> bool {
-    (ptr as usize) % APPLE_SILICON_PAGE_SIZE == 0
+    (ptr as usize).is_multiple_of(APPLE_SILICON_PAGE_SIZE)
 }
 
 /// RAII memory buffer guaranteed to be 16KB page-aligned for Apple Silicon SIMD and DMA I/O.

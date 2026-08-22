@@ -5,13 +5,11 @@
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
-#[cfg(test)]
-mod tests {
-    use crate::runtime::ring_buffer::mpmc::MpmcRingBuffer;
-    use crate::runtime::ring_buffer::spsc::SpscRingBuffer;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Arc;
-    use std::thread;
+use crate::runtime::ring_buffer::mpmc::MpmcRingBuffer;
+use crate::runtime::ring_buffer::spsc::SpscRingBuffer;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::thread;
 
     #[test]
     fn test_spsc_single_thread_push_pop() {
@@ -146,4 +144,3 @@ mod tests {
         let expected_sum: usize = (0..total_items).sum();
         assert_eq!(sum.load(Ordering::SeqCst), expected_sum);
     }
-}

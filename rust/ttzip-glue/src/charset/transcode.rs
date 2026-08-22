@@ -66,7 +66,7 @@ pub fn sanitize_filename_to_slice(data: &[u8], out_buf: &mut [u8]) -> Result<usi
         .max_utf8_buffer_length(data.len())
         .unwrap_or(data.len() * 4);
 
-    if max_needed + 1 <= out_buf.len() {
+    if max_needed < out_buf.len() {
         // Direct zero-allocation decode into target buffer
         let cap = out_buf.len() - 1;
         let buf_slice = &mut out_buf[..cap];

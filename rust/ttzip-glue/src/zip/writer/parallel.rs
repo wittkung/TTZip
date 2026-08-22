@@ -27,7 +27,7 @@ pub fn compress_items_parallel(
     }
 
     let thread_count = (thread_budget as usize).clamp(1, 64).min(items.len().max(1));
-    let chunk_size = (items.len() + thread_count - 1) / thread_count;
+    let chunk_size = items.len().div_ceil(thread_count);
     let pwd_owned = password.map(|s| s.to_string());
 
     let mut handles = Vec::new();

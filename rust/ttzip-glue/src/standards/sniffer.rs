@@ -149,8 +149,8 @@ pub fn detect_format_file<P: AsRef<Path>>(path: P) -> io::Result<SniffResult> {
                     });
                 }
             }
-            Anchor::Tail(512) => {
-                if file_len >= 512 {
+            Anchor::Tail(512)
+                if file_len >= 512 => {
                     let mut tail_buf = [0u8; 512];
                     file.seek(SeekFrom::End(-512))?;
                     file.read_exact(&mut tail_buf)?;
@@ -167,7 +167,6 @@ pub fn detect_format_file<P: AsRef<Path>>(path: P) -> io::Result<SniffResult> {
                         });
                     }
                 }
-            }
             _ => {}
         }
     }
@@ -294,13 +293,13 @@ mod tests {
 
     #[test]
     fn test_detect_zip_and_compound() {
-        let mut zip_header = vec![0u8; 30];
+        let mut zip_header = [0u8; 30];
         zip_header[0..4].copy_from_slice(b"PK\x03\x04");
         let result = detect_format_buffer(&zip_header, Some("archive.zip"));
         assert_eq!(result.format, DetectedFormat::Zip);
-        assert_eq!(result.is_sfx, false);
+        assert!(!result.is_sfx);
 
-        let mut gz_header = vec![0u8; 10];
+        let mut gz_header = [0u8; 10];
         gz_header[0..2].copy_from_slice(b"\x1F\x8B");
         let result_gz = detect_format_buffer(&gz_header, Some("source.tar.gz"));
         assert_eq!(result_gz.format, DetectedFormat::Gzip);
@@ -309,16 +308,16 @@ mod tests {
 
     #[test]
     fn test_detect_sfx_and_dmg() {
-        let mut sfx_stub = vec![0u8; 1024];
+        let mut sfx_stub = [0u8; 1024];
         sfx_stub[0] = b'M';
         sfx_stub[1] = b'Z';
         sfx_stub[256..262].copy_from_slice(b"7z\xBC\xAF\x27\x1C");
         let result = detect_format_buffer(&sfx_stub, Some("setup.exe"));
         assert_eq!(result.format, DetectedFormat::SevenZip);
-        assert_eq!(result.is_sfx, true);
+        assert!(result.is_sfx);
         assert_eq!(result.sfx_offset, 256);
 
-        let mut dmg_tail = vec![0u8; 1024];
+        let mut dmg_tail = [0u8; 1024];
         dmg_tail[512..516].copy_from_slice(b"koly");
         let result_dmg = detect_format_buffer(&dmg_tail, Some("Installer.dmg"));
         assert_eq!(result_dmg.format, DetectedFormat::Dmg);

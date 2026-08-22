@@ -19,7 +19,7 @@ pub fn check_tar_compliance(buffer: &[u8]) -> ComplianceReport {
         return report;
     }
 
-    if buffer.len() % 512 != 0 {
+    if !buffer.len().is_multiple_of(512) {
         let citation = StandardCitation::new(ComplianceStandard::Posix1Tar, "8.1", "512-byte Block Alignment");
         report.add_warning(
             citation,
@@ -96,7 +96,7 @@ pub fn check_tar_compliance(buffer: &[u8]) -> ComplianceReport {
         let file_size = parse_octal_field(size_field).unwrap_or(0) as usize;
 
         // Skip payload blocks (rounded up to 512 bytes)
-        let payload_blocks = (file_size + 511) / 512;
+        let payload_blocks = file_size.div_ceil(512);
         cursor += 512 + (payload_blocks * 512);
     }
 

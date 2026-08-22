@@ -44,11 +44,8 @@ pub fn detect_volume_chain(seed_path: &Path) -> io::Result<Vec<PathBuf>> {
             let width = ext.len();
 
             let check_0 = parent_dir.join(format!("{}.{:0width$}", prefix, 0, width = width));
-            let check_1 = parent_dir.join(format!("{}.{:0width$}", prefix, 1, width = width));
 
-            let start_idx = if check_0.exists() && !check_1.exists() {
-                0
-            } else if check_0.exists() && check_1.exists() {
+            let start_idx = if check_0.exists() {
                 0
             } else {
                 1

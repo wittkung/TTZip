@@ -83,6 +83,6 @@ pub fn fuzzy_search_nodes(root_nodes: &[VfsNode], query: &str) -> Vec<VfsSearchR
         search_node(&matcher, trimmed, node, &mut results);
     }
 
-    results.sort_by(|a, b| b.score.cmp(&a.score));
+    results.sort_by_key(|b| std::cmp::Reverse(b.score));
     results
 }

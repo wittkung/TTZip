@@ -64,7 +64,7 @@ impl<W: Write> Write for BrotliCompressorWriter<W> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match &mut self.inner {
             Some(w) => w.write(buf),
-            None => Err(std::io::Error::new(std::io::ErrorKind::Other, "closed stream")),
+            None => Err(std::io::Error::other("closed stream")),
         }
     }
 

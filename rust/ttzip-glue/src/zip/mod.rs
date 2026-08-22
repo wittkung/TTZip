@@ -147,7 +147,7 @@ mod tests {
             user_data: std::ptr::null_mut(),
         };
 
-        let report = create_zip_archive(&temp_dst_zip, &[temp_src.clone()], &create_opt).unwrap();
+        let report = create_zip_archive(&temp_dst_zip, std::slice::from_ref(&temp_src), &create_opt).unwrap();
         assert_eq!(report.total_entries, 4); // root dir + nested dir + 2 files
 
         let zip_bytes = fs::read(&temp_dst_zip).unwrap();

@@ -216,8 +216,8 @@ impl<'a> ParsedExtraFields<'a> {
                     }
                 }
 
-                TAG_WINZIP_AES => {
-                    if raw.data.len() >= 7 {
+                TAG_WINZIP_AES
+                    if raw.data.len() >= 7 => {
                         let version = u16::from_le_bytes([raw.data[0], raw.data[1]]);
                         let vendor_id = [raw.data[2], raw.data[3]];
                         let strength = raw.data[4];
@@ -229,7 +229,6 @@ impl<'a> ParsedExtraFields<'a> {
                             actual_compression_method: method,
                         });
                     }
-                }
 
                 _ => {}
             }

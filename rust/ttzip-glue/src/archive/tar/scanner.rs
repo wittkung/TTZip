@@ -92,7 +92,7 @@ impl<'a> TarSeekScanner<'a> {
 
             let header = parse_tar_header_block(block)?;
             let payload_size = header.size as usize;
-            let payload_blocks = (payload_size + TAR_BLOCK_SIZE - 1) / TAR_BLOCK_SIZE * TAR_BLOCK_SIZE;
+            let payload_blocks = payload_size.div_ceil(TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE;
             let payload_start = self.cursor + TAR_BLOCK_SIZE;
             let payload_end = payload_start + payload_size;
 

@@ -120,7 +120,7 @@ pub fn repair_damaged_zip(damaged_path: &Path, repaired_path: &Path) -> Result<u
                 let yr = ((mdate_dos >> 9) & 0x7F) as u32 + 1980;
                 let mo = ((mdate_dos >> 5) & 0x0F) as u32;
                 let dy = (mdate_dos & 0x1F) as u32;
-                if yr >= 1980 && mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31 {
+                if yr >= 1980 && (1..=12).contains(&mo) && (1..=31).contains(&dy) {
                     epoch_secs = (yr - 1970) * 31536000 + mo * 2592000 + dy * 86400;
                 }
 
@@ -193,7 +193,7 @@ pub fn repair_damaged_tar(damaged_path: &Path, repaired_path: &Path) -> Result<u
             let size_str = std::str::from_utf8(size_bytes).unwrap_or("").trim_matches(&['\0', ' '][..]);
             let file_size = usize::from_str_radix(size_str, 8).unwrap_or(0);
 
-            let payload_blocks = (file_size + 511) / 512;
+            let payload_blocks = file_size.div_ceil(512);
             let available_payload = total_len.saturating_sub(offset + 512);
             let write_payload_len = file_size.min(available_payload);
 

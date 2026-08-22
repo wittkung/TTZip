@@ -7,13 +7,11 @@
 
 //! Unit tests for pure Rust TAR (POSIX ustar, GNU, PAX) parser and generator.
 
-#[cfg(test)]
-mod tests {
-    use crate::archive::tar::header::*;
-    use crate::archive::tar::reader::*;
-    use crate::archive::tar::writer::*;
-    use crate::types::TTZipExtractOptions;
-    use std::fs;
+use crate::archive::tar::header::*;
+use crate::archive::tar::reader::*;
+use crate::archive::tar::writer::*;
+use crate::types::TTZipExtractOptions;
+use std::fs;
 
     #[test]
     fn test_tar_header_checksum_and_octal_roundtrip() {
@@ -68,7 +66,7 @@ mod tests {
             typeflag: TYPE_GNU_LONGNAME,
             linkname: "".to_string(),
             magic: *MAGIC_GNU,
-            version: [b' ', b' '],
+            version: *b"  ",
             uname: "".to_string(),
             gname: "".to_string(),
             devmajor: 0,
@@ -94,7 +92,7 @@ mod tests {
             typeflag: TYPE_GNU_LONGLINK,
             linkname: "".to_string(),
             magic: *MAGIC_GNU,
-            version: [b' ', b' '],
+            version: *b"  ",
             uname: "".to_string(),
             gname: "".to_string(),
             devmajor: 0,
@@ -121,7 +119,7 @@ mod tests {
             typeflag: TYPE_SYMLINK,
             linkname: long_link[..100].to_string(),
             magic: *MAGIC_GNU,
-            version: [b' ', b' '],
+            version: *b"  ",
             uname: "user".to_string(),
             gname: "user".to_string(),
             devmajor: 0,
@@ -215,4 +213,3 @@ mod tests {
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
-}

@@ -15,4 +15,11 @@ strip = false
 [profile.test]
 opt-level = 3
 debug = 1
-panic = "unwind"
+
+[workspace.lints.rust]
+unsafe_code = "allow"
+
+[workspace.lints.clippy]
+not_unsafe_ptr_arg_deref = "allow"
+needless_range_loop = "allow"
+

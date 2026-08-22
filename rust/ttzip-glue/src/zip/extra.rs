@@ -192,14 +192,13 @@ impl ZipExtraFields {
                     }
                 }
 
-                TAG_UNICODE_PATH => {
-                    if payload.len() >= 5 && payload[0] == 1 {
+                TAG_UNICODE_PATH
+                    if payload.len() >= 5 && payload[0] == 1 => {
                         let _expected_crc = u32::from_le_bytes(payload[1..5].try_into().unwrap());
                         if let Ok(s) = std::str::from_utf8(&payload[5..]) {
                             fields.unicode_path = Some(s.to_string());
                         }
                     }
-                }
 
                 _ => {}
             }

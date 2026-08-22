@@ -73,7 +73,7 @@ impl StreamingCauchyAccumulator {
             slice_size = DEFAULT_SLICE_SIZE;
         }
 
-        let total_k = ((payload_len + slice_size as u64 - 1) / slice_size as u64) as usize;
+        let total_k = payload_len.div_ceil(slice_size as u64) as usize;
         if total_k == 0 || total_k > 200 {
             return Err(TTZipStatus::ErrInvalidParam);
         }
