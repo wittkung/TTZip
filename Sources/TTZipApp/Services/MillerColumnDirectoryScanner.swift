@@ -102,34 +102,33 @@ public enum MillerColumnDirectoryScanner {
             comp.queryItems = [URLQueryItem(name: "subpath", value: childSubpath)]
             let virtualURL = comp.url ?? URL(fileURLWithPath: archivePath)
             
-            let visitor = ArchiveComponentVisitor<DiskItemInfo>(
-                visitLeaf: { leaf in
-                    let ext = (leaf.name as NSString).pathExtension
-                    let sizeText = ByteCountFormatter.string(fromByteCount: leaf.sizeBytes, countStyle: .file)
-                    let kind = ext.isEmpty ? "File" : "\(ext.uppercased()) File"
-                    return DiskItemInfo(
-                        virtualName: leaf.name,
-                        virtualURL: virtualURL,
-                        isDirectory: false,
-                        isArchive: false,
-                        sizeText: sizeText,
-                        rawSizeBytes: leaf.sizeBytes,
-                        kindText: kind
-                    )
-                },
-                visitComposite: { composite in
-                    return DiskItemInfo(
-                        virtualName: composite.name,
-                        virtualURL: virtualURL,
-                        isDirectory: true,
-                        isArchive: false,
-                        sizeText: "Folder",
-                        rawSizeBytes: composite.sizeBytes,
-                        kindText: "Archive Folder"
-                    )
-                }
-            )
-            diskItems.append(child.accept(visitor: visitor))
+            let isDir = child.isDirectory
+            let diskItem: DiskItemInfo
+            if isDir {
+                diskItem = DiskItemInfo(
+                    virtualName: child.name,
+                    virtualURL: virtualURL,
+                    isDirectory: true,
+                    isArchive: false,
+                    sizeText: "Folder",
+                    rawSizeBytes: child.sizeBytes,
+                    kindText: "Archive Folder"
+                )
+            } else {
+                let ext = (child.name as NSString).pathExtension
+                let sizeText = ByteCountFormatter.string(fromByteCount: child.sizeBytes, countStyle: .file)
+                let kind = ext.isEmpty ? "File" : "\(ext.uppercased()) File"
+                diskItem = DiskItemInfo(
+                    virtualName: child.name,
+                    virtualURL: virtualURL,
+                    isDirectory: false,
+                    isArchive: false,
+                    sizeText: sizeText,
+                    rawSizeBytes: child.sizeBytes,
+                    kindText: kind
+                )
+            }
+            diskItems.append(diskItem)
         }
         
         return diskItems.sorted { a, b in

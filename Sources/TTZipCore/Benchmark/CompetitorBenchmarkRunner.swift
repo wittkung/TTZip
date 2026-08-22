@@ -118,7 +118,7 @@ public final class CompetitorBenchmarkRunner: @unchecked Sendable {
 
             _ = try? CompetitorBenchmarkRunner.folderSize(payload.path)
 
-            var ttCompressAopStage = "-"
+            let ttCompressAopStage = "-"
             for pass in 0..<passCount {
                 let runArcPath = cacheDir.appendingPathComponent("tt_run_\(UUID().uuidString).\(fmt.rawValue)").path
                 defer { try? FileManager.default.removeItem(atPath: runArcPath) }

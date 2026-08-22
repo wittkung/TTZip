@@ -25,12 +25,6 @@ public protocol ArchiveComponentProtocol: Sendable {
     
     /// Obtains direct child components (empty array for leaf files).
     func getChildren() -> [ArchiveComponentProtocol]
-    
-    /// Accepts a closure-based visitor (`ArchiveComponentVisitor`).
-    func accept<R>(visitor: ArchiveComponentVisitor<R>) -> R
-    
-    /// Accepts a strongly-typed visitor protocol (`ArchiveComponentVisitorProtocol`).
-    func accept<V: ArchiveComponentVisitorProtocol>(visitor: V) -> V.Result
 }
 
 // MARK: - Leaf Node: Single File
@@ -68,14 +62,6 @@ public final class ArchiveLeafFile: ArchiveComponentProtocol, Identifiable, Equa
     
     public func getChildren() -> [ArchiveComponentProtocol] {
         return []
-    }
-    
-    public func accept<R>(visitor: ArchiveComponentVisitor<R>) -> R {
-        return visitor.visitLeafBlock(self)
-    }
-    
-    public func accept<V: ArchiveComponentVisitorProtocol>(visitor: V) -> V.Result {
-        return visitor.visit(leaf: self)
     }
     
     public static func == (lhs: ArchiveLeafFile, rhs: ArchiveLeafFile) -> Bool {
@@ -178,14 +164,6 @@ public final class ArchiveCompositeDirectory: ArchiveComponentProtocol, Identifi
         lock.lock()
         defer { lock.unlock() }
         return childrenMap[name]
-    }
-    
-    public func accept<R>(visitor: ArchiveComponentVisitor<R>) -> R {
-        return visitor.visitCompositeBlock(self)
-    }
-    
-    public func accept<V: ArchiveComponentVisitorProtocol>(visitor: V) -> V.Result {
-        return visitor.visit(directory: self)
     }
     
     public static func == (lhs: ArchiveCompositeDirectory, rhs: ArchiveCompositeDirectory) -> Bool {

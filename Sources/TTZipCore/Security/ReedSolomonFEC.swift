@@ -100,7 +100,7 @@ public final class ReedSolomonFEC: @unchecked Sendable {
             flatParity.withUnsafeMutableBufferPointer { pBuf -> Bool in
                 guard let dBase = dBuf.baseAddress, let pBase = pBuf.baseAddress else { return false }
 
-                var dataPointers: [UnsafePointer<UInt8>?] = (0..<K).map { dBase.advanced(by: $0 * sliceSize) }
+                let dataPointers: [UnsafePointer<UInt8>?] = (0..<K).map { dBase.advanced(by: $0 * sliceSize) }
                 var parityPointers: [UnsafeMutablePointer<UInt8>?] = (0..<M).map { pBase.advanced(by: $0 * sliceSize) }
 
                 return dataPointers.withUnsafeBufferPointer { dPtrs in
@@ -184,7 +184,7 @@ public final class ReedSolomonFEC: @unchecked Sendable {
                               let sIdxBase = sIdxBuf.baseAddress,
                               let mIdxBase = mIdxBuf.baseAddress else { return false }
 
-                        var availablePointers: [UnsafePointer<UInt8>?] = (0..<totalK).map { aBase.advanced(by: $0 * sliceSize) }
+                        let availablePointers: [UnsafePointer<UInt8>?] = (0..<totalK).map { aBase.advanced(by: $0 * sliceSize) }
                         var reconstructedPointers: [UnsafeMutablePointer<UInt8>?] = (0..<missingCount).map { rBase.advanced(by: $0 * sliceSize) }
 
                         return availablePointers.withUnsafeBufferPointer { aPtrs in

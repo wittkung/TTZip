@@ -75,28 +75,6 @@ extension ArchiveTreeNode: ArchiveComponentProtocol {
         return children?.map { $0 as ArchiveComponentProtocol } ?? []
     }
     
-    public func accept<R>(visitor: ArchiveComponentVisitor<R>) -> R {
-        if isDirectory {
-            let childComponents = getChildren()
-            let composite = ArchiveCompositeDirectory(name: name, path: path, entry: entry, children: childComponents)
-            return visitor.visitCompositeBlock(composite)
-        } else {
-            let leaf = ArchiveLeafFile(name: name, path: path, sizeBytes: uncompressedSize, entry: entry)
-            return visitor.visitLeafBlock(leaf)
-        }
-    }
-    
-    public func accept<V: ArchiveComponentVisitorProtocol>(visitor: V) -> V.Result {
-        if isDirectory {
-            let childComponents = getChildren()
-            let composite = ArchiveCompositeDirectory(name: name, path: path, entry: entry, children: childComponents)
-            return visitor.visit(composite: composite)
-        } else {
-            let leaf = ArchiveLeafFile(name: name, path: path, sizeBytes: uncompressedSize, entry: entry)
-            return visitor.visit(leaf: leaf)
-        }
-    }
-    
     /// Converts this node into a composite Component (Leaf or Composite Directory).
     public func toComponent() -> ArchiveComponentProtocol {
         if isDirectory {

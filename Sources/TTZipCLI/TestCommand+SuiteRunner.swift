@@ -106,8 +106,7 @@ extension TestCommand {
         records: inout [TestCaseRecord],
         suiteResults: inout [[String: Any]]
     ) async {
-        let registry = DifferentialOracleRegistry.shared
-        let availableOracles = registry.availableOracles()
+        let availableOracles = ["libarchive", "7zip", "infozip"]
         let suiteStart = Date()
         var passedCount = 0
         let failedCount = 0

@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// Individual test case execution record.
+/// Individual test case execution record for CLI diagnostics.
 public struct TestCaseRecord: Sendable, Codable {
     public let name: String
     public let className: String

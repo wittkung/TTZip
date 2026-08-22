@@ -96,4 +96,15 @@ public enum RustVfsBridge {
             return acc.matchedPaths.compactMap { entryMap[$0] }
         } ?? []
     }
+    
+    /// Retrieves aggregated VFS statistics (total files, directories, uncompressed size).
+    public static func getStats(from entries: [ArchiveEntry], rootName: String = "") -> (totalFiles: UInt64, totalDirs: UInt64, totalSize: UInt64)? {
+        return withTreeHandle(entries: entries, rootName: rootName) { handle in
+            var totalFiles: UInt64 = 0
+            var totalDirs: UInt64 = 0
+            var totalSize: UInt64 = 0
+            ttzip_rust_vfs_tree_get_stats(handle, &totalFiles, &totalDirs, &totalSize)
+            return (totalFiles, totalDirs, totalSize)
+        }
+    }
 }

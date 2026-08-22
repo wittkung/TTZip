@@ -183,6 +183,13 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
         return .none
     }
     
+    /// Asynchronously renders ASCII/Unicode hierarchical tree directly using the Safe Rust VFS engine.
+    public func renderTree(archivePath: String, password: String? = nil) async throws -> String {
+        let entries = try await inspect(archivePath: archivePath, password: password, candidatePasswords: nil)
+        let rootName = (archivePath as NSString).lastPathComponent
+        return RustVfsBridge.renderTree(from: entries, rootName: rootName)
+    }
+
     /// Performs fuzzy search on the archive contents using Safe Rust VFS engine.
     public func fuzzySearch(archivePath: String, query: String, password: String? = nil) async throws -> [ArchiveEntry] {
         let entries = try await inspect(archivePath: archivePath, password: password, candidatePasswords: nil)

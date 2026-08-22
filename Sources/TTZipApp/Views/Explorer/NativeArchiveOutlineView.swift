@@ -100,8 +100,7 @@ public struct NativeArchiveOutlineView: NSViewRepresentable {
     
     public func renderTreePreview(includeSize: Bool = false) -> String {
         let rootComposite = ArchiveCompositeDirectory(name: "Archive", path: "", children: nodes.map { $0.toComponent() })
-        let visitor = TreeRendererVisitor(includeSize: includeSize)
-        return rootComposite.accept(visitor: visitor)
+        return rootComposite.renderTree()
     }
     
     @MainActor

@@ -79,13 +79,10 @@ public enum TestCommand {
     private static func configureLogging(verbosity: Int) {
         if verbosity <= 1 {
             TTLogger.shared.level = .warning
-            TestLogger.logLevel = .normal
         } else if verbosity == 2 {
             TTLogger.shared.level = .info
-            TestLogger.logLevel = .verbose
         } else if verbosity >= 3 {
             TTLogger.shared.level = .debug
-            TestLogger.logLevel = .debug
         }
     }
     

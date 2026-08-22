@@ -44,7 +44,6 @@ public final class SecurityScanner: @unchecked Sendable {
 
     /// Scans an array of `ArchiveEntry` items for executable scripts or Zip Slip threats.
     public func scanArchiveEntries(_ entries: [ArchiveEntry]) -> SecurityScanResult {
-        let visitor = SecurityScannerVisitor(dangerousExtensions: dangerousExtensions)
         var suspicious: [String] = []
         for entry in entries {
             // Zip Slip path traversal check
@@ -55,10 +54,12 @@ public final class SecurityScanner: @unchecked Sendable {
                 continue
             }
             
-            let leaf = ArchiveLeafFile(name: entry.name, path: entry.path, sizeBytes: entry.uncompressedSize, entry: entry)
-            let threats = visitor.visit(leaf: leaf)
-            if !threats.isEmpty && !suspicious.contains(entry.path) {
-                suspicious.append(entry.path)
+            let ext = (entry.name as NSString).pathExtension.lowercased()
+            if dangerousExtensions.contains(ext) {
+                if !suspicious.contains(entry.path) {
+                    suspicious.append(entry.path)
+                }
+                continue
             }
         }
         if suspicious.isEmpty {
@@ -76,15 +77,34 @@ public final class SecurityScanner: @unchecked Sendable {
         }
     }
 
-    /// Scans a composite component tree using Visitor Pattern.
+    /// Scans a composite component tree.
     public func scanComponent(_ component: ArchiveComponentProtocol) -> SecurityScanResult {
-        let visitor = SecurityScannerVisitor(dangerousExtensions: dangerousExtensions)
-        let threats = component.accept(visitor: visitor)
-        
         var suspicious: [String] = []
-        for threat in threats {
-            if !suspicious.contains(threat.path) {
-                suspicious.append(threat.path)
+        for leaf in component.flattenLeaves() {
+            let path = leaf.path
+            let lowerPath = path.lowercased()
+            if lowerPath.contains("..") || lowerPath.hasPrefix("/") || !Self.isPathSafe(path) {
+                if !suspicious.contains(path) {
+                    suspicious.append(path)
+                }
+                continue
+            }
+            
+            let ext = (leaf.name as NSString).pathExtension.lowercased()
+            if dangerousExtensions.contains(ext) {
+                if !suspicious.contains(path) {
+                    suspicious.append(path)
+                }
+                continue
+            }
+            
+            if let compressedSize = leaf.compressedSizeBytes, compressedSize > 0 {
+                let ratio = Double(leaf.sizeBytes) / Double(compressedSize)
+                if ratio > 100.0 && leaf.sizeBytes > 1_000_000 {
+                    if !suspicious.contains(path) {
+                        suspicious.append(path)
+                    }
+                }
             }
         }
         

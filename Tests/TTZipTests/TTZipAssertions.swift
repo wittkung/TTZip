@@ -12,7 +12,7 @@ import Foundation
 /// libarchive test_common.h POSIX、
 public enum TTZipAssertions {
     
-    /// ， 16 HexDump
+    /// Compares two Data instances.
     public static func assertDataEqual(
         _ actual: Data,
         _ expected: Data,
@@ -20,24 +20,10 @@ public enum TTZipAssertions {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        if actual == expected {
-            _ = DiagnosticContext.consumePendingMessage()
-            return
-        }
-        
-        let pending = DiagnosticContext.consumePendingMessage()
-        let diff = FastHexDiffEngine.generateDiff(expected: expected, actual: actual, maxWindow: 256, useAnsi: true) ?? "Length mismatch"
-        
-        var failureMsg = "\n"
-        if let msg = message ?? pending {
-            failureMsg += "  \u{001B}[1;36mContext:\u{001B}[0m \(msg)\n"
-        }
-        failureMsg += diff
-        
-        XCTFail(failureMsg, file: file, line: line)
+        XCTAssertEqual(actual, expected, message ?? "Data mismatch", file: file, line: line)
     }
     
-    /// ， Unicode APFS NFD/NFC
+    /// Compares two String instances.
     public static func assertStringEqual(
         _ actual: String,
         _ expected: String,
@@ -45,21 +31,7 @@ public enum TTZipAssertions {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        if actual == expected {
-            _ = DiagnosticContext.consumePendingMessage()
-            return
-        }
-        
-        let pending = DiagnosticContext.consumePendingMessage()
-        let analysis = UnicodeDiagnosticFormatter.analyzeStringMismatch(expected: expected, actual: actual)
-        
-        var failureMsg = "\n"
-        if let msg = message ?? pending {
-            failureMsg += "  \u{001B}[1;36mContext:\u{001B}[0m \(msg)\n"
-        }
-        failureMsg += analysis
-        
-        XCTFail(failureMsg, file: file, line: line)
+        XCTAssertEqual(actual, expected, message ?? "String mismatch", file: file, line: line)
     }
     
     /// Validates expected behavior and invariants.
