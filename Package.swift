@@ -17,10 +17,6 @@ let package = Package(
             targets: ["TTZipApp"]
         ),
         .executable(
-            name: "ttzip-cli",
-            targets: ["TTZipCLI"]
-        ),
-        .executable(
             name: "ttzip-bench",
             targets: ["TTZipBench"]
         )
@@ -68,13 +64,6 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "TTZipCLI",
-            dependencies: [
-                "TTZipCore",
-                "CTTZipBridge"
-            ]
-        ),
-        .executableTarget(
             name: "TTZipBench",
             dependencies: [
                 "TTZipCore",
@@ -87,8 +76,7 @@ let package = Package(
         .testTarget(
             name: "TTZipTests",
             dependencies: [
-                "TTZipCore",
-                "TTZipCLI"
+                "TTZipCore"
             ],
             resources: [
                 .copy("Fixtures")

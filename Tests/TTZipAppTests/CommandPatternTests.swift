@@ -8,7 +8,6 @@
 import XCTest
 import Foundation
 @testable import TTZipCore
-@testable import TTZipCLI
 @testable import TTZipApp
 
 /// Mock ， MacroArchiveCommand Rollback

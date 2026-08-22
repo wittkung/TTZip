@@ -85,9 +85,8 @@ build_rust_core() {
 }
 
 build_swift_targets() {
-    echo "==> [2/6] Compiling Swift Release Products (TTZipApp & ttzip-cli)..."
+    echo "==> [2/6] Compiling Swift Release Product (TTZipApp)..."
     swift build -c release --product TTZipApp
-    swift build -c release --product ttzip-cli
 }
 
 assemble_app_bundle() {
@@ -143,11 +142,11 @@ assemble_app_bundle() {
 }
 
 package_cli_tarball() {
-    echo "==> [4/6] Packaging Standalone CLI Tarball & Man/Completions..."
-    local cli_bin
-    cli_bin="$(find_binary ttzip-cli)"
-    if [ -z "${cli_bin}" ] || [ ! -f "${cli_bin}" ]; then
-        echo "❌ Error: ttzip-cli executable not found in .build"; exit 1
+    echo "==> [4/6] Packaging Standalone Rust CLI Tarball..."
+    local rust_cli="${WORKSPACE_ROOT}/bin/ttzip"
+    [ ! -f "${rust_cli}" ] && rust_cli="${WORKSPACE_ROOT}/rust/target/release/ttzip"
+    if [ -z "${rust_cli}" ] || [ ! -f "${rust_cli}" ]; then
+        echo "❌ Error: ttzip standalone binary not found"; exit 1
     fi
     
     local staging_root="${OUTPUT_DIR}/staging"
@@ -156,25 +155,13 @@ package_cli_tarball() {
     mkdir -p "${staging_dir}/bin" "${staging_dir}/share/man/man1"
     mkdir -p "${staging_dir}/share/zsh/site-functions" "${staging_dir}/share/bash-completion/completions" "${staging_dir}/share/fish/vendor_completions.d"
     
-    cp "${cli_bin}" "${staging_dir}/bin/ttzip-cli"
-    if [ -f "${WORKSPACE_ROOT}/bin/ttzip" ]; then
-        cp "${WORKSPACE_ROOT}/bin/ttzip" "${staging_dir}/bin/ttzip"
-    else
-        ln -sf "ttzip-cli" "${staging_dir}/bin/ttzip"
-    fi
+    cp "${rust_cli}" "${staging_dir}/bin/ttzip"
+    ln -sf "ttzip" "${staging_dir}/bin/ttzip-cli"
     
-    dsymutil "${staging_dir}/bin/ttzip-cli" -o "${OUTPUT_DIR}/ttzip-cli-v${VERSION}.dSYM" 2>/dev/null || true
     if [ "${STRIP_SYMBOLS}" = true ]; then
-        strip -x "${staging_dir}/bin/ttzip-cli" 2>/dev/null || true
-        [ -f "${staging_dir}/bin/ttzip" ] && [ ! -L "${staging_dir}/bin/ttzip" ] && strip -x "${staging_dir}/bin/ttzip" 2>/dev/null || true
+        strip -x "${staging_dir}/bin/ttzip" 2>/dev/null || true
     fi
-    chmod +x "${staging_dir}/bin/ttzip-cli"
-    [ -f "${staging_dir}/bin/ttzip" ] && chmod +x "${staging_dir}/bin/ttzip"
-    
-    "${staging_dir}/bin/ttzip-cli" man > "${staging_dir}/share/man/man1/ttzip-cli.1" 2>/dev/null || true
-    "${staging_dir}/bin/ttzip-cli" completion zsh > "${staging_dir}/share/zsh/site-functions/_ttzip-cli" 2>/dev/null || true
-    "${staging_dir}/bin/ttzip-cli" completion bash > "${staging_dir}/share/bash-completion/completions/ttzip-cli" 2>/dev/null || true
-    "${staging_dir}/bin/ttzip-cli" completion fish > "${staging_dir}/share/fish/vendor_completions.d/ttzip-cli.fish" 2>/dev/null || true
+    chmod +x "${staging_dir}/bin/ttzip"
     
     [ -f "${WORKSPACE_ROOT}/LICENSE" ] && cp "${WORKSPACE_ROOT}/LICENSE" "${staging_dir}/LICENSE"
     [ -f "${WORKSPACE_ROOT}/README.md" ] && cp "${WORKSPACE_ROOT}/README.md" "${staging_dir}/README.md"

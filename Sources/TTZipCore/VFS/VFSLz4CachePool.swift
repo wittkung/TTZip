@@ -32,7 +32,6 @@ public final class VFSLz4CachePool: @unchecked Sendable {
     private let nativeHandle: OpaquePointer?
     private let maxRamBytes: Int
     private let spillDirectory: URL
-    private let fallbackEngine = LZ4LzoEngine()
     private let lock = NSLock()
     private var rawSizeCache: [String: Int] = [:]
     
