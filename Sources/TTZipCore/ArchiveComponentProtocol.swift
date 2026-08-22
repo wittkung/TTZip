@@ -106,6 +106,39 @@ public final class ArchiveCompositeDirectory: ArchiveComponentProtocol, Identifi
         defer { lock.unlock() }
         return childrenMap.values.reduce(0) { $0 + $1.sizeBytes }
     }
+
+    public func totalFileCount() -> Int {
+        return flattenLeaves().count
+    }
+    
+    public func totalDirectoryCount() -> Int {
+        var count = 0
+        for child in getChildren() {
+            if child.isDirectory {
+                count += 1
+                if let dir = child as? ArchiveCompositeDirectory {
+                    count += dir.totalDirectoryCount()
+                }
+            }
+        }
+        return count
+    }
+    
+    public func renderTree(indent: String = "") -> String {
+        var result = "\(name)\n"
+        let children = getChildren()
+        for (i, child) in children.enumerated() {
+            let isLast = (i == children.count - 1)
+            let branch = isLast ? "└── " : "├── "
+            let childIndent = indent + (isLast ? "    " : "│   ")
+            if let dir = child as? ArchiveCompositeDirectory {
+                result += indent + branch + dir.renderTree(indent: childIndent)
+            } else {
+                result += indent + branch + "\(child.name) (\(child.sizeBytes) B)\n"
+            }
+        }
+        return result
+    }
     
     /// Obtains unsorted child items in O(1) time (bypasses locale sorting for sampling).
     public func getChildrenUnsorted() -> [ArchiveComponentProtocol] {
@@ -170,3 +203,103 @@ public final class ArchiveCompositeDirectory: ArchiveComponentProtocol, Identifi
         return lhs.path == rhs.path && lhs.getChildren().count == rhs.getChildren().count
     }
 }
+
+// MARK: - ArchiveComponentTreeBuilder
+
+public enum ArchiveComponentTreeBuilder {
+    public static func buildTree(from entries: [ArchiveEntry]) -> ArchiveCompositeDirectory {
+        let root = ArchiveCompositeDirectory(name: "root", path: "")
+        for entry in entries {
+            let parts = entry.path.split(separator: "/").map(String.init)
+            guard !parts.isEmpty else { continue }
+            
+            var current = root
+            for i in 0..<(parts.count - 1) {
+                let dirName = parts[i]
+                let dirPath = parts[0...i].joined(separator: "/")
+                if let existingDir = current.findChildDirect(named: dirName) as? ArchiveCompositeDirectory {
+                    current = existingDir
+                } else {
+                    let newDir = ArchiveCompositeDirectory(name: dirName, path: dirPath)
+                    current.addDirect(component: newDir)
+                    current = newDir
+                }
+            }
+            
+            let leafName = parts.last!
+            if entry.isDirectory {
+                if current.findChildDirect(named: leafName) == nil {
+                    current.addDirect(component: ArchiveCompositeDirectory(name: leafName, path: entry.path))
+                }
+            } else {
+                let leaf = ArchiveLeafFile(
+                    name: leafName,
+                    path: entry.path,
+                    sizeBytes: entry.uncompressedSize,
+                    entry: entry,
+                    modificationDate: entry.modificationDate,
+                    compressedSizeBytes: nil,
+                    crc32: nil
+                )
+                current.addDirect(component: leaf)
+            }
+        }
+        return root
+    }
+
+    public static func buildTree(fromDiskPath diskPath: String) -> ArchiveCompositeDirectory {
+        let url = URL(fileURLWithPath: diskPath)
+        let name = url.lastPathComponent
+        let root = ArchiveCompositeDirectory(name: name, path: diskPath)
+        
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey]) else {
+            return root
+        }
+        
+        for case let fileURL as URL in enumerator {
+            let relativePath = fileURL.path.replacingOccurrences(of: diskPath + "/", with: "")
+            let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey])
+            let isDir = resourceValues?.isDirectory ?? false
+            let size = Int64(resourceValues?.fileSize ?? 0)
+            
+            let parts = relativePath.split(separator: "/").map(String.init)
+            guard !parts.isEmpty else { continue }
+            
+            var current = root
+            for i in 0..<(parts.count - 1) {
+                let dirName = parts[i]
+                let dirPath = diskPath + "/" + parts[0...i].joined(separator: "/")
+                if let existingDir = current.findChildDirect(named: dirName) as? ArchiveCompositeDirectory {
+                    current = existingDir
+                } else {
+                    let newDir = ArchiveCompositeDirectory(name: dirName, path: dirPath)
+                    current.addDirect(component: newDir)
+                    current = newDir
+                }
+            }
+            
+            let leafName = parts.last!
+            if isDir {
+                if current.findChildDirect(named: leafName) == nil {
+                    current.addDirect(component: ArchiveCompositeDirectory(name: leafName, path: fileURL.path))
+                }
+            } else {
+                let leaf = ArchiveLeafFile(name: leafName, path: fileURL.path, sizeBytes: size)
+                current.addDirect(component: leaf)
+            }
+        }
+        return root
+    }
+}
+
+extension ArchiveComponentProtocol {
+    public func flattenLeaves() -> [ArchiveLeafFile] {
+        if let leaf = self as? ArchiveLeafFile {
+            return [leaf]
+        }
+        return getChildren().flatMap { $0.flattenLeaves() }
+    }
+}
+
+

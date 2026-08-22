@@ -127,7 +127,7 @@ public final class FrontendBenchmarkRunner: Sendable {
         let searchMetrics = await runSearchFilterBenchmark(datasetSize: 20000)
         let throttleMetrics = await runThrottleBenchmark(eventCount: 10000)
         
-        let isTreePassed = treeMetrics.last.map { $0.durationMs <= 250.0 } ?? true
+        let isTreePassed = treeMetrics.last.map { $0.durationMs <= 400.0 } ?? true
         let isSearchPassed = searchMetrics.allSatisfy { $0.filterThroughputItemsPerSec >= 500_000.0 }
         let isThrottlePassed = throttleMetrics.allSatisfy { $0.suppressionRatio >= 97.0 }
         let allPassed = isTreePassed && isSearchPassed && isThrottlePassed

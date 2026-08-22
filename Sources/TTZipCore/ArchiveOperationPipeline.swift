@@ -36,13 +36,6 @@ public final class ArchiveOperationPipeline: Sendable {
     public let extractor: ArchiveExtracting
 
     public init(
-        familyFactory: ArchiveEngineFamilyFactoryProtocol
-    ) {
-        self.writer = familyFactory.makeWriter()
-        self.extractor = familyFactory.makeExtractor()
-    }
-
-    public init(
         writer: ArchiveWriting = ArchiveEngineFactory.makeWriter(),
         extractor: ArchiveExtracting = ArchiveEngineFactory.makeExtractor()
     ) {
@@ -59,17 +52,10 @@ public final class ArchiveOperationPipeline: Sendable {
         options: ArchiveFilterOptions = .defaultClean,
         splitVolumeSizeBytes: Int64? = nil,
         password: String? = nil,
-        advancedOptions: ArchiveAdvancedOptions = .defaultOptions,
-        progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
+        advancedOptions: ArchiveAdvancedOptions? = nil,
+        progress: (@Sendable (ArchiveProgress) -> Void)? = nil
     ) async throws -> ArchiveOperationResult {
         let startTime = Date()
-
-        // Estimate original uncompressed byte size via Composite Pattern
-        var totalOrigBytes: Int64 = 0
-        for p in inputPaths {
-            let component = ArchiveComponentTreeBuilder.buildTree(fromDiskPath: p)
-            totalOrigBytes += component.sizeBytes
-        }
 
         try await writer.createArchive(
             outputPath: outputPath,
@@ -79,54 +65,34 @@ public final class ArchiveOperationPipeline: Sendable {
             options: options,
             splitVolumeSizeBytes: splitVolumeSizeBytes,
             password: password,
-            advancedOptions: advancedOptions,
-            progressHandler: progressHandler
+            advancedOptions: advancedOptions ?? ArchiveAdvancedOptions(),
+            progressHandler: progress
         )
 
-        let elapsed = max(0.001, Date().timeIntervalSince(startTime))
-        let attr = try? FileManager.default.attributesOfItem(atPath: outputPath)
-        let compressedSize = (attr?[.size] as? Int64) ?? 0
-        let rate = (Double(totalOrigBytes) / 1024.0 / 1024.0) / elapsed
+        let duration = max(0.001, Date().timeIntervalSince(startTime))
+        let totalOriginalBytes = inputPaths.reduce(Int64(0)) { $0 + calculateDirectorySize(at: $1) }
+        let writtenBytes = (try? FileManager.default.attributesOfItem(atPath: outputPath)[.size] as? Int64) ?? totalOriginalBytes
+        let throughput = Double(totalOriginalBytes) / (1024.0 * 1024.0 * duration)
 
         return ArchiveOperationResult(
             outputPath: outputPath,
-            originalBytes: totalOrigBytes,
-            compressedBytes: compressedSize,
-            durationSeconds: elapsed,
-            throughputMBs: rate
+            originalBytes: totalOriginalBytes,
+            compressedBytes: writtenBytes,
+            durationSeconds: duration,
+            throughputMBs: throughput
         )
     }
 
-    /// Convenience overload executing archive creation via `ArchiveOptionsBuilder`.
-    public func createArchive(
-        outputPath: String,
-        inputPaths: [String],
-        optionsBuilder: ArchiveOptionsBuilder,
-        filterOptions: ArchiveFilterOptions = .defaultClean,
-        splitVolumeSizeBytes: Int64? = nil,
-        progressHandler: (@Sendable (ArchiveProgress) -> Void)? = nil
-    ) async throws -> ArchiveOperationResult {
-        return try await createArchive(
-            outputPath: outputPath,
-            format: optionsBuilder.format ?? .sevenZip,
-            level: optionsBuilder.level ?? .normal,
-            inputPaths: inputPaths,
-            options: filterOptions,
-            splitVolumeSizeBytes: splitVolumeSizeBytes,
-            password: optionsBuilder.password,
-            advancedOptions: optionsBuilder.build(),
-            progressHandler: progressHandler
-        )
-    }
-
-    /// Executes archive extraction workflow and records duration.
+    /// Executes unified archive extraction workflow.
     public func extractArchive(
         archivePath: String,
         destinationDir: String,
+        format: ArchiveCompressionFormat = .sevenZip,
         options: ArchiveFilterOptions = .defaultClean,
         password: String? = nil,
-        advancedOptions: ArchiveAdvancedOptions? = nil
-    ) async throws -> Double {
+        advancedOptions: ArchiveAdvancedOptions? = nil,
+        progress: (@Sendable (ArchiveProgress) -> Void)? = nil
+    ) async throws -> ArchiveOperationResult {
         let startTime = Date()
 
         try await extractor.extract(
@@ -137,6 +103,16 @@ public final class ArchiveOperationPipeline: Sendable {
             advancedOptions: advancedOptions
         )
 
-        return max(0.001, Date().timeIntervalSince(startTime))
+        let duration = max(0.001, Date().timeIntervalSince(startTime))
+        let extractedBytes = calculateDirectorySize(at: destinationDir)
+        let throughput = Double(extractedBytes) / (1024.0 * 1024.0 * duration)
+
+        return ArchiveOperationResult(
+            outputPath: destinationDir,
+            originalBytes: extractedBytes,
+            compressedBytes: extractedBytes,
+            durationSeconds: duration,
+            throughputMBs: throughput
+        )
     }
 }

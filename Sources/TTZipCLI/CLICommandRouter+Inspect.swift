@@ -24,11 +24,13 @@ extension CLICommandRouter {
         do {
             let res = try await TTZipEngineFacade.shared.inspectArchive(archivePath: path, password: pwd)
             let totalBytes = res.entries.reduce(Int64(0)) { $0 + $1.uncompressedSize }
+            let fileCount = res.entries.filter { !$0.isDirectory }.count
+            let dirCount = res.entries.filter { $0.isDirectory }.count
             if options.jsonOutput {
                 TerminalRenderEngine.shared.emitNDJSON(event: "archive_tree", payload: [
                     "archive_path": path,
-                    "total_files": res.treeNode.totalFileCount(),
-                    "total_directories": res.treeNode.totalDirectoryCount(),
+                    "total_files": fileCount,
+                    "total_directories": dirCount,
                     "total_size": totalBytes
                 ])
             } else {
@@ -80,8 +82,10 @@ extension CLICommandRouter {
                     let s = sizeStr.padding(toLength: 12, withPad: " ", startingAt: 0)
                     outText += "\(p) | \(s) | \(entry.detectedEncoding)\n"
                 }
+                let fileCount = res.entries.filter { !$0.isDirectory }.count
+                let dirCount = res.entries.filter { $0.isDirectory }.count
                 outText += "=================================================================\n"
-                outText += "Total: \(res.entries.count) entries (\(res.treeNode.totalDirectoryCount()) directories, \(res.treeNode.totalFileCount()) files)."
+                outText += "Total: \(res.entries.count) entries (\(dirCount) directories, \(fileCount) files)."
                 print(outText)
             }
             return .ok

@@ -14,7 +14,7 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
     public let targetFormat: ArchiveCompressionFormat?
 
     public init(
-        hardwareTuner: HardwareTunerProtocol = ArchiveEngineFamilyProvider.shared.currentFactory.tuner,
+        hardwareTuner: HardwareTunerProtocol = AppleSiliconTuner.shared,
         targetFormat: ArchiveCompressionFormat? = nil
     ) {
         self.hardwareTuner = hardwareTuner
@@ -26,7 +26,7 @@ public final class ArchiveWriter: ArchiveWriting, @unchecked Sendable {
         zipEngine: Any? = nil,
         sevenZipEngine: Any? = nil,
         zstdEngine: Any? = nil,
-        hardwareTuner: HardwareTunerProtocol = ArchiveEngineFamilyProvider.shared.currentFactory.tuner,
+        hardwareTuner: HardwareTunerProtocol = AppleSiliconTuner.shared,
         targetFormat: ArchiveCompressionFormat? = nil
     ) {
         self.init(hardwareTuner: hardwareTuner, targetFormat: targetFormat)

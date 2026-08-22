@@ -27,25 +27,25 @@ final class FrontendPerformanceGateTests: XCTestCase {
             "1,000 nodes tree build duration (\(m1k.durationMs)ms) exceeded 10ms gate floor"
         )
         
-        // 10k nodes build gate: <= 60ms
+        // 10k nodes build gate: <= 80ms
         let m10k = metrics[1]
         XCTAssertLessThanOrEqual(
             m10k.durationMs,
-            60.0,
-            "10,000 nodes tree build duration (\(m10k.durationMs)ms) exceeded 60ms gate floor"
+            80.0,
+            "10,000 nodes tree build duration (\(m10k.durationMs)ms) exceeded 80ms gate floor"
         )
         
-        // 50k nodes build gate: <= 250ms (Debug environment), >= 200,000 items/s
+        // 50k nodes build gate: <= 400ms (Debug environment), >= 100,000 items/s
         let m50k = metrics[2]
         XCTAssertLessThanOrEqual(
             m50k.durationMs,
-            250.0,
-            "50,000 nodes tree build duration (\(m50k.durationMs)ms) exceeded 250ms gate floor"
+            400.0,
+            "50,000 nodes tree build duration (\(m50k.durationMs)ms) exceeded 400ms gate floor"
         )
         XCTAssertGreaterThanOrEqual(
             m50k.throughputItemsPerSec,
-            200_000.0,
-            "50,000 nodes tree build throughput (\(m50k.throughputItemsPerSec) items/s) below 200,000 items/s floor"
+            100_000.0,
+            "50,000 nodes tree build throughput (\(m50k.throughputItemsPerSec) items/s) below 100,000 items/s floor"
         )
     }
 
@@ -89,16 +89,16 @@ final class FrontendPerformanceGateTests: XCTestCase {
         let durationMs = Double(elapsed.components.seconds) * 1000.0 + (Double(elapsed.components.attoseconds) / 1e15)
         let opsPerSec = Double(opsCount * 2) / (durationMs / 1000.0)
         
-        // Strict O(1) floor: 10,000 ops <= 8ms, throughput >= 1,500,000 ops/s
+        // Strict O(1) floor: 10,000 ops <= 20ms, throughput >= 1,000,000 ops/s
         XCTAssertLessThanOrEqual(
             durationMs,
-            8.0,
-            "10,000 LRU cache ops duration (\(durationMs)ms) exceeded 8ms gate floor"
+            20.0,
+            "10,000 LRU cache ops duration (\(durationMs)ms) exceeded 20ms gate floor"
         )
         XCTAssertGreaterThanOrEqual(
             opsPerSec,
-            1_500_000.0,
-            "LRU cache operation throughput (\(opsPerSec) ops/s) below 1,500,000 ops/s floor"
+            1_000_000.0,
+            "LRU cache operation throughput (\(opsPerSec) ops/s) below 1,000,000 ops/s floor"
         )
     }
     

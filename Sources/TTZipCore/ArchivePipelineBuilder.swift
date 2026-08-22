@@ -13,7 +13,6 @@ import Foundation
 public struct ArchivePipelineBuilder: Sendable {
     public var writer: ArchiveWriting?
     public var extractor: ArchiveExtracting?
-    public var familyFactory: ArchiveEngineFamilyFactoryProtocol?
     public var outputPath: String?
     public var archivePath: String?
     public var destinationDir: String?
@@ -29,12 +28,6 @@ public struct ArchivePipelineBuilder: Sendable {
     public init(writer: ArchiveWriting? = nil, extractor: ArchiveExtracting? = nil) {
         self.writer = writer
         self.extractor = extractor
-    }
-    
-    public init(familyFactory: ArchiveEngineFamilyFactoryProtocol) {
-        self.familyFactory = familyFactory
-        self.writer = familyFactory.makeWriter()
-        self.extractor = familyFactory.makeExtractor()
     }
     
     public init(pipeline: ArchiveOperationPipeline) {
@@ -63,15 +56,6 @@ public struct ArchivePipelineBuilder: Sendable {
     public func withExtractor(_ extractor: ArchiveExtracting) -> ArchivePipelineBuilder {
         var copy = self
         copy.extractor = extractor
-        return copy
-    }
-    
-    @discardableResult
-    public func withFamilyFactory(_ factory: ArchiveEngineFamilyFactoryProtocol) -> ArchivePipelineBuilder {
-        var copy = self
-        copy.familyFactory = factory
-        copy.writer = factory.makeWriter()
-        copy.extractor = factory.makeExtractor()
         return copy
     }
     
@@ -183,9 +167,7 @@ public struct ArchivePipelineBuilder: Sendable {
     }
     
     public func buildPipeline() -> ArchiveOperationPipeline {
-        if let ff = familyFactory {
-            return ArchiveOperationPipeline(familyFactory: ff)
-        } else if let w = writer, let e = extractor {
+        if let w = writer, let e = extractor {
             return ArchiveOperationPipeline(writer: w, extractor: e)
         } else if let w = writer {
             return ArchiveOperationPipeline(writer: w, extractor: ArchiveEngineFactory.makeExtractor())
@@ -196,18 +178,10 @@ public struct ArchivePipelineBuilder: Sendable {
         }
     }
     
-    /// Decorator Chain: Constructs fully decoupled execution implementors with dynamic decorators.
+    /// Decorator Chain: Constructs fully decoupled execution implementor.
     public func buildDecoratedImplementor() -> ArchiveEngineImplementorProtocol {
         let finalFormat = optionsBuilder.format ?? format
-        let finalPassword = password ?? optionsBuilder.password
-        return ArchiveEngineFactory.makeDecoratedImplementor(
-            for: finalFormat,
-            password: finalPassword,
-            splitVolumeSizeBytes: splitVolumeSizeBytes,
-            progressHandler: progressHandler,
-            enableChecksum: true,
-            enableMetrics: true
-        )
+        return ArchiveEngineFactory.makeImplementor(for: finalFormat)
     }
     
     public func executeCreate() async throws -> ArchiveOperationResult {
@@ -233,11 +207,11 @@ public struct ArchivePipelineBuilder: Sendable {
             splitVolumeSizeBytes: splitVolumeSizeBytes,
             password: finalPassword,
             advancedOptions: advancedOpts,
-            progressHandler: progressHandler
+            progress: progressHandler
         )
     }
     
-    public func executeExtract() async throws -> Double {
+    public func executeExtract() async throws -> ArchiveOperationResult {
         guard let arcPath = archivePath, !arcPath.isEmpty else {
             throw ArchiveError.readFailed(code: -2)
         }
@@ -254,7 +228,8 @@ public struct ArchivePipelineBuilder: Sendable {
             destinationDir: destDir,
             options: filterOptions,
             password: finalPassword,
-            advancedOptions: advancedOpts
+            advancedOptions: advancedOpts,
+            progress: progressHandler
         )
     }
 }

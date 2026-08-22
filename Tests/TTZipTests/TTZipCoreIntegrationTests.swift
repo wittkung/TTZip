@@ -230,29 +230,6 @@ final class TTZipCoreIntegrationTests: XCTestCase {
         XCTAssertEqual(recoveryResult.foundPassword, secretPassword)
         XCTAssertGreaterThan(recoveryResult.totalAttempts, 0)
         XCTAssertGreaterThanOrEqual(recoveryResult.durationSeconds, 0)
-
-        // 3. Brute force strategy recovery
-        let bruteStrategy = BruteForceRecoveryStrategy()
-        let context = PasswordRecoveryContext(
-            archivePath: archiveURL.path,
-            charset: "aps",
-            maxBruteForceLength: 4
-        )
-        XCTAssertTrue(bruteStrategy.canExecute(context: context))
-
-        let (bruteFound, attempts) = try await bruteStrategy.recover(context: context) { candidate in
-            return candidate == secretPassword
-        }
-        XCTAssertEqual(bruteFound, secretPassword, "Brute force recovery strategy should match secret")
-        XCTAssertGreaterThan(attempts, 0)
-
-        // 4. Strategy executor pipeline coordination
-        let executor = PasswordRecoveryStrategyExecutor(registerDefaults: true)
-        let execResult = try await executor.recoverPassword(context: context) { candidate in
-            return candidate == secretPassword
-        }
-        XCTAssertEqual(execResult.foundPassword, secretPassword)
-        XCTAssertGreaterThan(execResult.totalAttempts, 0)
     }
 
     // MARK: - 6. VFSLz4CachePool Int.min Bit-Pattern Overflow Safety

@@ -136,3 +136,21 @@ open class AdvancedArchiveOperationPipelineAbstraction: ArchiveOperationAbstract
         return (bytesExtracted: bytes, durationSeconds: elapsed, throughputMBs: throughput)
     }
 }
+
+// MARK: - ArchiveEngineBridge Factory
+
+public enum ArchiveEngineBridge {
+    public static func makeImplementor(for format: ArchiveCompressionFormat = .zip) -> ArchiveEngineImplementorProtocol {
+        switch format {
+        case .zip:
+            return ZipEngineBridgeImplementor()
+        case .sevenZip:
+            return SevenZipEngineBridgeImplementor()
+        case .zst:
+            return ZstdEngineBridgeImplementor()
+        default:
+            return RustUnifiedArchiveEngineBridgeImplementor(format: format)
+        }
+    }
+}
+

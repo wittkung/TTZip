@@ -123,6 +123,7 @@ extension TTZipEngineFacade {
             builder = builder.withProgressHandler(progress)
         }
         
-        return try await builder.executeExtract()
+        let res = try await builder.executeExtract()
+        return res.throughputMBs
     }
 }

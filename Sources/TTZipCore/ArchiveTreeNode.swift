@@ -89,23 +89,23 @@ extension ArchiveTreeNode: ArchiveComponentProtocol {
     public init(component: ArchiveComponentProtocol, detectedEncoding: String = "UTF-8") {
         self.name = component.name
         self.path = component.path
-        self.uncompressedSize = component.sizeBytes
         self.isDirectory = component.isDirectory
         self.detectedEncoding = detectedEncoding
         
-        let childComponents = component.getChildren()
-        if component.isDirectory {
-            self.children = childComponents.map { ArchiveTreeNode(component: $0, detectedEncoding: detectedEncoding) }
-        } else {
-            self.children = nil
-        }
-        
         if let leaf = component as? ArchiveLeafFile {
+            self.uncompressedSize = leaf.sizeBytes
             self.entry = leaf.entry
+            self.children = nil
         } else if let composite = component as? ArchiveCompositeDirectory {
             self.entry = composite.entry
+            let childComponents = composite.getChildren()
+            let childNodes = childComponents.map { ArchiveTreeNode(component: $0, detectedEncoding: detectedEncoding) }
+            self.uncompressedSize = childNodes.reduce(0) { $0 + $1.uncompressedSize }
+            self.children = childNodes
         } else {
+            self.uncompressedSize = 0
             self.entry = nil
+            self.children = nil
         }
     }
 }

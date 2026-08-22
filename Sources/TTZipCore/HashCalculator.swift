@@ -22,7 +22,7 @@ public enum HashType: String, Sendable {
 public final class HashCalculator: HashCalculating, @unchecked Sendable {
     internal let hardwareTuner: HardwareTunerProtocol
 
-    public init(hardwareTuner: HardwareTunerProtocol = ArchiveEngineFamilyProvider.shared.currentFactory.tuner) {
+    public init(hardwareTuner: HardwareTunerProtocol = AppleSiliconTuner.shared) {
         self.hardwareTuner = hardwareTuner
     }
     

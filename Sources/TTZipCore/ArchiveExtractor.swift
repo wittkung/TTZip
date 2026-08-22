@@ -14,7 +14,7 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
     public let targetFormat: ArchiveCompressionFormat?
 
     public init(
-        hardwareTuner: HardwareTunerProtocol = ArchiveEngineFamilyProvider.shared.currentFactory.tuner,
+        hardwareTuner: HardwareTunerProtocol = AppleSiliconTuner.shared,
         targetFormat: ArchiveCompressionFormat? = nil
     ) {
         self.hardwareTuner = hardwareTuner

@@ -7,80 +7,40 @@
 
 import Foundation
 
-/// Strategy Pattern & Abstract Factory Pattern engine factory.
-///
-/// Provides factory methods for creating format-specific writers, extractors, readers,
-/// strategy engines, bridge implementors, and decorated engine chains.
+/// Unified factory providing standard writers, extractors, readers, and C-ABI bridge implementors.
 public enum ArchiveEngineFactory {
     
-    /// Obtains current active engine family factory (Abstract Factory).
-    public static var currentFamilyFactory: ArchiveEngineFamilyFactoryProtocol {
-        return ArchiveEngineFamilyProvider.shared.currentFactory
-    }
-
-    /// Creates an archive writer for the specified format.
+    /// Creates an archive writer.
     public static func makeWriter(for format: ArchiveCompressionFormat? = nil) -> ArchiveWriting {
-        return currentFamilyFactory.makeWriter(for: format)
+        return ArchiveWriter()
     }
     
-    /// Creates an archive extractor for the specified format.
+    /// Creates an archive extractor.
     public static func makeExtractor(for format: ArchiveCompressionFormat? = nil) -> ArchiveExtracting {
-        return currentFamilyFactory.makeExtractor(for: format)
+        return ArchiveExtractor()
     }
     
-    /// Creates an archive reader for the specified format.
+    /// Creates an archive reader.
     public static func makeReader(for format: ArchiveCompressionFormat? = nil) -> ArchiveReading {
-        return currentFamilyFactory.makeReader(for: format)
-    }
-
-    /// Constructs format-specific strategy engine instance.
-    public static func makeStrategy(for format: ArchiveCompressionFormat) -> ArchiveFormatEngineStrategy {
-        switch format {
-        case .zip:
-            return ZipFormatEngineStrategy()
-        case .sevenZip:
-            return SevenZipFormatEngineStrategy()
-        case .zst:
-            return ZstdFormatEngineStrategy()
-        case .tar, .tarGz, .gz, .bz2, .tarBz2, .xz, .tarXz, .tarZst, .lzip, .lz4, .brotli, .lrzip, .snappy, .aar, .wim, .dmg, .iso:
-            return TarFormatEngineStrategy(format: format)
-        }
-    }
-
-    /// Discovers and builds strategy engine from filesystem path extension.
-    public static func makeStrategy(for path: String) -> ArchiveFormatEngineStrategy? {
-        return ArchiveEngineRegistry.shared.findExtractor(for: path)
+        return ArchiveReader()
     }
 
     /// Creates an integrity checker engine instance.
     public static func makeIntegrityChecker() -> ArchiveIntegrityChecking {
-        return currentFamilyFactory.makeIntegrityChecker()
+        return ArchiveIntegrityChecker()
     }
 
-    /// Creates a hardware-accelerated cryptographic hash calculator instance.
+    /// Creates a cryptographic hash calculator instance.
     public static func makeHashCalculator(hardwareTuner: HardwareTunerProtocol? = nil) -> HashCalculating {
-        if let tuner = hardwareTuner {
-            return HashCalculator(hardwareTuner: tuner)
-        }
-        return currentFamilyFactory.makeHashCalculator()
+        return HashCalculator(hardwareTuner: hardwareTuner ?? AppleSiliconTuner.shared)
     }
-
-    // MARK: - Bridge Pattern Factory Methods
 
     /// Creates a low-level engine implementor for Bridge Pattern decoupling.
     public static func makeImplementor(for format: ArchiveCompressionFormat = .zip) -> ArchiveEngineImplementorProtocol {
-        return currentFamilyFactory.makeImplementor(for: format)
+        return ArchiveEngineBridge.makeImplementor(for: format)
     }
 
-    /// Constructs high-level `ArchiveOperationAbstraction` with an implementor.
-    public static func makeOperationAbstraction(for format: ArchiveCompressionFormat = .zip) -> ArchiveOperationAbstraction {
-        let implementor = makeImplementor(for: format)
-        return ArchiveOperationAbstraction(implementor: implementor)
-    }
-
-    // MARK: - Decorator Pattern Factory Methods
-
-    /// Assembles an implementor wrapped with dynamic decorator chains.
+    /// Creates a decorated engine implementor.
     public static func makeDecoratedImplementor(
         for format: ArchiveCompressionFormat = .zip,
         password: String? = nil,
@@ -90,5 +50,11 @@ public enum ArchiveEngineFactory {
         enableMetrics: Bool = false
     ) -> ArchiveEngineImplementorProtocol {
         return makeImplementor(for: format)
+    }
+
+    /// Constructs high-level `ArchiveOperationAbstraction` with an implementor.
+    public static func makeOperationAbstraction(for format: ArchiveCompressionFormat = .zip) -> ArchiveOperationAbstraction {
+        let implementor = makeImplementor(for: format)
+        return ArchiveOperationAbstraction(implementor: implementor)
     }
 }
