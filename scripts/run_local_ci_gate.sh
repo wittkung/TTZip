@@ -6,7 +6,7 @@
 #
 # TTZip: High-performance native archiving and compression engine for macOS.
 #
-# run_local_ci_gate.sh: 6-Stage Automated Local Regression & Quality Gate Runner
+# run_local_ci_gate.sh: Automated Local Regression & Quality Gate Runner
 
 set -e
 
@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --bail               Stop immediately on first failed stage"
-            echo "  --stage <name>       Execute only the specified stage"
+            echo "  --stage <name>       Execute only the specified stage (loc-gate, swift-facade, performance, rust-industrial)"
             echo "  --json <path>        Export structured JSON report"
             echo "  -h, --help           Show this help message"
             exit 0
@@ -68,18 +68,21 @@ echo ""
 
 # Stage Definitions
 declare -a STAGE_NAMES=(
+    "Single-File LOC Defense Gate (<= 800 LOC)"
     "Swift High-Level Facade & CLI Suite"
     "Deflate-Bench 50-Point Matrix Gate"
     "Rust Industrial Suite (Props, Fuzz, Differential)"
 )
 
 declare -a STAGE_KEYS=(
+    "loc-gate"
     "swift-facade"
     "performance"
     "rust-industrial"
 )
 
 declare -a STAGE_COMMANDS=(
+    "./scripts/lint_loc_gate.sh"
     "swift test"
     "swift run ttzip-bench gate"
     "./scripts/run_rust_tests.sh --unit --props --fuzz"
@@ -151,8 +154,8 @@ GLOBAL_DURATION=$(python3 -c "print(round(${GLOBAL_END_TIME} - ${GLOBAL_START_TI
 echo -e "${C_CYAN}${C_BOLD}======================================================================${C_RESET}"
 echo -e "${C_CYAN}${C_BOLD}                          Summary Table                               ${C_RESET}"
 echo -e "${C_CYAN}${C_BOLD}======================================================================${C_RESET}"
-printf "%-6s | %-32s | %-8s | %-10s\n" "Stage" "Name" "Status" "Duration"
-echo "----------------------------------------------------------------------"
+printf "%-6s | %-45s | %-8s | %-10s\n" "Stage" "Name" "Status" "Duration"
+echo "----------------------------------------------------------------------------------"
 
 for i in "${!STAGE_STATUSES[@]}"; do
     S_IDX=$((i + 1))
@@ -168,10 +171,10 @@ for i in "${!STAGE_STATUSES[@]}"; do
         STATUS_DISPLAY="${C_YELLOW}SKIP${C_RESET}"
     fi
     
-    printf "%-6s | %-32s | %-17b | %-10s\n" "${S_IDX}" "${S_NAME}" "${STATUS_DISPLAY}" "${S_DUR}"
+    printf "%-6s | %-45s | %-17b | %-10s\n" "${S_IDX}" "${S_NAME}" "${STATUS_DISPLAY}" "${S_DUR}"
 done
 
-echo "----------------------------------------------------------------------"
+echo "----------------------------------------------------------------------------------"
 echo -e "Total: ${PASSED_STAGES} Passed, ${FAILED_STAGES} Failed (${GLOBAL_DURATION}s total)"
 echo ""
 
@@ -180,18 +183,16 @@ if [[ -n "${JSON_REPORT_PATH}" ]]; then
     python3 -c "
 import json
 import os
-stages = []
-names = [\"Unit & CLI Streaming Suite\", \"Standards Compliance Suite\", \"Differential System Oracle\", \"Malformed Stream Fuzzing\", \"Libarchive Golden Corpus\", \"Hard Performance Floors\"]
+names = [\"Single-File LOC Defense Gate (<= 800 LOC)\", \"Swift High-Level Facade & CLI Suite\", \"Deflate-Bench 50-Point Matrix Gate\", \"Rust Industrial Suite (Props, Fuzz, Differential)\"]
 cmds = [
-    \"swift test --filter PipeStreamingTests,ShellCompletionTests,ManPageGenerationTests,ArchiveFormatStandardTests,CLIPackagingTests,ArchiveInspectorViewTests\",
-    \"swift test --filter ArchiveStandardsComplianceTests\",
-    \"swift test --filter DifferentialOracleTests\",
-    \"swift test --filter ArchiveMutationFuzzTests\",
-    \"swift test --filter LibarchiveGoldenCorpusTests\",
-    \"swift test --filter XCTestPerformanceMeasureTests\"
+    \"./scripts/lint_loc_gate.sh\",
+    \"swift test\",
+    \"swift run ttzip-bench gate\",
+    \"./scripts/run_rust_tests.sh --unit --props --fuzz\"
 ]
 status_list = '${STAGE_STATUSES[*]}'.split()
 durations = [float(x) for x in '${STAGE_DURATIONS[*]}'.split()]
+stages = []
 for idx, stat in enumerate(status_list):
     stages.append({
         'stageIndex': idx + 1,

@@ -100,7 +100,16 @@ if [ -f "scripts/lint_codebase_invariants.py" ]; then
     }
 fi
 
-# 2. Run SwiftLint if installed
+# 2. Run Single-File LOC Defense Gate (<= 800 LOC)
+if [ -f "scripts/lint_loc_gate.py" ]; then
+    echo "  Running single-file LOC defense gate (scripts/lint_loc_gate.py)..."
+    python3 scripts/lint_loc_gate.py || {
+        echo -e "${RED}❌ Single-file LOC defense gate failed!${NC}"
+        exit 1
+    }
+fi
+
+# 3. Run SwiftLint if installed
 if command -v swiftlint >/dev/null 2>&1; then
     echo "  Running SwiftLint strict check..."
     swiftlint lint --strict --quiet || {
@@ -122,8 +131,8 @@ echo -e "${GREEN}✅ Stage 2 PASSED: Codebase invariants and linter clean (${STA
 echo -e "${BOLD}${BLUE}[Stage 3/4] Running Fast Core Unit & Pattern Test Suite...${NC}"
 S3_START=$(python3 -c 'import time; print(time.time())')
 
-echo "  Executing: swift test --filter \"(LibarchiveGoldenCorpusTests|TestReportGeneratorTests|PlatformPathSanitizerTests|PlatformMemoryTests|PlatformHardwareTests|SecurityAndComplianceTests|PasswordVaultV4Tests)\""
-swift test --filter "(LibarchiveGoldenCorpusTests|TestReportGeneratorTests|PlatformPathSanitizerTests|PlatformMemoryTests|PlatformHardwareTests|SecurityAndComplianceTests|PasswordVaultV4Tests)" || {
+echo "  Executing: swift test"
+swift test || {
     echo -e "${RED}❌ Unit & Pattern test suite failed!${NC}"
     exit 1
 }
@@ -140,13 +149,11 @@ echo -e "${GREEN}✅ Stage 3 PASSED: Core unit & pattern test suites passed (${S
 echo -e "${BOLD}${BLUE}[Stage 4/4] Verifying Core Engine Performance Floor Gates (Isolated Run)...${NC}"
 S4_START=$(python3 -c 'import time; print(time.time())')
 
-echo "  Executing: swift test --skip-build --filter XCTestPerformanceMeasureTests"
-swift test --skip-build --filter XCTestPerformanceMeasureTests || swift test --filter XCTestPerformanceMeasureTests || {
+echo "  Executing: swift run ttzip-bench gate"
+swift run ttzip-bench gate || {
     echo -e "${RED}❌ Core Engine Performance Floor gate failed (throughput regression detected)!${NC}"
     exit 1
 }
-
-
 
 S4_END=$(python3 -c 'import time; print(time.time())')
 STAGE4_DURATION=$(python3 -c "print(round($S4_END - $S4_START, 2))")

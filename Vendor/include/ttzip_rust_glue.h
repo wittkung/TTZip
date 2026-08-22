@@ -400,6 +400,11 @@ TTZipStatus ttzip_rust_calculate_pareto_frontier(TTZipParetoCodecPointRaw *point
 TTZipStatus ttzip_rust_bench_compute_pareto_frontier(TTZipParetoPointRaw *points, size_t count);
 uint64_t ttzip_rust_bench_monotonic_nanos(void);
 double ttzip_rust_bench_calc_throughput_mbs(size_t bytes, double elapsed_secs);
+int32_t ttzip_rust_bench_run_gate(void);
+int32_t ttzip_rust_bench_run_matrix(int32_t corpus_type, char *out_json, size_t max_len);
+char *ttzip_rust_bench_generate_svg_pareto(int32_t corpus_type, uint32_t width, uint32_t height);
+char *ttzip_rust_bench_generate_html_dashboard(int32_t corpus_type);
+void ttzip_rust_bench_free_string(char *ptr);
 
 // Analytics, SIMD Shannon Entropy & Cascaded Codec Selector
 typedef enum TTZipSelectorScenario {

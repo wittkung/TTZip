@@ -6,25 +6,24 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
-import CryptoKit
 import QuartzCore
 import TTZipCore
+import CTTZipBridge
 
-/// Multi-core hardware stress testing and efficiency benchmarking engine.
+/// Multi-core hardware stress testing and efficiency benchmarking engine delegating directly to Rust C-ABI.
 public final class BenchmarkEngine: @unchecked Sendable {
     public init() {}
 
-    /// High-resolution monotonic nanoseconds provider
+    /// High-resolution monotonic nanoseconds provider via Rust C-ABI
     @inline(__always)
     private func monotonicNanos() -> UInt64 {
-        return PlatformMonotonicTimer.nowNanoseconds()
+        return ttzip_rust_bench_monotonic_nanos()
     }
 
-    /// High-precision throughput calculator
+    /// High-precision throughput calculator via Rust C-ABI
     @inline(__always)
     private func calcThroughputMBs(bytes: Int, elapsedSecs: Double) -> Double {
-        guard elapsedSecs > 0 else { return 0.0 }
-        return (Double(bytes) / elapsedSecs) / (1024.0 * 1024.0)
+        return ttzip_rust_bench_calc_throughput_mbs(bytes, elapsedSecs)
     }
 
     /// Runs full preset benchmark suite across major formats.
@@ -96,7 +95,7 @@ public final class BenchmarkEngine: @unchecked Sendable {
         let sampleFilePath = tempDir.appendingPathComponent("benchmark_data.bin").path
         let outputArchivePath = tempDir.appendingPathComponent("benchmark_output.\(format.rawValue)").path
 
-        try generateSyntheticDataset(at: sampleFilePath, targetBytes: totalBytes, profile: profile)
+        try BenchmarkDatasetGenerator.shared.generateSyntheticDataset(at: sampleFilePath, targetBytes: totalBytes, profile: profile)
 
         // 2. Launch multi-core compression benchmark
         progressHandler?(BenchmarkProgress(
@@ -157,12 +156,12 @@ public final class BenchmarkEngine: @unchecked Sendable {
         let ratio = (Double(compressedSize) / Double(totalBytes)) * 100.0
 
         // Measure system ditto baseline
-        let nativeMeasuredMBs = measureNativeSystemZipThroughput(samplePath: sampleFilePath, targetMB: size.sizeMB)
+        let nativeMeasuredMBs = BenchmarkDatasetGenerator.shared.measureNativeSystemZipThroughput(samplePath: sampleFilePath, targetMB: size.sizeMB)
         let nativeEstimatedSeconds = size.sizeMB / max(1.0, nativeMeasuredMBs)
         let speedup = max(1.0, throughput / max(1.0, nativeMeasuredMBs))
 
         // Probe installed competitors
-        let installedCompetitorScores = measureRealCompetitorScores(samplePath: sampleFilePath, targetMB: size.sizeMB, nativeSpeedMBs: nativeMeasuredMBs)
+        let installedCompetitorScores = BenchmarkDatasetGenerator.shared.measureRealCompetitorScores(samplePath: sampleFilePath, targetMB: size.sizeMB, nativeSpeedMBs: nativeMeasuredMBs)
 
         let result = BenchmarkResult(
             dataSizeMB: size.sizeMB,
@@ -277,7 +276,7 @@ public final class BenchmarkEngine: @unchecked Sendable {
         let decompElapsed = Double(decompElapsedNanos) / 1_000_000_000.0
         let realDecompThroughput = calcThroughputMBs(bytes: Int(totalBytes), elapsedSecs: decompElapsed)
 
-        let nativeMeasuredMBs = measureNativeSystemZipThroughput(samplePath: inputPath, targetMB: dataSizeMB)
+        let nativeMeasuredMBs = BenchmarkDatasetGenerator.shared.measureNativeSystemZipThroughput(samplePath: inputPath, targetMB: dataSizeMB)
         let nativeEstimatedSeconds = dataSizeMB / max(1.0, nativeMeasuredMBs)
         let speedup = max(1.0, throughput / max(1.0, nativeMeasuredMBs))
         let installedCompetitorScores = BenchmarkDatasetGenerator.shared.measureRealCompetitorScores(samplePath: inputPath, targetMB: dataSizeMB, nativeSpeedMBs: nativeMeasuredMBs)
@@ -315,17 +314,5 @@ public final class BenchmarkEngine: @unchecked Sendable {
 
     public func calculateTotalSize(at path: String) -> Int64 {
         return BenchmarkDatasetGenerator.shared.calculateTotalSize(at: path)
-    }
-
-    private func generateSyntheticDataset(at path: String, targetBytes: Int64, profile: BenchmarkDatasetProfile) throws {
-        try BenchmarkDatasetGenerator.shared.generateSyntheticDataset(at: path, targetBytes: targetBytes, profile: profile)
-    }
-
-    private func measureNativeSystemZipThroughput(samplePath: String, targetMB: Double) -> Double {
-        return BenchmarkDatasetGenerator.shared.measureNativeSystemZipThroughput(samplePath: samplePath, targetMB: targetMB)
-    }
-
-    private func measureRealCompetitorScores(samplePath: String, targetMB: Double, nativeSpeedMBs: Double) -> [CompetitorRealScore] {
-        return BenchmarkDatasetGenerator.shared.measureRealCompetitorScores(samplePath: samplePath, targetMB: targetMB, nativeSpeedMBs: nativeSpeedMBs)
     }
 }

@@ -267,6 +267,9 @@ main() {
         echo "[DRY-RUN] Simulating release packaging for v${VERSION}..."; exit 0
     fi
     
+    echo "==> [0/6] Running Single-File LOC Defense Gate (<= 800 LOC)..."
+    "${SCRIPT_DIR}/lint_loc_gate.sh"
+    
     build_rust_core
     build_swift_targets
     assemble_app_bundle

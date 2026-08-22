@@ -106,10 +106,9 @@ extension TestCommand {
         records: inout [TestCaseRecord],
         suiteResults: inout [[String: Any]]
     ) async {
-        let availableOracles = ["libarchive", "7zip", "infozip"]
         let suiteStart = Date()
         var passedCount = 0
-        var failedCount = 0
+        let failedCount = 0
         var suiteCases: [[String: Any]] = []
         
         let oracleTargets = ["ZIP-DEFLATE", "TAR-GZ", "TAR-ZST", "7Z-LZMA2"]

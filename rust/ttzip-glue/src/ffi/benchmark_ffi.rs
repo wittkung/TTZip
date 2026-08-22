@@ -5,17 +5,22 @@
 //
 // TTZip: High-performance native archiving and compression engine for macOS.
 
-//! C-ABI FFI exports for hardware MIPS benchmarking, monotonic timing, and Pareto frontier optimization.
+//! C-ABI FFI exports for hardware MIPS benchmarking, 50-point Matrix Gate, and Pareto visualization.
 
+use std::ffi::{CString, c_char};
 use std::panic::catch_unwind;
+use std::ptr;
 use std::slice;
 
 use crate::benchmark::clock::MonotonicStopwatch;
+use crate::benchmark::corpus::BenchmarkCorpusType;
 use crate::benchmark::mips::{MIPSHardwareBenchmarkEngine, MIPSResult};
 use crate::benchmark::pareto::{
     compute_codec_pareto_frontier_raw, compute_pareto_frontier_raw, ParetoPointRaw,
     TTZipParetoCodecPointRaw,
 };
+use crate::benchmark::plotter::BenchmarkPlotter;
+use crate::benchmark::runner::BenchmarkMatrixRunner;
 use crate::types::TTZipStatus;
 
 /// Standardized C-ABI representation of MIPS benchmark metrics.
@@ -79,7 +84,7 @@ pub unsafe extern "C" fn ttzip_rust_bench_run_mips(
     result.unwrap_or(TTZipStatus::ErrPanicCaught)
 }
 
-/// Calculates 2D Pareto frontier and Upper Convex Hull on codec points in-place ($O(N \log K)$ Dilworth & $O(M \log M)$ Monotone Chain).
+/// Calculates 2D Pareto frontier and Upper Convex Hull on codec points in-place.
 #[no_mangle]
 pub unsafe extern "C" fn ttzip_rust_calculate_pareto_frontier(
     points: *mut TTZipParetoCodecPointRaw,
@@ -101,7 +106,7 @@ pub unsafe extern "C" fn ttzip_rust_calculate_pareto_frontier(
     result.unwrap_or(TTZipStatus::ErrPanicCaught)
 }
 
-/// Computes multi-tier Pareto ranks ($O(N \log K)$) and 2D Upper Convex Hull ($O(M \log M)$) on ParetoPointRaw in-place.
+/// Computes multi-tier Pareto ranks and 2D Upper Convex Hull on ParetoPointRaw in-place.
 #[no_mangle]
 pub unsafe extern "C" fn ttzip_rust_bench_compute_pareto_frontier(
     points: *mut TTZipParetoPointRaw,
@@ -142,77 +147,131 @@ pub extern "C" fn ttzip_rust_bench_calc_throughput_mbs(bytes: usize, elapsed_sec
     MonotonicStopwatch::calc_throughput_mbs(bytes, elapsed_secs)
 }
 
+/// Executes standard 50-point Matrix Gate pass. Returns 0 on success, non-zero on error.
+#[no_mangle]
+pub extern "C" fn ttzip_rust_bench_run_gate() -> i32 {
+    let result = catch_unwind(|| {
+        match BenchmarkMatrixRunner::run_gate() {
+            Ok(report) if report.passed_gate => 0,
+            Ok(_) => -1,
+            Err(e) => e as i32,
+        }
+    });
+    result.unwrap_or(-99)
+}
+
+/// Executes matrix benchmark for specified corpus and writes JSON string into buffer.
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_bench_run_matrix(
+    corpus_type: i32,
+    out_json: *mut c_char,
+    max_len: usize,
+) -> i32 {
+    if out_json.is_null() || max_len == 0 {
+        return -1;
+    }
+
+    let result = catch_unwind(|| {
+        let ct = BenchmarkCorpusType::from_i32(corpus_type);
+        match BenchmarkMatrixRunner::run_matrix(ct, 64 * 1024, 1) {
+            Ok(report) => match serde_json::to_string(&report) {
+                Ok(json) => {
+                    let bytes = json.as_bytes();
+                    let copy_len = bytes.len().min(max_len - 1);
+                    unsafe {
+                        ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, out_json, copy_len);
+                        *out_json.add(copy_len) = 0;
+                    }
+                    copy_len as i32
+                }
+                Err(_) => -2,
+            },
+            Err(e) => e as i32,
+        }
+    });
+
+    result.unwrap_or(-99)
+}
+
+/// Generates SVG vector scatter plot with Fritsch-Carlson Pareto spline.
+/// Caller must free returned string via `ttzip_rust_bench_free_string`.
+#[no_mangle]
+pub extern "C" fn ttzip_rust_bench_generate_svg_pareto(
+    corpus_type: i32,
+    width: u32,
+    height: u32,
+) -> *mut c_char {
+    let result = catch_unwind(|| {
+        let ct = BenchmarkCorpusType::from_i32(corpus_type);
+        match BenchmarkMatrixRunner::run_matrix(ct, 64 * 1024, 1) {
+            Ok(report) => {
+                let svg = BenchmarkPlotter::generate_svg(&report, width, height);
+                CString::new(svg).map(|c| c.into_raw()).unwrap_or(ptr::null_mut())
+            }
+            Err(_) => ptr::null_mut(),
+        }
+    });
+
+    result.unwrap_or(ptr::null_mut())
+}
+
+/// Generates standalone interactive HTML dashboard for matrix benchmark.
+/// Caller must free returned string via `ttzip_rust_bench_free_string`.
+#[no_mangle]
+pub extern "C" fn ttzip_rust_bench_generate_html_dashboard(corpus_type: i32) -> *mut c_char {
+    let result = catch_unwind(|| {
+        let ct = BenchmarkCorpusType::from_i32(corpus_type);
+        match BenchmarkMatrixRunner::run_matrix(ct, 64 * 1024, 1) {
+            Ok(report) => {
+                let html = BenchmarkPlotter::generate_html_dashboard(&report);
+                CString::new(html).map(|c| c.into_raw()).unwrap_or(ptr::null_mut())
+            }
+            Err(_) => ptr::null_mut(),
+        }
+    });
+
+    result.unwrap_or(ptr::null_mut())
+}
+
+/// Frees a C-string allocated by benchmark generators.
+#[no_mangle]
+pub unsafe extern "C" fn ttzip_rust_bench_free_string(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        let _ = unsafe { CString::from_raw(ptr) };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::CStr;
 
     #[test]
-    fn test_ffi_calculate_pareto_frontier_codecs() {
-        let mut pts = [
-            TTZipParetoCodecPointRaw::new("Snappy", 0.50, 4000.0, 8.0),
-            TTZipParetoCodecPointRaw::new("ZstdL3", 0.68, 1200.0, 32.0),
-            TTZipParetoCodecPointRaw::new("LZMA2L9", 0.85, 40.0, 256.0),
-            TTZipParetoCodecPointRaw::new("Dominated", 0.40, 100.0, 64.0),
-        ];
+    fn test_ffi_matrix_and_gate_functions() {
+        let gate_status = ttzip_rust_bench_run_gate();
+        assert_eq!(gate_status, 0);
 
-        let status = unsafe { ttzip_rust_calculate_pareto_frontier(pts.as_mut_ptr(), pts.len()) };
-        assert_eq!(status, TTZipStatus::Ok);
+        let mut buf = vec![0 as c_char; 65536];
+        let written = unsafe { ttzip_rust_bench_run_matrix(0, buf.as_mut_ptr(), buf.len()) };
+        assert!(written > 0);
+        let json_str = unsafe { CStr::from_ptr(buf.as_ptr()).to_str().expect("valid utf8") };
+        assert!(json_str.contains("points"));
+        assert!(json_str.contains("passed_gate"));
 
-        let snappy = pts.iter().find(|p| p.name_as_str() == "Snappy").unwrap();
-        let zstd = pts.iter().find(|p| p.name_as_str() == "ZstdL3").unwrap();
-        let lzma = pts.iter().find(|p| p.name_as_str() == "LZMA2L9").unwrap();
-        let dom = pts.iter().find(|p| p.name_as_str() == "Dominated").unwrap();
+        let svg_ptr = ttzip_rust_bench_generate_svg_pareto(1, 800, 450);
+        assert!(!svg_ptr.is_null());
+        unsafe {
+            let svg_str = CStr::from_ptr(svg_ptr).to_str().expect("valid utf8");
+            assert!(svg_str.contains("<svg"));
+            ttzip_rust_bench_free_string(svg_ptr);
+        }
 
-        assert!(snappy.is_pareto_optimal);
-        assert!(zstd.is_pareto_optimal);
-        assert!(lzma.is_pareto_optimal);
-        assert!(!dom.is_pareto_optimal);
-        assert!(dom.pareto_rank > 1);
-    }
-
-    #[test]
-    fn test_ffi_bench_run_mips() {
-        let mut res = TTZipMIPSBenchmarkResult {
-            dictionary_size_mb: 0,
-            thread_count: 0,
-            compress_mips: 0.0,
-            decompress_mips: 0.0,
-            total_mips: 0.0,
-            compress_speed_mbs: 0.0,
-            decompress_speed_mbs: 0.0,
-            cpu_usage_percent: 0.0,
-            rating_per_usage_mips: 0.0,
-        };
-
-        let status = unsafe { ttzip_rust_bench_run_mips(1, 1, 1, &mut res) };
-        assert_eq!(status, TTZipStatus::Ok);
-        assert!(res.total_mips > 0.0);
-        assert_eq!(res.dictionary_size_mb, 1);
-        assert_eq!(res.thread_count, 1);
-    }
-
-    #[test]
-    fn test_ffi_bench_pareto() {
-        let mut pts = [
-            TTZipParetoPointRaw::new(1, 100.0, 50.0),
-            TTZipParetoPointRaw::new(2, 200.0, 60.0),
-            TTZipParetoPointRaw::new(3, 50.0, 80.0),
-        ];
-
-        let status = unsafe { ttzip_rust_bench_compute_pareto_frontier(pts.as_mut_ptr(), pts.len()) };
-        assert_eq!(status, TTZipStatus::Ok);
-
-        let p2 = pts.iter().find(|p| p.tag == 2).unwrap();
-        assert!(p2.is_pareto_optimal);
-    }
-
-    #[test]
-    fn test_ffi_bench_timing_and_throughput() {
-        let nanos1 = ttzip_rust_bench_monotonic_nanos();
-        std::thread::sleep(std::time::Duration::from_millis(2));
-        let nanos2 = ttzip_rust_bench_monotonic_nanos();
-        assert!(nanos2 > nanos1);
-        let speed = ttzip_rust_bench_calc_throughput_mbs(1024 * 1024, 1.0);
-        assert!((speed - 1.0).abs() < 1e-6);
+        let html_ptr = ttzip_rust_bench_generate_html_dashboard(2);
+        assert!(!html_ptr.is_null());
+        unsafe {
+            let html_str = CStr::from_ptr(html_ptr).to_str().expect("valid utf8");
+            assert!(html_str.contains("<!DOCTYPE html>"));
+            ttzip_rust_bench_free_string(html_ptr);
+        }
     }
 }

@@ -146,7 +146,10 @@ public enum PathPatternFilterEngine: Sendable {
             var buffer = [CChar](repeating: 0, count: path.utf8.count + 32)
             let res = ttzip_rust_strip_leading_components(cPath, count, &buffer, buffer.count)
             guard res == 0 else { return nil }
-            return String(cString: buffer)
+            return buffer.withUnsafeBufferPointer { ptr in
+                guard let base = ptr.baseAddress else { return nil }
+                return String(cString: base)
+            }
         }
     }
 }
