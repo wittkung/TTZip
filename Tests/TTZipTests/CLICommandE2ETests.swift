@@ -96,7 +96,7 @@ final class CLICommandE2ETests: XCTestCase {
             level: .store
         )
         
-        let metadata = try await SmartLoggingProxy.shared.inspectArchive(archivePath: archiveFile.path, password: nil)
+        let metadata = try await TTZipEngineFacade.shared.inspectArchive(archivePath: archiveFile.path, password: nil)
         XCTAssertEqual(metadata.entries.count, 1)
         XCTAssertEqual(metadata.entries.first?.path, "inspect_me.txt")
     }

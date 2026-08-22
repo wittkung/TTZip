@@ -126,7 +126,7 @@ swift build -c release
 ### 3. Run 100% Local Automated CI Verification (0 Cloud Quota)
 
 ```bash
-./scripts/local-ci.sh
+./scripts/run_local_ci_gate.sh
 ```
 
 ---

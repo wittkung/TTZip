@@ -104,7 +104,7 @@ extension CompressModalView {
                             }
                         }
                     },
-                    engineFacade: SecurityProtectionProxy.shared
+                    engineFacade: TTZipEngineFacade.shared
                 )
                 
                 if openFinderAfterCompress {

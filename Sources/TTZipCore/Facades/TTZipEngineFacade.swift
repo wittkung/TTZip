@@ -83,7 +83,7 @@ public final class TTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
             filterOptions: filterOptions,
             advancedOptions: advancedOptions,
             progress: progress,
-            engineFacade: engineFacade ?? SecurityProtectionProxy.shared
+            engineFacade: engineFacade ?? self
         )
         return try await executeCommand(command)
     }
@@ -102,7 +102,7 @@ public final class TTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
             password: password,
             autoVaultUnlock: autoVaultUnlock,
             progress: progress,
-            engineFacade: engineFacade ?? SecurityProtectionProxy.shared
+            engineFacade: engineFacade ?? self
         )
         return try await executeCommand(command)
     }

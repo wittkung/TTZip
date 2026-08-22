@@ -92,6 +92,3 @@ public enum ArchiveEngineFactory {
         return makeImplementor(for: format)
     }
 }
-
-/// Repository Pattern alias compatibility.
-public typealias PresetRepositoryProtocol = ArchivePresetRepositoryProtocol

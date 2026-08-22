@@ -53,8 +53,8 @@ public final class NativeCoreArchitecture: @unchecked Sendable {
         CUnsafeBufferAdapter.deallocateAlignedBuffer(pointer)
     }
     
-    /// Spawns a high-priority POSIX process using `posix_spawn`.
+    /// Spawns a high-priority POSIX process using `SubprocessExecutor`.
     public func spawnProcessFast(binaryPath: String, arguments: [String], workingDirectory: String? = nil) -> Int32 {
-        return (try? POSIXTarCAdapter.shared.spawnProcess(binaryPath: binaryPath, arguments: arguments, workingDirectory: workingDirectory)) ?? -1
+        return (try? SubprocessExecutor.shared.executeProcess(executablePath: binaryPath, arguments: arguments, currentDirectory: workingDirectory)) ?? -1
     }
 }

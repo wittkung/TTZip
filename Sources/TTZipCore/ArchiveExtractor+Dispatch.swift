@@ -17,19 +17,6 @@ extension ArchiveExtractor {
         password: String?,
         advancedOptions: ArchiveAdvancedOptions? = nil
     ) -> Bool {
-        let fmt = ArchiveCompressionFormat.from(extensionOrName: archivePath)
-        if fmt == .sevenZip || archivePath.lowercased().contains(".7z") {
-            if let ok = try? SevenZipCAdapter.shared.extractArchive(
-                archivePath: archivePath,
-                destinationDir: destinationDir,
-                skipMacJunk: options.skipMacJunk,
-                password: password
-            ), ok {
-                Self.cleanupQuarantineAttributes(at: destinationDir)
-                return true
-            }
-        }
-
         let pwd = (password != nil && !password!.isEmpty) ? password : nil
         let status = CUnsafeBufferAdapter.withCString(archivePath) { aPtr in
             CUnsafeBufferAdapter.withCString(destinationDir) { dPtr in

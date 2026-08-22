@@ -136,7 +136,7 @@ public struct ExtractModalView: View {
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                                         .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
-                                )
+                                 )
                             
                             Menu {
                                 ForEach(vaultEntries) { entry in
@@ -242,7 +242,7 @@ public struct ExtractModalView: View {
                     archivePath: archivePath,
                     destinationDir: destinationDir,
                     password: password.isEmpty ? nil : password,
-                    engineFacade: SecurityProtectionProxy.shared
+                    engineFacade: TTZipEngineFacade.shared
                 )
                 await MainActor.run {
                     self.statusMessage = String(format: "✅ Extracted! (%.2fs)", cmdResult.executionDuration)

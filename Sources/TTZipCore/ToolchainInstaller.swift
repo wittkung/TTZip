@@ -142,7 +142,7 @@ public final class ToolchainInstaller: @unchecked Sendable {
         case "zstd_cli":
             return "To run zstd benchmark comparisons, install via terminal:\n  brew install zstd"
         case "turbobench_cli":
-            return "To run TurboBench benchmark comparisons, run:\n  ./scripts/bootstrap_turbobench.sh"
+            return "To run TurboBench benchmark comparisons, build TurboBench from source (https://github.com/powturbo/TurboBench)"
         case "lzbench_cli":
             return "To run lzbench in-memory tests, run:\n  brew install lzbench (or build from source)"
         default:

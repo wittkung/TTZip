@@ -43,38 +43,29 @@ public final class NativeParallelEncryptedSplitEngine: @unchecked Sendable {
         
         progressHandler?(0.1)
         
-        let success: Bool
-        if format == .sevenZip {
-            success = (try? SevenZipCAdapter.shared.createArchive(
-                outputPath: primaryOutputPath,
-                inputPaths: sourcePaths,
-                level: .store,
-                password: password,
-                progressHandler: nil
-            )) ?? false
-        } else {
-            let enc: TTZipEncryptionMethod = !password.isEmpty ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
-            let pwd = !password.isEmpty ? password : nil
-            let res = CUnsafeBufferAdapter.withCString(primaryOutputPath) { cOutputPath in
-                CUnsafeBufferAdapter.withCStringsArray(sourcePaths) { cInputPaths in
-                    CUnsafeBufferAdapter.withCString(pwd) { cPassword in
-                        guard let cOutputPath = cOutputPath else { return TTZIP_STATUS_ERR_INVALID_PARAM }
-                        var opt = TTZipCreateOptions(
-                            format: TTZIP_ARCHIVE_FORMAT_ZIP,
-                            level: TTZIP_COMPRESSION_LEVEL_STORE,
-                            encryption: enc,
-                            password: cPassword,
-                            thread_budget: 0,
-                            solid_block_size_mb: 0,
-                            progress_callback: nil,
-                            user_data: nil
-                        )
-                        return ttzip_rust_create_archive(cInputPaths, sourcePaths.count, cOutputPath, &opt)
-                    }
+        let enc: TTZipEncryptionMethod = !password.isEmpty ? TTZIP_ENCRYPTION_AES256 : TTZIP_ENCRYPTION_NONE
+        let pwd = !password.isEmpty ? password : nil
+        let rustFormat = (format == .sevenZip) ? TTZIP_ARCHIVE_FORMAT_SEVEN_ZIP : TTZIP_ARCHIVE_FORMAT_ZIP
+        
+        let res = CUnsafeBufferAdapter.withCString(primaryOutputPath) { cOutputPath in
+            CUnsafeBufferAdapter.withCStringsArray(sourcePaths) { cInputPaths in
+                CUnsafeBufferAdapter.withCString(pwd) { cPassword in
+                    guard let cOutputPath = cOutputPath else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                    var opt = TTZipCreateOptions(
+                        format: rustFormat,
+                        level: TTZIP_COMPRESSION_LEVEL_STORE,
+                        encryption: enc,
+                        password: cPassword,
+                        thread_budget: 0,
+                        solid_block_size_mb: 0,
+                        progress_callback: nil,
+                        user_data: nil
+                    )
+                    return ttzip_rust_create_archive(cInputPaths, sourcePaths.count, cOutputPath, &opt)
                 }
             }
-            success = (res == TTZIP_STATUS_OK)
         }
+        let success = (res == TTZIP_STATUS_OK)
         
         guard success, FileManager.default.fileExists(atPath: primaryOutputPath) else {
             throw ArchiveError.readFailed(code: -405)

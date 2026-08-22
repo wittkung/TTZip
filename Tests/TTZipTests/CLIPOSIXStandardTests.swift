@@ -6,7 +6,8 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import XCTest
-@testable import TTZipCore
+import TTZipCore
+@testable import TTZipCLI
 
 final class CLIPOSIXStandardTests: XCTestCase {
     

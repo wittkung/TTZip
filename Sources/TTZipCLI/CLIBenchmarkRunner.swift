@@ -89,7 +89,7 @@ public enum CLIBenchmarkRunner {
             var status = "OK"
             
             do {
-                _ = try await SecurityProtectionProxy.shared.quickCompress(
+                _ = try await TTZipEngineFacade.shared.quickCompress(
                     inputs: [sampleFile.path],
                     outputPath: outArc,
                     format: item.format,
@@ -102,7 +102,7 @@ public enum CLIBenchmarkRunner {
                 
                 try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
                 let t1 = PlatformMonotonicTimer.nowSeconds()
-                _ = try await SecurityProtectionProxy.shared.quickExtract(
+                _ = try await TTZipEngineFacade.shared.quickExtract(
                     archivePath: outArc,
                     destinationDir: outDir
                 )
@@ -152,7 +152,7 @@ public enum CLIBenchmarkRunner {
             }
             
             await measure("ZIP Tiny Files") {
-                _ = try await SecurityProtectionProxy.shared.quickCompress(
+                _ = try await TTZipEngineFacade.shared.quickCompress(
                     inputs: [tinyDir.path],
                     outputPath: tempDir.appendingPathComponent("tiny.zip").path,
                     format: .zip,
@@ -161,7 +161,7 @@ public enum CLIBenchmarkRunner {
             }
             if SevenZipBinaryResolver.resolveBinaryPath() != nil {
                 await measure("7Z Tiny Files") {
-                    _ = try await SecurityProtectionProxy.shared.quickCompress(
+                    _ = try await TTZipEngineFacade.shared.quickCompress(
                         inputs: [tinyDir.path],
                         outputPath: tempDir.appendingPathComponent("tiny.7z").path,
                         format: .sevenZip,

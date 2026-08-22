@@ -59,7 +59,7 @@ extension CLICommandRouter {
         }
         
         do {
-            let res = try await securityProxy.quickExtract(
+            let res = try await facade.quickExtract(
                 archivePath: effectivePath,
                 destinationDir: destDir,
                 password: pwd

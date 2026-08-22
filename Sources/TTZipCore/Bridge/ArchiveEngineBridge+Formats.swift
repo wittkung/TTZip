@@ -133,29 +133,23 @@ public final class ZstdEngineBridgeImplementor: ArchiveEngineImplementorProtocol
 /// Bridge implementor for POSIX TAR archives.
 public final class TarEngineBridgeImplementor: ArchiveEngineImplementorProtocol, @unchecked Sendable {
     public let supportedFormat: ArchiveCompressionFormat = .tar
-    public let tarEngine: POSIXTarEngineProtocol
 
-    public init(tarEngine: POSIXTarEngineProtocol = POSIXTarCAdapter.shared) {
-        self.tarEngine = tarEngine
-    }
+    public init() {}
 
     public func compressStream(
         inputPaths: [String],
         outputPath: String,
         options: ArchiveAdvancedOptions
     ) async throws -> Int64 {
-        let success = try tarEngine.createTar(outputPath: outputPath, inputPaths: inputPaths, workingDirectory: nil)
-        if !success {
-            let writer = ArchiveEngineFactory.makeWriter(for: .tar)
-            try writer.createArchiveSync(
-                outputPath: outputPath,
-                format: .tar,
-                level: .normal,
-                inputPaths: inputPaths,
-                options: .defaultClean,
-                advancedOptions: options
-            )
-        }
+        let writer = ArchiveEngineFactory.makeWriter(for: .tar)
+        try writer.createArchiveSync(
+            outputPath: outputPath,
+            format: .tar,
+            level: .normal,
+            inputPaths: inputPaths,
+            options: .defaultClean,
+            advancedOptions: options
+        )
         let attr = try? FileManager.default.attributesOfItem(atPath: outputPath)
         return (attr?[.size] as? Int64) ?? 0
     }
@@ -165,16 +159,13 @@ public final class TarEngineBridgeImplementor: ArchiveEngineImplementorProtocol,
         destinationDir: String,
         options: ArchiveAdvancedOptions
     ) async throws -> Int64 {
-        let success = try tarEngine.extractTar(archivePath: archivePath, destinationDir: destinationDir)
-        if !success {
-            let extractor = ArchiveEngineFactory.makeExtractor(for: .tar)
-            try extractor.extractSync(
-                archivePath: archivePath,
-                destinationDir: destinationDir,
-                options: .defaultClean,
-                advancedOptions: options
-            )
-        }
+        let extractor = ArchiveEngineFactory.makeExtractor(for: .tar)
+        try extractor.extractSync(
+            archivePath: archivePath,
+            destinationDir: destinationDir,
+            options: .defaultClean,
+            advancedOptions: options
+        )
         return calculateDirectorySize(at: destinationDir)
     }
 }

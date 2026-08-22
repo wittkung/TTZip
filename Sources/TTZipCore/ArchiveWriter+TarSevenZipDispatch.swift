@@ -68,18 +68,6 @@ extension ArchiveWriter {
             actualFormat = targetFmt
         }
 
-        if actualFormat == .sevenZip {
-            let handled = try? SevenZipCAdapter.shared.createArchive(
-                outputPath: outputPath,
-                inputPaths: inputPaths,
-                level: level,
-                password: password,
-                splitVolumeSizeBytes: splitVolumeSizeBytes,
-                progressHandler: progressHandler
-            )
-            if handled == true { return }
-        }
-
         let success = createArchiveWithRust(
             outputPath: outputPath,
             format: actualFormat,

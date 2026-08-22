@@ -89,7 +89,7 @@ extension CLICommandRouter {
         }
         
         do {
-            let res = try await securityProxy.quickCompress(
+            let res = try await facade.quickCompress(
                 inputs: inputPaths,
                 outputPath: outputPath,
                 format: format,

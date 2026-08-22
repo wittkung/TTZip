@@ -99,7 +99,7 @@ cmake --build build --config Release -j8
 ### 2. ローカル CI 統合テストの実行（クラウドクォータ消費 0）
 
 ```bash
-./scripts/local-ci.sh
+./scripts/run_local_ci_gate.sh
 ```
 
 ---

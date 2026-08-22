@@ -32,22 +32,17 @@ public final class PasswordVaultViewModel: ObservableObject {
     @Published public var copiedID: UUID? = nil
     @Published public var visiblePasswordIDs: Set<UUID> = []
     
-    public var repository: KeychainPasswordRepository
     public var manager: PasswordVaultManager
     
-    public init(
-        repository: KeychainPasswordRepository = KeychainPasswordRepository.shared,
-        manager: PasswordVaultManager = .shared
-    ) {
-        self.repository = repository
+    public init(manager: PasswordVaultManager = .shared) {
         self.manager = manager
         refreshState()
     }
     
     public func refreshState() {
-        self.isUnlocked = repository.isUnlocked
+        self.isUnlocked = manager.isUnlocked
         if isUnlocked {
-            self.entries = (try? repository.fetchAll()) ?? manager.getEntries()
+            self.entries = manager.getEntries()
         }
     }
     
@@ -85,13 +80,12 @@ public final class PasswordVaultViewModel: ObservableObject {
     public func unlockVault() {
         guard !masterPasswordInput.isEmpty else { return }
         let password = masterPasswordInput
-        let repo = self.repository
         let mgr = self.manager
         
         Task { @MainActor [weak self] in
             guard let self = self else { return }
             let success = await Task.detached(priority: .userInitiated) {
-                return (try? repo.unlock(masterPassword: password)) ?? mgr.unlockVault(with: password)
+                return mgr.unlockVault(with: password)
             }.value
             
             if success {
@@ -108,11 +102,10 @@ public final class PasswordVaultViewModel: ObservableObject {
     public func unlockVaultAsync() async -> Bool {
         guard !masterPasswordInput.isEmpty else { return false }
         let password = masterPasswordInput
-        let repo = self.repository
         let mgr = self.manager
         
         let success = await Task.detached(priority: .userInitiated) {
-            return (try? repo.unlock(masterPassword: password)) ?? mgr.unlockVault(with: password)
+            return mgr.unlockVault(with: password)
         }.value
         
         if success {
@@ -127,7 +120,7 @@ public final class PasswordVaultViewModel: ObservableObject {
     }
     
     public func lockVault() {
-        repository.lock()
+        manager.lockVault()
         isUnlocked = false
         masterPasswordInput = ""
         entries = []
@@ -163,9 +156,8 @@ public final class PasswordVaultViewModel: ObservableObject {
         guard !newLabel.isEmpty, !newPassword.isEmpty else { return }
         let finalLabel = newLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Password" : newLabel.trimmingCharacters(in: .whitespacesAndNewlines)
         let finalCategory = newCategory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "General" : newCategory.trimmingCharacters(in: .whitespacesAndNewlines)
-        let entry = PasswordVaultEntry(label: finalLabel, password: newPassword, category: finalCategory)
         
-        try? repository.save(entry)
+        manager.addEntry(label: finalLabel, password: newPassword, category: finalCategory)
         refreshState()
         newLabel = ""
         newPassword = ""
@@ -173,7 +165,7 @@ public final class PasswordVaultViewModel: ObservableObject {
     }
     
     public func deleteEntry(id: UUID) {
-        try? repository.delete(id: id)
+        manager.removeEntry(id: id)
         refreshState()
     }
     
@@ -260,8 +252,7 @@ public final class PasswordVaultViewModel: ObservableObject {
     
     public func saveRecoveredPasswordToVault(label: String, password: String, category: String = "Recovered") {
         guard !password.isEmpty else { return }
-        let entry = PasswordVaultEntry(label: label, password: password, category: category)
-        try? repository.save(entry)
+        manager.addEntry(label: label, password: password, category: category)
         refreshState()
     }
 }

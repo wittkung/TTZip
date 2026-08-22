@@ -99,7 +99,7 @@ cmake --build build --config Release -j8
 ### 2. 로컬 자동화 CI 파이프라인 실행 (클라우드 쿼터 0 소모)
 
 ```bash
-./scripts/local-ci.sh
+./scripts/run_local_ci_gate.sh
 ```
 
 ---

@@ -63,7 +63,7 @@ extension AppViewState {
         }
         
         do {
-            let res = try await SecurityProtectionProxy.shared.quickExtract(
+            let res = try await TTZipEngineFacade.shared.quickExtract(
                 archivePath: archivePath,
                 destinationDir: destDir,
                 password: pwd,
@@ -99,7 +99,7 @@ extension AppViewState {
         }
         
         do {
-            try await SecurityProtectionProxy.shared.extractSingleEntry(archivePath: archivePath, entryPath: entryPath, destinationDir: destinationDir, password: pwd)
+            try await TTZipEngineFacade.shared.extractSingleEntry(archivePath: archivePath, entryPath: entryPath, destinationDir: destinationDir, password: pwd)
             let targetExtractedFile = (destinationDir as NSString).appendingPathComponent(name)
             await MainActor.run {
                 self.statusMessage = "Extracted entry: \(name)"

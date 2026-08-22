@@ -22,7 +22,7 @@ extension CLICommandRouter {
         )
         
         do {
-            let res = try await SmartLoggingProxy.shared.inspectArchive(archivePath: path, password: pwd)
+            let res = try await TTZipEngineFacade.shared.inspectArchive(archivePath: path, password: pwd)
             let totalBytes = res.entries.reduce(Int64(0)) { $0 + $1.uncompressedSize }
             if options.jsonOutput {
                 TerminalRenderEngine.shared.emitNDJSON(event: "archive_tree", payload: [
@@ -53,7 +53,7 @@ extension CLICommandRouter {
         }
         
         do {
-            let res = try await SmartLoggingProxy.shared.inspectArchive(archivePath: path, password: password)
+            let res = try await TTZipEngineFacade.shared.inspectArchive(archivePath: path, password: password)
             if options.jsonOutput {
                 var entriesJSON: [[String: Any]] = []
                 for e in res.entries {
@@ -104,7 +104,7 @@ extension CLICommandRouter {
         
         do {
             let integrity = try await TTZipEngineFacade.shared.verifyIntegrity(archivePath: path)
-            let res = try await SmartLoggingProxy.shared.inspectArchive(archivePath: path, password: pwd)
+            let res = try await TTZipEngineFacade.shared.inspectArchive(archivePath: path, password: pwd)
             
             if options.jsonOutput {
                 var entriesJSON: [[String: Any]] = []

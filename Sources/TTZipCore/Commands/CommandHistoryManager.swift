@@ -7,28 +7,49 @@
 
 import Foundation
 
-/// Command history manager and invoker maintaining dual Undo/Redo stacks and repository persistence.
+/// Archive task history record domain entity model.
+public struct ArchiveTaskRecord: Identifiable, Codable, Equatable, Sendable {
+    public let id: UUID
+    public var commandName: String
+    public var archivePath: String
+    public var targetPath: String
+    public var isSuccess: Bool
+    public var timestamp: Date
+    public var fileSizeByte: Int64
+    
+    public init(
+        id: UUID = UUID(),
+        commandName: String,
+        archivePath: String,
+        targetPath: String,
+        isSuccess: Bool,
+        timestamp: Date = Date(),
+        fileSizeByte: Int64 = 0
+    ) {
+        self.id = id
+        self.commandName = commandName
+        self.archivePath = archivePath
+        self.targetPath = targetPath
+        self.isSuccess = isSuccess
+        self.timestamp = timestamp
+        self.fileSizeByte = fileSizeByte
+    }
+}
+
+/// Command history manager and invoker maintaining dual Undo/Redo stacks.
 public final class CommandHistoryManager: @unchecked Sendable {
     public static let shared = CommandHistoryManager()
     
     public let maxHistoryCapacity: Int
-    public var historyRepository: any ArchiveHistoryRepositoryProtocol
+    private var records: [ArchiveTaskRecord] = []
     
     private var undoStack: [ArchiveCommandProtocol] = []
     private var redoStack: [ArchiveCommandProtocol] = []
     private let lock = NSLock()
     private var currentOperationTask: Task<Void, Never>? = nil
     
-    private convenience init() {
-        self.init(maxHistoryCapacity: 50, historyRepository: JSONFileArchiveHistoryRepository())
-    }
-    
-    internal init(
-        maxHistoryCapacity: Int = 50,
-        historyRepository: any ArchiveHistoryRepositoryProtocol = JSONFileArchiveHistoryRepository()
-    ) {
+    public init(maxHistoryCapacity: Int = 50) {
         self.maxHistoryCapacity = maxHistoryCapacity
-        self.historyRepository = historyRepository
     }
     
     private func chainTask<T: Sendable>(_ block: @escaping @Sendable () async throws -> T) -> Task<T, Error> {
@@ -90,11 +111,29 @@ public final class CommandHistoryManager: @unchecked Sendable {
     }
     
     public func getHistoryRecords() throws -> [ArchiveTaskRecord] {
-        return try historyRepository.fetchAll()
+        lock.lock()
+        defer { lock.unlock() }
+        return records
     }
     
     public func getRecentHistoryRecords(limit: Int) throws -> [ArchiveTaskRecord] {
-        return try historyRepository.fetchRecent(limit: limit)
+        lock.lock()
+        defer { lock.unlock() }
+        let sorted = records.sorted { $0.timestamp > $1.timestamp }
+        return Array(sorted.prefix(limit))
+    }
+    
+    /// Constructs `ArchiveTaskRecord` from command execution.
+    public func makeRecord(for command: ArchiveCommandProtocol, isSuccess: Bool) -> ArchiveTaskRecord {
+        return ArchiveTaskRecord(
+            id: UUID(),
+            commandName: command.description,
+            archivePath: "archive_\(command.commandId.prefix(8)).zip",
+            targetPath: "/tmp/TTZip/Output",
+            isSuccess: isSuccess,
+            timestamp: Date(),
+            fileSizeByte: 1024
+        )
     }
     
     /// Executes command and pushes to undo stack if supported, clearing redo branch.
@@ -116,9 +155,18 @@ public final class CommandHistoryManager: @unchecked Sendable {
                 timestamp: Date(),
                 fileSizeByte: 1024
             )
-            try? self.historyRepository.save(record)
+            self.appendRecord(record)
             
             return result
+        }
+    }
+    
+    private func appendRecord(_ record: ArchiveTaskRecord) {
+        lock.lock()
+        defer { lock.unlock() }
+        records.append(record)
+        if records.count > maxHistoryCapacity {
+            records.removeFirst()
         }
     }
     
@@ -173,6 +221,7 @@ public final class CommandHistoryManager: @unchecked Sendable {
         discarded.append(contentsOf: redoStack)
         undoStack.removeAll()
         redoStack.removeAll()
+        records.removeAll()
         lock.unlock()
         
         for cmd in discarded {

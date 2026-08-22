@@ -7,21 +7,21 @@
 
 import Foundation
 
-/// Repository and persistence manager for compression presets.
+/// Persistence and management coordinator for compression presets.
 public final class PresetManager: @unchecked Sendable {
     public static let shared = PresetManager()
     
-    private var repository: any ArchivePresetRepositoryProtocol
+    private let userDefaults: UserDefaults
+    private let storageKey: String
     private var cachedPresets: [CompressionPreset] = []
     private let lock = NSLock()
     
-    private init() {
-        self.repository = UserDefaultsPresetRepository()
-        loadPresets()
-    }
-    
-    internal init(repository: any ArchivePresetRepositoryProtocol) {
-        self.repository = repository
+    public init(
+        userDefaults: UserDefaults = .standard,
+        storageKey: String = "TTZip_User_Compression_Presets_v3"
+    ) {
+        self.userDefaults = userDefaults
+        self.storageKey = storageKey
         loadPresets()
     }
     
@@ -39,32 +39,32 @@ public final class PresetManager: @unchecked Sendable {
     
     public func loadPresets() {
         lock.withLock {
-            if let list = try? repository.fetchAll(), !list.isEmpty {
+            if let data = userDefaults.data(forKey: storageKey),
+               let list = try? JSONDecoder().decode([CompressionPreset].self, from: data),
+               !list.isEmpty {
                 self.cachedPresets = list
             } else {
                 self.cachedPresets = PresetManager.defaultBuiltInPresets
-                syncRepositoryLocked()
+                saveToStorageLocked()
             }
         }
     }
     
     public func savePreset(_ preset: CompressionPreset) {
-        let _ = lock.withLock { () -> String? in
-            let old = cachedPresets.first(where: { $0.id == preset.id })?.name
+        lock.withLock {
             if let index = cachedPresets.firstIndex(where: { $0.id == preset.id }) {
                 cachedPresets[index] = preset
             } else {
                 cachedPresets.append(preset)
             }
-            try? repository.save(preset)
-            return old
+            saveToStorageLocked()
         }
     }
     
     public func deletePreset(id: UUID) {
         lock.withLock {
             cachedPresets.removeAll(where: { $0.id == id })
-            try? repository.delete(id: id)
+            saveToStorageLocked()
         }
     }
     
@@ -76,7 +76,7 @@ public final class PresetManager: @unchecked Sendable {
             let defaultName = newName ?? "\(source.name) Copy"
             let item = source.clone(newId: UUID(), newName: defaultName)
             cachedPresets.append(item)
-            try? repository.save(item)
+            saveToStorageLocked()
             return item
         }
     }
@@ -87,7 +87,7 @@ public final class PresetManager: @unchecked Sendable {
         let cloned = lock.withLock { () -> CompressionPreset in
             let item = prototype.clone(newId: UUID(), newName: newName)
             cachedPresets.append(item)
-            try? repository.save(item)
+            saveToStorageLocked()
             return item
         }
         return cloned
@@ -96,13 +96,13 @@ public final class PresetManager: @unchecked Sendable {
     public func resetToDefaults() {
         lock.withLock {
             cachedPresets = PresetManager.defaultBuiltInPresets
-            try? repository.resetToDefaults()
+            saveToStorageLocked()
         }
     }
     
-    private func syncRepositoryLocked() {
-        for preset in cachedPresets {
-            try? repository.save(preset)
+    private func saveToStorageLocked() {
+        if let encoded = try? JSONEncoder().encode(cachedPresets) {
+            userDefaults.set(encoded, forKey: storageKey)
         }
     }
     

@@ -126,7 +126,7 @@ swift build -c release
 ### 3. 运行本地自动化 CI 门禁（0 云端配额消耗）
 
 ```bash
-./scripts/local-ci.sh
+./scripts/run_local_ci_gate.sh
 ```
 
 ---

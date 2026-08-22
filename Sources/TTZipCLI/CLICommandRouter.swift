@@ -21,7 +21,6 @@ import Glibc
 @MainActor
 public enum CLICommandRouter {
     public static var facade: TTZipEngineFacading = TTZipEngineFacade.shared
-    public static var securityProxy: SecurityProtectionProxy = SecurityProtectionProxy.shared
     
     /// Routes and executes a parsed CLI command with the specified options.
     /// - Parameters:

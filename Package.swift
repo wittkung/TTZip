@@ -71,7 +71,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "TTZipCLI",
-            dependencies: ["TTZipCore"]
+            dependencies: [
+                "TTZipCore",
+                "CTTZipBridge"
+            ]
         ),
         .executableTarget(
             name: "TTZipBench",
@@ -85,7 +88,10 @@ let package = Package(
         ),
         .testTarget(
             name: "TTZipTests",
-            dependencies: ["TTZipCore"],
+            dependencies: [
+                "TTZipCore",
+                "TTZipCLI"
+            ],
             resources: [
                 .copy("Fixtures")
             ],

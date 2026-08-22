@@ -68,8 +68,8 @@ TTZip Pro is an enterprise-grade, high-performance macOS archive management soft
 - **`Benchmark/` (`InMemoryBenchmarkEngine`)**:
   - 100% in-memory contiguous page-aligned micro-benchmarking engine (zero disk I/O, 16KB page alignment, warmup cache-priming, and 500ms adaptive time-clamping).
   - TurboBench and lzbench metric parity (decimal MB/s, space savings ratio, roundtrip `memcmp` verification, and structured JSON report serialization).
-- **`scripts/bootstrap_turbobench.sh`**:
-  - Automated submodule cloning and compilation of upstream `powturbo/TurboBench` for continuous bilateral differential testing.
+- **TurboBench / lzbench Parity**:
+  - Parity and structured JSON report serialization for continuous bilateral differential testing.
 
 ---
 
