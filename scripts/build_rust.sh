@@ -16,7 +16,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 RUST_DIR="${REPO_ROOT}/rust"
 VENDOR_DIR="${REPO_ROOT}/Vendor"
-VENDOR_LIB_DIR="${VENDOR_DIR}/lib"
 XCFRAMEWORK_MAC_DIR="${VENDOR_DIR}/TTZipVendor.xcframework/macos-arm64"
 HEADER_OUT="${REPO_ROOT}/Sources/CTTZipBridge/include/ttzip_rust_glue.h"
 
@@ -66,7 +65,7 @@ echo "=========================================="
 
 export PATH="$HOME/.cargo/bin:$PATH"
 
-mkdir -p "${VENDOR_LIB_DIR}" "${VENDOR_DIR}/include" "${REPO_ROOT}/Sources/CTTZipBridge/include"
+mkdir -p "${XCFRAMEWORK_MAC_DIR}/Headers" "${REPO_ROOT}/Sources/CTTZipBridge/include"
 
 # 1. 探测支持的编译目标架构
 HOST_ARCH="$(uname -m)"
@@ -114,48 +113,32 @@ for target in "${TARGETS[@]}"; do
     fi
 done
 
-# 2. 生成或合并 Universal 静态库 libttzip_glue.a
-echo "--> Creating universal / standalone libttzip_glue.a..."
-TEMP_GLUE_LIB="${RUST_DIR}/target/libttzip_glue_merged.a"
-mkdir -p "${RUST_DIR}/target"
+# 2. 生成并部署静态库 libTTZipVendor.a 到 XCFramework
+echo "--> [INFO] Packaging static library directly into ${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a..."
+mkdir -p "${XCFRAMEWORK_MAC_DIR}"
 
 if [ ${#BUILT_LIBS[@]} -eq 1 ]; then
-    cp "${BUILT_LIBS[0]}" "${TEMP_GLUE_LIB}"
+    cp "${BUILT_LIBS[0]}" "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a"
 else
     echo "--> Combining slices via lipo: ${BUILT_LIBS[*]}"
-    lipo -create "${BUILT_LIBS[@]}" -output "${TEMP_GLUE_LIB}"
+    lipo -create "${BUILT_LIBS[@]}" -output "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a"
 fi
 
-cp "${TEMP_GLUE_LIB}" "${VENDOR_LIB_DIR}/libttzip_glue.a"
-rm -f "${TEMP_GLUE_LIB}"
-
-echo "    libttzip_glue.a architecture: $(lipo -info "${VENDOR_LIB_DIR}/libttzip_glue.a")"
-
-# 3. 重新打包 libTTZipVendor.a (包含 libttzip_glue.a 与已有 vendor 库)
-echo "--> [INFO] Creating Universal static library via libtool / lipo: Vendor/libTTZipVendor.a..."
-libtool -static -no_warning_for_no_symbols -o "${VENDOR_DIR}/libTTZipVendor.a" "${VENDOR_LIB_DIR}"/*.a
-
-if [ -d "${XCFRAMEWORK_MAC_DIR}" ]; then
-    echo "--> Syncing libTTZipVendor.a to ${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a..."
-    if lipo -info "${VENDOR_DIR}/libTTZipVendor.a" | grep -q "arm64"; then
-        lipo "${VENDOR_DIR}/libTTZipVendor.a" -extract arm64 -output "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a" 2>/dev/null || \
-            cp "${VENDOR_DIR}/libTTZipVendor.a" "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a"
-    else
-        cp "${VENDOR_DIR}/libTTZipVendor.a" "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a"
-    fi
-    strip -S -x "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a" 2>/dev/null || true
+if lipo -info "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a" | grep -q "arm64"; then
+    lipo "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a" -extract arm64 -output "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a" 2>/dev/null || true
 fi
-strip -S -x "${VENDOR_DIR}/libTTZipVendor.a" 2>/dev/null || true
+strip -S -x "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a" 2>/dev/null || true
 
-# 4. 生成或维护 C-ABI 头文件
+echo "    libTTZipVendor.a architecture: $(lipo -info "${XCFRAMEWORK_MAC_DIR}/libTTZipVendor.a")"
+
+# 3. 生成或维护 C-ABI 头文件
 echo "--> [INFO] Generating C headers: Sources/CTTZipBridge/include/ttzip_rust_glue.h..."
 if command -v cbindgen &>/dev/null; then
     echo "--> Running cbindgen..."
     cbindgen --config "${RUST_DIR}/ttzip-glue/cbindgen.toml" "${RUST_DIR}/ttzip-glue" --output "${HEADER_OUT}" || true
 fi
 
-# 同步头文件至 Vendor/include 与 XCFramework Headers
-cp "${HEADER_OUT}" "${VENDOR_DIR}/include/ttzip_rust_glue.h"
+# 同步头文件至 XCFramework Headers
 if [ -d "${XCFRAMEWORK_MAC_DIR}/Headers" ]; then
     cp "${HEADER_OUT}" "${XCFRAMEWORK_MAC_DIR}/Headers/ttzip_rust_glue.h"
 fi

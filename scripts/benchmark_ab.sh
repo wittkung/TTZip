@@ -93,9 +93,9 @@ if [[ -d "${REPO_ROOT}/Vendor/lib" && ! -d "${WORKTREE_BASE}/Vendor/lib" ]]; the
     mkdir -p "${WORKTREE_BASE}/Vendor"
     ln -sf "${REPO_ROOT}/Vendor/lib" "${WORKTREE_BASE}/Vendor/lib"
 fi
-if [[ -f "${REPO_ROOT}/Vendor/libTTZipVendor.a" && ! -f "${WORKTREE_BASE}/Vendor/libTTZipVendor.a" ]]; then
-    mkdir -p "${WORKTREE_BASE}/Vendor"
-    ln -sf "${REPO_ROOT}/Vendor/libTTZipVendor.a" "${WORKTREE_BASE}/Vendor/libTTZipVendor.a"
+if [[ -f "${REPO_ROOT}/Vendor/TTZipVendor.xcframework/macos-arm64/libTTZipVendor.a" && ! -f "${WORKTREE_BASE}/Vendor/TTZipVendor.xcframework/macos-arm64/libTTZipVendor.a" ]]; then
+    mkdir -p "${WORKTREE_BASE}/Vendor/TTZipVendor.xcframework/macos-arm64"
+    ln -sf "${REPO_ROOT}/Vendor/TTZipVendor.xcframework/macos-arm64/libTTZipVendor.a" "${WORKTREE_BASE}/Vendor/TTZipVendor.xcframework/macos-arm64/libTTZipVendor.a"
 fi
 
 cmake -S "${WORKTREE_BASE}" -B "${WORKTREE_BASE}/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-O3 -DNDEBUG" >/dev/null
@@ -118,9 +118,9 @@ else
         mkdir -p "${WORKTREE_CAND}/Vendor"
         ln -sf "${REPO_ROOT}/Vendor/lib" "${WORKTREE_CAND}/Vendor/lib"
     fi
-    if [[ -f "${REPO_ROOT}/Vendor/libTTZipVendor.a" && ! -f "${WORKTREE_CAND}/Vendor/libTTZipVendor.a" ]]; then
-        mkdir -p "${WORKTREE_CAND}/Vendor"
-        ln -sf "${REPO_ROOT}/Vendor/libTTZipVendor.a" "${WORKTREE_CAND}/Vendor/libTTZipVendor.a"
+    if [[ -f "${REPO_ROOT}/Vendor/TTZipVendor.xcframework/macos-arm64/libTTZipVendor.a" && ! -f "${WORKTREE_CAND}/Vendor/TTZipVendor.xcframework/macos-arm64/libTTZipVendor.a" ]]; then
+        mkdir -p "${WORKTREE_CAND}/Vendor/TTZipVendor.xcframework/macos-arm64"
+        ln -sf "${REPO_ROOT}/Vendor/TTZipVendor.xcframework/macos-arm64/libTTZipVendor.a" "${WORKTREE_CAND}/Vendor/TTZipVendor.xcframework/macos-arm64/libTTZipVendor.a"
     fi
 
     cmake -S "${WORKTREE_CAND}" -B "${WORKTREE_CAND}/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-O3 -DNDEBUG" >/dev/null
