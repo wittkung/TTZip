@@ -55,4 +55,44 @@ final class QuickLookAndFinderIntegrationTests: XCTestCase {
         XCTAssertNotNil(itemProvider)
         XCTAssertEqual(itemProvider.suggestedName, "spec.pdf")
     }
+    
+    func test_quicklook_format_identifier_mapping_all_16_formats() {
+        for format in ArchiveCompressionFormat.allCases {
+            let qlId = QuickLookFormatIdentifier.from(format: format)
+            XCTAssertFalse(qlId.rawValue.isEmpty, "Format \(format) must map to non-empty QuickLook identifier")
+        }
+    }
+    
+    func test_findersync_context_menu_generation_for_archives() {
+        let testURLs = [
+            URL(fileURLWithPath: "/tmp/test.zip"),
+            URL(fileURLWithPath: "/tmp/archive.7z")
+        ]
+        
+        let menuItems = FinderSyncHelper.shared.getContextMenuItems(selectedURLs: testURLs)
+        XCTAssertFalse(menuItems.isEmpty, "Context menu items should be generated for archive URLs")
+        
+        let actionIds = menuItems.map { $0.actionIdentifier }
+        XCTAssertTrue(actionIds.contains("extract_here"))
+        XCTAssertTrue(actionIds.contains("extract_to_subfolder"))
+        XCTAssertTrue(actionIds.contains("inspect_archive"))
+    }
+    
+    func test_findersync_action_request_ipc_json_roundtrip() throws {
+        let original = FinderSyncActionRequest(
+            action: .extractHere,
+            sourcePaths: ["/Users/test/archive.zip"],
+            destinationDirectory: "/Users/test/output"
+        )
+        
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(original)
+        
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(FinderSyncActionRequest.self, from: data)
+        
+        XCTAssertEqual(decoded.actionIdentifier, "extract_here")
+        XCTAssertEqual(decoded.sourcePaths, ["/Users/test/archive.zip"])
+        XCTAssertEqual(decoded.destinationDirectory, "/Users/test/output")
+    }
 }

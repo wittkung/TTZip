@@ -183,5 +183,18 @@
 			</dict>
 		</dict>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.metastudyline.ttzip.url-scheme</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ttzip</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

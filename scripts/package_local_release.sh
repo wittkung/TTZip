@@ -136,6 +136,12 @@ assemble_app_bundle() {
     fi
     [ -f "${icon_path}" ] && cp "${icon_path}" "${resources_dir}/AppIcon.icns"
     [ -f "${WORKSPACE_ROOT}/Sources/TTZipApp/PrivacyInfo.xcprivacy" ] && cp "${WORKSPACE_ROOT}/Sources/TTZipApp/PrivacyInfo.xcprivacy" "${resources_dir}/PrivacyInfo.xcprivacy"
+    local plugins_dir="${contents_dir}/PlugIns"
+    mkdir -p "${plugins_dir}"
+    "${SCRIPT_DIR}/build_extensions.sh"
+    if [ -d "${OUTPUT_DIR}/PlugIns" ]; then
+        cp -R "${OUTPUT_DIR}/PlugIns/"* "${plugins_dir}/"
+    fi
     
     codesign --force --deep --sign - "${APP_BUNDLE}" 2>/dev/null || true
     echo "  ✓ App bundle assembled at ${APP_BUNDLE}"

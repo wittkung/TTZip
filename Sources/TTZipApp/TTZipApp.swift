@@ -92,6 +92,9 @@ struct TTZipApp: App {
             MainView()
                 .frame(minWidth: 460, minHeight: 380)
                 .background(Color.clear)
+                .onOpenURL { url in
+                    handleIncomingURL(url)
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unifiedCompact)
@@ -107,6 +110,40 @@ struct TTZipApp: App {
                     UpdateManager.shared.checkForUpdates()
                 }
                 #endif
+            }
+        }
+    }
+    
+    private func handleIncomingURL(_ url: URL) {
+        if url.scheme == "ttzip" {
+            guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+            let actionType = components.queryItems?.first(where: { $0.name == "type" })?.value ?? ""
+            let pathsStr = components.queryItems?.first(where: { $0.name == "paths" })?.value ?? ""
+            let paths = pathsStr.components(separatedBy: "|").filter { !$0.isEmpty }
+            guard !paths.isEmpty else { return }
+            
+            Task { @MainActor in
+                switch actionType {
+                case "extract_here":
+                    for path in paths {
+                        let parent = (path as NSString).deletingLastPathComponent
+                        _ = try? await TTZipEngineFacade.shared.quickExtract(archivePath: path, destinationDir: parent)
+                    }
+                case "extract_to_subfolder":
+                    for path in paths {
+                        let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+                        let parent = (path as NSString).deletingLastPathComponent
+                        let dest = (parent as NSString).appendingPathComponent(name)
+                        _ = try? await TTZipEngineFacade.shared.quickExtract(archivePath: path, destinationDir: dest)
+                    }
+                case "compress_zip":
+                    if let first = paths.first {
+                        let outPath = first + ".zip"
+                        _ = try? await TTZipEngineFacade.shared.quickCompress(inputs: paths, outputPath: outPath, format: .zip)
+                    }
+                default:
+                    break
+                }
             }
         }
     }

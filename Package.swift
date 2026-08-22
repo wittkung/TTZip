@@ -16,6 +16,16 @@ let package = Package(
             name: "TTZipApp",
             targets: ["TTZipApp"]
         ),
+        .library(
+            name: "TTZipQuickLook",
+            type: .dynamic,
+            targets: ["TTZipQuickLook"]
+        ),
+        .library(
+            name: "TTZipFinderSync",
+            type: .dynamic,
+            targets: ["TTZipFinderSync"]
+        ),
         .executable(
             name: "ttzip-bench",
             targets: ["TTZipBench"]
@@ -62,6 +72,16 @@ let package = Package(
                 .copy("Resources/AppIcon.icns"),
                 .process("Resources/Assets.xcassets")
             ]
+        ),
+        .target(
+            name: "TTZipQuickLook",
+            dependencies: ["TTZipCore"],
+            exclude: ["Info.plist"]
+        ),
+        .target(
+            name: "TTZipFinderSync",
+            dependencies: ["TTZipCore"],
+            exclude: ["Info.plist"]
         ),
         .executableTarget(
             name: "TTZipBench",
