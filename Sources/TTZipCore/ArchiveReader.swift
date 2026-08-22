@@ -135,6 +135,7 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                     args.append(archivePath)
                     proc.arguments = args
                     let pipe = Pipe()
+                    proc.standardInput = FileHandle.nullDevice
                     proc.standardOutput = pipe
                     proc.standardError = FileHandle.nullDevice
                     if (try? proc.run()) != nil {
@@ -189,7 +190,25 @@ public final class ArchiveReader: ArchiveReading, @unchecked Sendable {
                 
                 var success = (try? SevenZipCAdapter.shared.extractArchive(archivePath: targetInspectPath, destinationDir: tempDir, skipMacJunk: true, password: pwd)) ?? false
                 if !success {
-                    success = (ttzip_extract_archive_advanced(targetInspectPath, tempDir, true, pwd) == 0)
+                    let res = CUnsafeBufferAdapter.withCString(targetInspectPath) { cPath in
+                        CUnsafeBufferAdapter.withCString(tempDir) { cDest in
+                            CUnsafeBufferAdapter.withCString(pwd) { cPwd in
+                                guard let cPath = cPath, let cDest = cDest else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                                var opt = TTZipExtractOptions(
+                                    destination_path: cDest,
+                                    password: cPwd,
+                                    thread_budget: 1,
+                                    overwrite_existing: true,
+                                    preserve_permissions: true,
+                                    dry_run: false,
+                                    progress_callback: nil,
+                                    user_data: nil
+                                )
+                                return ttzip_rust_extract_archive(cPath, cDest, &opt)
+                            }
+                        }
+                    }
+                    success = (res == TTZIP_STATUS_OK)
                 }
                 TTLogger.debug("[Inspect] in-process extraction success=\(success), tempDir=\(tempDir)")
                 if success {

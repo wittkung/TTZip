@@ -71,6 +71,26 @@ final class ArchiveMutationFuzzTests: XCTestCase {
         return fallbackStub(for: format)
     }
     
+    @discardableResult
+    private static func extractFuzzedArchive(path: String, destination: String) -> Int32 {
+        return CUnsafeBufferAdapter.withCString(path) { cArc in
+            CUnsafeBufferAdapter.withCString(destination) { cDest in
+                guard let cArc = cArc, let cDest = cDest else { return Int32(-1) }
+                var opt = TTZipExtractOptions(
+                    destination_path: cDest,
+                    password: nil,
+                    thread_budget: 1,
+                    overwrite_existing: true,
+                    preserve_permissions: true,
+                    dry_run: false,
+                    progress_callback: nil,
+                    user_data: nil
+                )
+                return ttzip_rust_extract_archive(cArc, cDest, &opt) == TTZIP_STATUS_OK ? 0 : -1
+            }
+        }
+    }
+    
     // MARK: - 2. Corrupt Magic Mutation Fuzzing (50+ Iterations Across Formats)
     
     func testCorruptMagicMutationStability() async throws {
@@ -93,7 +113,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         try mutatedData.write(to: URL(fileURLWithPath: reproducerPath))
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_magic_\(fmt.rawValue)_\(iter)").path
-                        let status = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
+                        let status = Self.extractFuzzedArchive(path: reproducerPath, destination: extractDest)
                         _ = status
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
@@ -136,7 +156,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         try mutatedData.write(to: URL(fileURLWithPath: reproducerPath))
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_crc_\(fmt.rawValue)_\(iter)").path
-                        _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
+                        _ = Self.extractFuzzedArchive(path: reproducerPath, destination: extractDest)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)
@@ -178,7 +198,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         try mutatedData.write(to: URL(fileURLWithPath: reproducerPath))
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_trunc_\(fmt.rawValue)_\(iter)").path
-                        _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
+                        _ = Self.extractFuzzedArchive(path: reproducerPath, destination: extractDest)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)
@@ -242,7 +262,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                             XCTAssertFalse(ArchiveSecurityFacade.shared.validateExtractPath(entryPath: evil, destinationDir: extractDest))
                         }
                         
-                        _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
+                        _ = Self.extractFuzzedArchive(path: reproducerPath, destination: extractDest)
                         
                         let parentSandbox = baseSandbox.deletingLastPathComponent().path
                         let escapedFile = (parentSandbox as NSString).appendingPathComponent("etc/passwd")
@@ -288,7 +308,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         try mutatedData.write(to: URL(fileURLWithPath: reproducerPath))
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_oversize_\(fmt.rawValue)_\(iter)").path
-                        _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
+                        _ = Self.extractFuzzedArchive(path: reproducerPath, destination: extractDest)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)
@@ -330,7 +350,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         try mutatedData.write(to: URL(fileURLWithPath: reproducerPath))
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_dict_\(fmt.rawValue)_\(iter)").path
-                        _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
+                        _ = Self.extractFuzzedArchive(path: reproducerPath, destination: extractDest)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)
@@ -380,7 +400,7 @@ final class ArchiveMutationFuzzTests: XCTestCase {
                         try mutatedData.write(to: URL(fileURLWithPath: reproducerPath))
                         
                         let extractDest = baseSandbox.appendingPathComponent("ext_matrix_\(fmt.rawValue)_\(iter)").path
-                        _ = ttzip_extract_archive_advanced(reproducerPath, extractDest, true, nil)
+                        _ = Self.extractFuzzedArchive(path: reproducerPath, destination: extractDest)
                         
                         try? FileManager.default.removeItem(atPath: reproducerPath)
                         try? FileManager.default.removeItem(atPath: extractDest)

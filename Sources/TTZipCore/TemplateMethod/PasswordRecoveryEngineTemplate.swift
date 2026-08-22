@@ -154,10 +154,7 @@ public final class PasswordRecoveryEngineTemplate: BaseArchiveEngineTemplate, @u
                         user_data: nil
                     )
                     let status = ttzip_rust_extract_archive(cPath, cDest, &opt)
-                    if status == TTZIP_STATUS_OK {
-                        return true
-                    }
-                    return ttzip_extract_archive_advanced(cPath, cDest, false, cPwd) == 0
+                    return status == TTZIP_STATUS_OK
                 }
             }
         }

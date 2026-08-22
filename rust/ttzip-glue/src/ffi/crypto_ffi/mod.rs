@@ -10,14 +10,14 @@
 pub mod checksum;
 pub mod ciphers;
 pub mod fec;
-mod recovery;
+pub mod password_recovery;
 pub mod recovery_record_ffi;
 pub mod vault;
 
 pub use checksum::*;
 pub use ciphers::*;
 pub use fec::*;
-pub use recovery::*;
+pub use password_recovery::*;
 pub use recovery_record_ffi::*;
 pub use vault::*;
 

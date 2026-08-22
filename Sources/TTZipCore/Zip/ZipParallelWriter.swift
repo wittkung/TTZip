@@ -198,7 +198,7 @@ public final class ZipParallelWriter: @unchecked Sendable {
         
         for cdfh in cdfhEntries {
             let pathData = Data(cdfh.relPath.utf8)
-            var fnLen = UInt16(pathData.count)
+            let fnLen = UInt16(pathData.count)
             let needsZip64 = cdfh.uncompressedSize >= 0xFFFFFFFF || cdfh.compressedSize >= 0xFFFFFFFF || cdfh.offset >= 0xFFFFFFFF
             
             var record = Data()
@@ -306,7 +306,6 @@ public final class ZipParallelWriter: @unchecked Sendable {
             withUnsafeBytes(of: totalDisks) { locatorData.append(contentsOf: $0) }
             writeBuffer.append(locatorData)
         }
-        
         var eocd = Data()
         let eocdSig: UInt32 = 0x06054b50
         let diskNo: UInt16 = 0
@@ -316,7 +315,6 @@ public final class ZipParallelWriter: @unchecked Sendable {
         let cdSize32: UInt32 = needsZip64Global ? 0xFFFFFFFF : UInt32(cdSize)
         let cdOff32: UInt32 = needsZip64Global ? 0xFFFFFFFF : UInt32(cdStartOffset)
         let commentLen: UInt16 = 0
-        
         withUnsafeBytes(of: eocdSig) { eocd.append(contentsOf: $0) }
         withUnsafeBytes(of: diskNo) { eocd.append(contentsOf: $0) }
         withUnsafeBytes(of: cdDiskNo) { eocd.append(contentsOf: $0) }
@@ -326,16 +324,13 @@ public final class ZipParallelWriter: @unchecked Sendable {
         withUnsafeBytes(of: cdOff32) { eocd.append(contentsOf: $0) }
         withUnsafeBytes(of: commentLen) { eocd.append(contentsOf: $0) }
         writeBuffer.append(eocd)
-        
         if !writeBuffer.isEmpty {
             outHandle.write(writeBuffer)
             writeBuffer.removeAll(keepingCapacity: true)
         }
-        
         let endTime = Date()
         let duration = max(0.001, endTime.timeIntervalSince(startTime))
         let throughput = (Double(totalOriginalBytes) / (1024 * 1024)) / duration
-        
         progressHandler?(ArchiveProgress(
             state: .completed,
             bytesProcessed: totalOriginalBytes,
@@ -343,7 +338,6 @@ public final class ZipParallelWriter: @unchecked Sendable {
             currentFileName: "ZIP archive creation completed",
             throughputMBs: throughput
         ))
-        
         return true
     }
 }

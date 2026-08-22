@@ -53,35 +53,11 @@ extension ArchiveWriter {
         splitSizeBytes: Int64,
         namingPattern: VolumeNamingPattern = .numberedExtension
     ) throws {
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: archivePath) else { return }
-        let attrs = try fm.attributesOfItem(atPath: archivePath)
-        guard let fileSize = attrs[.size] as? Int64, fileSize > 0 else { return }
-        guard splitSizeBytes >= 65536 && splitSizeBytes < fileSize else { return }
-        
-        let schemeVal: Int32
-        switch namingPattern {
-        case .numberedExtension:
-            schemeVal = Int32(TTZIP_VOLUME_NAMING_NUMBERED.rawValue)
-        case .pkzipSpanned:
-            schemeVal = Int32(TTZIP_VOLUME_NAMING_PKZIP.rawValue)
-        case .rawSplit:
-            schemeVal = Int32(TTZIP_VOLUME_NAMING_RAW.rawValue)
-        }
-        
-        let res = archivePath.withCString { cSrc in
-            archivePath.withCString { cDst in
-                ttzip_rust_split_file(cSrc, cDst, UInt64(splitSizeBytes), schemeVal, true)
-            }
-        }
-        
-        guard res == TTZIP_STATUS_OK else {
-            throw ArchiveError.readFailed(code: res.rawValue)
-        }
-        
-        if namingPattern != .pkzipSpanned {
-            try? fm.removeItem(atPath: archivePath)
-        }
+        try SplitVolumeEngine.shared.sliceArchive(
+            archivePath: archivePath,
+            splitSizeBytes: splitSizeBytes,
+            namingPattern: namingPattern
+        )
     }
 }
 

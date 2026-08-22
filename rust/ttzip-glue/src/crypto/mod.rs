@@ -10,6 +10,7 @@
 pub mod adler32;
 pub mod aes256;
 pub mod crc32;
+pub mod password_recovery;
 pub mod recovery;
 pub mod rs_fec;
 pub mod sha1;
@@ -20,6 +21,7 @@ pub mod zipcrypto;
 pub use adler32::{adler32, adler32_fast};
 pub use aes256::{aes256_cbc_decrypt, aes256_cbc_encrypt, aes256_ctr_crypt, Aes256Context};
 pub use crc32::{crc32, crc32_fast};
+pub use password_recovery::*;
 pub use recovery::*;
 pub use rs_fec::{
     cauchy, gf8, recovery_record, ReedSolomonEngine, RecoveryRecordInfo,

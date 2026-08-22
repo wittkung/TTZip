@@ -167,12 +167,25 @@ public final class TarArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                 }
             }
 
-            let status = ttzip_extract_archive_advanced(
-                context.archivePath,
-                context.destinationDir,
-                context.options.skipMacJunk,
-                context.password
-            )
+            let status = CUnsafeBufferAdapter.withCString(context.archivePath) { cArc in
+                CUnsafeBufferAdapter.withCString(context.destinationDir) { cDest in
+                    CUnsafeBufferAdapter.withCString(context.password) { cPwd in
+                        guard let cArc = cArc, let cDest = cDest else { return Int32(-1) }
+                        var opt = TTZipExtractOptions(
+                            destination_path: cDest,
+                            password: cPwd,
+                            thread_budget: 0,
+                            overwrite_existing: true,
+                            preserve_permissions: true,
+                            dry_run: false,
+                            progress_callback: nil,
+                            user_data: nil
+                        )
+                        let st = ttzip_rust_extract_archive(cArc, cDest, &opt)
+                        return st == TTZIP_STATUS_OK ? Int32(0) : Int32(-1)
+                    }
+                }
+            }
             if status != 0 {
                 throw ArchiveError.readFailed(code: status)
             }

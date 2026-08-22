@@ -169,10 +169,7 @@ public final class ZipArchiveEngineTemplate: BaseArchiveEngineTemplate, @uncheck
                             user_data: nil
                         )
                         let rStatus = ttzip_rust_extract_archive(aPtr, dPtr, &opt)
-                        if rStatus == TTZIP_STATUS_OK {
-                            return Int32(0)
-                        }
-                        return ttzip_extract_archive_advanced(aPtr, dPtr, context.options.skipMacJunk, pPtr)
+                        return rStatus == TTZIP_STATUS_OK ? Int32(0) : Int32(-1)
                     }
                 }
             }

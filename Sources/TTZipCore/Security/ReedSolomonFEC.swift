@@ -14,42 +14,51 @@ import CTTZipBridge
 /// reconstruction with zero pointer escaping and single-scope ContiguousArray memory pinning.
 public final class ReedSolomonFEC: @unchecked Sendable {
 
-    // MARK: - GF(2^8) Galois Field Arithmetic Bridge
+    // MARK: - GF(2^8) Galois Field Tables & Arithmetic
+    private static let (gfExpTable, gfLogTable): ([UInt8], [UInt8]) = {
+        var exp = [UInt8](repeating: 0, count: 512)
+        var log = [UInt8](repeating: 0, count: 256)
+        var x: UInt16 = 1
+        for i in 0..<255 {
+            exp[i] = UInt8(x)
+            exp[i + 255] = UInt8(x)
+            log[Int(x)] = UInt8(i)
+            x &<<= 1
+            if x >= 256 {
+                x ^= 0x11D
+            }
+        }
+        exp[510] = exp[0]
+        exp[511] = exp[1]
+        log[0] = 0
+        return (exp, log)
+    }()
 
     @inline(__always)
     public static func gfMul(_ a: UInt8, _ b: UInt8) -> UInt8 {
-        return ttzip_rs_gf_mul(a, b)
+        if a == 0 || b == 0 { return 0 }
+        let idx = Int(gfLogTable[Int(a)]) + Int(gfLogTable[Int(b)])
+        return gfExpTable[idx]
     }
 
     @inline(__always)
     public static func gfDiv(_ a: UInt8, _ b: UInt8) -> UInt8 {
         if a == 0 || b == 0 { return 0 }
-        return ttzip_rs_gf_mul(a, ttzip_rs_gf_inv(b))
+        let idx = 255 - Int(gfLogTable[Int(b)])
+        return gfMul(a, gfExpTable[idx])
     }
 
     @inline(__always)
     public static func gfInv(_ a: UInt8) -> UInt8 {
-        return ttzip_rs_gf_inv(a)
+        if a == 0 { return 0 }
+        let idx = 255 - Int(gfLogTable[Int(a)])
+        return gfExpTable[idx]
     }
 
     // MARK: - Cauchy Matrix Generation
     /// Generates an M x K Cauchy generator matrix in GF(2^8).
     /// Element (i, j) = 1 / (X_i XOR Y_j), where X and Y are disjoint sets.
     public static func createCauchyMatrix(rows M: Int, cols K: Int) -> [[UInt8]] {
-        var flatMatrix = [UInt8](repeating: 0, count: M * K)
-        let res = flatMatrix.withUnsafeMutableBufferPointer { ptr in
-            ttzip_rs_create_cauchy_matrix(M, K, ptr.baseAddress)
-        }
-        if res == 0 {
-            var matrix = [[UInt8]](repeating: [UInt8](repeating: 0, count: K), count: M)
-            for i in 0..<M {
-                for j in 0..<K {
-                    matrix[i][j] = flatMatrix[i * K + j]
-                }
-            }
-            return matrix
-        }
-
         var matrix = [[UInt8]](repeating: [UInt8](repeating: 0, count: K), count: M)
         for i in 0..<M {
             let xi = UInt8(i)

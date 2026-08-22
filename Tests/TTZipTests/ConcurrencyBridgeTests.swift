@@ -12,7 +12,7 @@ import CTTZipBridge
 final class ConcurrencyBridgeTests: XCTestCase {
 
     func testParallelForZeroCount() {
-        var called = false
+        nonisolated(unsafe) var called = false
         ConcurrencyBridge.parallelFor(count: 0) { _ in
             called = true
         }
@@ -20,7 +20,7 @@ final class ConcurrencyBridgeTests: XCTestCase {
     }
 
     func testParallelForSingleIteration() {
-        var result = -1
+        nonisolated(unsafe) var result = -1
         ConcurrencyBridge.parallelFor(count: 1) { idx in
             result = idx
         }
@@ -29,7 +29,7 @@ final class ConcurrencyBridgeTests: XCTestCase {
 
     func testParallelForMultiIterationCorrectness() {
         let count = 1000
-        let array = UnsafeMutablePointer<Int32>.allocate(capacity: count)
+        nonisolated(unsafe) let array = UnsafeMutablePointer<Int32>.allocate(capacity: count)
         array.initialize(repeating: 0, count: count)
         defer {
             array.deinitialize(count: count)

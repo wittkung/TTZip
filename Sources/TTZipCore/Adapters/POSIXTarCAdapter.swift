@@ -6,6 +6,7 @@
 // TTZip: High-performance native archiving and compression engine for macOS.
 
 import Foundation
+import Darwin
 import CTTZipBridge
 
 /// Adapter Pattern: POSIX Tar and accelerated posix_spawn adapter.
@@ -28,15 +29,59 @@ public final class POSIXTarCAdapter: POSIXTarEngineProtocol, Sendable {
         arguments: [String],
         workingDirectory: String? = nil
     ) throws -> Int32 {
-        let fullArgs = [binaryPath] + arguments
-        return CUnsafeBufferAdapter.withCString(binaryPath) { cBinPath in
-            CUnsafeBufferAdapter.withCStringsNullTerminatedArray(fullArgs) { cArgv in
-                CUnsafeBufferAdapter.withCString(workingDirectory) { cWorkDir in
-                    guard let cBinPath = cBinPath else { return Int32(-1) }
-                    return ttzip_core_posix_spawn_fast(cBinPath, cArgv, cWorkDir)
-                }
+        var actions: posix_spawn_file_actions_t? = nil
+        posix_spawn_file_actions_init(&actions)
+        defer { posix_spawn_file_actions_destroy(&actions) }
+        
+        let devNull = open("/dev/null", O_RDWR)
+        defer {
+            if devNull >= 0 {
+                close(devNull)
             }
         }
+        if devNull >= 0 {
+            posix_spawn_file_actions_adddup2(&actions, devNull, STDIN_FILENO)
+            posix_spawn_file_actions_adddup2(&actions, devNull, STDOUT_FILENO)
+            posix_spawn_file_actions_adddup2(&actions, devNull, STDERR_FILENO)
+        }
+        
+        if let wd = workingDirectory, !wd.isEmpty {
+            posix_spawn_file_actions_addchdir_np(&actions, wd)
+        }
+        
+        var attr: posix_spawnattr_t? = nil
+        posix_spawnattr_init(&attr)
+        defer { posix_spawnattr_destroy(&attr) }
+        posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
+        
+        let fullArgs = [binaryPath] + arguments
+        var cArgs: [UnsafeMutablePointer<CChar>?] = fullArgs.map { strdup($0) }
+        cArgs.append(nil)
+        defer {
+            for ptr in cArgs where ptr != nil {
+                free(ptr)
+            }
+        }
+        
+        var pid: pid_t = 0
+        let spawnStatus = posix_spawn(&pid, binaryPath, &actions, &attr, cArgs, nil)
+        if spawnStatus != 0 {
+            return spawnStatus
+        }
+        
+        var status: Int32 = 0
+        while waitpid(pid, &status, 0) < 0 {
+            if errno != EINTR {
+                return -1
+            }
+        }
+        
+        if (status & 0x7F) == 0 {
+            return (status >> 8) & 0xFF
+        } else if ((status & 0x7F) + 1) >> 1 > 0 {
+            return 128 + (status & 0x7F)
+        }
+        return -1
     }
     
     /// Extracts a TAR archive in-process using native C static library bindings.

@@ -217,12 +217,12 @@ public final class ArchiveExtractor: ArchiveExtracting, @unchecked Sendable {
 
     /// Joins multi-volume split archive files into a continuous output file.
     public func joinSplitVolumes(firstVolumePath: String, outputPath: String) -> Bool {
-        let status = firstVolumePath.withCString { cFirst in
-            outputPath.withCString { cOut in
-                ttzip_rust_join_split_volumes(cFirst, cOut, nil, nil)
-            }
+        do {
+            try SplitVolumeConcatenator.shared.join(firstVolumePath: firstVolumePath, outputPath: outputPath)
+            return true
+        } catch {
+            return false
         }
-        return status == TTZIP_STATUS_OK
     }
 
     /// Template Method Pattern execution of streaming archive extraction.

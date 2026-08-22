@@ -84,6 +84,7 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
                         args.append(contentsOf: inputPaths)
                         proc.arguments = args
                         let pipe = Pipe()
+                        proc.standardInput = FileHandle.nullDevice
                         proc.standardOutput = pipe
                         proc.standardError = FileHandle.nullDevice
                         if (try? proc.run()) != nil {
@@ -148,6 +149,7 @@ public final class SevenZipCAdapter: SevenZipEngineProtocol, Sendable {
                         args.append(archivePath)
                         proc.arguments = args
                         let pipe = Pipe()
+                        proc.standardInput = FileHandle.nullDevice
                         proc.standardOutput = pipe
                         proc.standardError = FileHandle.nullDevice
                         if (try? proc.run()) != nil {

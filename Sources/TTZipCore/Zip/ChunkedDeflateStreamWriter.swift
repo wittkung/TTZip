@@ -33,7 +33,7 @@ public final class ChunkedDeflateStreamWriter: @unchecked Sendable {
     
     /// Writes a data buffer into the streaming pipeline.
     public func write(data: Data) -> Bool {
-        guard let compressor = compressor, !isClosed else { return false }
+        guard compressor != nil, !isClosed else { return false }
         if data.isEmpty { return true }
         
         return data.withUnsafeBytes { rawBuffer in

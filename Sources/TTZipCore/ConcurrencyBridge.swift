@@ -45,7 +45,7 @@ public enum ConcurrencyBridge {
     public static func parallelFor(
         count: Int,
         pool: OpaquePointer? = nil,
-        _ worker: (Int) -> Void
+        _ worker: @Sendable (Int) -> Void
     ) {
         // Fast Path 1: Zero iterations -> Instant no-op
         guard count > 0 else { return }
@@ -64,7 +64,7 @@ public enum ConcurrencyBridge {
     public static func parallelFor(
         iterations: Int,
         pool: OpaquePointer? = nil,
-        _ worker: (Int) -> Void
+        _ worker: @Sendable (Int) -> Void
     ) {
         parallelFor(count: iterations, pool: pool, worker)
     }

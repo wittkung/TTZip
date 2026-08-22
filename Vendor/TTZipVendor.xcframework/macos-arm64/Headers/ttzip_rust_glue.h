@@ -435,6 +435,9 @@ void ttzip_rust_vfs_cache_get_stats(const TTZipVfsCacheHandle *handle, size_t *o
 void ttzip_rust_vfs_cache_free(TTZipVfsCacheHandle *handle);
 
 // In-Memory Multi-Core Password Recovery Pipeline
+TTZipStatus ttzip_rust_password_recovery_start_dictionary(const char *archive_path, const char *const *passwords, size_t count, const TTZipCancellationToken *cancel_token, char *out_found_pwd, size_t out_capacity, uint64_t *out_attempts);
+TTZipStatus ttzip_rust_password_recovery_start_brute_force(const char *archive_path, const char *charset, size_t min_len, size_t max_len, const TTZipCancellationToken *cancel_token, char *out_found_pwd, size_t out_capacity, uint64_t *out_attempts);
+TTZipStatus ttzip_rust_password_recovery_cancel(TTZipCancellationToken *token);
 bool ttzip_rust_crypto_recover_zipcrypto(const char *const *passwords, size_t count, const uint8_t *enc_header, uint8_t check_byte, char *out_found_pwd, size_t out_capacity);
 bool ttzip_rust_crypto_recover_winzip_aes(const char *const *passwords, size_t count, const uint8_t *salt, const uint8_t *stored_pvv, char *out_found_pwd, size_t out_capacity);
 bool ttzip_rust_crypto_recover_7z_aes(const char *const *passwords, size_t count, const uint8_t *salt, size_t salt_len, uint32_t num_cycles_power, const uint8_t *probe_cipher, size_t probe_len, const uint8_t *expected_magic, size_t magic_len, char *out_found_pwd, size_t out_capacity);

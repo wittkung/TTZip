@@ -27,7 +27,7 @@ public struct PasswordRecoveryResult: Sendable {
 
 /// State Pattern & Memento Pattern: Multi-threaded password verification and recovery engine.
 ///
-/// Supports full lifecycle task state machine control (Pause / Resume / Cancel / Checkpoint save & restore).
+/// Directly delegates to high-throughput multi-core Rust Rayon recovery pipelines.
 public final class PasswordRecoveryEngine: @unchecked Sendable {
     public let checkpointCaretaker: TaskCheckpointCaretaker
     
@@ -69,13 +69,14 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
         
         let startIndex = min(max(0, Int(sm.checkpointOffset)), dictionary.count)
         let totalCount = dictionary.count
-        
         var attempts: Int64 = Int64(startIndex)
         var foundPassword: String? = nil
         let start = Date()
         
-        for i in startIndex..<totalCount {
-            // Handle PausedState
+        let batchSize = 100
+        var currentIndex = startIndex
+        
+        while currentIndex < totalCount {
             while sm.currentState is PausedState {
                 let pauseMemento = TaskCheckpointMemento(
                     taskID: sm.id,
@@ -88,14 +89,12 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
                     checksum: "PAUSE-\(attempts)"
                 )
                 checkpointCaretaker.saveCheckpoint(pauseMemento)
-                
-                try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+                try await Task.sleep(nanoseconds: 50_000_000)
                 if Task.isCancelled || sm.currentState is CancellingState || sm.currentState is FailedState {
                     break
                 }
             }
             
-            // Handle CancellingState
             if Task.isCancelled || sm.currentState is CancellingState {
                 if !(sm.currentState is FailedState) {
                     try? sm.cancel()
@@ -103,30 +102,44 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
                 throw CommandError.executionFailed(reason: "Password recovery task was cancelled")
             }
             
-            let pwd = dictionary[i]
-            attempts += 1
-            sm.updateProgress(processedBytes: attempts, totalBytes: Int64(totalCount))
-            sm.setCheckpointOffset(attempts)
+            let nextIndex = min(currentIndex + batchSize, totalCount)
+            let batch = Array(dictionary[currentIndex..<nextIndex])
             
-            if attempts % 10 == 0 || i == totalCount - 1 {
-                let memento = TaskCheckpointMemento(
-                    taskID: sm.id,
-                    taskName: sm.taskName,
-                    stateName: sm.stateName,
-                    processedBytes: attempts,
-                    totalBytes: Int64(totalCount),
-                    dictionaryOffset: attempts,
-                    throughputTPS: Double(attempts) / max(0.001, Date().timeIntervalSince(start)),
-                    checksum: "CHK-\(attempts)"
-                )
-                checkpointCaretaker.saveCheckpoint(memento)
-            }
-            
-            let isCorrect = await Self.testArchivePassword(archivePath: archivePath, password: pwd)
-            if isCorrect {
-                foundPassword = pwd
+            if let fastFound = Self.recoverFastInMemory(passwords: batch, archivePath: archivePath) {
+                foundPassword = fastFound
+                attempts += Int64(batch.firstIndex(of: fastFound).map { $0 + 1 } ?? batch.count)
+                sm.updateProgress(processedBytes: attempts, totalBytes: Int64(totalCount))
+                sm.setCheckpointOffset(attempts)
                 break
+            } else {
+                var matched: String? = nil
+                for pwd in batch {
+                    attempts += 1
+                    sm.updateProgress(processedBytes: attempts, totalBytes: Int64(totalCount))
+                    sm.setCheckpointOffset(attempts)
+                    if await Self.testArchivePassword(archivePath: archivePath, password: pwd) {
+                        matched = pwd
+                        break
+                    }
+                }
+                if let matched = matched {
+                    foundPassword = matched
+                    break
+                }
             }
+            
+            currentIndex = nextIndex
+            let memento = TaskCheckpointMemento(
+                taskID: sm.id,
+                taskName: sm.taskName,
+                stateName: sm.stateName,
+                processedBytes: attempts,
+                totalBytes: Int64(totalCount),
+                dictionaryOffset: attempts,
+                throughputTPS: Double(attempts) / max(0.001, Date().timeIntervalSince(start)),
+                checksum: "CHK-\(attempts)"
+            )
+            checkpointCaretaker.saveCheckpoint(memento)
         }
         
         let duration = max(0.001, Date().timeIntervalSince(start))
@@ -157,8 +170,11 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
         return result
     }
     
-    /// Probes archive header and stream password in-process without extracting entire archive.
+    /// Probes archive header and stream password in-process without full extraction.
     public static func testArchivePassword(archivePath: String, password: String) async -> Bool {
+        if let fast = recoverFastInMemory(passwords: [password], archivePath: archivePath) {
+            return fast == password
+        }
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("probe_\(UUID().uuidString)").path
         defer { try? FileManager.default.removeItem(atPath: tempDir) }
         try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
@@ -182,65 +198,46 @@ public final class PasswordRecoveryEngine: @unchecked Sendable {
                         progress_callback: nil,
                         user_data: nil
                     )
-                    let status = ttzip_rust_extract_archive(cPath, cDest, &opt)
-                    if status == TTZIP_STATUS_OK {
-                        return true
-                    }
-                    return ttzip_extract_archive_advanced(cPath, cDest, false, cPwd) == 0
+                    return ttzip_rust_extract_archive(cPath, cDest, &opt) == TTZIP_STATUS_OK
                 }
             }
         }
     }
 
-    /// Fast in-memory multi-core dictionary recovery via native Rust FFI.
+    /// Fast in-memory multi-core dictionary recovery via native Rust C-ABI.
     public static func recoverFastInMemory(
         passwords: [String],
         archivePath: String
     ) -> String? {
-        guard !passwords.isEmpty, let data = try? Data(contentsOf: URL(fileURLWithPath: archivePath)), data.count >= 30 else {
+        guard !passwords.isEmpty, FileManager.default.fileExists(atPath: archivePath) else {
             return nil
         }
-        
         let cStrings = passwords.map { strdup($0) }
         defer {
             for ptr in cStrings {
                 free(ptr)
             }
         }
-        
         var outFound = [CChar](repeating: 0, count: 256)
         let ptrs = cStrings.map { UnsafePointer($0) }
+        var attempts: UInt64 = 0
         
         return ptrs.withUnsafeBufferPointer { bufPtr -> String? in
             guard let basePtr = bufPtr.baseAddress else { return nil }
-            
-            // Check for ZipCrypto 12-byte header
-            return data.withUnsafeBytes { rawBytes -> String? in
-                guard let baseAddr = rawBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
-                if baseAddr[0] == 0x50 && baseAddr[1] == 0x4B && baseAddr[2] == 0x03 && baseAddr[3] == 0x04 {
-                    let flags = UInt16(baseAddr[6]) | (UInt16(baseAddr[7]) << 8)
-                    let isEncrypted = (flags & 0x01) != 0
-                    let method = UInt16(baseAddr[8]) | (UInt16(baseAddr[9]) << 8)
-                    let fnLen = Int(UInt16(baseAddr[26]) | (UInt16(baseAddr[27]) << 8))
-                    let extraLen = Int(UInt16(baseAddr[28]) | (UInt16(baseAddr[29]) << 8))
-                    let headerOffset = 30 + fnLen + extraLen
-                    
-                    if isEncrypted && method != 99 && rawBytes.count >= headerOffset + 12 {
-                        let encHeaderPtr = baseAddr + headerOffset
-                        let checkByte = baseAddr[17] // CRC byte / time byte
-                        let found = ttzip_rust_crypto_recover_zipcrypto(
-                            basePtr,
-                            passwords.count,
-                            encHeaderPtr,
-                            checkByte,
-                            &outFound,
-                            outFound.count
-                        )
-                        if found {
-                            return outFound.withUnsafeBufferPointer { ptr in
-                                ptr.baseAddress.map { String(cString: $0) }
-                            }
-                        }
+            return CUnsafeBufferAdapter.withCString(archivePath) { cPath in
+                guard let cPath = cPath else { return nil }
+                let status = ttzip_rust_password_recovery_start_dictionary(
+                    cPath,
+                    basePtr,
+                    passwords.count,
+                    nil,
+                    &outFound,
+                    outFound.count,
+                    &attempts
+                )
+                if status == TTZIP_STATUS_OK {
+                    return outFound.withUnsafeBufferPointer { ptr in
+                        ptr.baseAddress.map { String(cString: $0) }
                     }
                 }
                 return nil

@@ -112,5 +112,55 @@ final class SplitVolumeCreationTests: XCTestCase {
         let extractedData = try Data(contentsOf: URL(fileURLWithPath: extractedFile))
         XCTAssertEqual(extractedData, sampleData)
     }
+    
+    func testSplitVolumeEngineAndConcatenatorRoundtrip() throws {
+        let baseFile = tempDirectoryURL.appendingPathComponent("engine_test.bin").path
+        let sampleData = Data((0..<200_000).map { UInt8($0 & 0xFF) })
+        try sampleData.write(to: URL(fileURLWithPath: baseFile))
+        
+        let engine = SplitVolumeEngine.shared
+        try engine.sliceArchive(archivePath: baseFile, splitSizeBytes: 65536, namingPattern: .numberedExtension)
+        
+        let part1 = baseFile + ".001"
+        XCTAssertTrue(FileManager.default.fileExists(atPath: part1))
+        
+        let resolved = engine.resolveVolumes(seedPath: part1)
+        XCTAssertEqual(resolved.count, 4)
+        
+        let inspection = SplitVolumeConcatenator.shared.inspect(seedPath: part1)
+        XCTAssertNotNil(inspection)
+        XCTAssertEqual(inspection?.totalSize, 200_000)
+        XCTAssertEqual(inspection?.volumePaths.count, 4)
+        
+        let reassembled = tempDirectoryURL.appendingPathComponent("reassembled.bin").path
+        try engine.joinVolumes(firstVolumePath: part1, outputPath: reassembled)
+        
+        XCTAssertTrue(FileManager.default.fileExists(atPath: reassembled))
+        let restoredData = try Data(contentsOf: URL(fileURLWithPath: reassembled))
+        XCTAssertEqual(restoredData, sampleData)
+    }
+    
+    func testSplitVolumeStreamWriterLifecycleAndFlush() throws {
+        let basePath = tempDirectoryURL.appendingPathComponent("stream_writer_test.dat").path
+        let writer = try SplitVolumeStreamWriter(
+            baseOutputPath: basePath,
+            volumeSizeBytes: 65536,
+            namingPattern: .rawSplit,
+            cleanOnFailure: true
+        )
+        
+        let chunk1 = Data(repeating: 0x11, count: 50_000)
+        let chunk2 = Data(repeating: 0x22, count: 50_000)
+        
+        try writer.write(data: chunk1)
+        try writer.flush()
+        XCTAssertEqual(writer.totalBytes, 50_000)
+        
+        try writer.write(data: chunk2)
+        let paths = try writer.close()
+        
+        XCTAssertEqual(paths.count, 2)
+        XCTAssertEqual(writer.totalBytes, 100_000)
+    }
 }
 

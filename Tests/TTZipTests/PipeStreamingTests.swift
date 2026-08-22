@@ -75,11 +75,19 @@ final class PipeStreamingTests: XCTestCase {
         // 1. Create tar.zst direct
         let paths = [testFile]
         let createStatus = CUnsafeBufferAdapter.withCString(outArchive) { cOut in
-            CUnsafeBufferAdapter.withCString("tar.zst") { cFmt in
-                CUnsafeBufferAdapter.withCStringsArray(paths) { cIn in
-                    guard let cOut = cOut else { return Int32(-1) }
-                    return ttzip_create_tar_native_c(cOut, cFmt, cIn, paths.count, false, 3)
-                }
+            CUnsafeBufferAdapter.withCStringsArray(paths) { cIn in
+                guard let cOut = cOut else { return Int32(-1) }
+                var opt = TTZipCreateOptions(
+                    format: TTZIP_ARCHIVE_FORMAT_TAR_ZSTD,
+                    level: TTZIP_COMPRESSION_LEVEL_FAST,
+                    encryption: TTZIP_ENCRYPTION_NONE,
+                    password: nil,
+                    thread_budget: 0,
+                    solid_block_size_mb: 0,
+                    progress_callback: nil,
+                    user_data: nil
+                )
+                return ttzip_rust_create_archive(cIn, paths.count, cOut, &opt) == TTZIP_STATUS_OK ? Int32(0) : Int32(-1)
             }
         }
         XCTAssertEqual(createStatus, 0)
@@ -88,7 +96,17 @@ final class PipeStreamingTests: XCTestCase {
         let extractStatus = CUnsafeBufferAdapter.withCString(outArchive) { cArchive in
             CUnsafeBufferAdapter.withCString(dstDir) { cDst in
                 guard let cArchive = cArchive, let cDst = cDst else { return Int32(-1) }
-                return ttzip_extract_tar_native_c(cArchive, cDst, false)
+                var opt = TTZipExtractOptions(
+                    destination_path: cDst,
+                    password: nil,
+                    thread_budget: 0,
+                    overwrite_existing: true,
+                    preserve_permissions: true,
+                    dry_run: false,
+                    progress_callback: nil,
+                    user_data: nil
+                )
+                return ttzip_rust_extract_archive(cArchive, cDst, &opt) == TTZIP_STATUS_OK ? Int32(0) : Int32(-1)
             }
         }
         XCTAssertEqual(extractStatus, 0)
@@ -113,11 +131,19 @@ final class PipeStreamingTests: XCTestCase {
         
         let paths = [testFile]
         let createStatus = CUnsafeBufferAdapter.withCString(outArchive) { cOut in
-            CUnsafeBufferAdapter.withCString("tar.gz") { cFmt in
-                CUnsafeBufferAdapter.withCStringsArray(paths) { cIn in
-                    guard let cOut = cOut else { return Int32(-1) }
-                    return ttzip_create_tar_native_c(cOut, cFmt, cIn, paths.count, false, 1)
-                }
+            CUnsafeBufferAdapter.withCStringsArray(paths) { cIn in
+                guard let cOut = cOut else { return Int32(-1) }
+                var opt = TTZipCreateOptions(
+                    format: TTZIP_ARCHIVE_FORMAT_TAR_GZ,
+                    level: TTZIP_COMPRESSION_LEVEL_FASTEST,
+                    encryption: TTZIP_ENCRYPTION_NONE,
+                    password: nil,
+                    thread_budget: 0,
+                    solid_block_size_mb: 0,
+                    progress_callback: nil,
+                    user_data: nil
+                )
+                return ttzip_rust_create_archive(cIn, paths.count, cOut, &opt) == TTZIP_STATUS_OK ? Int32(0) : Int32(-1)
             }
         }
         XCTAssertEqual(createStatus, 0)
@@ -125,7 +151,17 @@ final class PipeStreamingTests: XCTestCase {
         let extractStatus = CUnsafeBufferAdapter.withCString(outArchive) { cArchive in
             CUnsafeBufferAdapter.withCString(dstDir) { cDst in
                 guard let cArchive = cArchive, let cDst = cDst else { return Int32(-1) }
-                return ttzip_extract_tar_native_c(cArchive, cDst, false)
+                var opt = TTZipExtractOptions(
+                    destination_path: cDst,
+                    password: nil,
+                    thread_budget: 0,
+                    overwrite_existing: true,
+                    preserve_permissions: true,
+                    dry_run: false,
+                    progress_callback: nil,
+                    user_data: nil
+                )
+                return ttzip_rust_extract_archive(cArchive, cDst, &opt) == TTZIP_STATUS_OK ? Int32(0) : Int32(-1)
             }
         }
         XCTAssertEqual(extractStatus, 0)

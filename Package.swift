@@ -36,29 +36,9 @@ let package = Package(
         .target(
             name: "CTTZipBridge",
             dependencies: ["TTZipVendor"],
-            exclude: [
-                "fast-lzma2",
-                "lzfse",
-                "snappy"
-            ],
+            publicHeadersPath: "include",
             cSettings: [
-                .headerSearchPath("include"),
-                .headerSearchPath("zopfli"),
-                .headerSearchPath("../../Vendor/include"),
-                .headerSearchPath("../../Vendor/include/uchardet"),
-                .unsafeFlags([
-                    "-O3",
-                    "-fvisibility=hidden",
-                    "-Wall",
-                    "-Wextra",
-                    "-Wno-unused-function",
-                    "-Wno-unused-parameter",
-                    "-Wno-unused-variable",
-                    "-Wno-sign-compare",
-                    "-Wno-implicit-fallthrough",
-                    "-Wno-missing-field-initializers",
-                    "-Wformat=2"
-                ])
+                .headerSearchPath("include")
             ],
             linkerSettings: [
                 .linkedLibrary("bz2"),

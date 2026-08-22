@@ -106,26 +106,18 @@ public final class ZipExtremeBlockWriter: @unchecked Sendable {
                     let outBuf = slabBox.pointer.advanced(by: blockIdx * maxChunkOut)
                     let isFinal = (blockIdx == totalBlocks - 1)
                     
-                    let histPtr: UnsafePointer<UInt8>? = blockIdx > 0 ? chunkPtr.advanced(by: -min(32768, offset)) : nil
-                    let histSize: Int = blockIdx > 0 ? min(32768, offset) : 0
-                    
-                    var zopts = ttzip_zopfli_options_t(
-                        num_iterations: Int32(activeProfile.zopfliIterations),
-                        max_block_splits: Int32(activeProfile.maxBlockSplits)
-                    )
-                    let compSize = ttzip_zopfli_compress_block_with_history(
+                    var outLen: Int = 0
+                    let status = ttzip_rust_deflate_compress(
                         chunkPtr,
                         currentChunkSize,
-                        histPtr,
-                        histSize,
                         outBuf,
                         maxChunkOut,
-                        &zopts,
-                        isFinal
+                        activeProfile.deflateLevel,
+                        &outLen
                     )
                     
-                    if compSize > 0 {
-                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: compSize))
+                    if status == TTZIP_STATUS_OK && outLen > 0 {
+                        resultsBox.set(idx: blockIdx, res: RawBlockBuffer(ptr: outBuf, size: outLen))
                     } else {
                         TTLogger.warning("[ExtremeBlockWriter] Block \(blockIdx) compression fallback to uncompressed store (len: \(currentChunkSize))")
                         var fallbackLen: Int = 0
