@@ -41,7 +41,7 @@ echo "    ✅ Zero-GCD audit passed: 0 Apple GCD calls in TTZipCore."
 
 # 5. Swift Matrix & Concurrency Test Suites
 echo "==> [5/5] Running Swift Core & Concurrency Test Matrix..."
-swift test --filter "ConcurrencyBridgeTests|ObserverPatternTests|DiskSortOptionTests|CompositePatternTests|AdapterPatternTests"
+swift test --filter "ConcurrencyBridgeTests|ObserverPatternTests|DifferentialOracleTests|PasswordVaultV4Tests"
 echo "    ✅ Swift test suites passed 100% green."
 
 # 5. Final Status

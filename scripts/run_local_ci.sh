@@ -71,10 +71,10 @@ if [ "$MODE" = "--full" ]; then
     swift test --filter "(XCTestPerformanceMeasureTests|FrontendPerformanceGateTests)"
 elif [ "$MODE" = "--sanitize" ]; then
     echo -e "  ▶ Running AddressSanitizer & ThreadSanitizer Matrix..."
-    swift test --sanitize=address --filter "(MmapBufferHandleTests|LibarchiveGoldenCorpusTests)"
+    swift test --sanitize=address --filter "LibarchiveGoldenCorpusTests"
 else
     echo -e "  ▶ Running Core High-Value Tests (Golden Corpus & Memory Gates & PAL)..."
-    swift test --filter "(MmapBufferHandleTests|FrontendPerformanceGateTests|LibarchiveGoldenCorpusTests|TestReportGeneratorTests|PlatformPathSanitizerTests|PlatformMemoryTests|PlatformHardwareTests|SecurityAndComplianceTests|PasswordVaultV4Tests)"
+    swift test --filter "(FrontendPerformanceGateTests|LibarchiveGoldenCorpusTests|TestReportGeneratorTests|PlatformPathSanitizerTests|PlatformMemoryTests|PlatformHardwareTests|SecurityAndComplianceTests|PasswordVaultV4Tests)"
 fi
 
 

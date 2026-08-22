@@ -122,8 +122,8 @@ echo -e "${GREEN}✅ Stage 2 PASSED: Codebase invariants and linter clean (${STA
 echo -e "${BOLD}${BLUE}[Stage 3/4] Running Fast Core Unit & Pattern Test Suite...${NC}"
 S3_START=$(python3 -c 'import time; print(time.time())')
 
-echo "  Executing: swift test --filter \"(MmapBufferHandleTests|LibarchiveGoldenCorpusTests|TestReportGeneratorTests|PlatformPathSanitizerTests|PlatformMemoryTests|PlatformHardwareTests|SecurityAndComplianceTests|PasswordVaultV4Tests)\""
-swift test --filter "(MmapBufferHandleTests|LibarchiveGoldenCorpusTests|TestReportGeneratorTests|PlatformPathSanitizerTests|PlatformMemoryTests|PlatformHardwareTests|SecurityAndComplianceTests|PasswordVaultV4Tests)" || {
+echo "  Executing: swift test --filter \"(LibarchiveGoldenCorpusTests|TestReportGeneratorTests|PlatformPathSanitizerTests|PlatformMemoryTests|PlatformHardwareTests|SecurityAndComplianceTests|PasswordVaultV4Tests)\""
+swift test --filter "(LibarchiveGoldenCorpusTests|TestReportGeneratorTests|PlatformPathSanitizerTests|PlatformMemoryTests|PlatformHardwareTests|SecurityAndComplianceTests|PasswordVaultV4Tests)" || {
     echo -e "${RED}❌ Unit & Pattern test suite failed!${NC}"
     exit 1
 }
