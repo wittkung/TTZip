@@ -32,12 +32,13 @@ extension CLICommandRouter {
                     "total_size": totalBytes
                 ])
             } else {
-                let treeText = ArchiveVisualTreeRenderer.render(
-                    archivePath: path,
-                    entries: res.entries,
-                    maxDepth: options.treeDepth
-                )
-                TerminalPagerEngine.display(text: treeText, noPager: options.noPager)
+                var outText = "=================================================================\n"
+                outText += "TTZip Archive Tree: \(path)\n"
+                outText += "=================================================================\n"
+                for e in res.entries {
+                    outText += "├── \(e.path) (\(e.uncompressedSize) B)\n"
+                }
+                print(outText)
             }
             return .ok
         } catch {
@@ -81,7 +82,7 @@ extension CLICommandRouter {
                 }
                 outText += "=================================================================\n"
                 outText += "Total: \(res.entries.count) entries (\(res.treeNode.totalDirectoryCount()) directories, \(res.treeNode.totalFileCount()) files)."
-                TerminalPagerEngine.display(text: outText, noPager: options.noPager)
+                print(outText)
             }
             return .ok
         } catch {
@@ -137,7 +138,7 @@ extension CLICommandRouter {
                 }
                 outText += "=================================================================\n"
                 outText += "Total: \(res.entries.count) files validated."
-                TerminalPagerEngine.display(text: outText, noPager: options.noPager)
+                print(outText)
             }
             return .ok
         } catch {

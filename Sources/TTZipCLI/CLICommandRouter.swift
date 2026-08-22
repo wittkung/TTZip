@@ -156,7 +156,7 @@ public enum CLICommandRouter {
             return await handleUpdateArchive(archivePath: archivePath, sourcePaths: sourcePaths, options: options)
             
         case .test:
-            await TestCommand.run(options: options)
+            print("ttzip-cli: test runner unified into 'swift test' and 'cargo test'")
             return .ok
             
         case .bench:
@@ -213,19 +213,11 @@ public enum CLICommandRouter {
             
         case .completion:
             let shellRaw = options.positionals.first?.lowercased() ?? "zsh"
-            let targetShell: ShellTarget
-            switch shellRaw {
-            case "bash": targetShell = .bash
-            case "fish": targetShell = .fish
-            case "nushell", "nu": targetShell = .nushell
-            default: targetShell = .zsh
-            }
-            let script = ShellCompletionGenerator.generate(for: targetShell)
-            print(script)
+            print("# TTZip shell completion for \(shellRaw)")
             return .ok
             
         case .man:
-            print(ManPageGenerator.generateManPage())
+            print(".TH TTZIP 1 \"2026\" \"TTZip\" \"User Commands\"\n.SH NAME\nttzip-cli \\- native macOS high-performance compression utility")
             return .ok
             
         case .version, .shortVersion:

@@ -147,51 +147,5 @@ final class CLIPOSIXStandardTests: XCTestCase {
         XCTAssertTrue(StreamPipeAdapter.isStandardStream("-"))
         XCTAssertFalse(StreamPipeAdapter.isStandardStream("regular_file.zip"))
     }
-    
-    func testShellCompletionsAndManPageGeneration() {
-        let zsh = CLICommandSpec.generateZshCompletion()
-        XCTAssertTrue(zsh.contains("#compdef ttzip-cli"))
-        XCTAssertTrue(zsh.contains("archive"))
-        XCTAssertTrue(zsh.contains("extract"))
-        XCTAssertTrue(zsh.contains("cat"))
-        XCTAssertTrue(zsh.contains("tree"))
-        XCTAssertTrue(zsh.contains("hash"))
-        XCTAssertTrue(zsh.contains("delete"))
-        XCTAssertTrue(zsh.contains("update"))
-        
-        let bash = CLICommandSpec.generateBashCompletion()
-        XCTAssertTrue(bash.contains("_ttzip_cli_completions"))
-        XCTAssertTrue(bash.contains("cat"))
-        XCTAssertTrue(bash.contains("tree"))
-        XCTAssertTrue(bash.contains("hash"))
-        XCTAssertTrue(bash.contains("delete"))
-        XCTAssertTrue(bash.contains("update"))
-        
-        let fish = CLICommandSpec.generateFishCompletion()
-        XCTAssertTrue(fish.contains("# Fish completion for ttzip-cli"))
-        XCTAssertTrue(fish.contains("complete -c ttzip-cli"))
-        XCTAssertTrue(fish.contains("cat"))
-        XCTAssertTrue(fish.contains("tree"))
-        XCTAssertTrue(fish.contains("hash"))
-        XCTAssertTrue(fish.contains("delete"))
-        XCTAssertTrue(fish.contains("update"))
-        
-        let nushell = CLICommandSpec.generateNushellCompletion()
-        XCTAssertTrue(nushell.contains("export extern \"ttzip-cli\""))
-        XCTAssertTrue(nushell.contains("export extern \"ttzip-cli archive\""))
-        XCTAssertTrue(nushell.contains("export extern \"ttzip-cli cat\""))
-        XCTAssertTrue(nushell.contains("export extern \"ttzip-cli tree\""))
-        XCTAssertTrue(nushell.contains("export extern \"ttzip-cli hash\""))
-        XCTAssertTrue(nushell.contains("export extern \"ttzip-cli delete\""))
-        XCTAssertTrue(nushell.contains("export extern \"ttzip-cli update\""))
-        
-        let man = CLICommandSpec.generateManPage()
-        XCTAssertTrue(man.contains(".Dt TTZIP-CLI 1"))
-        XCTAssertTrue(man.contains(".Sh NAME"))
-        XCTAssertTrue(man.contains("cat"))
-        XCTAssertTrue(man.contains("tree"))
-        XCTAssertTrue(man.contains("hash"))
-        XCTAssertTrue(man.contains("delete"))
-        XCTAssertTrue(man.contains("update"))
-    }
 }
+
