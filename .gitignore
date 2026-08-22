@@ -1,6 +1,6 @@
 # ==============================================================================
 # TTZip Repository Hygiene & Git Ignore Rules
-# High-Performance Swift 6 + C11 Native Archiving Engine
+# High-Performance Swift 6 + Safe Rust Dual-Core Archiving Engine
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -60,13 +60,10 @@ Vendor/worktrees/
 
 # ------------------------------------------------------------------------------
 # 5. Static Libraries & Binary Targets
-# (Globally ignore .a except tracked Vendor libraries required by Package.swift)
+# (Globally ignore .a except tracked XCFramework binary targets)
 # ------------------------------------------------------------------------------
 *.a
-Vendor/lib/
-Vendor/libTTZipVendor.a
 !Vendor/TTZipVendor.xcframework/**/*.a
-
 
 # ------------------------------------------------------------------------------
 # 6. Benchmark Outputs, Test Payloads & Scratch Debris
@@ -88,7 +85,6 @@ test*.zip
 test*.tar*
 test*.txt
 /test_*
-!tests/c/**
 
 # ------------------------------------------------------------------------------
 # 7. Environment, IDE & Local Overrides
@@ -107,7 +103,6 @@ GEMINI.md
 .agents/
 .specify/
 specs/
-
 
 # ------------------------------------------------------------------------------
 # 9. Upstream Drafts, Study & Private Methodology
