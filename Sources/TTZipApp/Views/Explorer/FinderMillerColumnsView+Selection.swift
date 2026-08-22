@@ -43,7 +43,7 @@ extension FinderMillerColumnsView {
         selectedItem = item
         onSelectItem(item)
         
-        let isEncrypted = item.kindText == "受密码保护的归档包" || item.name.contains("压缩包已被加密")
+        let isEncrypted = item.kindText == "Password-Protected Archive" || item.kindText == "受密码保护的归档包" || item.name.contains("Encrypted Archive") || item.name.contains("压缩包已被加密")
         if isEncrypted {
             let (archivePath, _) = parseVirtualURL(item.path)
             NotificationCenter.default.post(name: NSNotification.Name("TTZipEncryptedArchivePromptRequired"), object: archivePath)

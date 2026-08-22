@@ -8,7 +8,7 @@
 import Foundation
 import CTTZipBridge
 
-/// 面向海量小文件批量处理的虚拟多块连续内存竞技场 (Virtual Multi-Block Memory Arena)
+/// High-performance contiguous memory arena for batch processing massive small files.
 public final class VirtualMultiBlockArena: @unchecked Sendable {
     public struct BlockDescriptor: Sendable, Equatable {
         public let id: Int
@@ -20,10 +20,20 @@ public final class VirtualMultiBlockArena: @unchecked Sendable {
     private let totalCapacity: Int
     private let rawBuffer: UnsafeMutableRawPointer
     private let typedBuffer: UnsafeMutablePointer<UInt8>
-    private(set) public var currentOffset: Int = 0
-    private(set) public var blocks: [BlockDescriptor] = []
+    private let lock = NSLock()
+    private var _currentOffset: Int = 0
+    private var _blocks: [BlockDescriptor] = []
 
-    public init?(capacity: Int = 32 * 1024 * 1024) { // 默认 32MB 连续大页
+    public var currentOffset: Int {
+        lock.withLock { _currentOffset }
+    }
+
+    public var blocks: [BlockDescriptor] {
+        lock.withLock { _blocks }
+    }
+
+    /// Initializes a contiguous page-aligned memory arena (default 32MB super-page).
+    public init?(capacity: Int = 32 * 1024 * 1024) {
         self.totalCapacity = capacity
         guard let raw = NativeCoreArchitecture.allocateAlignedPageBuffer(capacity: capacity) else {
             return nil
@@ -36,35 +46,40 @@ public final class VirtualMultiBlockArena: @unchecked Sendable {
         NativeCoreArchitecture.deallocateAlignedPageBuffer(rawBuffer)
     }
 
-    /// 获取底层连续内存基指针
+    /// Retrieves base pointer to the contiguous memory buffer.
     public var basePointer: UnsafePointer<UInt8> {
         return UnsafePointer(typedBuffer)
     }
 
-    /// 追加单个文件块数据到竞技场中 (零额外动态堆分配)
+    /// Appends single file block data into arena with zero heap reallocation.
     @discardableResult
     public func appendBlock(name: String, data: UnsafePointer<UInt8>, length: Int) -> BlockDescriptor? {
-        guard currentOffset + length <= totalCapacity else {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard _currentOffset + length <= totalCapacity else {
             return nil
         }
 
-        let startOffset = currentOffset
+        let startOffset = _currentOffset
         memcpy(typedBuffer + startOffset, data, length)
-        currentOffset += length
+        _currentOffset += length
 
         let descriptor = BlockDescriptor(
-            id: blocks.count,
+            id: _blocks.count,
             name: name,
             offset: startOffset,
             length: length
         )
-        blocks.append(descriptor)
+        _blocks.append(descriptor)
         return descriptor
     }
 
-    /// 重置竞技场 (O(1) 游标复位，避免内存二次分配)
+    /// Resets arena cursor in O(1) time without reallocating underlying physical memory.
     public func reset() {
-        currentOffset = 0
-        blocks.removeAll(keepingCapacity: true)
+        lock.lock()
+        defer { lock.unlock() }
+        _currentOffset = 0
+        _blocks.removeAll(keepingCapacity: true)
     }
 }

@@ -84,6 +84,7 @@ public final class MemoryPageBufferPool: @unchecked Sendable {
     private var totalBorrowed: Int = 0
     private var totalReturned: Int = 0
     private var totalAllocatedCount: Int = 0
+    private var memoryPressureSource: (any DispatchSourceMemoryPressure)?
 
     private init() {
         for _ in 0..<4 {
@@ -120,6 +121,7 @@ public final class MemoryPageBufferPool: @unchecked Sendable {
             self?.clearPool()
         }
         source.resume()
+        self.memoryPressureSource = source
         #endif
     }
 

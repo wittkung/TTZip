@@ -14,7 +14,7 @@ import TTZipCore
 /// from `CLICommandSpec` as the single source of truth.
 public enum ShellCompletionGenerator {
     
-    /// 按目标 Shell 派生补全脚本
+    /// Generates completion script for the targeted shell.
     public static func generate(
         for shell: ShellTarget,
         binaryName: String = "ttzip-cli",

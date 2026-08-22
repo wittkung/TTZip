@@ -14,7 +14,7 @@ import TTZipCore
 /// for full compatibility with `man(1)`, `mandoc(1)`, and `groff(1)`.
 public enum ManPageGenerator {
     
-    /// 生成 `ttzip-cli(1)` 标准 mdoc 手册页
+    /// Generates `ttzip-cli(1)` standard mdoc manual page.
     public static func generateManPage(
         title: String = "TTZIP-CLI",
         section: Int = 1,

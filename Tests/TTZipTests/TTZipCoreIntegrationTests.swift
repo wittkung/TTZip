@@ -254,4 +254,75 @@ final class TTZipCoreIntegrationTests: XCTestCase {
         XCTAssertEqual(execResult.foundPassword, secretPassword)
         XCTAssertGreaterThan(execResult.totalAttempts, 0)
     }
+
+    // MARK: - 6. VFSLz4CachePool Int.min Bit-Pattern Overflow Safety
+
+    func testVFSLz4CachePoolHashOverflowSafety() {
+        let pool = VFSLz4CachePool.shared
+        let dummyData = Data([0x01, 0x02, 0x03, 0x04])
+        
+        // Ensure cacheEntry and getCachedEntry handle arbitrary strings without crashing
+        pool.cacheEntry(archivePath: "test_session", entryPath: "path/to/entry.bin", data: dummyData)
+        let cached = pool.getCachedEntry(archivePath: "test_session", entryPath: "path/to/entry.bin")
+        XCTAssertEqual(cached, dummyData)
+        
+        // Direct test of non-overflowing chunkIdx bit-pattern calculation logic with Int.min
+        let minHash = Int.min
+        let safeChunkIdx = Int(truncatingIfNeeded: UInt64(bitPattern: Int64(minHash)) & 0x7FFF_FFFF_FFFF_FFFF)
+        XCTAssertGreaterThanOrEqual(safeChunkIdx, 0)
+        XCTAssertEqual(safeChunkIdx, 0)
+    }
+
+    // MARK: - 7. VirtualMultiBlockArena Multi-Threaded Concurrency Safety
+
+    func testVirtualMultiBlockArenaConcurrentThreadSafety() {
+        guard let arena = VirtualMultiBlockArena(capacity: 16 * 1024 * 1024) else {
+            XCTFail("Failed to allocate VirtualMultiBlockArena")
+            return
+        }
+
+        let testPayload: [UInt8] = Array(repeating: 0x42, count: 1024)
+        let threadCount = 8
+        let iterationsPerThread = 100
+        let group = DispatchGroup()
+
+        for t in 0..<threadCount {
+            group.enter()
+            DispatchQueue.global().async {
+                for i in 0..<iterationsPerThread {
+                    testPayload.withUnsafeBufferPointer { ptr in
+                        guard let base = ptr.baseAddress else { return }
+                        _ = arena.appendBlock(name: "file_\(t)_\(i)", data: base, length: 1024)
+                    }
+                }
+                group.leave()
+            }
+        }
+
+        group.wait()
+        XCTAssertEqual(arena.blocks.count, threadCount * iterationsPerThread)
+        XCTAssertEqual(arena.currentOffset, threadCount * iterationsPerThread * 1024)
+        
+        arena.reset()
+        XCTAssertEqual(arena.blocks.count, 0)
+        XCTAssertEqual(arena.currentOffset, 0)
+    }
+
+    // MARK: - 8. MemoryPageBufferPool Borrow & Return Lifecycle
+
+    func testMemoryPageBufferPoolLifecycle() {
+        let pool = MemoryPageBufferPool.shared
+        let buf4k = pool.borrowBuffer(size: .page4K)
+        XCTAssertEqual(buf4k.capacity, 4096)
+        
+        let buf16k = pool.borrowBuffer(size: .page16K)
+        XCTAssertEqual(buf16k.capacity, 16384)
+        
+        let buf64k = pool.borrowBuffer(size: .page64K)
+        XCTAssertEqual(buf64k.capacity, 65536)
+        
+        pool.returnBuffer(buf4k)
+        pool.returnBuffer(buf16k)
+        pool.returnBuffer(buf64k)
+    }
 }

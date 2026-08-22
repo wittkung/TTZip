@@ -106,7 +106,7 @@ public protocol TTZipEngineFacading: Sendable {
     func repairArchive(damagedPath: String, outputPath: String) async throws -> Int
     func recoverPassword(archivePath: String, dictionary: [String]) async throws -> PasswordRecoveryResult
     
-    // MARK: - 【3.4 命令模式 (Command Pattern)】命令与 Undo/Redo 控制
+    // MARK: - Command Pattern: Execution and Undo/Redo Control
     var historyManager: CommandHistoryManager { get }
     var canUndoCommand: Bool { get }
     var canRedoCommand: Bool { get }
@@ -116,7 +116,7 @@ public protocol TTZipEngineFacading: Sendable {
     func undoLastCommand() async throws -> CommandResult?
     func redoLastCommand() async throws -> CommandResult?
     
-    // MARK: - 【桥接模式 & 装饰器模式】Bridge Abstraction & Decorator Integration
+    // MARK: - Bridge Pattern & Decorator Pattern Integration
     func operationAbstraction(for format: ArchiveCompressionFormat) -> ArchiveOperationAbstraction
     func decoratedImplementor(for format: ArchiveCompressionFormat, password: String?, splitSize: Int64?, progressHandler: (@Sendable (ArchiveProgress) -> Void)?, enableChecksum: Bool, enableMetrics: Bool) -> ArchiveEngineImplementorProtocol
 }
@@ -190,7 +190,7 @@ extension TTZipEngineFacading {
         return CommandHistoryManager.shared
     }
     
-    /// 初始化底层引擎子系统（Rust 结构化日志分发等）
+    /// Initializes native microkernel subsystems (structured Rust logging bridge, etc.).
     public static func initializeSubsystems() {
         ttzip_rust_set_logger({ level, target, message, file, line, _ in
             guard let msg = message else { return }

@@ -7,7 +7,7 @@
 
 import Foundation
 
-// MARK: - 2. 快捷统一解压门面 (Extract Facade)
+// MARK: - Unified Extraction Facade
 
 extension TTZipEngineFacade {
     public func quickExtract(
@@ -56,7 +56,7 @@ extension TTZipEngineFacade {
                     isVaultUnlocked: false
                 )
             } catch {
-                // 无密码解压失败，进入密码库自动解锁
+                // Password-less extraction failed, try password vault auto-unlock
             }
         }
         
@@ -80,7 +80,7 @@ extension TTZipEngineFacade {
                         isVaultUnlocked: true
                     )
                 } catch {
-                    // 继续下个口令
+                    // Try next candidate password in vault
                 }
             }
         }

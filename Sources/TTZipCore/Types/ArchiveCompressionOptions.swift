@@ -80,7 +80,7 @@ public enum ArchiveCompressionLevel: Int, Sendable, CaseIterable, Identifiable, 
         self = ArchiveCompressionLevel(rawValue: clamped) ?? .level6
     }
     
-    /// 将通用压缩级别透明映射至底层 Deflate 引擎的原生物理等级
+    /// Maps the generic compression level transparently to the underlying Deflate engine native physical level.
     public var effectiveZipRawLevel: Int32 {
         switch self {
         case .fast5, .fast4, .fast3, .fast2, .fast1:

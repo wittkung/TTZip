@@ -173,16 +173,19 @@ public final class AppViewState: ObservableObject {
             RootFolderAccessManager.shared.ensureAccess(for: self.currentDirectory, promptIfMissing: true)
         }
         
-        NotificationCenter.default.addObserver(forName: NSNotification.Name("TTZipPerformUndoNotification"), object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in
+        NotificationCenter.default.publisher(for: NSNotification.Name("TTZipPerformUndoNotification"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
                 self?.performUndo()
             }
-        }
-        NotificationCenter.default.addObserver(forName: NSNotification.Name("TTZipPerformRedoNotification"), object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in
+            .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: NSNotification.Name("TTZipPerformRedoNotification"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
                 self?.performRedo()
             }
-        }
+            .store(in: &cancellables)
         
         updateUndoRedoState()
     }

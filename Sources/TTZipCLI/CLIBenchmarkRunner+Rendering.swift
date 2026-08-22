@@ -54,7 +54,7 @@ extension CLIBenchmarkRunner {
     // MARK: - In-Memory & Recommendation Benchmark Suite
 
     public static func runInMemoryBenchmark(options: CLIOptions) async {
-        // 1. 快速场景推荐分支 (--recommend)
+        // 1. Fast scenario recommendation branch (--recommend)
         if options.recommend {
             print("🧠 Running Smart Codec Scenario Selector (< 10ms micro-probe)...")
             let scStr = options.scenario ?? "balanced"

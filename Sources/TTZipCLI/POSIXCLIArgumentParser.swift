@@ -43,14 +43,14 @@ public enum POSIXCLIArgumentParser {
                 continue
             }
             
-            // 1. 处理 POSIX `--` 结束选项截断符
+            // 1. Process POSIX `--` end-of-options delimiter
             if token == "--" {
                 endOfOptionsReached = true
                 i += 1
                 continue
             }
             
-            // 2. 处理长选项 (--option 或 --option=value)
+            // 2. Process long options (--option or --option=value)
             if token.starts(with: "--") {
                 parseLongOption(
                     token: token,
@@ -63,7 +63,7 @@ public enum POSIXCLIArgumentParser {
                 continue
             }
             
-            // 3. 处理短选项与合并标志 (-h, -v, -q, -y, -vq, -f, -p pwd, -o dir, -x pat, -i pat, -j, -T file, -0, -P file, -n, -d N)
+            // 3. Process short options and bundled flags (-h, -v, -q, -y, -vq, -f, -p pwd, -o dir, etc.)
             if token.starts(with: "-") && token.count > 1 {
                 parseShortOptions(
                     token: token,
@@ -76,7 +76,7 @@ public enum POSIXCLIArgumentParser {
                 continue
             }
             
-            // 4. 处理位置参数
+            // 4. Process positional arguments
             if isFirstPositional {
                 let cmd = CLICommand(commandString: token)
                 if cmd != .unknown {

@@ -70,7 +70,40 @@ public final class ArchiveSelectiveExtractor: @unchecked Sendable {
             return cached
         }
         
-        // General Streaming Path: Extract single entry to ephemeral temp directory
+        // 1. Safe Rust Microkernel In-Memory Fast Path (7z archives)
+        let ext = (archivePath as NSString).pathExtension.lowercased()
+        if ext == "7z" || ext == "cb7" {
+            let maxBufSize = 32 * 1024 * 1024 // 32MB single entry in-memory window
+            var memBuffer = [UInt8](repeating: 0, count: maxBufSize)
+            var extractedLen: Int = 0
+            
+            let status = archivePath.withCString { cArch in
+                entryPath.withCString { cEntry in
+                    CUnsafeBufferAdapter.withCString(password) { cPwd in
+                        memBuffer.withUnsafeMutableBufferPointer { bPtr in
+                            guard let base = bPtr.baseAddress else { return TTZIP_STATUS_ERR_INVALID_PARAM }
+                            return ttzip_rust_7z_extract_entry_memory(
+                                cArch,
+                                cEntry,
+                                -1,
+                                cPwd,
+                                base,
+                                maxBufSize,
+                                &extractedLen
+                            )
+                        }
+                    }
+                }
+            }
+            
+            if status == TTZIP_STATUS_OK && extractedLen > 0 && extractedLen <= maxBufSize {
+                let data = Data(memBuffer.prefix(extractedLen))
+                VFSLz4CachePool.shared.cacheEntry(archivePath: archivePath, entryPath: entryPath, data: data)
+                return data
+            }
+        }
+        
+        // 2. General Streaming Path: Extract single entry to ephemeral temp directory
         let fm = FileManager.default
         let tempDir = fm.temporaryDirectory.appendingPathComponent("ttzip_preview_\(UUID().uuidString)").path
         defer { try? fm.removeItem(atPath: tempDir) }

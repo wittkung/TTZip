@@ -7,14 +7,14 @@
 
 import Foundation
 
-/// 归档操作类型分类
+/// Archive operation type classification.
 public enum ArchiveOperationType: String, Sendable, Equatable, CaseIterable {
-    case compress = "压缩"
-    case extract = "解压"
-    case repair = "修复"
-    case batch = "批处理"
-    case recover = "密码恢复"
-    case inspect = "探索"
+    case compress = "Compress"
+    case extract = "Extract"
+    case repair = "Repair"
+    case batch = "Batch"
+    case recover = "PasswordRecovery"
+    case inspect = "Inspect"
 }
 
 /// Real-time progress and telemetry metadata for archiving operations.
@@ -62,7 +62,7 @@ public struct ArchiveProgress: Sendable {
     public static let zero = ArchiveProgress()
 }
 
-/// 归档进度观察者传递的详细进度数据包
+/// Detailed progress data packet delivered to archive progress observers.
 public struct ArchiveProgressInfo: Sendable, Equatable {
     public let state: ArchiveProgress.State
     public let bytesProcessed: Int64
@@ -100,7 +100,7 @@ public struct ArchiveProgressInfo: Sendable, Equatable {
     }
 }
 
-/// 多文件/批处理任务观察者传递的进度数据包
+/// Progress data packet delivered to multi-file and batch task observers.
 public struct BatchProgressInfo: Sendable, Equatable {
     public let completedTasks: Int
     public let totalTasks: Int
@@ -138,7 +138,7 @@ public struct BatchProgressInfo: Sendable, Equatable {
     }
 }
 
-/// 归档进度观察者协议
+/// Archive progress observer protocol.
 public protocol ArchiveProgressObserverProtocol: AnyObject, Sendable {
     func onProgressUpdated(_ progress: ArchiveProgressInfo)
     func onBatchProgressUpdated(_ progress: BatchProgressInfo)
@@ -149,7 +149,7 @@ extension ArchiveProgressObserverProtocol {
     public func onBatchProgressUpdated(_ progress: BatchProgressInfo) {}
 }
 
-/// 系统全局事件类型
+/// System-wide global archive event type.
 public enum ArchiveEventType: String, Sendable, Equatable, Hashable, CaseIterable {
     case archiveCompleted
     case extractionFailed
@@ -159,7 +159,7 @@ public enum ArchiveEventType: String, Sendable, Equatable, Hashable, CaseIterabl
     case taskStateChanged
 }
 
-/// 系统全局事件载荷数据
+/// System-wide global archive event payload data.
 public enum ArchiveEvent: Sendable, Equatable {
     case archiveCompleted(archivePath: String, operationType: ArchiveOperationType, duration: TimeInterval, totalBytes: Int64)
     case extractionFailed(archivePath: String, error: String)
@@ -190,7 +190,7 @@ public enum ArchiveEvent: Sendable, Equatable {
     }
 }
 
-/// 系统全局事件观察者协议
+/// System-wide global archive event observer protocol.
 public protocol ArchiveEventObserverProtocol: AnyObject, Sendable {
     func onArchiveEvent(_ event: ArchiveEvent)
 }

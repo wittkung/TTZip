@@ -9,7 +9,7 @@ import Foundation
 import TTZipCore
 
 extension ShellCompletionGenerator {
-    /// 生成 Zsh `_arguments` 自动补全脚本
+    /// Generates Zsh `_arguments` auto-completion script.
     public static func generateZsh(binaryName: String = "ttzip-cli", includeAliases: Bool = true) -> String {
         var out = "#compdef \(binaryName)\n\n"
         out += "# Zsh completion script for \(binaryName)\n"

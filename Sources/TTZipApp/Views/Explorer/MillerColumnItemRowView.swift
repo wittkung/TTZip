@@ -49,7 +49,7 @@ public struct MillerColumnItemRowView: View {
     }
     
     private var isEncryptedLockItem: Bool {
-        item.kindText == "受密码保护的归档包" || item.name.contains("压缩包已被加密")
+        item.kindText == "Password-Protected Archive" || item.kindText == "受密码保护的归档包" || item.name.contains("Encrypted Archive") || item.name.contains("压缩包已被加密")
     }
     
     private var iconName: String {

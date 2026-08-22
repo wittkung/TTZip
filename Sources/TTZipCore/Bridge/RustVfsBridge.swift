@@ -13,38 +13,34 @@ public enum RustVfsBridge {
     
     /// Builds a native VFS tree handle from flat ArchiveEntry list.
     public static func withTreeHandle<R>(entries: [ArchiveEntry], rootName: String = "", block: (OpaquePointer) throws -> R) rethrows -> R? {
-        var rawEntries: [TTZipEntryMetadata] = []
-        rawEntries.reserveCapacity(entries.count)
-        
-        var cStrings: [ContiguousArray<CChar>] = []
-        cStrings.reserveCapacity(entries.count)
-        
-        for entry in entries {
-            let cstr = entry.path.utf8CString
-            cStrings.append(cstr)
-        }
-        
-        for (i, entry) in entries.enumerated() {
-            cStrings[i].withUnsafeBufferPointer { ptr in
-                let mtime = entry.modificationDate.map { Int64($0.timeIntervalSince1970) } ?? 0
-                rawEntries.append(TTZipEntryMetadata(
-                    path: ptr.baseAddress,
-                    uncompressed_size: UInt64(max(0, entry.uncompressedSize)),
-                    compressed_size: 0,
-                    crc32: 0,
-                    mtime_epoch_secs: mtime,
-                    mode: entry.isDirectory ? 0o755 : 0o644,
-                    is_directory: entry.isDirectory,
-                    is_encrypted: entry.isEncrypted,
-                    compression_method: 0
-                ))
+        let cPathPointers: [UnsafeMutablePointer<CChar>?] = entries.map { strdup($0.path) }
+        defer {
+            for ptr in cPathPointers {
+                if let ptr = ptr { free(ptr) }
             }
         }
         
-        let rootCStr = rootName.utf8CString
-        let handle: OpaquePointer? = rootCStr.withUnsafeBufferPointer { rPtr in
+        var rawEntries: [TTZipEntryMetadata] = []
+        rawEntries.reserveCapacity(entries.count)
+        
+        for (i, entry) in entries.enumerated() {
+            let mtime = entry.modificationDate.map { Int64($0.timeIntervalSince1970) } ?? 0
+            rawEntries.append(TTZipEntryMetadata(
+                path: cPathPointers[i].map { UnsafePointer($0) },
+                uncompressed_size: UInt64(max(0, entry.uncompressedSize)),
+                compressed_size: 0,
+                crc32: 0,
+                mtime_epoch_secs: mtime,
+                mode: entry.isDirectory ? 0o755 : 0o644,
+                is_directory: entry.isDirectory,
+                is_encrypted: entry.isEncrypted,
+                compression_method: 0
+            ))
+        }
+        
+        let handle: OpaquePointer? = rootName.withCString { rPtr in
             rawEntries.withUnsafeBufferPointer { ePtr in
-                ttzip_rust_vfs_tree_build(ePtr.baseAddress, ePtr.count, rPtr.baseAddress)
+                ttzip_rust_vfs_tree_build(ePtr.baseAddress, ePtr.count, rPtr)
             }
         }
         

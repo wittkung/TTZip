@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// 智能场景推荐方案
+/// Smart compression codec recommendation profile.
 public struct ScenarioRecommendation: Codable, Sendable, Equatable {
     public let scenario: String
     public let measuredEntropy: Double

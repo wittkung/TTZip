@@ -8,7 +8,7 @@
 import Foundation
 import TTZipCore
 
-/// 声明式命令行选项规范模型
+/// Declarative command line option specification model.
 public struct CLIOptionSpec: Sendable {
     public let shortName: String?
     public let longName: String
@@ -37,7 +37,7 @@ public struct CLIOptionSpec: Sendable {
     }
 }
 
-/// 声明式命令行子命令规范模型
+/// Declarative command line subcommand specification model.
 public struct CLICommandMetadata: Sendable {
     public let name: String
     public let aliases: [String]
@@ -54,7 +54,7 @@ public struct CLICommandMetadata: Sendable {
     }
 }
 
-/// 声明式命令元数据与 Shell 自动补全 / Man Page 规范定义
+/// Declarative command metadata, shell autocompletion, and man page specification provider.
 public enum CLICommandSpec {
     
     public static let globalOptions: [CLIOptionSpec] = [

@@ -8,7 +8,7 @@
 import Foundation
 import CTTZipBridge
 
-/// 平台硬件热状态异步协调器与 DVFS 防抖调度器 (Swift 6 Isolated Actor)
+/// Platform hardware thermal state coordinator and DVFS debounce scheduler (Swift 6 Isolated Actor).
 public actor HardwareThermalCoordinator {
     public static let shared = HardwareThermalCoordinator()
     private init() {}
@@ -20,7 +20,7 @@ public actor HardwareThermalCoordinator {
         return ProcessInfo.processInfo.thermalState
     }
 
-    /// 启动后台热状态监听 (基于 AsyncSequence 零线程阻塞)
+    /// Starts background thermal state observer (non-blocking AsyncSequence stream).
     public func startMonitoring() {
         guard !isMonitoring else { return }
         isMonitoring = true
@@ -37,7 +37,7 @@ public actor HardwareThermalCoordinator {
         }
     }
 
-    /// 停止监听
+    /// Stops thermal state monitoring.
     public func stopMonitoring() {
         isMonitoring = false
         monitorTask?.cancel()
@@ -45,12 +45,12 @@ public actor HardwareThermalCoordinator {
     }
 
     private func handleThermalStateChange(_ state: ProcessInfo.ThermalState) {
-        // 内部状态同步
+        // Internal state synchronization hook
     }
 
-    /// 执行自适应硬件冷却等待 (如果热压力过高)
-    /// - Parameter maxWaitSeconds: 最大等待超时上限
-    /// - Returns: 是否触发了冷却暂停
+    /// Performs adaptive hardware cooldown wait if thermal throttling pressure is high.
+    /// - Parameter maxWaitSeconds: Maximum cooldown timeout limit in seconds.
+    /// - Returns: Boolean indicating whether cooldown pause was triggered.
     @discardableResult
     public func performAdaptiveCooldownIfNeeded(maxWaitSeconds: Double = 30.0) async -> Bool {
         let state = ProcessInfo.processInfo.thermalState
@@ -61,16 +61,16 @@ public actor HardwareThermalCoordinator {
         let startNanos = PlatformMonotonicTimer.nowNanoseconds()
         let maxWaitNanos = UInt64(maxWaitSeconds * 1_000_000_000)
 
-        // 循环检测直到恢复到 .nominal 或超时
+        // Poll until thermal state recovers to .nominal or timeout expires
         while ProcessInfo.processInfo.thermalState != .nominal {
             let elapsed = PlatformMonotonicTimer.nowNanoseconds() - startNanos
             if elapsed >= maxWaitNanos {
                 break
             }
-            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms 探测一次
+            try? await Task.sleep(nanoseconds: 500_000_000) // Poll every 500ms
         }
 
-        // 恢复到 nominal 后，追加 1.5 秒尾部稳定延迟让 DVFS 稳频
+        // Additional 1.5s post-nominal stabilization delay for DVFS frequency settling
         try? await Task.sleep(nanoseconds: 1_500_000_000)
         return true
     }

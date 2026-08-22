@@ -7,7 +7,7 @@
 
 import Foundation
 
-// MARK: - 1. 快捷统一压缩门面 (Compress Facade)
+// MARK: - Unified Compression Facade
 
 extension TTZipEngineFacade {
     public func quickCompress(

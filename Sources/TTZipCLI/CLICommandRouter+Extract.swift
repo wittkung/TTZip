@@ -31,7 +31,7 @@ extension CLICommandRouter {
             archiveName: archivePath
         )
         
-        // 直通 stdout 流式解压模式
+        // Direct stdout streaming extraction mode
         if options.toStdout || destDir == "-" || options.outputPath == "-" {
             return await handleCatArchive(archivePath: archivePath, entryPath: nil, options: options)
         }

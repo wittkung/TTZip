@@ -17,7 +17,7 @@ public final class ExplorerLRUCache<Key: Hashable & Sendable, Value: Sendable>: 
     private final class Node {
         let key: Key
         var value: Value
-        var prev: Node?
+        weak var prev: Node?
         var next: Node?
         
         init(key: Key, value: Value) {
@@ -84,6 +84,14 @@ public final class ExplorerLRUCache<Key: Hashable & Sendable, Value: Sendable>: 
     public func removeAll() {
         os_unfair_lock_lock(&lock)
         defer { os_unfair_lock_unlock(&lock) }
+        
+        var current = head
+        while let node = current {
+            let next = node.next
+            node.prev = nil
+            node.next = nil
+            current = next
+        }
         
         map.removeAll(keepingCapacity: true)
         head = nil

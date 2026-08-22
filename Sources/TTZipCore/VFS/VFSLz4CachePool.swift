@@ -170,13 +170,13 @@ public final class VFSLz4CachePool: @unchecked Sendable {
     
     /// Stores entry preview/payload data in VFS session cache.
     public func cacheEntry(archivePath: String, entryPath: String, data: Data) {
-        let chunkIdx = abs(entryPath.hashValue)
+        let chunkIdx = Int(truncatingIfNeeded: UInt64(bitPattern: Int64(entryPath.hashValue)) & 0x7FFF_FFFF_FFFF_FFFF)
         put(sessionId: archivePath, chunkIndex: chunkIdx, rawData: data)
     }
     
     /// Retrieves cached entry preview/payload data from VFS session cache.
     public func getCachedEntry(archivePath: String, entryPath: String) -> Data? {
-        let chunkIdx = abs(entryPath.hashValue)
+        let chunkIdx = Int(truncatingIfNeeded: UInt64(bitPattern: Int64(entryPath.hashValue)) & 0x7FFF_FFFF_FFFF_FFFF)
         return get(sessionId: archivePath, chunkIndex: chunkIdx)
     }
     

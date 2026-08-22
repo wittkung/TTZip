@@ -8,8 +8,9 @@
 import Foundation
 import CTTZipBridge
 
-/// 【2.5 外观模式 (Facade Pattern)】主归档统一门面中心 (`TTZipEngineFacade`)
-/// 为解压/打包引擎、密码库、哈希校验、解压预览、安全扫描、分卷切片与修复恢复提供极简单 API 高层接口
+/// Facade Pattern: Unified primary archive orchestration facade center (`TTZipEngineFacade`).
+/// Provides streamlined high-level APIs for compression, extraction, password vault, integrity verification,
+/// preview generation, security scanning, split-volume management, and archive self-healing repair.
 public final class TTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
     public static let shared = TTZipEngineFacade()
     
@@ -59,7 +60,7 @@ public final class TTZipEngineFacade: TTZipEngineFacading, @unchecked Sendable {
         self.splitEngine = splitEngine
     }
     
-    // MARK: - 命令模式便捷包装方法
+    // MARK: - Command Pattern Convenience Wrappers
     
     public func compressWithCommand(
         inputs: [String],

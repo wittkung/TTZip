@@ -7,7 +7,7 @@
 
 import Foundation
 
-// MARK: - 3. 快捷归档检测与结构探测门面 (Inspect Facade)
+// MARK: - Unified Archive Inspection & Structure Probing Facade
 
 extension TTZipEngineFacade {
     public func inspectArchive(
@@ -36,7 +36,7 @@ extension TTZipEngineFacade {
                 unlockedPassword: explicitPwd
             )
         } catch ArchiveError.passwordRequired {
-            // 继续密码库解锁逻辑
+            // Fall through to password vault auto-unlock
         } catch {
             if explicitPwd != nil && explicitPwd?.isEmpty == false {
                 throw error
@@ -65,7 +65,7 @@ extension TTZipEngineFacade {
         throw ArchiveError.passwordRequired
     }
     
-    // MARK: - 4. 辅助高阶功能门面 (Integrity, Repair & Password Recovery Facade)
+    // MARK: - Auxiliary High-Level Facade (Integrity, Repair & Password Recovery)
     
     public func verifyIntegrity(archivePath: String) async throws -> HashVerificationResult {
         let crc = integrityChecker.computeCRC32(filePath: archivePath)
